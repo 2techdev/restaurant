@@ -1,0 +1,96 @@
+name: gastrocore_pos
+description: "GastroCore - Restaurant POS System"
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Database - Drift ORM (SQLite)
+  drift: ^2.22.1
+  sqlite3_flutter_libs: ^0.5.28
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Networking (sync)
+  connectivity_plus: ^6.1.4
+  http: ^1.3.0
+  web_socket_channel: ^3.0.2
+
+  # Navigation
+  go_router: ^14.8.1
+
+  # Dependency Injection
+  get_it: ^8.0.3
+
+  # UUID generation
+  uuid: ^4.5.1
+
+  # Crypto (PIN hashing + Ed25519 license verification)
+  crypto: ^3.0.6
+  pointycastle: ^3.9.1
+
+  # Date/Time
+  intl: ^0.20.2
+
+  # Icons
+  cupertino_icons: ^1.0.8
+
+  # Persistent key-value storage (used by WalleePaymentProvider for trxSyncNumber)
+  shared_preferences: ^2.3.2
+
+  # Runtime permission requests (camera, bluetooth, storage)
+  permission_handler: ^11.3.1
+
+  # Charts
+  fl_chart: ^0.69.0
+
+  # Collection utilities
+  collection: ^1.19.1
+
+  # Equatable for value objects
+  equatable: ^2.0.7
+
+  # Freezed annotations
+  freezed_annotation: ^3.0.0
+  json_annotation: ^4.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+  # Code generation
+  drift_dev: ^2.22.1
+  build_runner: ^2.4.14
+  riverpod_generator: ^2.6.3
+  freezed: ^3.0.2
+  json_serializable: ^6.9.4
+
+flutter:
+  generate: true
+  uses-material-design: true
+
+  assets:
+    - assets/images/products/starter.svg
+    - assets/images/products/main_course.svg
+    - assets/images/products/pizza.svg
+    - assets/images/products/dessert.svg
+    - assets/images/products/beverage.svg
+    - assets/images/staff/max_mueller.svg
+    - assets/images/staff/sarah_weber.svg
+    - assets/images/staff/luca_bernasconi.svg
+    - assets/images/staff/anna_fischer.svg
+    - assets/images/staff/mehmet_yilmaz.svg

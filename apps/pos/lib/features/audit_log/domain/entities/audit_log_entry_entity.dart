@@ -1,0 +1,40 @@
+import 'audit_action.dart';
+
+/// Immutable domain representation of a single audit log entry.
+class AuditLogEntryEntity {
+  const AuditLogEntryEntity({
+    required this.id,
+    required this.tenantId,
+    required this.deviceId,
+    required this.userId,
+    required this.userName,
+    required this.action,
+    required this.entityType,
+    required this.entityId,
+    required this.timestamp,
+    this.branchId,
+    this.oldValueJson,
+    this.newValueJson,
+    this.reason,
+    this.ipAddress,
+  });
+
+  final String id;
+  final String tenantId;
+  final String? branchId;
+  final String deviceId;
+  final String userId;
+  final String userName;
+  final AuditAction action;
+  final String entityType;
+  final String entityId;
+  final String? oldValueJson;
+  final String? newValueJson;
+  final String? reason;
+  final String? ipAddress;
+  final DateTime timestamp;
+
+  @override
+  String toString() =>
+      'AuditLogEntry(action: ${action.name}, entity: $entityType/$entityId, user: $userName)';
+}

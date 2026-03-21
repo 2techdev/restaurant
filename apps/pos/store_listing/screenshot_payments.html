@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GastroCore – Payment Screen</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #1a1a2e;
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    color: #fff;
+  }
+  .topbar {
+    background: #16213e;
+    padding: 18px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #0f3460;
+  }
+  .logo { font-size: 26px; font-weight: 700; color: #e94560; }
+  .section-title { font-size: 20px; font-weight: 600; }
+  .back-btn {
+    background: #0f3460;
+    color: #a0c4ff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .main { display: flex; height: calc(1920px - 76px); }
+
+  /* Left: order summary */
+  .summary-panel {
+    width: 360px;
+    background: #0f1b35;
+    border-right: 2px solid #0f3460;
+    display: flex;
+    flex-direction: column;
+  }
+  .summary-header {
+    padding: 20px 24px 14px;
+    border-bottom: 1px solid #0f3460;
+  }
+  .summary-title { font-size: 18px; font-weight: 700; }
+  .table-badge {
+    display: inline-block;
+    background: #e94560;
+    color: #fff;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+  .summary-items { flex: 1; padding: 14px 24px; overflow: hidden; }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #0f3460;
+    font-size: 14px;
+  }
+  .summary-row:last-child { border: none; }
+  .s-name { color: #c0c0d0; }
+  .s-qty { color: #708090; }
+  .s-price { color: #fff; font-weight: 600; }
+  .summary-totals {
+    padding: 16px 24px;
+    border-top: 1px solid #0f3460;
+    background: #0a1428;
+  }
+  .tot-row { display: flex; justify-content: space-between; font-size: 14px; padding: 5px 0; color: #a0a0b0; }
+  .tot-row.grand { font-size: 24px; font-weight: 700; color: #fff; padding-top: 12px; border-top: 1px solid #0f3460; margin-top: 6px; }
+  .vat-detail { font-size: 11px; color: #506070; margin-top: 6px; line-height: 1.6; }
+
+  /* Right: payment methods */
+  .payment-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    gap: 20px;
+    overflow: hidden;
+  }
+  .pay-section-title { font-size: 18px; font-weight: 600; color: #e0e0e0; margin-bottom: 4px; }
+
+  .method-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .method-card {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 24px 20px;
+    text-align: center;
+    cursor: pointer;
+    border: 2px solid #0f3460;
+    transition: border-color 0.2s;
+  }
+  .method-card.active { border-color: #e94560; background: #2d0a12; }
+  .method-card:hover { border-color: #e94560; }
+  .method-icon { font-size: 42px; margin-bottom: 10px; }
+  .method-name { font-size: 16px; font-weight: 700; color: #fff; }
+  .method-sub { font-size: 12px; color: #708090; margin-top: 4px; }
+
+  /* Selected: card payment detail */
+  .card-detail {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 22px;
+    border: 2px solid #e94560;
+  }
+  .card-detail-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: #e94560; }
+  .terminal-box {
+    background: #0f1b35;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid #0f3460;
+    margin-bottom: 16px;
+  }
+  .terminal-icon { font-size: 48px; margin-bottom: 10px; }
+  .terminal-msg { font-size: 16px; font-weight: 600; color: #2ecc71; }
+  .terminal-sub { font-size: 13px; color: #708090; margin-top: 6px; }
+  .terminal-amount { font-size: 28px; font-weight: 700; color: #fff; margin-top: 12px; }
+
+  .provider-badges { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .provider-badge {
+    background: #0f3460;
+    color: #a0c4ff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .provider-badge.active { background: #e94560; color: #fff; }
+
+  /* Cash calculation */
+  .cash-calc {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 22px;
+    border: 1px solid #0f3460;
+  }
+  .calc-row { display: flex; justify-content: space-between; font-size: 16px; padding: 8px 0; border-bottom: 1px solid #0f3460; }
+  .calc-row:last-child { border: none; }
+  .calc-label { color: #a0a0b0; }
+  .calc-val { font-weight: 700; }
+  .calc-val.green { color: #2ecc71; }
+  .calc-val.red { color: #e94560; }
+
+  /* TWINT section */
+  .twint-box {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 22px;
+    border: 1px solid #0f3460;
+    text-align: center;
+  }
+  .twint-logo {
+    font-size: 22px;
+    font-weight: 900;
+    color: #fff;
+    background: #0033cc;
+    display: inline-block;
+    padding: 10px 24px;
+    border-radius: 10px;
+    margin-bottom: 14px;
+    letter-spacing: 3px;
+  }
+  .qr-placeholder {
+    width: 140px;
+    height: 140px;
+    margin: 0 auto 14px;
+    background: #fff;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .confirm-btn {
+    background: #2ecc71;
+    color: #000;
+    border: none;
+    border-radius: 14px;
+    padding: 20px;
+    font-size: 20px;
+    font-weight: 700;
+    width: 100%;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  .split-btn {
+    background: #0f3460;
+    color: #a0c4ff;
+    border: none;
+    border-radius: 14px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    width: 100%;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="back-btn">← Zurück</button>
+  <div class="section-title">Zahlung</div>
+  <div class="logo">GastroCore</div>
+</div>
+<div class="main">
+  <!-- Order summary -->
+  <div class="summary-panel">
+    <div class="summary-header">
+      <div class="summary-title">Bestellung</div>
+      <div class="table-badge">Tisch 7</div>
+    </div>
+    <div class="summary-items">
+      <div class="summary-row"><span class="s-name">Gemischter Salat</span><span class="s-qty">×2</span><span class="s-price">CHF 25.00</span></div>
+      <div class="summary-row"><span class="s-name">Tagessuppe</span><span class="s-qty">×1</span><span class="s-price">CHF 9.00</span></div>
+      <div class="summary-row"><span class="s-name">Mineralwasser 0.5L</span><span class="s-qty">×3</span><span class="s-price">CHF 11.40</span></div>
+      <div class="summary-row"><span class="s-name">Hauswein dl</span><span class="s-qty">×2</span><span class="s-price">CHF 16.00</span></div>
+      <div class="summary-row"><span class="s-name">Chicken Wings</span><span class="s-qty">×1</span><span class="s-price">CHF 15.50</span></div>
+    </div>
+    <div class="summary-totals">
+      <div class="tot-row"><span>Subtotal</span><span>CHF 76.90</span></div>
+      <div class="tot-row"><span>Rabatt</span><span>–</span></div>
+      <div class="tot-row grand"><span>Total</span><span>CHF 76.90</span></div>
+      <div class="vat-detail">
+        inkl. MWST 8.1% → CHF 4.57<br>
+        inkl. MWST 2.6% → CHF 0.72<br>
+        Gesamt MWST: CHF 5.29
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment methods -->
+  <div class="payment-panel">
+    <div>
+      <div class="pay-section-title">Zahlungsmethode wählen</div>
+    </div>
+    <div class="method-grid">
+      <div class="method-card">
+        <div class="method-icon">💵</div>
+        <div class="method-name">Bargeld</div>
+        <div class="method-sub">Wechselgeld berechnen</div>
+      </div>
+      <div class="method-card active">
+        <div class="method-icon">💳</div>
+        <div class="method-name">Kartenzahlung</div>
+        <div class="method-sub">Wallee · MyPOS</div>
+      </div>
+      <div class="method-card">
+        <div class="method-icon">📱</div>
+        <div class="method-name">TWINT</div>
+        <div class="method-sub">QR-Code scannen</div>
+      </div>
+      <div class="method-card">
+        <div class="method-icon">🔀</div>
+        <div class="method-name">Splitten</div>
+        <div class="method-sub">Rechnung teilen</div>
+      </div>
+    </div>
+
+    <!-- Card terminal active -->
+    <div class="card-detail">
+      <div class="card-detail-title">Kartenzahlung — Terminal aktiv</div>
+      <div class="terminal-box">
+        <div class="terminal-icon">💳</div>
+        <div class="terminal-msg">Karte bitte auflegen oder einstecken</div>
+        <div class="terminal-sub">Wallee Terminal · SN: WT-20847</div>
+        <div class="terminal-amount">CHF 76.90</div>
+      </div>
+      <div class="provider-badges">
+        <div class="provider-badge active">Wallee</div>
+        <div class="provider-badge">MyPOS</div>
+        <div class="provider-badge">Visa</div>
+        <div class="provider-badge">Mastercard</div>
+        <div class="provider-badge">AMEX</div>
+      </div>
+    </div>
+
+    <!-- Cash quick calc -->
+    <div class="cash-calc">
+      <div class="calc-row"><span class="calc-label">Zu zahlen</span><span class="calc-val">CHF 76.90</span></div>
+      <div class="calc-row"><span class="calc-label">Gegeben</span><span class="calc-val">CHF 100.00</span></div>
+      <div class="calc-row"><span class="calc-label">Rückgeld</span><span class="calc-val green">CHF 23.10</span></div>
+    </div>
+
+    <button class="confirm-btn">✓ ZAHLUNG BESTÄTIGEN</button>
+    <button class="split-btn">Rechnung aufteilen</button>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GastroCore | Secure Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-secondary-fixed": "#002107",
+              "secondary-fixed": "#72fe88",
+              "error": "#ffb4ab",
+              "surface-container-lowest": "#0c0e14",
+              "secondary-fixed-dim": "#53e16f",
+              "surface-bright": "#373940",
+              "on-tertiary-fixed-variant": "#7201a2",
+              "primary-container": "#528dff",
+              "tertiary": "#e8b3ff",
+              "secondary": "#53e16f",
+              "on-error-container": "#ffdad6",
+              "on-background": "#e2e2eb",
+              "surface-dim": "#111319",
+              "surface-container-highest": "#33343b",
+              "on-surface-variant": "#c2c6d6",
+              "primary-fixed": "#d9e2ff",
+              "on-tertiary": "#510074",
+              "on-secondary-container": "#003a11",
+              "on-secondary": "#003911",
+              "on-primary-fixed": "#001a43",
+              "surface-container-low": "#191b22",
+              "primary": "#afc6ff",
+              "inverse-on-surface": "#2e3037",
+              "on-surface": "#e2e2eb",
+              "outline-variant": "#424753",
+              "inverse-primary": "#0059c6",
+              "primary-fixed-dim": "#afc6ff",
+              "outline": "#8c909f",
+              "tertiary-fixed": "#f6d9ff",
+              "surface-tint": "#afc6ff",
+              "on-primary-fixed-variant": "#004398",
+              "on-tertiary-container": "#460066",
+              "tertiary-fixed-dim": "#e8b3ff",
+              "on-error": "#690005",
+              "surface-variant": "#33343b",
+              "surface-container-high": "#282a30",
+              "on-secondary-fixed-variant": "#00531c",
+              "on-primary-container": "#00275f",
+              "tertiary-container": "#c567f4",
+              "inverse-surface": "#e2e2eb",
+              "background": "#111319",
+              "on-tertiary-fixed": "#310048",
+              "on-primary": "#002d6c",
+              "surface-container": "#1e1f26",
+              "surface": "#111319",
+              "secondary-container": "#05b046",
+              "error-container": "#93000a"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #0f1117;
+            font-family: 'Inter', sans-serif;
+        }
+        .pin-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+        .keypad-btn:active {
+            transform: scale(0.95);
+            background-color: #afc6ff !important;
+            color: #00275f !important;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen text-on-surface select-none overflow-hidden">
+<!-- Status Bar / Offline Indicator -->
+<div class="fixed top-0 right-0 p-8 flex items-center gap-3 z-50">
+<div class="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-full shadow-sm">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="cloud_done">cloud_done</span>
+<span class="text-label-sm font-semibold tracking-wide text-on-surface-variant uppercase">Local Sync Active</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-full shadow-sm">
+<span class="material-symbols-outlined text-outline text-sm" data-icon="wifi_off">wifi_off</span>
+<span class="text-label-sm font-semibold tracking-wide text-on-surface-variant uppercase text-xs">Offline Mode</span>
+</div>
+</div>
+<!-- Main Content Container -->
+<main class="flex-1 flex flex-col items-center justify-center max-w-[1280px] mx-auto w-full px-12">
+<!-- Brand Header -->
+<header class="mb-16 text-center">
+<h1 class="text-5xl font-black italic tracking-tighter">
+<span class="text-on-surface">Gastro</span><span class="text-[#4f8cff]">Core</span>
+</h1>
+<p class="mt-4 text-on-surface-variant font-medium tracking-tight opacity-60">STATION 01 • MAIN FLOOR • LUNCH SHIFT</p>
+</header>
+<div class="grid grid-cols-12 gap-16 w-full items-start">
+<!-- Left Side: User Selection -->
+<div class="col-span-12 lg:col-span-6 flex flex-col items-center justify-center">
+<div class="w-full">
+<h2 class="text-on-surface-variant font-bold text-xs uppercase tracking-[0.2em] mb-8 text-center">Select Team Member</h2>
+<div class="grid grid-cols-3 gap-6">
+<!-- User Card 1 (Active/Selected) -->
+<div class="flex flex-col items-center group cursor-pointer">
+<div class="relative w-32 h-32 mb-4">
+<div class="absolute inset-0 bg-[#4f8cff] rounded-3xl rotate-6 group-hover:rotate-12 transition-transform"></div>
+<img alt="Manager Avatar" class="relative w-32 h-32 rounded-3xl object-cover ring-4 ring-[#4f8cff]" data-alt="Professional man in a suit smiling" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvrDzPwpWb_9C6-jFzPLOXQdzoLUwmbhikHGu6DfCpg_WqUbjUWmZKetnoGEMSK3FR3zVunQlxoVZaYndoArGkEXzzkjbMezb22c9lSjdliYXIB1etS5I82vdfTFxbKCyxcpNE3DZH2OJLGPA9GPBewN7vcn5dV3ej05hqRCgyc-ZAtM1EfuV5BA_pY5rV5DnTeAcBo3OiE7b8fj4TyTjGFruxaujJzh1nX674sw8T7xer3jn00gILS_dw1H2cd5kCRGlErI33AB5h"/>
+</div>
+<span class="font-bold text-on-surface text-lg">Marcus V.</span>
+<span class="text-xs font-semibold text-[#4f8cff] uppercase tracking-wider">Manager</span>
+</div>
+<!-- User Card 2 -->
+<div class="flex flex-col items-center group cursor-pointer opacity-40 hover:opacity-100 transition-opacity">
+<div class="relative w-32 h-32 mb-4">
+<div class="absolute inset-0 bg-surface-container-highest rounded-3xl group-hover:rotate-6 transition-transform"></div>
+<img alt="Staff Avatar" class="relative w-32 h-32 rounded-3xl object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Professional woman in business attire" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCaSkX04HCOct8LEmHT7kivkmtUQkWj8s5PzcU78VMRigvC9bQB0u_Q6yRWtMbYNDZgcIryAgaNH9GN9zATTodPeHJPoNtR5FwBrrrmYkXvInPkvC17_qxNA0FFPYg7z_qSmkQgH5j_TEWTadd88JXMFKlBaGcJru6uWNFSsnQXdsYbslBTA0ZNuIasLohVub7K0qLyihs8Z-WqKHAy3F-XqQpmyQSWAsXmsXhsp_7sKxdbn0kFaDcSJNKdgoxdLt4STRlUNd3rFZUn"/>
+</div>
+<span class="font-bold text-on-surface text-lg">Elena R.</span>
+<span class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Floor Lead</span>
+</div>
+<!-- User Card 3 -->
+<div class="flex flex-col items-center group cursor-pointer opacity-40 hover:opacity-100 transition-opacity">
+<div class="relative w-32 h-32 mb-4">
+<div class="absolute inset-0 bg-surface-container-highest rounded-3xl group-hover:rotate-6 transition-transform"></div>
+<img alt="Staff Avatar" class="relative w-32 h-32 rounded-3xl object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Young man with professional hairstyle" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyrkV2ITAJx6vlrEMreuxiZ5FErd1NebK4OXzBj_rlpeB3g4XTdz1_SByTJ0KagYDrZvNvHqCwepFrXBJkxZGbkCdYjkYa3RK1U0Q_HFGovzXTUSdjjionCYIXj4C0rk0bXUYoyIPiCX3L6ycT3BY_UHG_9RZuXBCb_NDHyMz_wLFowgnve8WX-b7o3lx6tdV-w7ZRCK5HMAqQhwYVM7FU__w_0EgVWzlhDSm7EdCFr1E4EpAU79KYQa-Hz-oc-dBKaEWi8FFeh4pc"/>
+</div>
+<span class="font-bold text-on-surface text-lg">Julian K.</span>
+<span class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Service</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Side: PIN Entry & Keypad -->
+<div class="col-span-12 lg:col-span-6 flex flex-col items-center">
+<!-- PIN Indicators -->
+<div class="flex gap-5 mb-12">
+<div class="pin-dot bg-[#4f8cff] shadow-[0_0_12px_#4f8cff]"></div>
+<div class="pin-dot bg-[#4f8cff] shadow-[0_0_12px_#4f8cff]"></div>
+<div class="pin-dot bg-surface-container-highest"></div>
+<div class="pin-dot bg-surface-container-highest"></div>
+<div class="pin-dot bg-surface-container-highest"></div>
+</div>
+<!-- 3x4 Numeric Keypad -->
+<div class="grid grid-cols-3 gap-4 w-full max-w-[400px]">
+<!-- Row 1 -->
+<button class="keypad-btn h-20 bg-surface-container-high rounded-2xl flex items-center justify-center text-3xl font-extrabold text-on-surface transition-all">1</button>
+<button class="keypad-btn h-20 bg-surface-container-high rounded-2xl flex items-center justify-center text-3xl font-extrabold text-on-surface transition-all">2</button>
+<button class="keypad-btn h-20 bg-surface-container-high rounded-2xl flex items-center justify-center text-3xl font-extrabold text-on-surface transition-all">3</button>
+<!-- Row 2 -->
+<button class="keypad-btn h-20 bg-surface-container-high rounded-2xl flex items-center justify-center text-3xl font-extrabold text-on-surface transition-all">4</button>
+<button class="keypad-btn h-20 bg-surface-container-high rounded-2xl flex items-center justify-center text-3xl font-extrabold text-on-surface transition-all">5</button>
+<button class="keypad-btn h-20 bg-surface-container-high rounded-2xl flex items-center justify-center text-3xl font-extrabold text-on-surface transition-all">6</button>
+<!-- Row 3 -->
+<button class="keypad-btn h-20 bg-surface-container-high rounded-2xl flex items-center justify-center text-3xl font-extrabold text-on-surface transition-all">7</button>
+<button class="keypad-btn h-20 bg-surface-container-high rounded-2xl flex items-center justify-center text-3xl font-extrabold text-on-surface transition-all">8</button>
+<button class="keypad-btn h-20 bg-surface-container-high rounded-2xl flex items-center justify-center text-3xl font-extrabold text-on-surface transition-all">9</button>
+<!-- Row 4 -->
+<button class="keypad-btn h-20 bg-surface-container-highest/30 rounded-2xl flex items-center justify-center text-on-surface-variant transition-all">
+<span class="material-symbols-outlined text-3xl" data-icon="backspace">backspace</span>
+</button>
+<button class="keypad-btn h-20 bg-surface-container-high rounded-2xl flex items-center justify-center text-3xl font-extrabold text-on-surface transition-all">0</button>
+<button class="keypad-btn h-20 bg-gradient-to-br from-[#4f8cff] to-[#528dff] rounded-2xl flex items-center justify-center text-on-primary-container transition-all">
+<span class="material-symbols-outlined text-4xl" data-icon="login" style="font-variation-settings: 'FILL' 1;">login</span>
+</button>
+</div>
+<div class="mt-8">
+<button class="flex items-center gap-2 text-on-surface-variant hover:text-on-surface transition-colors py-2 px-4">
+<span class="material-symbols-outlined text-lg" data-icon="help_outline">help_outline</span>
+<span class="text-sm font-semibold uppercase tracking-widest">Forgot Pin</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer Security Notice -->
+<footer class="p-8 flex justify-between items-end border-t border-white/[0.03]">
+<div class="flex items-center gap-6">
+<div class="flex flex-col">
+<span class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-1">Last Update</span>
+<span class="text-xs font-mono text-outline">2023-10-27 14:42:01</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mb-1">Terminal ID</span>
+<span class="text-xs font-mono text-outline">GCORE-ST01-DXB</span>
+</div>
+</div>
+<div class="flex items-center gap-4 bg-[#191B22] px-6 py-3 rounded-xl">
+<span class="material-symbols-outlined text-primary" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span>
+<span class="text-sm font-bold tracking-tight text-on-surface">Precision Encrypted Environment</span>
+</div>
+</footer>
+<!-- Background Decoration -->
+<div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[#4f8cff]/5 blur-[120px] -z-10 rounded-full"></div>
+<div class="fixed -bottom-48 -left-48 w-96 h-96 bg-primary-container/10 blur-[100px] -z-10 rounded-full"></div>
+</body></html>

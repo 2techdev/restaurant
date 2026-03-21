@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GastroCore | Precision POS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-secondary-fixed": "#002107",
+              "secondary-fixed": "#72fe88",
+              "error": "#ffb4ab",
+              "surface-container-lowest": "#0c0e14",
+              "secondary-fixed-dim": "#53e16f",
+              "surface-bright": "#373940",
+              "on-tertiary-fixed-variant": "#7201a2",
+              "primary-container": "#528dff",
+              "tertiary": "#e8b3ff",
+              "secondary": "#53e16f",
+              "on-error-container": "#ffdad6",
+              "on-background": "#e2e2eb",
+              "surface-dim": "#111319",
+              "surface-container-highest": "#33343b",
+              "on-surface-variant": "#c2c6d6",
+              "primary-fixed": "#d9e2ff",
+              "on-tertiary": "#510074",
+              "on-secondary-container": "#003a11",
+              "on-secondary": "#003911",
+              "on-primary-fixed": "#001a43",
+              "surface-container-low": "#191b22",
+              "primary": "#afc6ff",
+              "inverse-on-surface": "#2e3037",
+              "on-surface": "#e2e2eb",
+              "outline-variant": "#424753",
+              "inverse-primary": "#0059c6",
+              "primary-fixed-dim": "#afc6ff",
+              "outline": "#8c909f",
+              "tertiary-fixed": "#f6d9ff",
+              "surface-tint": "#afc6ff",
+              "on-primary-fixed-variant": "#004398",
+              "on-tertiary-container": "#460066",
+              "tertiary-fixed-dim": "#e8b3ff",
+              "on-error": "#690005",
+              "surface-variant": "#33343b",
+              "surface-container-high": "#282a30",
+              "on-secondary-fixed-variant": "#00531c",
+              "on-primary-container": "#00275f",
+              "tertiary-container": "#c567f4",
+              "inverse-surface": "#e2e2eb",
+              "background": "#111319",
+              "on-tertiary-fixed": "#310048",
+              "on-primary": "#002d6c",
+              "surface-container": "#1e1f26",
+              "surface": "#111319",
+              "secondary-container": "#05b046",
+              "error-container": "#93000a"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background overflow-hidden h-screen w-screen flex flex-col">
+<!-- Top Bar Component -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 bg-[#111319]/80 backdrop-blur-2xl shadow-[0px_0px_48px_0px_rgba(79,140,255,0.06)] h-16">
+<div class="flex items-center gap-8">
+<h1 class="text-2xl font-black italic text-[#F0F0F5] tracking-tighter">GastroCore</h1>
+<nav class="hidden md:flex items-center gap-6 font-['Inter'] tracking-tight font-semibold">
+<a class="text-[#F0F0F5] border-b-2 border-[#4f8cff] pb-1" href="#">Floor Plan</a>
+<a class="text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors" href="#">Orders</a>
+<a class="text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors" href="#">Kitchen</a>
+<a class="text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors" href="#">Inventory</a>
+<a class="text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-3 bg-surface-container-high px-3 py-1.5 rounded-full">
+<div class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_#53e16f]"></div>
+<span class="text-xs font-bold uppercase tracking-widest text-[#8E8E9A]">Online</span>
+<span class="w-[1px] h-3 bg-outline-variant/30"></span>
+<span class="text-xs font-medium text-primary">Shift: Lunch</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-[#8E8E9A] hover:text-[#F0F0F5] transition-all duration-200 scale-95 active:scale-90"><span class="material-symbols-outlined">notifications</span></button>
+<button class="text-[#8E8E9A] hover:text-[#F0F0F5] transition-all duration-200 scale-95 active:scale-90"><span class="material-symbols-outlined">wifi</span></button>
+<button class="text-[#8E8E9A] hover:text-[#F0F0F5] transition-all duration-200 scale-95 active:scale-90"><span class="material-symbols-outlined">settings</span></button>
+<img class="w-9 h-9 rounded-full ring-2 ring-outline-variant/20" data-alt="Manager Profile Picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBD6kffKwgRAnq8q_Gh16S-BA1WocBnoI06sDf2bZA4Qrow-w1FuJsrNsj6dtDmHnaWHy-2xZjhDqFZtcON1oMqXVT4ZRLSLeOeR7gyougHsrI3Gmkh0zxe0kQHYQpAV2CGewSiFbmNYrtDgvy_JcD0ysYgEVGShuVA8M_PJKSbitSJcREX_bmWVQQOwuuHu-7HzKJCXcQlNQKKfQxQTSmfePF1X-8AIh3kQYrdQYi7tazbkQKRy-gVGT4DeWXMniEvOBzlHe840BXm"/>
+</div>
+</div>
+</header>
+<!-- Main Layout Container -->
+<main class="flex flex-1 pt-16 h-full overflow-hidden">
+<!-- Sidebar Navigation (Categories) -->
+<aside class="fixed left-0 top-16 bottom-0 w-24 flex flex-col justify-between py-4 bg-[#191B22] font-['Inter'] text-sm font-medium z-40">
+<div class="flex flex-col gap-1 px-1 overflow-y-auto no-scrollbar">
+<button class="flex flex-col items-center justify-center bg-[#4f8cff] text-[#F0F0F5] rounded-xl mx-2 py-4 scale-98 transition-transform duration-200">
+<span class="material-symbols-outlined mb-1">restaurant</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Dine In</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#8E8E9A] py-4 hover:bg-[#33343B] rounded-xl mx-2 transition-all duration-200">
+<span class="material-symbols-outlined mb-1">shopping_bag</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Takeaway</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#8E8E9A] py-4 hover:bg-[#33343B] rounded-xl mx-2 transition-all duration-200">
+<span class="material-symbols-outlined mb-1">delivery_dining</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Delivery</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#8E8E9A] py-4 hover:bg-[#33343B] rounded-xl mx-2 transition-all duration-200">
+<span class="material-symbols-outlined mb-1">payments</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Quick Pay</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#8E8E9A] py-4 hover:bg-[#33343B] rounded-xl mx-2 transition-all duration-200">
+<span class="material-symbols-outlined mb-1">badge</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Staff</span>
+</button>
+<div class="my-4 border-t border-outline-variant/10 mx-4"></div>
+<button class="flex flex-col items-center justify-center text-[#8E8E9A] py-4 hover:bg-[#33343B] rounded-xl mx-2 transition-all duration-200">
+<span class="material-symbols-outlined mb-1">local_pizza</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Mains</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#8E8E9A] py-4 hover:bg-[#33343B] rounded-xl mx-2 transition-all duration-200">
+<span class="material-symbols-outlined mb-1">liquor</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Drinks</span>
+</button>
+</div>
+<div class="flex flex-col gap-1 px-1 mt-auto">
+<button class="flex flex-col items-center justify-center text-[#8E8E9A] py-3 hover:bg-[#33343B] rounded-xl mx-2 transition-all duration-200">
+<span class="material-symbols-outlined">help</span>
+<span class="text-[10px] font-bold">Support</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#8E8E9A] py-3 hover:bg-[#33343B] rounded-xl mx-2 transition-all duration-200">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-[10px] font-bold">Logout</span>
+</button>
+</div>
+</aside>
+<!-- Center Content: Search & Product Grid -->
+<div class="ml-24 flex-1 flex flex-col bg-surface p-6 h-full mr-[450px]">
+<!-- Top Search & Filters -->
+<div class="flex gap-4 mb-6">
+<div class="relative flex-1 group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-xl py-4 pl-12 pr-4 text-on-surface placeholder-outline focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium" placeholder="Search menu items, ingredients or tags..." type="text"/>
+</div>
+<button class="bg-surface-container-low px-6 rounded-xl flex items-center gap-2 hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-outline">tune</span>
+<span class="text-sm font-semibold text-on-surface">Filters</span>
+</button>
+</div>
+<!-- Category Headers -->
+<div class="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-1">
+<button class="whitespace-nowrap bg-surface-container-highest px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-[#F0F0F5]">All Items</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-[#8E8E9A] hover:bg-surface-container-low">Appetizers</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-[#8E8E9A] hover:bg-surface-container-low">Beef Steak</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-[#8E8E9A] hover:bg-surface-container-low">Pasta &amp; Risotto</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-[#8E8E9A] hover:bg-surface-container-low">Salads</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-[#8E8E9A] hover:bg-surface-container-low">Sea Food</button>
+<button class="whitespace-nowrap px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider text-[#8E8E9A] hover:bg-surface-container-low">Desserts</button>
+</div>
+<!-- Product Grid -->
+<div class="flex-1 overflow-y-auto no-scrollbar pr-2 pb-6">
+<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-3.5">
+<!-- Product Cards -->
+<!-- Item 1 -->
+<div class="group relative bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-all duration-200 cursor-pointer overflow-hidden">
+<div class="flex flex-col">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight mb-1 group-hover:text-primary transition-colors">Truffle Burger Special</span>
+<span class="text-[#8E8E9A] text-[10px] font-medium leading-tight">W/ Truffle Mayo &amp; Fries</span>
+</div>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg tracking-tight">$24.00</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">add_circle</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="group relative bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-all duration-200 cursor-pointer overflow-hidden">
+<div class="flex flex-col">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight mb-1">Ribeye Steak</span>
+<span class="text-[#8E8E9A] text-[10px] font-medium leading-tight">300g Argentinian Beef</span>
+</div>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg tracking-tight">$42.50</span>
+<span class="material-symbols-outlined text-outline">add_circle</span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="group relative bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-all duration-200 cursor-pointer overflow-hidden">
+<div class="flex flex-col">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight mb-1">Classic Caesar</span>
+<span class="text-[#8E8E9A] text-[10px] font-medium leading-tight">Grilled Chicken, Grana</span>
+</div>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg tracking-tight">$18.00</span>
+<span class="material-symbols-outlined text-outline">add_circle</span>
+</div>
+</div>
+<!-- Item 4 (Active/Selected State Example) -->
+<div class="group relative bg-surface-bright p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between ring-2 ring-primary transition-all duration-200 cursor-pointer overflow-hidden">
+<div class="flex flex-col">
+<div class="flex justify-between items-start">
+<span class="text-primary font-semibold text-sm leading-tight mb-1">Wild Mushroom Risotto</span>
+<span class="bg-primary/20 text-primary text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase">Popular</span>
+</div>
+<span class="text-[#8E8E9A] text-[10px] font-medium leading-tight">Portobello &amp; Truffle Oil</span>
+</div>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg tracking-tight">$22.00</span>
+<div class="flex items-center gap-2">
+<span class="text-[10px] font-bold text-primary">QTY: 1</span>
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+</div>
+<!-- Item 5 -->
+<div class="group relative bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-all duration-200 cursor-pointer overflow-hidden">
+<div class="flex flex-col">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight mb-1">Margarita Pizza</span>
+<span class="text-[#8E8E9A] text-[10px] font-medium leading-tight">Buffalo Mozzarella, Basil</span>
+</div>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg tracking-tight">$19.50</span>
+<span class="material-symbols-outlined text-outline">add_circle</span>
+</div>
+</div>
+<!-- Item 6 -->
+<div class="group relative bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-all duration-200 cursor-pointer overflow-hidden">
+<div class="flex flex-col">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight mb-1">Lobster Bisque</span>
+<span class="text-[#8E8E9A] text-[10px] font-medium leading-tight">Creamy Atlantic Lobster</span>
+</div>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg tracking-tight">$16.00</span>
+<span class="material-symbols-outlined text-outline">add_circle</span>
+</div>
+</div>
+<!-- More generic grid items to fill space -->
+<div class="group bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-colors">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight">Grilled Salmon</span>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg">$28.00</span>
+<span class="material-symbols-outlined text-outline">add_circle</span>
+</div>
+</div>
+<div class="group bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-colors">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight">Beef Carpaccio</span>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg">$21.00</span>
+<span class="material-symbols-outlined text-outline">add_circle</span>
+</div>
+</div>
+<div class="group bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-colors">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight">Tiramisu</span>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg">$12.50</span>
+<span class="material-symbols-outlined text-outline">add_circle</span>
+</div>
+</div>
+<div class="group bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-colors">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight">Red Wine (Glass)</span>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg">$14.00</span>
+<span class="material-symbols-outlined text-outline">add_circle</span>
+</div>
+</div>
+<div class="group bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-colors">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight">Pina Colada</span>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg">$16.50</span>
+<span class="material-symbols-outlined text-outline">add_circle</span>
+</div>
+</div>
+<div class="group bg-surface-container-low p-3.5 rounded-xl h-auto min-h-[140px] flex flex-col justify-between hover:bg-surface-bright transition-colors">
+<span class="text-[#F0F0F5] font-semibold text-sm leading-tight">Double Espresso</span>
+<div class="flex items-end justify-between mt-4">
+<span class="text-primary font-extrabold text-lg">$4.50</span>
+<span class="material-symbols-outlined text-outline">add_circle</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Side: Order Panel -->
+<aside class="fixed right-0 top-16 bottom-0 w-[450px] bg-surface-container border-l border-outline-variant/10 flex flex-col z-40">
+<!-- Order Header -->
+<div class="p-6 pb-4">
+<div class="flex justify-between items-center mb-4">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">table_restaurant</span>
+<h2 class="text-xl font-bold text-[#F0F0F5]">Table 12</h2>
+</div>
+<span class="text-xs font-semibold text-[#8E8E9A] uppercase tracking-widest mt-1">Waiter: Alex M. • 4 Guests</span>
+</div>
+<button class="bg-surface-container-highest p-2.5 rounded-lg text-outline hover:text-error transition-colors">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+<!-- Quick Tags/Actions -->
+<div class="flex gap-2 mb-4">
+<button class="flex-1 bg-surface-container-low py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider text-[#8E8E9A] hover:bg-surface-bright transition-colors">Split Bill</button>
+<button class="flex-1 bg-surface-container-low py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider text-[#8E8E9A] hover:bg-surface-bright transition-colors">Add Note</button>
+<button class="flex-1 bg-surface-container-low py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider text-[#8E8E9A] hover:bg-surface-bright transition-colors">Discount</button>
+</div>
+</div>
+<!-- Scrollable Item List -->
+<div class="flex-1 overflow-y-auto px-6 space-y-3.5 no-scrollbar pb-6">
+<!-- Order Item -->
+<div class="flex gap-4 group">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-primary font-bold text-sm shrink-0">1x</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<span class="text-on-surface font-semibold text-sm">Wild Mushroom Risotto</span>
+<span class="text-on-surface font-bold text-sm">$22.00</span>
+</div>
+<div class="flex flex-wrap gap-1 mt-1">
+<span class="text-[10px] text-outline bg-outline-variant/10 px-1.5 py-0.5 rounded">Extra Parmesan</span>
+</div>
+</div>
+</div>
+<!-- Order Item -->
+<div class="flex gap-4 group">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-primary font-bold text-sm shrink-0">2x</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<span class="text-on-surface font-semibold text-sm">Lobster Bisque</span>
+<span class="text-on-surface font-bold text-sm">$32.00</span>
+</div>
+</div>
+</div>
+<!-- Order Item -->
+<div class="flex gap-4 group">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-primary font-bold text-sm shrink-0">1x</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<span class="text-on-surface font-semibold text-sm">Truffle Burger Special</span>
+<span class="text-on-surface font-bold text-sm">$24.00</span>
+</div>
+<div class="flex flex-wrap gap-1 mt-1">
+<span class="text-[10px] text-outline bg-outline-variant/10 px-1.5 py-0.5 rounded">Medium Rare</span>
+<span class="text-[10px] text-error bg-error-container/20 px-1.5 py-0.5 rounded font-bold">No Onions</span>
+</div>
+</div>
+</div>
+<!-- Order Item -->
+<div class="flex gap-4 group">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-primary font-bold text-sm shrink-0">4x</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<span class="text-on-surface font-semibold text-sm">San Pellegrino 250ml</span>
+<span class="text-on-surface font-bold text-sm">$16.00</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer: Totals and Actions -->
+<div class="bg-surface-container-high/50 backdrop-blur-xl p-6 rounded-t-3xl border-t border-outline-variant/10">
+<div class="space-y-2 mb-6">
+<div class="flex justify-between items-center">
+<span class="text-sm font-medium text-[#8E8E9A]">Ara Toplam</span>
+<span class="text-sm font-bold text-on-surface">$94.00</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-sm font-medium text-[#8E8E9A]">KDV (%18)</span>
+<span class="text-sm font-bold text-on-surface">$16.92</span>
+</div>
+<div class="flex justify-between items-center pt-2 mt-2 border-t border-outline-variant/10">
+<span class="text-lg font-bold text-[#F0F0F5]">Genel Toplam</span>
+<span class="text-[2.75rem] font-extrabold text-primary leading-none tracking-tighter">$110.92</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<button class="flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-[#FF9F43] to-[#FF6B6B] h-20 rounded-2xl text-white scale-98 active:scale-95 transition-transform shadow-[0_8px_32px_rgba(255,159,67,0.2)]">
+<span class="material-symbols-outlined">restaurant_menu</span>
+<span class="text-[11px] font-black uppercase tracking-widest">Mutfaga Gonder</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-secondary-container to-secondary h-20 rounded-2xl text-on-secondary-container scale-98 active:scale-95 transition-transform shadow-[0_8px_32px_rgba(5,176,70,0.2)]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span class="text-[11px] font-black uppercase tracking-widest">Odeme</span>
+</button>
+</div>
+</div>
+</aside>
+</main>
+<!-- Overlay Floating Controls (Optional Contextual FAB) -->
+<div class="fixed bottom-6 left-28 z-50 flex gap-4">
+<button class="w-14 h-14 rounded-full bg-primary-container text-on-primary-container shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-2xl">barcode_scanner</span>
+</button>
+<button class="w-14 h-14 rounded-full bg-surface-container-highest text-on-surface shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-2xl">keyboard</span>
+</button>
+</div>
+</body></html>

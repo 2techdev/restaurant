@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  FLUTTER_VERSION: '3.35.0'
+  JAVA_VERSION: '17'
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('apps/pos/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/pos/android/**/*.gradle*', 'apps/pos/android/**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode \
+            > apps/pos/android/app/gastrocore-release.jks
+
+      - name: Write key.properties
+        run: |
+          cat > apps/pos/android/key.properties <<EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=app/gastrocore-release.jks
+          EOF
+
+      - name: Get dependencies
+        working-directory: apps/pos
+        run: flutter pub get
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "build_number=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release AAB
+        working-directory: apps/pos
+        run: |
+          flutter build appbundle --release \
+            --build-name=${{ steps.version.outputs.version }} \
+            --build-number=${{ steps.version.outputs.build_number }}
+
+      - name: Build release APK
+        working-directory: apps/pos
+        run: |
+          flutter build apk --release \
+            --build-name=${{ steps.version.outputs.version }} \
+            --build-number=${{ steps.version.outputs.build_number }}
+
+      - name: Rename artifacts
+        run: |
+          VERSION=${{ steps.version.outputs.tag }}
+          cp apps/pos/build/app/outputs/bundle/release/app-release.aab \
+             gastrocore-${VERSION}.aab
+          cp apps/pos/build/app/outputs/flutter-apk/app-release.apk \
+             gastrocore-${VERSION}.apk
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]' | sed -n '2p')
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG=$(git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s" --no-merges)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s" --no-merges | head -20)
+          fi
+          echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGELOG" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: GastroCore POS ${{ steps.version.outputs.tag }}
+          body: |
+            ## Changes in ${{ steps.version.outputs.tag }}
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ---
+            **Build:** ${{ steps.version.outputs.build_number }}
+            **Flutter:** ${{ env.FLUTTER_VERSION }}
+          files: |
+            gastrocore-${{ steps.version.outputs.tag }}.aab
+            gastrocore-${{ steps.version.outputs.tag }}.apk
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.tag, '-') }}

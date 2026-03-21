@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GastroCore — Modifier Dialog</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-high": "#282a30",
+                        "on-secondary-fixed": "#171b28",
+                        "on-primary-fixed": "#001944",
+                        "tertiary": "#afc6ff",
+                        "tertiary-fixed": "#d9e2ff",
+                        "surface-container": "#1d1f26",
+                        "secondary": "#c3c6d7",
+                        "outline-variant": "#424753",
+                        "tertiary-container": "#7990c6",
+                        "on-tertiary": "#152f5e",
+                        "on-tertiary-fixed": "#001943",
+                        "on-surface-variant": "#c2c6d6",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#2e4676",
+                        "on-primary-fixed-variant": "#004299",
+                        "inverse-primary": "#0059c7",
+                        "secondary-fixed-dim": "#c3c6d7",
+                        "surface": "#111319",
+                        "on-secondary": "#2c303d",
+                        "surface-tint": "#afc6ff",
+                        "on-secondary-container": "#b4b8c9",
+                        "primary-fixed": "#d9e2ff",
+                        "primary-container": "#528dff",
+                        "surface-bright": "#373940",
+                        "surface-container-lowest": "#0c0e14",
+                        "on-secondary-fixed-variant": "#424654",
+                        "surface-container-low": "#191b22",
+                        "surface-variant": "#33343b",
+                        "secondary-fixed": "#dfe2f3",
+                        "tertiary-fixed-dim": "#afc6ff",
+                        "on-background": "#e2e2eb",
+                        "inverse-on-surface": "#2e3037",
+                        "error-container": "#93000a",
+                        "on-primary-container": "#00275f",
+                        "outline": "#8c909f",
+                        "error": "#ffb4ab",
+                        "primary": "#afc6ff",
+                        "inverse-surface": "#e2e2eb",
+                        "surface-container-highest": "#33343b",
+                        "on-tertiary-container": "#0c2857",
+                        "on-primary": "#002d6d",
+                        "secondary-container": "#454957",
+                        "background": "#111319",
+                        "surface-dim": "#111319",
+                        "on-surface": "#e2e2eb",
+                        "primary-fixed-dim": "#afc6ff",
+                        "on-error": "#690005"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        .primary-gradient {
+            background: linear-gradient(135deg, #AFC6FF 0%, #528DFF 100%);
+        }
+        .glass-panel {
+            background: rgba(42, 47, 61, 0.2);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container/30">
+<!-- Backdrop Overlay -->
+<div class="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"></div>
+<!-- Main Container Shell -->
+<div class="flex h-screen w-full overflow-hidden">
+<!-- SideNavBar (Shared Component Blueprint) -->
+<aside class="fixed left-0 top-0 bottom-0 flex flex-col z-50 py-8 bg-[#1A1D27] dark:bg-[#1A1D27] w-24 md:w-64 shadow-[8px_0_24px_rgba(0,0,0,0.15)]">
+<div class="px-8 mb-10">
+<span class="text-xl font-extrabold bg-gradient-to-br from-[#AFC6FF] to-[#528DFF] bg-clip-text text-transparent">GastroCore</span>
+<p class="text-[#8E8E9A] text-xs font-medium mt-1">Station 01</p>
+</div>
+<nav class="flex-1 flex flex-col space-y-2">
+<div class="bg-[#222633] text-[#F0F0F5] border-l-4 border-[#528DFF] px-6 py-4 flex items-center gap-4 transition-all duration-300 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+<span class="hidden md:inline font-medium text-sm">Order</span>
+</div>
+<div class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="hidden md:inline font-medium text-sm">Records</span>
+</div>
+<div class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="hidden md:inline font-medium text-sm">Tables</span>
+</div>
+<div class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="restaurant_menu">restaurant_menu</span>
+<span class="hidden md:inline font-medium text-sm">Menu</span>
+</div>
+<div class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span class="hidden md:inline font-medium text-sm">KDS</span>
+</div>
+</nav>
+<div class="mt-auto px-6 space-y-2">
+<div class="text-[#8E8E9A] py-3 flex items-center gap-4 hover:text-[#F0F0F5] cursor-pointer">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="hidden md:inline text-sm">Support</span>
+</div>
+</div>
+</aside>
+<!-- Main Content (Dialog Overlay) -->
+<main class="flex-1 ml-24 md:ml-64 flex items-center justify-center p-4 md:p-12 relative z-50">
+<!-- High Fidelity Modifier Modal -->
+<div class="bg-surface-container w-full max-w-4xl max-h-[921px] flex flex-col rounded-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
+<!-- Header with Glassmorphism -->
+<div class="px-8 py-8 glass-panel flex justify-between items-start shrink-0">
+<div class="flex-1">
+<div class="flex items-center gap-3 text-primary mb-1">
+<span class="material-symbols-outlined text-lg" data-icon="local_pizza">local_pizza</span>
+<span class="text-xs font-bold tracking-widest uppercase">Classic Menu</span>
+</div>
+<h1 class="text-3xl md:text-4xl font-black text-on-surface tracking-tighter leading-none mb-2">Margherita Classica</h1>
+<p class="text-[#8E8E9A] max-w-md text-sm">San Marzano tomatoes, fresh buffalo mozzarella, hand-torn basil, extra virgin olive oil.</p>
+</div>
+<div class="text-right">
+<span class="block text-3xl font-extrabold text-[#F0F0F5]">CHF 24.50</span>
+<div class="flex justify-end gap-2 mt-4">
+<button class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-on-surface" data-icon="close">close</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Scrollable Body (Modifier Sections) -->
+<div class="flex-1 overflow-y-auto px-8 py-6 space-y-12 bg-surface">
+<!-- Section: Size (Required) -->
+<section>
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-lg font-bold text-on-surface tracking-tight flex items-center gap-2">
+                                Size <span class="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full uppercase tracking-tighter">Required</span>
+</h3>
+<span class="text-xs text-[#5A5A6A]">Choose 1</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Option Card (Active) -->
+<div class="bg-surface-container-high border-2 border-primary-container p-5 rounded-xl flex flex-col cursor-pointer transition-all duration-200">
+<div class="flex justify-between items-start mb-4">
+<span class="font-extrabold text-[#F0F0F5]">Regular</span>
+<span class="material-symbols-outlined text-primary text-xl" data-icon="radio_button_checked" style="font-variation-settings: 'FILL' 1;">radio_button_checked</span>
+</div>
+<span class="text-xs text-[#8E8E9A] mb-auto">30cm — Standard size</span>
+<span class="text-sm font-bold mt-4 text-[#F0F0F5]">Incl.</span>
+</div>
+<!-- Option Card -->
+<div class="bg-surface-container-low p-5 rounded-xl flex flex-col cursor-pointer hover:bg-surface-container-high transition-all duration-200 group">
+<div class="flex justify-between items-start mb-4">
+<span class="font-bold text-[#8E8E9A] group-hover:text-on-surface">Grande</span>
+<span class="material-symbols-outlined text-[#5A5A6A] group-hover:text-[#8E8E9A] text-xl" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+</div>
+<span class="text-xs text-[#5A5A6A] mb-auto">45cm — Family size</span>
+<span class="text-sm font-bold mt-4 text-[#8E8E9A] group-hover:text-on-surface">+CHF 8.00</span>
+</div>
+<!-- Option Card -->
+<div class="bg-surface-container-low p-5 rounded-xl flex flex-col cursor-pointer hover:bg-surface-container-high transition-all duration-200 group opacity-50">
+<div class="flex justify-between items-start mb-4">
+<span class="font-bold text-[#8E8E9A]">Personal</span>
+<span class="material-symbols-outlined text-[#5A5A6A] text-xl" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+</div>
+<span class="text-xs text-[#5A5A6A] mb-auto">22cm — Solo portion</span>
+<span class="text-sm font-bold mt-4 text-[#8E8E9A]">-CHF 3.50</span>
+</div>
+</div>
+</section>
+<!-- Section: Extra Toppings -->
+<section>
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-lg font-bold text-on-surface tracking-tight">Extra Toppings</h3>
+<span class="text-xs text-[#5A5A6A]">Add as many as you like</span>
+</div>
+<div class="flex flex-wrap gap-3">
+<!-- Interactive Chip -->
+<div class="bg-surface-container-high px-4 py-3 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-surface-container-highest transition-all group">
+<span class="material-symbols-outlined text-[#528DFF]" data-icon="add_circle">add_circle</span>
+<span class="text-sm font-medium text-[#F0F0F5]">Buffalo Mozzarella</span>
+<span class="text-xs font-bold text-[#8E8E9A]">+CHF 4.00</span>
+</div>
+<!-- Interactive Chip (Selected) -->
+<div class="bg-primary/10 border border-primary/30 px-4 py-3 rounded-xl flex items-center gap-3 cursor-pointer transition-all">
+<span class="material-symbols-outlined text-primary" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-sm font-bold text-on-surface">Fresh Basil</span>
+<span class="text-xs font-bold text-primary">+CHF 1.50</span>
+</div>
+<div class="bg-surface-container-high px-4 py-3 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-surface-container-highest transition-all group">
+<span class="material-symbols-outlined text-[#528DFF]" data-icon="add_circle">add_circle</span>
+<span class="text-sm font-medium text-[#F0F0F5]">Prosciutto di Parma</span>
+<span class="text-xs font-bold text-[#8E8E9A]">+CHF 6.00</span>
+</div>
+<div class="bg-surface-container-high px-4 py-3 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-surface-container-highest transition-all group">
+<span class="material-symbols-outlined text-[#528DFF]" data-icon="add_circle">add_circle</span>
+<span class="text-sm font-medium text-[#F0F0F5]">Artichokes</span>
+<span class="text-xs font-bold text-[#8E8E9A]">+CHF 2.50</span>
+</div>
+<div class="bg-surface-container-high px-4 py-3 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-surface-container-highest transition-all group">
+<span class="material-symbols-outlined text-[#528DFF]" data-icon="add_circle">add_circle</span>
+<span class="text-sm font-medium text-[#F0F0F5]">Truffle Oil</span>
+<span class="text-xs font-bold text-[#8E8E9A]">+CHF 3.00</span>
+</div>
+</div>
+</section>
+<!-- Section: Sauce -->
+<section>
+<h3 class="text-lg font-bold text-on-surface tracking-tight mb-6">Sauce Base</h3>
+<div class="space-y-3">
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center justify-between cursor-pointer border border-transparent hover:border-outline-variant transition-all">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-[#3D1A1A] flex items-center justify-center">
+<span class="material-symbols-outlined text-red-400" data-icon="water_drop">water_drop</span>
+</div>
+<div>
+<p class="font-bold text-[#F0F0F5]">San Marzano Tomato</p>
+<p class="text-xs text-[#5A5A6A]">Original red base</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary" data-icon="radio_button_checked" style="font-variation-settings: 'FILL' 1;">radio_button_checked</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center justify-between cursor-pointer border border-transparent hover:border-outline-variant transition-all">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-[#1A253D] flex items-center justify-center">
+<span class="material-symbols-outlined text-blue-400" data-icon="palette">palette</span>
+</div>
+<div>
+<p class="font-bold text-[#8E8E9A]">Bianca (White Sauce)</p>
+<p class="text-xs text-[#5A5A6A]">Ricotta and herbs base</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-[#5A5A6A]" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+</div>
+</div>
+</section>
+<!-- Section: Special Notes -->
+<section class="pb-8">
+<h3 class="text-lg font-bold text-on-surface tracking-tight mb-4">Special Notes</h3>
+<textarea class="w-full bg-surface-container-high border-none rounded-xl p-5 text-on-surface placeholder:text-[#5A5A6A] focus:ring-2 focus:ring-primary-container min-h-[120px] text-sm resize-none transition-shadow" placeholder="Allergies, extra crispy, no basil please..."></textarea>
+</section>
+</div>
+<!-- Footer Action Area -->
+<footer class="px-8 py-6 bg-surface-container border-t border-outline-variant/10 flex flex-col md:flex-row items-center gap-6 shadow-[0_-10px_30px_rgba(0,0,0,0.3)] shrink-0">
+<!-- Quantity Stepper -->
+<div class="flex items-center bg-surface-container-high p-1 rounded-full w-full md:w-auto">
+<button class="w-12 h-12 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined" data-icon="remove">remove</span>
+</button>
+<span class="px-6 text-xl font-extrabold text-[#F0F0F5] min-w-[60px] text-center">1</span>
+<button class="w-12 h-12 rounded-full flex items-center justify-center text-primary-container hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</div>
+<div class="flex-1 flex flex-col md:flex-row items-center justify-end gap-6 w-full">
+<div class="text-center md:text-right">
+<p class="text-[10px] text-[#8E8E9A] uppercase tracking-widest font-bold">Total Bill</p>
+<p class="text-3xl font-black text-[#F0F0F5]">CHF 26.00</p>
+</div>
+<!-- CTA Button -->
+<button class="primary-gradient w-full md:w-auto px-10 py-5 rounded-xl text-on-primary-fixed font-black text-lg tracking-tight hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_8px_20px_rgba(82,141,255,0.3)]">
+                            Add to Order
+                        </button>
+</div>
+</footer>
+</div>
+</main>
+</div>
+</body></html>

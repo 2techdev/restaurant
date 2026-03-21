@@ -1,0 +1,41 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - '**/*.g.dart'
+    - '**/*.freezed.dart'
+    - 'lib/l10n/**'
+  errors:
+    missing_required_param: error
+    missing_return: error
+    dead_code: warning
+
+linter:
+  rules:
+    # Style
+    prefer_single_quotes: true
+    require_trailing_commas: true
+    sort_child_properties_last: true
+    avoid_unnecessary_containers: true
+
+    # Correctness
+    avoid_print: true
+    cancel_subscriptions: true
+    close_sinks: true
+    no_adjacent_strings_in_list: true
+    throw_in_finally: true
+    unnecessary_statements: true
+
+    # Dart idioms
+    prefer_final_fields: true
+    prefer_final_in_for_each: true
+    prefer_is_empty: true
+    prefer_is_not_empty: true
+    prefer_iterable_whereType: true
+    unnecessary_lambdas: true
+
+    # Flutter best practices
+    use_colored_box: true
+    use_decorated_box: true
+    sized_box_for_whitespace: true
+    sized_box_shrink_expand: true

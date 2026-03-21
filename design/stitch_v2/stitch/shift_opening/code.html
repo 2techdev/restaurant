@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-container-high": "#282a30",
+            "secondary": "#c3c6d7",
+            "error-container": "#93000a",
+            "surface-dim": "#111319",
+            "on-secondary-container": "#b4b8c9",
+            "tertiary-fixed": "#d9e2ff",
+            "inverse-on-surface": "#2e3037",
+            "outline-variant": "#424753",
+            "inverse-surface": "#e2e2eb",
+            "on-tertiary-fixed": "#001943",
+            "primary-fixed-dim": "#afc6ff",
+            "on-secondary": "#2c303d",
+            "on-background": "#e2e2eb",
+            "secondary-fixed-dim": "#c3c6d7",
+            "primary": "#afc6ff",
+            "background": "#111319",
+            "surface-container-low": "#191b22",
+            "surface-variant": "#33343b",
+            "on-surface": "#e2e2eb",
+            "surface-container-lowest": "#0c0e14",
+            "on-primary-container": "#00275f",
+            "on-tertiary-container": "#0c2857",
+            "on-tertiary": "#152f5e",
+            "on-primary": "#002d6d",
+            "inverse-primary": "#0059c7",
+            "surface-container-highest": "#33343b",
+            "surface-bright": "#373940",
+            "on-primary-fixed": "#001944",
+            "surface-tint": "#afc6ff",
+            "surface": "#111319",
+            "on-primary-fixed-variant": "#004299",
+            "on-error": "#690005",
+            "error": "#ffb4ab",
+            "on-secondary-fixed-variant": "#424654",
+            "outline": "#8c909f",
+            "surface-container": "#1d1f26",
+            "on-secondary-fixed": "#171b28",
+            "primary-container": "#528dff",
+            "tertiary-fixed-dim": "#afc6ff",
+            "on-error-container": "#ffdad6",
+            "tertiary": "#afc6ff",
+            "secondary-container": "#454957",
+            "secondary-fixed": "#dfe2f3",
+            "primary-fixed": "#d9e2ff",
+            "on-tertiary-fixed-variant": "#2e4676",
+            "tertiary-container": "#7990c6",
+            "on-surface-variant": "#c2c6d6"
+          },
+          fontFamily: {
+            "headline": ["Inter"],
+            "body": ["Inter"],
+            "label": ["Inter"]
+          },
+          borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .brand-gradient {
+      background: linear-gradient(135deg, #afc6ff 0%, #528dff 100%);
+    }
+    .glass-effect {
+      background: rgba(42, 47, 61, 0.2);
+      backdrop-filter: blur(20px);
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #111319;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex items-center justify-center p-4">
+<!-- Shell Layout: Fixed Navigation (Suppressed for transactional screen) -->
+<main class="w-full max-w-lg">
+<!-- Centered Modal Card: Kinetic Monolith -->
+<div class="bg-surface-container-low rounded-xl overflow-hidden flex flex-col items-center">
+<!-- Top Section -->
+<div class="w-full px-8 pt-10 pb-6 flex flex-col items-center text-center">
+<div class="w-16 h-16 bg-surface-container-high rounded-full flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="payments">payments</span>
+</div>
+<h1 class="text-2xl font-extrabold tracking-tight text-on-surface mb-1 uppercase">Vardiya Ac / Open Shift</h1>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<p class="text-sm font-medium text-on-secondary-container tracking-widest uppercase">ADMIN</p>
+</div>
+</div>
+<!-- Middle Section: Display -->
+<div class="w-full px-8 py-4">
+<div class="bg-surface-dim rounded-xl p-8 flex flex-col items-center justify-center text-center">
+<label class="text-xs font-bold text-secondary tracking-widest uppercase mb-4 opacity-60">Acilis Kasasi</label>
+<div class="flex items-baseline">
+<span class="text-5xl font-black text-on-surface tracking-tighter">1.000,00</span>
+<span class="text-xl font-bold text-primary ml-2">₺</span>
+</div>
+</div>
+</div>
+<!-- Quick Amount Buttons -->
+<div class="w-full px-8 pt-4 pb-2">
+<div class="grid grid-cols-3 gap-4">
+<button class="bg-surface-container-high py-4 rounded-lg font-bold text-on-surface hover:bg-surface-variant transition-colors active:scale-95">
+            200
+          </button>
+<button class="bg-surface-container-high py-4 rounded-lg font-bold text-on-surface hover:bg-surface-variant transition-colors active:scale-95">
+            500
+          </button>
+<button class="bg-surface-variant py-4 rounded-lg font-bold text-primary border-2 border-primary/20 transition-colors active:scale-95">
+            1000
+          </button>
+</div>
+</div>
+<!-- Numpad -->
+<div class="w-full px-8 py-6">
+<div class="grid grid-cols-3 gap-3">
+<!-- Row 1 -->
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-surface transition-all active:scale-90">1</button>
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-surface transition-all active:scale-90">2</button>
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-surface transition-all active:scale-90">3</button>
+<!-- Row 2 -->
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-surface transition-all active:scale-90">4</button>
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-surface transition-all active:scale-90">5</button>
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-surface transition-all active:scale-90">6</button>
+<!-- Row 3 -->
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-surface transition-all active:scale-90">7</button>
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-surface transition-all active:scale-90">8</button>
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-surface transition-all active:scale-90">9</button>
+<!-- Row 4 -->
+<button class="h-16 flex items-center justify-center text-xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-secondary-container transition-all active:scale-90">00</button>
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-on-surface transition-all active:scale-90">0</button>
+<button class="h-16 flex items-center justify-center text-2xl font-bold bg-surface-container py-4 rounded-lg hover:bg-surface-container-high text-primary transition-all active:scale-90">
+<span class="material-symbols-outlined" data-icon="backspace">backspace</span>
+</button>
+</div>
+</div>
+<!-- Action Footer -->
+<div class="w-full px-8 pb-10 flex flex-col gap-4">
+<button class="brand-gradient w-full h-16 rounded-xl flex items-center justify-center text-on-primary font-black text-lg tracking-wider uppercase transition-all duration-200 active:scale-[0.98] active:brightness-90 shadow-lg shadow-primary/10">
+          VARDIYAYI BASLAT
+        </button>
+<button class="w-full h-12 flex items-center justify-center gap-2 text-secondary font-semibold hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="arrow_back">arrow_back</span>
+<span>Back to Login</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Visual Flourish: Background Kinetic Accents -->
+<div class="fixed -top-24 -left-24 w-96 h-96 bg-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
+<div class="fixed -bottom-24 -right-24 w-96 h-96 bg-primary/10 rounded-full blur-[120px] pointer-events-none"></div>
+</body></html>

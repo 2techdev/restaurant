@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary": "#e8b3ff",
+              "on-tertiary": "#510074",
+              "surface-container-lowest": "#0c0e14",
+              "primary-fixed": "#d9e2ff",
+              "on-surface-variant": "#c2c6d6",
+              "on-error": "#690005",
+              "on-secondary": "#003911",
+              "on-error-container": "#ffdad6",
+              "on-tertiary-container": "#460066",
+              "error-container": "#93000a",
+              "background": "#111319",
+              "primary-container": "#528dff",
+              "on-primary-container": "#00275f",
+              "on-primary": "#002d6c",
+              "primary-fixed-dim": "#afc6ff",
+              "on-primary-fixed-variant": "#004398",
+              "on-background": "#e2e2eb",
+              "tertiary-fixed-dim": "#e8b3ff",
+              "on-surface": "#e2e2eb",
+              "tertiary-container": "#c567f4",
+              "on-tertiary-fixed": "#310048",
+              "secondary-container": "#05b046",
+              "error": "#ffb4ab",
+              "surface-container-highest": "#33343b",
+              "primary": "#afc6ff",
+              "secondary-fixed": "#72fe88",
+              "outline-variant": "#424753",
+              "surface-container": "#1e1f26",
+              "surface-bright": "#373940",
+              "on-secondary-fixed-variant": "#00531c",
+              "inverse-on-surface": "#2e3037",
+              "surface": "#111319",
+              "secondary": "#53e16f",
+              "surface-container-low": "#191b22",
+              "surface-tint": "#afc6ff",
+              "tertiary-fixed": "#f6d9ff",
+              "on-primary-fixed": "#001a43",
+              "inverse-primary": "#0059c6",
+              "on-secondary-fixed": "#002107",
+              "on-secondary-container": "#003a11",
+              "inverse-surface": "#e2e2eb",
+              "surface-variant": "#33343b",
+              "outline": "#8c909f",
+              "on-tertiary-fixed-variant": "#7201a2",
+              "surface-container-high": "#282a30",
+              "surface-dim": "#111319",
+              "secondary-fixed-dim": "#53e16f"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .thermal-paper {
+            background-color: #ffffff;
+            color: #111319;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        .thermal-paper::after {
+            content: "";
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 100%;
+            height: 10px;
+            background: linear-gradient(-45deg, transparent 5px, #ffffff 0), linear-gradient(45deg, transparent 5px, #ffffff 0);
+            background-size: 10px 10px;
+        }
+    </style>
+</head>
+<body class="bg-surface-dim font-body text-on-background min-h-screen flex flex-col overflow-hidden">
+<!-- Top Navigation Anchor (Manual Implementation of JSON Spec) -->
+<header class="flex justify-between items-center w-full px-6 h-16 backdrop-blur-md bg-opacity-80 bg-[#191B22] border-none shadow-[0_0_48px_0_rgba(79,140,255,0.06)] z-50">
+<div class="flex items-center gap-8">
+<span class="text-xl font-extrabold text-[#F0F0F5] tracking-tighter font-['Inter']">Precision POS</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="font-['Inter'] tracking-tight font-semibold text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors" href="#">Dashboard</a>
+<a class="font-['Inter'] tracking-tight font-semibold text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors" href="#">Tables</a>
+<a class="font-['Inter'] tracking-tight font-semibold text-[#F0F0F5] border-b-2 border-[#4f8cff] pb-2" href="#">Orders</a>
+<a class="font-['Inter'] tracking-tight font-semibold text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors" href="#">Kitchen</a>
+<a class="font-['Inter'] tracking-tight font-semibold text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors" href="#">Inventory</a>
+<a class="font-['Inter'] tracking-tight font-semibold text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative flex items-center bg-[#1E1F26] rounded-full px-4 py-2 gap-2 text-[#8E8E9A]">
+<span class="material-symbols-outlined text-sm">search</span>
+<span class="text-xs">Search transactions...</span>
+</div>
+<button class="text-[#8E8E9A] hover:text-[#F0F0F5] active:scale-95 transition-transform"><span class="material-symbols-outlined">notifications</span></button>
+<button class="text-[#8E8E9A] hover:text-[#F0F0F5] active:scale-95 transition-transform"><span class="material-symbols-outlined">settings</span></button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden">
+<img alt="User Avatar" data-alt="Portrait of a male restaurant server" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKqGAGlJ5QgCoUqScaXSixVjTRkfkr1XTg8X_bLjn0Ic4A50szVGjbKjoCsC0R7IX5UF2nQHNodRNdQAv4UCrzejZAh1YqTQ4sU_Se6EAYnwx9zOk6pdh1_HzOq8vhuefNXOtsC3MAKfq2A8zoGJE2G5ZhYNrpnED6i8vPWVVkOaLjq2BEh10ozvzcgPvK7eGgHFZXmndZXvPjcOdh3CZLLAqw9W2NcM2DJY39ey9MT_Uz_RuUL0WCaBLD3iUN_ksEImlLic4l3xHi"/>
+</div>
+</div>
+</header>
+<main class="flex-grow flex flex-col items-center justify-center p-8 relative">
+<!-- Receipt Card -->
+<div class="thermal-paper w-full max-w-[420px] p-8 font-mono text-sm leading-relaxed mb-12">
+<!-- Receipt Header -->
+<div class="text-center mb-6 space-y-1">
+<h1 class="font-extrabold text-xl tracking-tight uppercase">GastroCore Restaurant</h1>
+<p class="text-xs opacity-70">Bahariye Cad. No: 42, Kadıköy</p>
+<p class="text-xs opacity-70">34710 İstanbul / Türkiye</p>
+<p class="text-xs opacity-70">Tel: +90 (216) 123 45 67</p>
+</div>
+<!-- Receipt Metadata -->
+<div class="border-y border-dashed border-gray-300 py-3 my-4 space-y-1 text-xs">
+<div class="flex justify-between">
+<span>Tarih: 24.05.2024</span>
+<span>Saat: 19:42</span>
+</div>
+<div class="flex justify-between">
+<span>Fiş No: #0412</span>
+<span>Garson: Marco A.</span>
+</div>
+</div>
+<!-- Receipt Items -->
+<div class="space-y-3 mb-6">
+<div class="flex justify-between font-bold border-b border-gray-100 pb-1">
+<span>Ürün Adı</span>
+<span>Tutar</span>
+</div>
+<div class="flex justify-between">
+<span>1x Gastro Burger XL</span>
+<span>420.00 ₺</span>
+</div>
+<div class="flex justify-between">
+<span>1x Margherita</span>
+<span>365.00 ₺</span>
+</div>
+<div class="flex justify-between">
+<span>2x Coca-Cola</span>
+<span>150.00 ₺</span>
+</div>
+</div>
+<!-- Receipt Totals -->
+<div class="border-t-2 border-black pt-4 space-y-2">
+<div class="flex justify-between items-end">
+<span class="text-xs uppercase font-bold">Toplam</span>
+<span class="text-2xl font-black">935.00 ₺</span>
+</div>
+<div class="space-y-1 pt-2 text-xs opacity-80">
+<div class="flex justify-between">
+<span>Nakit</span>
+<span>1000.00 ₺</span>
+</div>
+<div class="flex justify-between font-bold">
+<span>Para Üstü</span>
+<span>65.00 ₺</span>
+</div>
+</div>
+</div>
+<!-- Receipt Footer -->
+<div class="text-center mt-12 space-y-2">
+<div class="w-full flex justify-center py-4">
+<div class="w-48 h-12 bg-gray-200" data-alt="Stylized barcode for receipt tracking" style="background-image: repeating-linear-gradient(90deg, #000, #000 2px, #fff 2px, #fff 4px);"></div>
+</div>
+<p class="text-lg font-bold">Afiyet Olsun!</p>
+<p class="text-[10px] opacity-60">GastroCore v2.4.1 Cloud POS System</p>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center gap-4 w-full max-w-[420px]">
+<button class="flex-1 h-14 bg-gradient-to-br from-primary to-primary-container text-on-primary-container font-bold rounded-xl shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">print</span>
+                Yazdır
+            </button>
+<button class="flex-1 h-14 bg-surface-container-highest text-on-surface font-semibold rounded-xl active:scale-95 transition-transform flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">mail</span>
+                E-Posta
+            </button>
+<button class="flex-none px-6 h-14 text-outline hover:text-on-surface active:scale-95 transition-transform flex items-center justify-center gap-2 font-medium">
+<span class="material-symbols-outlined">close</span>
+                Kapat
+            </button>
+</div>
+</main>
+<!-- Side Navigation Anchor (Hidden on receipt focused view per rule, but structural skeleton) -->
+<aside class="hidden">
+<!-- The SideNavBar is suppressed for this focused task as per the "Task-Focused" rule in JSON Shell logic -->
+</aside>
+<!-- Floating Atmosphere Elements -->
+<div class="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
+<div class="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px]"></div>
+<div class="absolute bottom-[-5%] left-[-5%] w-[400px] h-[400px] bg-secondary-container/5 rounded-full blur-[100px]"></div>
+</div>
+</body></html>

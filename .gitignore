@@ -1,0 +1,36 @@
+# Flutter
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/pubspec.lock
+**/*.g.dart
+
+# Go
+server/bin/
+server/*.exe
+server/seed.exe
+server/server.exe
+*.exe
+
+# Environment
+.env
+**/.env
+!**/.env.example
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

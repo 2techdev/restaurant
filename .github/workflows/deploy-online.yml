@@ -1,0 +1,127 @@
+name: Deploy Online Ordering
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. Build Flutter web app
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-web:
+    name: Build Flutter Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter build web (release)
+        working-directory: apps/online
+        run: flutter build web --release
+
+      - name: Add CNAME for custom domain
+        run: echo "pos.2tech.ch" > apps/online/build/web/CNAME
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: online-web
+          path: apps/online/build/web/
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. Deploy to GitHub Pages (serves at pos.2tech.ch after CNAME DNS update)
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    needs: build-web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: online-web
+          path: ./web
+
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./web
+          publish_branch: gh-pages
+          cname: pos.2tech.ch
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. Deploy to pos.2tech.ch server (updates nginx static files + Go binary)
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-server:
+    name: Deploy to pos.2tech.ch Server
+    needs: build-web
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: online-web
+          path: ./web
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Cross-compile Go server for Linux amd64
+        working-directory: server
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: 0
+        run: go build -ldflags="-s -w" -o bin/gastrocore-server-linux ./cmd/server
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy web files to server
+        env:
+          SSH_OPTS: "-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=10"
+          USER: ${{ secrets.SERVER_USER }}
+          HOST: ${{ secrets.SERVER_HOST }}
+          WEB_PATH: ${{ secrets.SERVER_WEB_PATH || '/home/tech/gastrocore/web/dist' }}
+        run: |
+          # Clear old files and copy new web build
+          ssh $SSH_OPTS $USER@$HOST "mkdir -p $WEB_PATH && rm -rf $WEB_PATH/*"
+          scp $SSH_OPTS -r ./web/* $USER@$HOST:$WEB_PATH/
+
+      - name: Deploy Go binary and restart service
+        env:
+          SSH_OPTS: "-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=10"
+          USER: ${{ secrets.SERVER_USER }}
+          HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          scp $SSH_OPTS server/bin/gastrocore-server-linux $USER@$HOST:/tmp/gastrocore-server-new
+          ssh $SSH_OPTS $USER@$HOST "
+            chmod +x /tmp/gastrocore-server-new
+            sudo mv /tmp/gastrocore-server-new /usr/local/bin/gastrocore-server
+            sudo systemctl restart gastrocore || sudo pkill -f gastrocore-server || true
+            sleep 2
+            echo 'Deploy complete'
+          "

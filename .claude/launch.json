@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flutter-pos-web",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "run-online-preview.bat"],
+      "port": 8081
+    },
+    {
+      "name": "flutter-online-web",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "run-online-preview.bat"],
+      "port": 8081
+    }
+  ]
+}

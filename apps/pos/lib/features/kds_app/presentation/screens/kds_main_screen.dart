@@ -1,0 +1,724 @@
+/// KDS Main Screen — full-screen ticket grid for kitchen display.
+///
+/// Renders incoming order tickets sorted oldest-first.
+/// Color coding: new/pending = blue, in-progress = yellow, late >10 min = red.
+/// Tap a ticket to bump (mark ready). Long-press to recall (un-bump).
+library;
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/features/kitchen/domain/entities/kitchen_ticket_entity.dart';
+import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_provider.dart';
+import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_providers.dart';
+import 'package:gastrocore_pos/features/kds_app/router/kds_router.dart';
+
+// ---------------------------------------------------------------------------
+// Urgency helpers
+// ---------------------------------------------------------------------------
+
+enum _Urgency { fresh, inProgress, late }
+
+_Urgency _getUrgency(KitchenTicketEntity ticket, int lateThresholdMin) {
+  final elapsed = DateTime.now().difference(ticket.sentAt);
+  if (elapsed.inMinutes >= lateThresholdMin) return _Urgency.late;
+  if (ticket.status == KitchenTicketStatus.preparing) return _Urgency.inProgress;
+  return _Urgency.fresh;
+}
+
+Color _urgencyBorderColor(_Urgency u) => switch (u) {
+      _Urgency.fresh => const Color(0xFF3B82F6), // blue
+      _Urgency.inProgress => const Color(0xFFFBBF24), // yellow
+      _Urgency.late => const Color(0xFFEF4444), // red
+    };
+
+Color _urgencyBadgeColor(_Urgency u) => switch (u) {
+      _Urgency.fresh => const Color(0x1A3B82F6),
+      _Urgency.inProgress => const Color(0x1AFBBF24),
+      _Urgency.late => const Color(0x1AEF4444),
+    };
+
+String _urgencyLabel(_Urgency u) => switch (u) {
+      _Urgency.fresh => 'NEW',
+      _Urgency.inProgress => 'COOKING',
+      _Urgency.late => 'LATE',
+    };
+
+String _formatElapsed(KitchenTicketEntity ticket) {
+  final elapsed = DateTime.now().difference(ticket.sentAt);
+  final m = elapsed.inMinutes.toString().padLeft(2, '0');
+  final s = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
+  return '$m:$s';
+}
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
+
+class KdsMainScreen extends ConsumerStatefulWidget {
+  const KdsMainScreen({super.key});
+
+  @override
+  ConsumerState<KdsMainScreen> createState() => _KdsMainScreenState();
+}
+
+class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
+  late final Timer _clockTimer;
+  Set<String> _previousTicketIds = {};
+
+  // Physical bump-bar keyboard: Space / Enter bumps the oldest ticket.
+  late final FocusNode _keyFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+    _keyFocus = FocusNode();
+    _loadPrefs();
+  }
+
+  @override
+  void dispose() {
+    _clockTimer.cancel();
+    _keyFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final threshold = prefs.getInt('kds_late_threshold') ?? 10;
+    final largeFont = prefs.getBool('kds_large_font') ?? false;
+    if (mounted) {
+      ref.read(kdsLateThresholdProvider.notifier).state = threshold;
+      ref.read(kdsLargeFontProvider.notifier).state = largeFont;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Bump / Recall
+  // -------------------------------------------------------------------------
+
+  Future<void> _bumpTicket(String id) async {
+    HapticFeedback.lightImpact();
+    await ref.read(kitchenRepositoryProvider).completeTicket(id);
+  }
+
+  Future<void> _recallTicket(String id) async {
+    // Un-bump: restore status to 'preparing' so it reappears on the KDS.
+    HapticFeedback.mediumImpact();
+    final repo = ref.read(kitchenRepositoryProvider);
+    await repo.recallTicket(id);
+  }
+
+  // -------------------------------------------------------------------------
+  // New-ticket detection
+  // -------------------------------------------------------------------------
+
+  void _detectNewTickets(List<KitchenTicketEntity> tickets) {
+    final currentIds = tickets.map((t) => t.id).toSet();
+    final newIds = currentIds.difference(_previousTicketIds);
+    if (newIds.isNotEmpty && _previousTicketIds.isNotEmpty) {
+      _onNewTicket();
+    }
+    _previousTicketIds = currentIds;
+  }
+
+  void _onNewTicket() {
+    // Visual flash — sound integration point for audioplayers package.
+    HapticFeedback.vibrate();
+  }
+
+  // -------------------------------------------------------------------------
+  // Build
+  // -------------------------------------------------------------------------
+
+  @override
+  Widget build(BuildContext context) {
+    final ticketsAsync = ref.watch(activeKitchenTicketsProvider);
+    final completedAsync = ref.watch(completedTodayProvider);
+    final stationFilter = ref.watch(kdsStationFilterProvider);
+    final largeFont = ref.watch(kdsLargeFontProvider);
+    final lateThreshold = ref.watch(kdsLateThresholdProvider);
+
+    return KeyboardListener(
+      focusNode: _keyFocus,
+      autofocus: true,
+      onKeyEvent: (event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.space ||
+              key == LogicalKeyboardKey.enter) {
+            // Bump the oldest ticket via bump-bar hardware.
+            final tickets = ticketsAsync.valueOrNull ?? const [];
+            if (tickets.isNotEmpty) _bumpTicket(tickets.first.id);
+          }
+        }
+      },
+      child: ticketsAsync.when(
+        data: (allTickets) {
+          _detectNewTickets(allTickets);
+          final tickets = stationFilter == null
+              ? allTickets
+              : allTickets
+                  .where((t) => t.printerGroup == stationFilter)
+                  .toList();
+          final completed = completedAsync.valueOrNull ?? 0;
+          return _buildScaffold(
+            tickets,
+            completed,
+            largeFont: largeFont,
+            lateThreshold: lateThreshold,
+          );
+        },
+        loading: () =>
+            _buildScaffold(const [], 0, largeFont: false, lateThreshold: 10,
+                loading: true),
+        error: (e, _) => _buildScaffold(const [], 0,
+            largeFont: false, lateThreshold: 10, error: e.toString()),
+      ),
+    );
+  }
+
+  Widget _buildScaffold(
+    List<KitchenTicketEntity> tickets,
+    int completed, {
+    required bool largeFont,
+    required int lateThreshold,
+    bool loading = false,
+    String? error,
+  }) {
+    return Scaffold(
+      backgroundColor: AppColors.surfaceDim,
+      body: Column(
+        children: [
+          _buildTopBar(tickets, completed),
+          Expanded(
+            child: loading
+                ? const Center(child: CircularProgressIndicator())
+                : error != null
+                    ? _buildError(error)
+                    : _buildGrid(tickets,
+                        largeFont: largeFont,
+                        lateThreshold: lateThreshold),
+          ),
+          _buildFooter(),
+        ],
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Top bar
+  // -------------------------------------------------------------------------
+
+  Widget _buildTopBar(List<KitchenTicketEntity> tickets, int completed) {
+    final stationFilter = ref.watch(kdsStationFilterProvider);
+    final pending =
+        tickets.where((t) => t.status == KitchenTicketStatus.pending).length;
+    final cooking =
+        tickets.where((t) => t.status == KitchenTicketStatus.preparing).length;
+
+    return Container(
+      height: 72,
+      color: const Color(0xFF1A1D27),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        children: [
+          // Logo mark
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.restaurant,
+              size: 18,
+              color: Color(0xFF001944),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Text(
+            'KDS',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(width: 4),
+          if (stationFilter != null)
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.accentDim,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                stationFilter.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ),
+          const SizedBox(width: 32),
+          _statChip('PENDING', '$pending', AppColors.textPrimary),
+          const SizedBox(width: 16),
+          _statChip('COOKING', '$cooking', const Color(0xFFFBBF24)),
+          const SizedBox(width: 16),
+          _statChip('DONE TODAY', '$completed', AppColors.green),
+          const Spacer(),
+          // Action buttons
+          _topBarIcon(Icons.filter_list, 'Station filter',
+              () => context.go(KdsRoutes.stationFilter)),
+          const SizedBox(width: 8),
+          _topBarIcon(Icons.settings_outlined, 'Settings',
+              () => context.go(KdsRoutes.settings)),
+          const SizedBox(width: 8),
+          _topBarIcon(Icons.logout, 'Logout',
+              () => context.go(KdsRoutes.login)),
+        ],
+      ),
+    );
+  }
+
+  Widget _statChip(String label, String value, Color valueColor) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+            letterSpacing: 2.0,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: valueColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _topBarIcon(
+      IconData icon, String tooltip, VoidCallback onTap) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 20, color: AppColors.textSecondary),
+        ),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Ticket grid
+  // -------------------------------------------------------------------------
+
+  Widget _buildGrid(
+    List<KitchenTicketEntity> tickets, {
+    required bool largeFont,
+    required int lateThreshold,
+  }) {
+    if (tickets.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_circle_outline,
+              size: 72,
+              color: Color(0xFF4ADE80),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'All clear — no active tickets',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Adaptive columns based on available width.
+          final minCardWidth = largeFont ? 340.0 : 280.0;
+          final cols =
+              (constraints.maxWidth / minCardWidth).floor().clamp(1, 6);
+          return GridView.builder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: cols,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: largeFont ? 0.65 : 0.72,
+            ),
+            itemCount: tickets.length,
+            itemBuilder: (context, i) => _buildTicketCard(
+              tickets[i],
+              largeFont: largeFont,
+              lateThreshold: lateThreshold,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Ticket card
+  // -------------------------------------------------------------------------
+
+  Widget _buildTicketCard(
+    KitchenTicketEntity ticket, {
+    required bool largeFont,
+    required int lateThreshold,
+  }) {
+    final urgency = _getUrgency(ticket, lateThreshold);
+    final borderColor = _urgencyBorderColor(urgency);
+    final badgeColor = _urgencyBadgeColor(urgency);
+    final titleSize = largeFont ? 34.0 : 26.0;
+    final itemSize = largeFont ? 17.0 : 14.0;
+    final modSize = largeFont ? 14.0 : 12.0;
+
+    return GestureDetector(
+      onTap: () => _bumpTicket(ticket.id),
+      onLongPress: () => _recallTicket(ticket.id),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1D1F26),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: borderColor.withValues(alpha: 0.35),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 16,
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            // Urgency top-strip
+            Container(height: 5, color: borderColor),
+
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+              color: const Color(0xFF282A30).withValues(alpha: 0.5),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          ticket.tableName ?? '#${ticket.orderNumber}',
+                          style: TextStyle(
+                            fontSize: titleSize,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -1.5,
+                            height: 1.0,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Order ${ticket.orderNumber}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        if (ticket.waiterName != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Server: ${ticket.waiterName}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textDim,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        _formatElapsed(ticket),
+                        style: TextStyle(
+                          fontSize: largeFont ? 24 : 20,
+                          fontWeight: FontWeight.w800,
+                          color: borderColor,
+                          height: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: badgeColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _urgencyLabel(urgency),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: borderColor,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Items
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+                itemCount: ticket.items.length,
+                itemBuilder: (context, i) {
+                  final item = ticket.items[i];
+                  final mods = item.modifiersText
+                          ?.split(',')
+                          .map((s) => s.trim())
+                          .where((s) => s.isNotEmpty)
+                          .toList() ??
+                      const [];
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: largeFont ? 30 : 24,
+                          height: largeFont ? 30 : 24,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2F3D),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Center(
+                            child: Text(
+                              item.quantity == item.quantity.roundToDouble()
+                                  ? item.quantity.toInt().toString()
+                                  : item.quantity.toString(),
+                              style: TextStyle(
+                                fontSize: largeFont ? 16 : 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.productName,
+                                style: TextStyle(
+                                  fontSize: itemSize,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                  height: 1.3,
+                                ),
+                              ),
+                              ...mods.map(
+                                (mod) => Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    '\u2022 $mod',
+                                    style: TextStyle(
+                                      fontSize: modSize,
+                                      color: const Color(0xFFC3C6D7),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (item.notes != null &&
+                                  item.notes!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    '\u26A0 ${item.notes}',
+                                    style: TextStyle(
+                                      fontSize: modSize,
+                                      color: AppColors.orange,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // BUMP button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Container(
+                width: double.infinity,
+                height: largeFont ? 64 : 52,
+                decoration: BoxDecoration(
+                  color: AppColors.green,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      size: 20,
+                      color: Color(0xFF003A11),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'BUMP',
+                      style: TextStyle(
+                        fontSize: largeFont ? 20 : 17,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF003A11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Error
+  // -------------------------------------------------------------------------
+
+  Widget _buildError(String message) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, size: 52, color: AppColors.red),
+          const SizedBox(height: 12),
+          Text(
+            'KDS Error: $message',
+            style: const TextStyle(
+                fontSize: 14, color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Footer
+  // -------------------------------------------------------------------------
+
+  Widget _buildFooter() {
+    return Container(
+      height: 40,
+      color: const Color(0xFF1A1D27),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        children: [
+          _footerDot(AppColors.green, 'Live sync active'),
+          const SizedBox(width: 24),
+          _footerDot(AppColors.primary, 'Tap = bump • Long-press = recall • Space/Enter = bump oldest'),
+          const Spacer(),
+          const Text(
+            'GASTROCORE KDS',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textDim,
+              letterSpacing: 2.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _footerDot(Color color, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+}

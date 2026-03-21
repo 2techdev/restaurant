@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GastroCore KDS | Kitchen Display System</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "tertiary": "#e8b3ff",
+            "on-secondary": "#003911",
+            "on-tertiary": "#510074",
+            "primary-fixed-dim": "#afc6ff",
+            "secondary-container": "#05b046",
+            "outline": "#8c909f",
+            "tertiary-container": "#c567f4",
+            "on-error-container": "#ffdad6",
+            "primary-fixed": "#d9e2ff",
+            "on-primary-container": "#00275f",
+            "error-container": "#93000a",
+            "surface-bright": "#373940",
+            "secondary-fixed": "#72fe88",
+            "tertiary-fixed": "#f6d9ff",
+            "inverse-surface": "#e2e2eb",
+            "surface": "#111319",
+            "on-primary-fixed-variant": "#004398",
+            "tertiary-fixed-dim": "#e8b3ff",
+            "on-tertiary-fixed-variant": "#7201a2",
+            "surface-dim": "#111319",
+            "primary-container": "#528dff",
+            "on-primary-fixed": "#001a43",
+            "surface-variant": "#33343b",
+            "inverse-primary": "#0059c6",
+            "inverse-on-surface": "#2e3037",
+            "on-tertiary-fixed": "#310048",
+            "surface-container-highest": "#33343b",
+            "on-background": "#e2e2eb",
+            "surface-container-low": "#191b22",
+            "background": "#111319",
+            "surface-tint": "#afc6ff",
+            "on-secondary-fixed": "#002107",
+            "on-secondary-fixed-variant": "#00531c",
+            "on-error": "#690005",
+            "error": "#ffb4ab",
+            "on-surface-variant": "#c2c6d6",
+            "outline-variant": "#424753",
+            "surface-container-high": "#282a30",
+            "on-secondary-container": "#003a11",
+            "surface-container": "#1e1f26",
+            "secondary": "#53e16f",
+            "on-tertiary-container": "#460066",
+            "on-primary": "#002d6c",
+            "on-surface": "#e2e2eb",
+            "primary": "#afc6ff",
+            "surface-container-lowest": "#0c0e14",
+            "secondary-fixed-dim": "#53e16f",
+            "kds-accent": "#ff9500"
+          },
+          fontFamily: {
+            "headline": ["Inter"],
+            "body": ["Inter"],
+            "label": ["Inter"]
+          },
+          borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      line-height: 1;
+    }
+    ::-webkit-scrollbar {
+      height: 12px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111319;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #33343b;
+      border-radius: 6px;
+    }
+    .kds-gradient-orange {
+      background: linear-gradient(135deg, #ff9500 0%, #ff7b00 100%);
+    }
+    .kds-gradient-green {
+      background: linear-gradient(135deg, #05b046 0%, #038d37 100%);
+    }
+    .kds-ticket-shadow {
+      box-shadow: 0px 4px 24px rgba(0, 0, 0, 0.4);
+    }
+  </style>
+</head>
+<body class="bg-surface-dim text-on-surface font-body select-none overflow-hidden h-screen w-screen flex flex-col">
+<!-- Top Bar: Shared Component Logic Applied -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-8 h-20 bg-[#111319] backdrop-blur-xl bg-opacity-90 shadow-[0px_0px_48px_rgba(255,149,0,0.06)]">
+<div class="flex items-center gap-6">
+<h1 class="font-['Inter'] tracking-tighter font-black text-2xl text-on-surface">
+        GastroCore <span class="text-kds-accent">KITCHEN</span>
+</h1>
+<div class="h-8 w-[1px] bg-outline-variant opacity-20"></div>
+<div class="flex gap-4">
+<div class="flex flex-col">
+<span class="text-[10px] uppercase tracking-widest text-outline">Station</span>
+<span class="font-bold text-on-surface">HOT LINE 01</span>
+</div>
+<div class="flex flex-col ml-4">
+<span class="text-[10px] uppercase tracking-widest text-outline">Shift</span>
+<span class="font-bold text-on-surface">#402</span>
+</div>
+</div>
+</div>
+<!-- KDS Stats: High Visibility Center -->
+<div class="flex items-center gap-12">
+<div class="flex flex-col items-center">
+<span class="text-3xl font-black text-on-surface">12</span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-outline">Pending</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-3xl font-black text-kds-accent">04</span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-kds-accent">Preparing</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-3xl font-black text-secondary">28</span>
+<span class="text-[10px] font-bold uppercase tracking-widest text-secondary">Completed</span>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="text-right">
+<span class="block text-sm font-bold text-on-surface">Chef Marco</span>
+<span class="block text-[10px] text-outline">Executive Sous</span>
+</div>
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center border-2 border-outline-variant">
+<span class="material-symbols-outlined text-outline">person_2</span>
+</div>
+</div>
+</header>
+<!-- Side Navigation (Suppressed per "Task-Focused" rule, but using logic if it were rendered) -->
+<!-- Note: Kitchen intent page suppresses standard side nav to maximize horizontal space for tickets -->
+<!-- Main Content: Horizontal Ticket Display -->
+<main class="flex-1 mt-20 p-6 flex overflow-x-auto gap-6 items-start">
+<!-- Ticket Card 1: New (Green Timer) -->
+<section class="flex-none w-[400px] h-full flex flex-col bg-surface-container-low rounded-xl kds-ticket-shadow overflow-hidden">
+<!-- Ticket Header -->
+<div class="p-5 flex justify-between items-start border-b border-outline-variant/10">
+<div>
+<h2 class="text-2xl font-black text-on-surface uppercase leading-tight">Table 14</h2>
+<span class="text-sm font-semibold text-outline">Waiter: Ahmed Y.</span>
+</div>
+<div class="px-4 py-2 rounded-lg bg-secondary-container/20 border border-secondary/30 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-xl">schedule</span>
+<span class="text-2xl font-black text-secondary">04:12</span>
+</div>
+</div>
+<!-- Item List -->
+<div class="flex-1 overflow-y-auto p-5 space-y-4">
+<div class="flex gap-4 items-start">
+<span class="text-3xl font-black text-primary-container leading-none">2</span>
+<div class="flex-1">
+<p class="text-xl font-bold text-on-surface">Cheeseburger Classic</p>
+<p class="text-sm font-semibold text-kds-accent uppercase tracking-wide">+ Medium Rare</p>
+<p class="text-sm font-semibold text-kds-accent uppercase tracking-wide">+ No Onions</p>
+</div>
+</div>
+<div class="flex gap-4 items-start">
+<span class="text-3xl font-black text-primary-container leading-none">1</span>
+<div class="flex-1">
+<p class="text-xl font-bold text-on-surface">Truffle Fries</p>
+</div>
+</div>
+</div>
+<!-- Footer Action -->
+<button class="w-full py-6 kds-gradient-green text-on-secondary-container font-black text-2xl uppercase tracking-widest active:scale-[0.98] transition-transform">
+        HAZIR
+      </button>
+</section>
+<!-- Ticket Card 2: Warning (Orange Timer) -->
+<section class="flex-none w-[400px] h-full flex flex-col bg-surface-container-low rounded-xl kds-ticket-shadow overflow-hidden">
+<div class="p-5 flex justify-between items-start border-b border-outline-variant/10">
+<div>
+<h2 class="text-2xl font-black text-on-surface uppercase leading-tight">Table 08</h2>
+<span class="text-sm font-semibold text-outline">Waiter: Selin K.</span>
+</div>
+<div class="px-4 py-2 rounded-lg bg-kds-accent/20 border border-kds-accent/30 flex items-center gap-2">
+<span class="material-symbols-outlined text-kds-accent text-xl">schedule</span>
+<span class="text-2xl font-black text-kds-accent">14:55</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-5 space-y-4">
+<div class="flex gap-4 items-start">
+<span class="text-3xl font-black text-primary-container leading-none">1</span>
+<div class="flex-1">
+<p class="text-xl font-bold text-on-surface">Grilled Sea Bass</p>
+<p class="text-sm font-semibold text-kds-accent uppercase tracking-wide">+ Extra Lemon</p>
+<div class="mt-2 px-3 py-1 bg-error-container/30 rounded border border-error/30 inline-flex items-center gap-2">
+<span class="material-symbols-outlined text-error text-sm">warning</span>
+<span class="text-xs font-black text-error uppercase">ALLERGY: SHELLFISH</span>
+</div>
+</div>
+</div>
+<div class="flex gap-4 items-start">
+<span class="text-3xl font-black text-primary-container leading-none">3</span>
+<div class="flex-1">
+<p class="text-xl font-bold text-on-surface">Garden Salad</p>
+<p class="text-sm font-semibold text-kds-accent uppercase tracking-wide">+ Sauce on side</p>
+</div>
+</div>
+</div>
+<button class="w-full py-6 kds-gradient-green text-on-secondary-container font-black text-2xl uppercase tracking-widest active:scale-[0.98] transition-transform">
+        HAZIR
+      </button>
+</section>
+<!-- Ticket Card 3: Critical (Red Timer) -->
+<section class="flex-none w-[400px] h-full flex flex-col bg-surface-container-low rounded-xl kds-ticket-shadow overflow-hidden border-2 border-error/30">
+<div class="p-5 flex justify-between items-start border-b border-outline-variant/10 bg-error/5">
+<div>
+<h2 class="text-2xl font-black text-on-surface uppercase leading-tight">B-02 (Takeout)</h2>
+<span class="text-sm font-semibold text-outline">Platform: Deliveroo</span>
+</div>
+<div class="px-4 py-2 rounded-lg bg-error/20 border border-error/30 flex items-center gap-2">
+<span class="material-symbols-outlined text-error text-xl">priority_high</span>
+<span class="text-2xl font-black text-error">22:08</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-5 space-y-4">
+<div class="flex gap-4 items-start">
+<span class="text-3xl font-black text-primary-container leading-none">4</span>
+<div class="flex-1">
+<p class="text-xl font-bold text-on-surface">Spicy Chicken Wings (12pc)</p>
+<p class="text-sm font-semibold text-kds-accent uppercase tracking-wide">+ Blue Cheese Dip</p>
+</div>
+</div>
+<div class="flex gap-4 items-start">
+<span class="text-3xl font-black text-primary-container leading-none">2</span>
+<div class="flex-1">
+<p class="text-xl font-bold text-on-surface">Margherita Pizza Large</p>
+<p class="text-sm font-semibold text-kds-accent uppercase tracking-wide">+ Extra Basil</p>
+</div>
+</div>
+<div class="flex gap-4 items-start">
+<span class="text-3xl font-black text-primary-container leading-none">1</span>
+<div class="flex-1">
+<p class="text-xl font-bold text-on-surface">Coca Cola 1.5L</p>
+</div>
+</div>
+</div>
+<button class="w-full py-6 kds-gradient-green text-on-secondary-container font-black text-2xl uppercase tracking-widest active:scale-[0.98] transition-transform">
+        HAZIR
+      </button>
+</section>
+<!-- Ticket Card 4: Standard -->
+<section class="flex-none w-[400px] h-full flex flex-col bg-surface-container-low rounded-xl kds-ticket-shadow overflow-hidden">
+<div class="p-5 flex justify-between items-start border-b border-outline-variant/10">
+<div>
+<h2 class="text-2xl font-black text-on-surface uppercase leading-tight">Table 21</h2>
+<span class="text-sm font-semibold text-outline">Waiter: Ahmed Y.</span>
+</div>
+<div class="px-4 py-2 rounded-lg bg-secondary-container/20 border border-secondary/30 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-xl">schedule</span>
+<span class="text-2xl font-black text-secondary">02:40</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-5 space-y-4">
+<div class="flex gap-4 items-start">
+<span class="text-3xl font-black text-primary-container leading-none">1</span>
+<div class="flex-1">
+<p class="text-xl font-bold text-on-surface">Ribeye Steak 400g</p>
+<p class="text-sm font-semibold text-kds-accent uppercase tracking-wide">+ Well Done</p>
+<p class="text-sm font-semibold text-kds-accent uppercase tracking-wide">+ Asparagus</p>
+</div>
+</div>
+</div>
+<button class="w-full py-6 kds-gradient-green text-on-secondary-container font-black text-2xl uppercase tracking-widest active:scale-[0.98] transition-transform">
+        HAZIR
+      </button>
+</section>
+</main>
+<!-- Bottom Control Bar (Contextual) -->
+<footer class="h-16 bg-surface-container-high flex items-center justify-between px-8 border-t border-outline-variant/10">
+<div class="flex gap-4">
+<button class="px-6 h-10 bg-surface-container-highest rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-surface-bright transition-colors">
+<span class="material-symbols-outlined text-sm">history</span>
+        RECENT BUMPS
+      </button>
+<button class="px-6 h-10 bg-surface-container-highest rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-surface-bright transition-colors">
+<span class="material-symbols-outlined text-sm">print</span>
+        REPRINT TICKET
+      </button>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-secondary animate-pulse"></div>
+<span class="text-xs font-bold text-outline">SYSTEM ONLINE</span>
+</div>
+<span class="text-xs font-bold text-outline uppercase tracking-widest">16:42:08</span>
+</div>
+</footer>
+</body></html>

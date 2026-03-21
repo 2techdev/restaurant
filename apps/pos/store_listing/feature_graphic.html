@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GastroCore – Feature Graphic 1024×500</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1024px;
+    height: 500px;
+    overflow: hidden;
+    font-family: 'Segoe UI', Arial, sans-serif;
+  }
+  .graphic {
+    width: 1024px;
+    height: 500px;
+    background: linear-gradient(135deg, #0f1b35 0%, #1a1a2e 45%, #2d0a12 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 70px;
+    overflow: hidden;
+  }
+
+  /* Background decorative circles */
+  .bg-circle {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.07;
+  }
+  .bg-circle-1 { width: 600px; height: 600px; background: #e94560; top: -200px; right: -100px; }
+  .bg-circle-2 { width: 400px; height: 400px; background: #3498db; bottom: -150px; left: -80px; }
+  .bg-circle-3 { width: 200px; height: 200px; background: #2ecc71; top: 50px; left: 350px; opacity: 0.05; }
+
+  /* Grid lines overlay */
+  .grid-overlay {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+
+  /* Left: branding */
+  .left { position: relative; z-index: 2; flex: 1; }
+
+  .brand-logo {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+  .logo-icon {
+    width: 64px;
+    height: 64px;
+    background: #e94560;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    box-shadow: 0 8px 32px rgba(233,69,96,0.5);
+  }
+  .logo-text {
+    font-size: 42px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -1px;
+  }
+  .logo-text span { color: #e94560; }
+
+  .tagline {
+    font-size: 20px;
+    color: #a0c4ff;
+    font-weight: 400;
+    margin-bottom: 30px;
+    line-height: 1.4;
+    max-width: 400px;
+  }
+
+  .feature-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    max-width: 440px;
+  }
+  .pill {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #e0e0e0;
+    padding: 7px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
+  }
+  .pill.accent { background: rgba(233,69,96,0.2); border-color: rgba(233,69,96,0.5); color: #ff8fa3; }
+
+  /* Right: device mockup */
+  .right { position: relative; z-index: 2; display: flex; align-items: center; gap: 20px; }
+
+  .device {
+    background: #16213e;
+    border-radius: 28px;
+    border: 3px solid #2a3a5e;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    position: relative;
+  }
+  .device-tablet {
+    width: 240px;
+    height: 340px;
+  }
+  .device-phone {
+    width: 140px;
+    height: 290px;
+    margin-top: 30px;
+  }
+
+  .device-screen {
+    width: 100%;
+    height: 100%;
+    background: #0f1b35;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* Tablet: POS mini mockup */
+  .mini-topbar {
+    background: #e94560;
+    border-radius: 8px;
+    padding: 6px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .mini-logo { font-size: 11px; font-weight: 700; color: #fff; }
+  .mini-time { font-size: 10px; color: rgba(255,255,255,0.8); }
+
+  .mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; flex: 1; }
+  .mini-item {
+    background: #16213e;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 3px;
+    font-size: 16px;
+  }
+  .mini-item-price { font-size: 8px; color: #e94560; font-weight: 700; }
+
+  .mini-total {
+    background: #2ecc71;
+    border-radius: 8px;
+    padding: 8px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #000;
+  }
+
+  /* Phone: KDS mini mockup */
+  .mini-kds-top {
+    background: #e94560;
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+  }
+  .mini-ticket {
+    background: #16213e;
+    border-radius: 6px;
+    padding: 7px;
+    border-left: 3px solid #f39c12;
+    flex: 1;
+  }
+  .mini-t-title { font-size: 9px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .mini-t-item { font-size: 8px; color: #a0a0b0; padding: 2px 0; }
+  .mini-ticket-2 {
+    background: #16213e;
+    border-radius: 6px;
+    padding: 7px;
+    border-left: 3px solid #2ecc71;
+    flex: 1;
+  }
+
+  /* Swiss flag accent */
+  .swiss-badge {
+    position: absolute;
+    bottom: 30px;
+    right: 70px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 8px 16px;
+    z-index: 3;
+  }
+  .swiss-flag {
+    width: 24px;
+    height: 24px;
+    background: #ff0000;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 900;
+  }
+  .swiss-text { font-size: 13px; color: #e0e0e0; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="graphic">
+  <div class="bg-circle bg-circle-1"></div>
+  <div class="bg-circle bg-circle-2"></div>
+  <div class="bg-circle bg-circle-3"></div>
+  <div class="grid-overlay"></div>
+
+  <div class="left">
+    <div class="brand-logo">
+      <div class="logo-icon">🍽</div>
+      <div class="logo-text">Gastro<span>Core</span></div>
+    </div>
+    <div class="tagline">
+      The smart restaurant POS.<br>
+      Offline-first. Swiss-compliant. Everywhere.
+    </div>
+    <div class="feature-pills">
+      <div class="pill accent">🇨🇭 MWST-konform</div>
+      <div class="pill">📡 Offline-first</div>
+      <div class="pill">👨‍🍳 Kitchen Display</div>
+      <div class="pill">💳 TWINT · Wallee · MyPOS</div>
+      <div class="pill">🪑 Tischplan</div>
+      <div class="pill">🌍 DE / FR / IT / EN</div>
+      <div class="pill">🆓 Kostenlos starten</div>
+    </div>
+  </div>
+
+  <div class="right">
+    <!-- Tablet mockup -->
+    <div class="device device-tablet">
+      <div class="device-screen">
+        <div class="mini-topbar">
+          <div class="mini-logo">GastroCore</div>
+          <div class="mini-time">19:34</div>
+        </div>
+        <div class="mini-grid">
+          <div class="mini-item">🥗<div class="mini-item-price">12.50</div></div>
+          <div class="mini-item">🍖<div class="mini-item-price">28.00</div></div>
+          <div class="mini-item">🍕<div class="mini-item-price">17.00</div></div>
+          <div class="mini-item">🥩<div class="mini-item-price">34.00</div></div>
+          <div class="mini-item">🍹<div class="mini-item-price">8.50</div></div>
+          <div class="mini-item">🍰<div class="mini-item-price">9.00</div></div>
+          <div class="mini-item">🍺<div class="mini-item-price">6.00</div></div>
+          <div class="mini-item">☕<div class="mini-item-price">4.50</div></div>
+          <div class="mini-item">🥤<div class="mini-item-price">3.80</div></div>
+        </div>
+        <div style="display:flex;gap:4px;margin-top:2px;">
+          <div style="flex:1;background:#16213e;border-radius:6px;padding:6px;font-size:9px;color:#a0a0b0">
+            <div style="color:#fff;font-weight:700;margin-bottom:3px">Tisch 7</div>
+            <div>×2 Salat</div>
+            <div>×1 Suppe</div>
+          </div>
+          <div style="flex:1;">
+            <div style="background:#16213e;border-radius:6px;padding:5px;font-size:8px;color:#a0a0b0;margin-bottom:4px">CHF 76.90<br><span style="color:#e94560;font-weight:700">inkl. MWST</span></div>
+            <div class="mini-total">BEZAHLEN</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phone mockup -->
+    <div class="device device-phone">
+      <div class="device-screen">
+        <div class="mini-kds-top">KÜCHE · KDS</div>
+        <div class="mini-ticket">
+          <div class="mini-t-title">⚠ Tisch 3 · 15:21</div>
+          <div class="mini-t-item">× Schnitzel</div>
+          <div class="mini-t-item">× Rösti</div>
+          <div class="mini-t-item">× Pommes ×2</div>
+        </div>
+        <div class="mini-ticket-2">
+          <div class="mini-t-title">✓ Tisch 7 · 07:45</div>
+          <div class="mini-t-item">× Salat ×2</div>
+          <div class="mini-t-item">× Suppe</div>
+        </div>
+        <div style="background:#2ecc71;border-radius:6px;padding:6px;text-align:center;font-size:9px;font-weight:700;color:#000">FERTIG</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="swiss-badge">
+    <div class="swiss-flag">✚</div>
+    <div class="swiss-text">Made for Swiss restaurants</div>
+  </div>
+</div>
+</body>
+</html>

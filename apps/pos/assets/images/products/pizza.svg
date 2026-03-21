@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="12" fill="#FF6B35" opacity="0.12"/>
+  <!-- Pizza slice -->
+  <path d="M40 12 L68 64 L12 64 Z" fill="#FF9F0A" opacity="0.85"/>
+  <path d="M40 12 L68 64 L12 64 Z" fill="none" stroke="#FF6B35" stroke-width="2"/>
+  <!-- Crust -->
+  <path d="M12 64 Q40 72 68 64" fill="#E8A87C" stroke="#FF6B35" stroke-width="2"/>
+  <!-- Toppings -->
+  <circle cx="40" cy="42" r="4" fill="#FF3B30" opacity="0.8"/>
+  <circle cx="30" cy="52" r="3" fill="#FF3B30" opacity="0.8"/>
+  <circle cx="50" cy="52" r="3" fill="#FF3B30" opacity="0.8"/>
+  <circle cx="36" cy="34" r="2.5" fill="#34C759" opacity="0.9"/>
+  <circle cx="46" cy="36" r="2" fill="#34C759" opacity="0.9"/>
+</svg>

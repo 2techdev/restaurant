@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=800, initial-scale=1">
+<title>GastroCore POS - UI Prototype</title>
+<style>
+  :root {
+    --bg-primary: #0f1117;
+    --bg-secondary: #1a1d27;
+    --bg-card: #222633;
+    --bg-card-hover: #2a2f3d;
+    --bg-input: #181b24;
+    --accent: #4f8cff;
+    --accent-hover: #3a7af0;
+    --accent-dim: #2a4a8a;
+    --green: #34c759;
+    --green-dim: #1a3a25;
+    --orange: #ff9500;
+    --orange-dim: #3a2a10;
+    --red: #ff3b30;
+    --red-dim: #3a1a18;
+    --yellow: #ffd60a;
+    --purple: #af52de;
+    --text-primary: #f0f0f5;
+    --text-secondary: #8e8e9a;
+    --text-dim: #5a5a6a;
+    --border: #2a2d3a;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    width: 1280px;
+    height: 800px;
+    overflow: hidden;
+    user-select: none;
+  }
+  .screen { display:none; width:1280px; height:800px; position:absolute; top:0; left:0; }
+  .screen.active { display:flex; }
+
+  /* ===== PIN LOGIN ===== */
+  #login { justify-content:center; align-items:center; background: linear-gradient(135deg, #0f1117 0%, #1a1d27 100%); }
+  .login-container { text-align:center; width: 420px; }
+  .login-logo { font-size:42px; font-weight:800; margin-bottom:8px; letter-spacing:-1px; }
+  .login-logo span { color: var(--accent); }
+  .login-subtitle { color: var(--text-secondary); font-size:14px; margin-bottom:40px; }
+  .login-avatars { display:flex; gap:16px; justify-content:center; margin-bottom:32px; flex-wrap:wrap; }
+  .avatar-btn {
+    width:80px; height:96px; background:var(--bg-card); border:2px solid var(--border);
+    border-radius:var(--radius); cursor:pointer; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:6px; transition:all .15s;
+  }
+  .avatar-btn:hover, .avatar-btn.selected { border-color:var(--accent); background:var(--accent-dim); }
+  .avatar-icon { width:40px; height:40px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:18px; font-weight:700; color:#fff; }
+  .avatar-name { font-size:11px; color:var(--text-secondary); }
+  .pin-display { display:flex; gap:12px; justify-content:center; margin-bottom:24px; }
+  .pin-dot {
+    width:16px; height:16px; border-radius:50%; border:2px solid var(--text-dim);
+    transition:all .15s;
+  }
+  .pin-dot.filled { background:var(--accent); border-color:var(--accent); }
+  .pin-pad { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; max-width:280px; margin:0 auto; }
+  .pin-key {
+    height:64px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm);
+    font-size:24px; font-weight:600; color:var(--text-primary); cursor:pointer; transition:all .1s;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .pin-key:hover { background:var(--bg-card-hover); }
+  .pin-key:active { transform:scale(0.95); background:var(--accent-dim); }
+  .pin-key.accent { background:var(--accent); border-color:var(--accent); }
+  .pin-key.accent:hover { background:var(--accent-hover); }
+  .pin-key.danger { color:var(--red); }
+
+  /* ===== SHIFT OPEN ===== */
+  #shift-open { flex-direction:column; align-items:center; justify-content:center; }
+  .shift-card {
+    background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-lg);
+    padding:48px; width:500px; text-align:center;
+  }
+  .shift-title { font-size:24px; font-weight:700; margin-bottom:8px; }
+  .shift-info { color:var(--text-secondary); font-size:14px; margin-bottom:32px; }
+  .cash-input-group { margin-bottom:32px; }
+  .cash-label { font-size:13px; color:var(--text-secondary); margin-bottom:8px; text-align:left; }
+  .cash-input {
+    width:100%; height:64px; background:var(--bg-input); border:2px solid var(--border);
+    border-radius:var(--radius); font-size:32px; font-weight:700; color:var(--text-primary);
+    text-align:center; outline:none; padding:0 20px;
+  }
+  .cash-input:focus { border-color:var(--accent); }
+  .cash-currency { font-size:14px; color:var(--text-dim); margin-top:4px; text-align:right; }
+  .btn-primary {
+    width:100%; height:56px; background:var(--accent); border:none; border-radius:var(--radius);
+    font-size:16px; font-weight:700; color:#fff; cursor:pointer; transition:all .15s;
+  }
+  .btn-primary:hover { background:var(--accent-hover); }
+
+  /* ===== MAIN POS SCREEN ===== */
+  #pos { flex-direction:column; }
+  .pos-topbar {
+    height:56px; background:var(--bg-secondary); border-bottom:1px solid var(--border);
+    display:flex; align-items:center; padding:0 16px; gap:12px; flex-shrink:0;
+  }
+  .topbar-logo { font-size:18px; font-weight:800; }
+  .topbar-logo span { color:var(--accent); }
+  .topbar-divider { width:1px; height:28px; background:var(--border); }
+  .topbar-info { display:flex; align-items:center; gap:8px; }
+  .topbar-badge {
+    padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600;
+  }
+  .badge-green { background:var(--green-dim); color:var(--green); }
+  .badge-orange { background:var(--orange-dim); color:var(--orange); }
+  .topbar-text { font-size:13px; color:var(--text-secondary); }
+  .topbar-spacer { flex:1; }
+  .topbar-btn {
+    height:36px; padding:0 14px; background:var(--bg-card); border:1px solid var(--border);
+    border-radius:var(--radius-sm); font-size:13px; color:var(--text-primary); cursor:pointer;
+    display:flex; align-items:center; gap:6px; transition:all .1s;
+  }
+  .topbar-btn:hover { background:var(--bg-card-hover); }
+  .topbar-user { display:flex; align-items:center; gap:8px; }
+  .user-avatar-sm {
+    width:32px; height:32px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:13px; font-weight:700; color:#fff;
+  }
+
+  .pos-body { display:flex; flex:1; overflow:hidden; }
+
+  /* Left: Categories */
+  .pos-categories {
+    width:90px; background:var(--bg-secondary); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; gap:4px; padding:8px 6px; overflow-y:auto;
+  }
+  .cat-btn {
+    width:78px; min-height:72px; background:var(--bg-card); border:2px solid transparent;
+    border-radius:var(--radius-sm); cursor:pointer; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:4px; padding:6px 4px; transition:all .12s;
+    flex-shrink:0;
+  }
+  .cat-btn:hover { background:var(--bg-card-hover); }
+  .cat-btn.active { border-color:var(--accent); background:var(--accent-dim); }
+  .cat-icon { font-size:22px; }
+  .cat-name { font-size:10px; color:var(--text-secondary); text-align:center; line-height:1.2; }
+  .cat-btn.active .cat-name { color:var(--text-primary); }
+
+  /* Center: Product Grid */
+  .pos-products {
+    flex:1; padding:12px; overflow-y:auto; display:flex; flex-direction:column; gap:12px;
+  }
+  .products-search {
+    display:flex; gap:8px; flex-shrink:0;
+  }
+  .search-input {
+    flex:1; height:44px; background:var(--bg-card); border:1px solid var(--border);
+    border-radius:var(--radius-sm); padding:0 16px; font-size:14px; color:var(--text-primary);
+    outline:none;
+  }
+  .search-input:focus { border-color:var(--accent); }
+  .search-input::placeholder { color:var(--text-dim); }
+  .products-grid {
+    display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; flex:1; align-content:start;
+  }
+  .product-card {
+    height:100px; background:var(--bg-card); border:1px solid var(--border);
+    border-radius:var(--radius-sm); padding:12px; cursor:pointer; transition:all .1s;
+    display:flex; flex-direction:column; justify-content:space-between; position:relative;
+  }
+  .product-card:hover { background:var(--bg-card-hover); border-color:var(--text-dim); }
+  .product-card:active { transform:scale(0.97); }
+  .product-name { font-size:13px; font-weight:600; line-height:1.3; }
+  .product-price { font-size:15px; font-weight:700; color:var(--accent); }
+  .product-badge {
+    position:absolute; top:8px; right:8px; width:8px; height:8px;
+    border-radius:50%; background:var(--green);
+  }
+
+  /* Right: Order Panel */
+  .pos-order {
+    width:340px; background:var(--bg-secondary); border-left:1px solid var(--border);
+    display:flex; flex-direction:column;
+  }
+  .order-header {
+    padding:12px 16px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .order-title { font-size:15px; font-weight:700; }
+  .order-table-badge {
+    padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600;
+    background:var(--accent-dim); color:var(--accent);
+  }
+  .order-items { flex:1; overflow-y:auto; padding:8px 0; }
+  .order-item {
+    display:flex; align-items:center; padding:10px 16px; gap:10px;
+    border-bottom:1px solid var(--border); transition:background .1s;
+  }
+  .order-item:hover { background:var(--bg-card); }
+  .item-qty {
+    width:28px; height:28px; background:var(--accent-dim); border-radius:6px;
+    display:flex; align-items:center; justify-content:center; font-size:13px;
+    font-weight:700; color:var(--accent); flex-shrink:0;
+  }
+  .item-info { flex:1; }
+  .item-name { font-size:13px; font-weight:500; }
+  .item-mods { font-size:11px; color:var(--text-dim); margin-top:2px; }
+  .item-price { font-size:13px; font-weight:600; flex-shrink:0; }
+  .order-empty { flex:1; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:8px; color:var(--text-dim); }
+  .order-empty-icon { font-size:48px; opacity:0.3; }
+  .order-empty-text { font-size:14px; }
+
+  .order-totals { padding:12px 16px; border-top:1px solid var(--border); }
+  .total-row { display:flex; justify-content:space-between; padding:4px 0; }
+  .total-label { font-size:13px; color:var(--text-secondary); }
+  .total-value { font-size:13px; font-weight:600; }
+  .total-row.grand { padding:8px 0 4px; margin-top:4px; border-top:1px solid var(--border); }
+  .total-row.grand .total-label { font-size:16px; font-weight:700; color:var(--text-primary); }
+  .total-row.grand .total-value { font-size:20px; font-weight:800; color:var(--accent); }
+
+  .order-actions { padding:12px 16px; display:flex; flex-direction:column; gap:8px;
+    border-top:1px solid var(--border); }
+  .order-action-row { display:flex; gap:8px; }
+  .btn-order {
+    flex:1; height:48px; border:none; border-radius:var(--radius-sm); font-size:14px;
+    font-weight:700; cursor:pointer; transition:all .12s; display:flex; align-items:center;
+    justify-content:center; gap:6px;
+  }
+  .btn-order:active { transform:scale(0.97); }
+  .btn-kitchen { background:var(--orange); color:#000; }
+  .btn-kitchen:hover { background:#e68600; }
+  .btn-pay { background:var(--green); color:#fff; }
+  .btn-pay:hover { background:#2db84e; }
+  .btn-secondary { background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); }
+  .btn-secondary:hover { background:var(--bg-card-hover); }
+
+  /* ===== FLOOR PLAN ===== */
+  #floor-plan { flex-direction:column; }
+  .floor-body { display:flex; flex:1; overflow:hidden; }
+  .floor-sidebar {
+    width:200px; background:var(--bg-secondary); border-right:1px solid var(--border);
+    padding:16px; display:flex; flex-direction:column; gap:8px;
+  }
+  .floor-tab {
+    height:44px; background:var(--bg-card); border:1px solid var(--border);
+    border-radius:var(--radius-sm); display:flex; align-items:center; padding:0 14px;
+    font-size:13px; font-weight:600; cursor:pointer; transition:all .12s;
+  }
+  .floor-tab:hover { background:var(--bg-card-hover); }
+  .floor-tab.active { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+  .floor-stats { margin-top:auto; padding-top:16px; border-top:1px solid var(--border); }
+  .stat-row { display:flex; justify-content:space-between; padding:6px 0; }
+  .stat-label { font-size:12px; color:var(--text-secondary); }
+  .stat-value { font-size:12px; font-weight:700; }
+
+  .floor-canvas {
+    flex:1; padding:24px; position:relative; overflow:hidden;
+    background:
+      radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0 / 40px 40px;
+  }
+  .table-obj {
+    position:absolute; border-radius:var(--radius-sm); cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-weight:700; transition:all .15s; border:2px solid;
+  }
+  .table-obj:hover { transform:scale(1.05); z-index:10; }
+  .table-available { background:#1a2a1a; border-color:var(--green); color:var(--green); }
+  .table-occupied { background:#2a1a18; border-color:var(--red); color:var(--red); }
+  .table-reserved { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+  .table-dirty { background:var(--orange-dim); border-color:var(--orange); color:var(--orange); }
+  .table-number { font-size:18px; }
+  .table-status { font-size:9px; text-transform:uppercase; letter-spacing:0.5px; margin-top:2px; }
+  .table-time { font-size:10px; opacity:0.7; margin-top:1px; }
+  .table-guests { font-size:10px; opacity:0.7; }
+  .table-round { border-radius:50% !important; }
+
+  /* ===== KITCHEN DISPLAY ===== */
+  #kds { flex-direction:column; }
+  .kds-topbar {
+    height:56px; background:#1a0a00; border-bottom:2px solid var(--orange);
+    display:flex; align-items:center; padding:0 16px; gap:16px;
+  }
+  .kds-title { font-size:20px; font-weight:800; color:var(--orange); }
+  .kds-stats { display:flex; gap:24px; margin-left:auto; }
+  .kds-stat { text-align:center; }
+  .kds-stat-value { font-size:20px; font-weight:800; }
+  .kds-stat-label { font-size:10px; color:var(--text-dim); text-transform:uppercase; }
+  .kds-body {
+    flex:1; display:flex; gap:12px; padding:12px; overflow-x:auto;
+    background:var(--bg-primary);
+  }
+  .kds-ticket {
+    min-width:240px; max-width:240px; background:var(--bg-card); border-radius:var(--radius);
+    display:flex; flex-direction:column; border:2px solid var(--border); flex-shrink:0;
+  }
+  .kds-ticket.urgent { border-color:var(--red); }
+  .kds-ticket.warning { border-color:var(--orange); }
+  .kds-ticket.fresh { border-color:var(--green); }
+  .kds-ticket-header {
+    padding:10px 14px; border-bottom:1px solid var(--border);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .kds-ticket-table { font-size:18px; font-weight:800; }
+  .kds-ticket-time { font-size:14px; font-weight:700; }
+  .kds-ticket-time.urgent { color:var(--red); }
+  .kds-ticket-time.warning { color:var(--orange); }
+  .kds-ticket-time.fresh { color:var(--green); }
+  .kds-ticket-meta { padding:6px 14px; font-size:11px; color:var(--text-dim);
+    border-bottom:1px solid var(--border); display:flex; justify-content:space-between; }
+  .kds-ticket-items { flex:1; padding:8px 0; overflow-y:auto; }
+  .kds-item {
+    padding:6px 14px; display:flex; gap:8px; align-items:flex-start;
+  }
+  .kds-item-qty { font-size:16px; font-weight:800; min-width:24px; color:var(--accent); }
+  .kds-item-name { font-size:14px; font-weight:600; }
+  .kds-item-mods { font-size:11px; color:var(--orange); margin-top:2px; }
+  .kds-item-note { font-size:11px; color:var(--yellow); font-style:italic; margin-top:2px; }
+  .kds-ticket-footer { padding:8px 14px; border-top:1px solid var(--border); }
+  .kds-bump-btn {
+    width:100%; height:44px; background:var(--green); border:none; border-radius:var(--radius-sm);
+    font-size:14px; font-weight:800; color:#fff; cursor:pointer; text-transform:uppercase;
+    letter-spacing:1px; transition:all .12s;
+  }
+  .kds-bump-btn:hover { background:#2db84e; }
+  .kds-bump-btn:active { transform:scale(0.97); }
+
+  /* ===== PAYMENT SCREEN ===== */
+  #payment { flex-direction:column; align-items:center; justify-content:center;
+    background:linear-gradient(135deg, #0f1117, #1a1d27); }
+  .payment-container { display:flex; gap:32px; width:900px; }
+  .payment-summary {
+    width:340px; background:var(--bg-secondary); border:1px solid var(--border);
+    border-radius:var(--radius-lg); padding:24px; display:flex; flex-direction:column;
+  }
+  .payment-summary-title { font-size:16px; font-weight:700; margin-bottom:16px; }
+  .payment-items { flex:1; overflow-y:auto; margin-bottom:16px; }
+  .payment-item { display:flex; justify-content:space-between; padding:8px 0;
+    border-bottom:1px solid var(--border); font-size:13px; }
+  .payment-total-section { border-top:2px solid var(--border); padding-top:12px; }
+  .payment-total-row { display:flex; justify-content:space-between; padding:4px 0; }
+  .payment-grand { font-size:24px; font-weight:800; color:var(--accent); margin-top:8px; }
+
+  .payment-methods {
+    flex:1; display:flex; flex-direction:column; gap:16px;
+  }
+  .payment-methods-title { font-size:16px; font-weight:700; }
+  .payment-method-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .method-btn {
+    height:80px; background:var(--bg-card); border:2px solid var(--border);
+    border-radius:var(--radius); cursor:pointer; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:6px; transition:all .12s;
+  }
+  .method-btn:hover { border-color:var(--text-dim); }
+  .method-btn.selected { border-color:var(--accent); background:var(--accent-dim); }
+  .method-icon { font-size:28px; }
+  .method-label { font-size:13px; font-weight:600; }
+
+  .payment-numpad {
+    display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:16px;
+  }
+  .pay-key {
+    height:56px; background:var(--bg-card); border:1px solid var(--border);
+    border-radius:var(--radius-sm); font-size:20px; font-weight:600; color:var(--text-primary);
+    cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .1s;
+  }
+  .pay-key:hover { background:var(--bg-card-hover); }
+  .payment-tendered {
+    background:var(--bg-input); border:2px solid var(--border); border-radius:var(--radius);
+    height:56px; display:flex; align-items:center; justify-content:center;
+    font-size:28px; font-weight:800; margin-top:8px;
+  }
+  .payment-change { text-align:center; margin-top:12px; }
+  .change-label { font-size:12px; color:var(--text-secondary); }
+  .change-amount { font-size:28px; font-weight:800; color:var(--green); }
+  .btn-complete-payment {
+    width:100%; height:56px; background:var(--green); border:none; border-radius:var(--radius);
+    font-size:16px; font-weight:800; color:#fff; cursor:pointer; margin-top:16px;
+    transition:all .12s; text-transform:uppercase; letter-spacing:1px;
+  }
+  .btn-complete-payment:hover { background:#2db84e; }
+
+  /* ===== NAV DOTS ===== */
+  .screen-nav {
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+    display:flex; gap:8px; background:rgba(0,0,0,0.7); padding:8px 16px;
+    border-radius:24px; z-index:100; backdrop-filter:blur(10px);
+  }
+  .nav-dot {
+    padding:6px 14px; border-radius:16px; font-size:11px; font-weight:600;
+    cursor:pointer; transition:all .15s; color:var(--text-secondary);
+    background:transparent; border:1px solid transparent;
+  }
+  .nav-dot:hover { color:var(--text-primary); background:var(--bg-card); }
+  .nav-dot.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  /* ===== SHIFT CLOSE ===== */
+  #shift-close { flex-direction:column; align-items:center; justify-content:center; }
+  .close-container { display:flex; gap:24px; width:900px; }
+  .close-summary {
+    flex:1; background:var(--bg-secondary); border:1px solid var(--border);
+    border-radius:var(--radius-lg); padding:24px;
+  }
+  .close-title { font-size:18px; font-weight:700; margin-bottom:20px; }
+  .summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+  .summary-card {
+    background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px; text-align:center;
+  }
+  .summary-card-value { font-size:24px; font-weight:800; }
+  .summary-card-label { font-size:11px; color:var(--text-secondary); margin-top:4px; text-transform:uppercase; }
+  .close-breakdown { margin-top:16px; }
+  .breakdown-row { display:flex; justify-content:space-between; padding:8px 0;
+    border-bottom:1px solid var(--border); font-size:14px; }
+
+  .close-cash {
+    width:320px; background:var(--bg-secondary); border:1px solid var(--border);
+    border-radius:var(--radius-lg); padding:24px; display:flex; flex-direction:column;
+  }
+  .variance-display { text-align:center; margin:20px 0; padding:16px; border-radius:var(--radius);
+    background:var(--bg-card); }
+  .variance-amount { font-size:28px; font-weight:800; }
+  .variance-label { font-size:12px; color:var(--text-secondary); margin-top:4px; }
+  .variance-ok { color:var(--green); }
+  .variance-off { color:var(--red); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--text-dim); }
+</style>
+</head>
+<body>
+
+<!-- ===== SCREEN 1: PIN LOGIN ===== -->
+<div id="login" class="screen active">
+  <div class="login-container">
+    <div class="login-logo">Gastro<span>Core</span></div>
+    <div class="login-subtitle">Restaurant POS System</div>
+    <div class="login-avatars">
+      <div class="avatar-btn selected" onclick="selectAvatar(this)">
+        <div class="avatar-icon" style="background:#4f8cff;">AY</div>
+        <div class="avatar-name">Ahmet Y.</div>
+      </div>
+      <div class="avatar-btn" onclick="selectAvatar(this)">
+        <div class="avatar-icon" style="background:#34c759;">MK</div>
+        <div class="avatar-name">Mehmet K.</div>
+      </div>
+      <div class="avatar-btn" onclick="selectAvatar(this)">
+        <div class="avatar-icon" style="background:#ff9500;">SD</div>
+        <div class="avatar-name">Selin D.</div>
+      </div>
+      <div class="avatar-btn" onclick="selectAvatar(this)">
+        <div class="avatar-icon" style="background:#af52de;">EG</div>
+        <div class="avatar-name">Elif G.</div>
+      </div>
+    </div>
+    <div class="pin-display">
+      <div class="pin-dot filled"></div>
+      <div class="pin-dot filled"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+    </div>
+    <div class="pin-pad">
+      <div class="pin-key">1</div><div class="pin-key">2</div><div class="pin-key">3</div>
+      <div class="pin-key">4</div><div class="pin-key">5</div><div class="pin-key">6</div>
+      <div class="pin-key">7</div><div class="pin-key">8</div><div class="pin-key">9</div>
+      <div class="pin-key danger">&#9003;</div><div class="pin-key">0</div>
+      <div class="pin-key accent" onclick="goTo('shift-open')">&#10140;</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN 2: SHIFT OPEN ===== -->
+<div id="shift-open" class="screen">
+  <div class="shift-card">
+    <div style="font-size:36px;margin-bottom:16px;">&#9748;</div>
+    <div class="shift-title">Vardiya Ac</div>
+    <div class="shift-info">20 Mart 2026, Cuma &bull; 09:15 &bull; Ahmet Yilmaz</div>
+    <div class="cash-input-group">
+      <div class="cash-label">Kasa Acilis Tutari</div>
+      <input class="cash-input" type="text" value="500.00" readonly>
+      <div class="cash-currency">CHF</div>
+    </div>
+    <button class="btn-primary" onclick="goTo('pos')">Vardiyayi Baslat</button>
+  </div>
+</div>
+
+<!-- ===== SCREEN 3: MAIN POS ===== -->
+<div id="pos" class="screen">
+  <div class="pos-topbar">
+    <div class="topbar-logo">Gastro<span>Core</span></div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-info">
+      <span class="topbar-badge badge-green">&#9679; Online</span>
+      <span class="topbar-text">Vardiya #0047</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-btn" onclick="goTo('floor-plan')">&#9638; Masalar</div>
+    <div class="topbar-btn" onclick="goTo('kds')">&#9832; Mutfak</div>
+    <div class="topbar-btn" onclick="goTo('shift-close')">&#9881; Vardiya</div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-user">
+      <div class="user-avatar-sm" style="background:#4f8cff;">AY</div>
+      <span style="font-size:13px;font-weight:600;">Ahmet</span>
+    </div>
+  </div>
+  <div class="pos-body">
+    <!-- Categories -->
+    <div class="pos-categories">
+      <div class="cat-btn active"><div class="cat-icon">&#9733;</div><div class="cat-name">Populer</div></div>
+      <div class="cat-btn"><div class="cat-icon">&#127860;</div><div class="cat-name">Ana Yemek</div></div>
+      <div class="cat-btn"><div class="cat-icon">&#127830;</div><div class="cat-name">Pizza</div></div>
+      <div class="cat-btn"><div class="cat-icon">&#129367;</div><div class="cat-name">Salata</div></div>
+      <div class="cat-btn"><div class="cat-icon">&#127858;</div><div class="cat-name">Burger</div></div>
+      <div class="cat-btn"><div class="cat-icon">&#127836;</div><div class="cat-name">Makarna</div></div>
+      <div class="cat-btn"><div class="cat-icon">&#129473;</div><div class="cat-name">Tatli</div></div>
+      <div class="cat-btn"><div class="cat-icon">&#127866;</div><div class="cat-name">Icecek</div></div>
+      <div class="cat-btn"><div class="cat-icon">&#127863;</div><div class="cat-name">Sarap</div></div>
+      <div class="cat-btn"><div class="cat-icon">&#9749;</div><div class="cat-name">Sicak Icecek</div></div>
+    </div>
+    <!-- Products -->
+    <div class="pos-products">
+      <div class="products-search">
+        <input class="search-input" placeholder="&#128269; Urun ara..." type="text">
+      </div>
+      <div class="products-grid">
+        <div class="product-card"><div class="product-name">Adana Kebap</div><div class="product-price">CHF 28.50</div><div class="product-badge"></div></div>
+        <div class="product-card"><div class="product-name">Iskender</div><div class="product-price">CHF 32.00</div><div class="product-badge"></div></div>
+        <div class="product-card"><div class="product-name">Karisik Izgara</div><div class="product-price">CHF 38.00</div><div class="product-badge"></div></div>
+        <div class="product-card"><div class="product-name">Tavuk Sis</div><div class="product-price">CHF 24.50</div><div class="product-badge"></div></div>
+        <div class="product-card"><div class="product-name">Lahmacun</div><div class="product-price">CHF 14.00</div><div class="product-badge"></div></div>
+        <div class="product-card"><div class="product-name">Pide Kasarli</div><div class="product-price">CHF 18.00</div></div>
+        <div class="product-card"><div class="product-name">Mercimek Corbasi</div><div class="product-price">CHF 9.50</div></div>
+        <div class="product-card"><div class="product-name">Humus</div><div class="product-price">CHF 12.00</div></div>
+        <div class="product-card"><div class="product-name">Cacik</div><div class="product-price">CHF 8.00</div></div>
+        <div class="product-card"><div class="product-name">Sigara Boregi</div><div class="product-price">CHF 11.00</div></div>
+        <div class="product-card"><div class="product-name">Imam Bayildi</div><div class="product-price">CHF 16.50</div></div>
+        <div class="product-card"><div class="product-name">Kuzu Tandir</div><div class="product-price">CHF 34.00</div></div>
+        <div class="product-card"><div class="product-name">Beyti Sarma</div><div class="product-price">CHF 29.00</div></div>
+        <div class="product-card"><div class="product-name">Ali Nazik</div><div class="product-price">CHF 26.00</div></div>
+        <div class="product-card"><div class="product-name">Kofte</div><div class="product-price">CHF 22.00</div></div>
+        <div class="product-card"><div class="product-name">Doner Porsiyon</div><div class="product-price">CHF 21.00</div></div>
+      </div>
+    </div>
+    <!-- Order Panel -->
+    <div class="pos-order">
+      <div class="order-header">
+        <div class="order-title">Siparis #0128</div>
+        <div class="order-table-badge">Masa 7</div>
+      </div>
+      <div class="order-items">
+        <div class="order-item">
+          <div class="item-qty">2</div>
+          <div class="item-info"><div class="item-name">Adana Kebap</div><div class="item-mods">Acili, Lavash</div></div>
+          <div class="item-price">57.00</div>
+        </div>
+        <div class="order-item">
+          <div class="item-qty">1</div>
+          <div class="item-info"><div class="item-name">Iskender</div><div class="item-mods">Yogurtlu</div></div>
+          <div class="item-price">32.00</div>
+        </div>
+        <div class="order-item">
+          <div class="item-qty">1</div>
+          <div class="item-info"><div class="item-name">Mercimek Corbasi</div></div>
+          <div class="item-price">9.50</div>
+        </div>
+        <div class="order-item">
+          <div class="item-qty">2</div>
+          <div class="item-info"><div class="item-name">Ayran</div></div>
+          <div class="item-price">9.00</div>
+        </div>
+        <div class="order-item">
+          <div class="item-qty">1</div>
+          <div class="item-info"><div class="item-name">Kunefe</div><div class="item-mods">Ekstra Fistik</div></div>
+          <div class="item-price">16.00</div>
+        </div>
+      </div>
+      <div class="order-totals">
+        <div class="total-row"><span class="total-label">Ara Toplam</span><span class="total-value">CHF 123.50</span></div>
+        <div class="total-row"><span class="total-label">KDV (%8.1)</span><span class="total-value">CHF 10.00</span></div>
+        <div class="total-row grand"><span class="total-label">Toplam</span><span class="total-value">CHF 123.50</span></div>
+      </div>
+      <div class="order-actions">
+        <div class="order-action-row">
+          <button class="btn-order btn-kitchen">&#9832; Mutfaga Gonder</button>
+        </div>
+        <div class="order-action-row">
+          <button class="btn-order btn-secondary">&#9998; Indirim</button>
+          <button class="btn-order btn-pay" onclick="goTo('payment')">&#10004; Odeme</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN 4: FLOOR PLAN ===== -->
+<div id="floor-plan" class="screen">
+  <div class="pos-topbar">
+    <div class="topbar-logo">Gastro<span>Core</span></div>
+    <div class="topbar-divider"></div>
+    <span style="font-size:15px;font-weight:700;">Masa Plani</span>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-btn" onclick="goTo('pos')">&#8592; POS</div>
+  </div>
+  <div class="floor-body">
+    <div class="floor-sidebar">
+      <div class="floor-tab active">&#127968; Ana Salon</div>
+      <div class="floor-tab">&#127774; Teras</div>
+      <div class="floor-tab">&#127867; Bar</div>
+      <div class="floor-tab">&#127775; VIP</div>
+      <div class="floor-stats">
+        <div class="stat-row"><span class="stat-label">Toplam Masa</span><span class="stat-value">18</span></div>
+        <div class="stat-row"><span class="stat-label">Dolu</span><span class="stat-value" style="color:var(--red)">7</span></div>
+        <div class="stat-row"><span class="stat-label">Bos</span><span class="stat-value" style="color:var(--green)">9</span></div>
+        <div class="stat-row"><span class="stat-label">Rezerve</span><span class="stat-value" style="color:var(--accent)">2</span></div>
+      </div>
+    </div>
+    <div class="floor-canvas">
+      <!-- Row 1 -->
+      <div class="table-obj table-occupied" style="left:40px;top:30px;width:120px;height:80px;" onclick="goTo('pos')">
+        <div class="table-number">M1</div><div class="table-status">Dolu</div><div class="table-time">45dk</div>
+      </div>
+      <div class="table-obj table-occupied" style="left:200px;top:30px;width:120px;height:80px;">
+        <div class="table-number">M2</div><div class="table-status">Dolu</div><div class="table-time">22dk</div>
+      </div>
+      <div class="table-obj table-available" style="left:360px;top:30px;width:120px;height:80px;">
+        <div class="table-number">M3</div><div class="table-status">Bos</div>
+      </div>
+      <div class="table-obj table-reserved" style="left:520px;top:30px;width:120px;height:80px;">
+        <div class="table-number">M4</div><div class="table-status">Rezerve</div><div class="table-time">20:00</div>
+      </div>
+      <!-- Row 2 -->
+      <div class="table-obj table-available" style="left:40px;top:160px;width:120px;height:80px;">
+        <div class="table-number">M5</div><div class="table-status">Bos</div>
+      </div>
+      <div class="table-obj table-occupied" style="left:200px;top:160px;width:120px;height:80px;">
+        <div class="table-number">M6</div><div class="table-status">Dolu</div><div class="table-time">58dk</div>
+      </div>
+      <div class="table-obj table-occupied" style="left:360px;top:140px;width:120px;height:120px;" onclick="goTo('pos')">
+        <div class="table-number">M7</div><div class="table-status">Dolu</div><div class="table-guests">4 kisi</div><div class="table-time">12dk</div>
+      </div>
+      <div class="table-obj table-available" style="left:520px;top:160px;width:120px;height:80px;">
+        <div class="table-number">M8</div><div class="table-status">Bos</div>
+      </div>
+      <!-- Round tables -->
+      <div class="table-obj table-round table-available" style="left:680px;top:40px;width:100px;height:100px;">
+        <div class="table-number">B1</div><div class="table-status">Bos</div>
+      </div>
+      <div class="table-obj table-round table-occupied" style="left:680px;top:170px;width:100px;height:100px;">
+        <div class="table-number">B2</div><div class="table-status">Dolu</div><div class="table-time">33dk</div>
+      </div>
+      <!-- Row 3 -->
+      <div class="table-obj table-dirty" style="left:40px;top:300px;width:120px;height:80px;">
+        <div class="table-number">M9</div><div class="table-status">Kirli</div>
+      </div>
+      <div class="table-obj table-available" style="left:200px;top:300px;width:120px;height:80px;">
+        <div class="table-number">M10</div><div class="table-status">Bos</div>
+      </div>
+      <div class="table-obj table-occupied" style="left:360px;top:300px;width:120px;height:80px;">
+        <div class="table-number">M11</div><div class="table-status">Dolu</div><div class="table-time">5dk</div>
+      </div>
+      <div class="table-obj table-available" style="left:520px;top:300px;width:120px;height:80px;">
+        <div class="table-number">M12</div><div class="table-status">Bos</div>
+      </div>
+      <div class="table-obj table-round table-reserved" style="left:680px;top:310px;width:100px;height:100px;">
+        <div class="table-number">B3</div><div class="table-status">Rezerve</div><div class="table-time">21:00</div>
+      </div>
+      <!-- Large tables row 4 -->
+      <div class="table-obj table-occupied" style="left:40px;top:430px;width:280px;height:80px;">
+        <div class="table-number">L1</div><div class="table-status">Dolu - 8 kisi</div><div class="table-time">1s 15dk</div>
+      </div>
+      <div class="table-obj table-available" style="left:360px;top:430px;width:280px;height:80px;">
+        <div class="table-number">L2</div><div class="table-status">Bos - 10 kisilik</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN 5: KITCHEN DISPLAY ===== -->
+<div id="kds" class="screen">
+  <div class="kds-topbar">
+    <div class="kds-title">&#9832; MUTFAK</div>
+    <div class="topbar-btn" onclick="goTo('pos')" style="border-color:var(--orange);color:var(--orange);">&#8592; POS</div>
+    <div class="kds-stats">
+      <div class="kds-stat"><div class="kds-stat-value" style="color:var(--red);">3</div><div class="kds-stat-label">Bekleyen</div></div>
+      <div class="kds-stat"><div class="kds-stat-value" style="color:var(--orange);">2</div><div class="kds-stat-label">Hazirlanan</div></div>
+      <div class="kds-stat"><div class="kds-stat-value" style="color:var(--green);">14</div><div class="kds-stat-label">Tamamlanan</div></div>
+      <div class="kds-stat"><div class="kds-stat-value">8:42</div><div class="kds-stat-label">Ort. Sure</div></div>
+    </div>
+  </div>
+  <div class="kds-body">
+    <div class="kds-ticket urgent">
+      <div class="kds-ticket-header">
+        <div class="kds-ticket-table">M1</div>
+        <div class="kds-ticket-time urgent">18:32</div>
+      </div>
+      <div class="kds-ticket-meta"><span>#0125</span><span>Ahmet</span></div>
+      <div class="kds-ticket-items">
+        <div class="kds-item"><span class="kds-item-qty">2</span><div><div class="kds-item-name">Adana Kebap</div><div class="kds-item-mods">Acili, Lavash</div></div></div>
+        <div class="kds-item"><span class="kds-item-qty">1</span><div><div class="kds-item-name">Karisik Izgara</div><div class="kds-item-note">&#9888; Fistik alerjisi</div></div></div>
+        <div class="kds-item"><span class="kds-item-qty">1</span><div><div class="kds-item-name">Kuzu Tandir</div></div></div>
+      </div>
+      <div class="kds-ticket-footer"><button class="kds-bump-btn">&#10004; HAZIR</button></div>
+    </div>
+    <div class="kds-ticket warning">
+      <div class="kds-ticket-header">
+        <div class="kds-ticket-table">M7</div>
+        <div class="kds-ticket-time warning">12:15</div>
+      </div>
+      <div class="kds-ticket-meta"><span>#0128</span><span>Selin</span></div>
+      <div class="kds-ticket-items">
+        <div class="kds-item"><span class="kds-item-qty">1</span><div><div class="kds-item-name">Mercimek Corbasi</div></div></div>
+        <div class="kds-item"><span class="kds-item-qty">2</span><div><div class="kds-item-name">Lahmacun</div><div class="kds-item-mods">Bol Maydanoz</div></div></div>
+      </div>
+      <div class="kds-ticket-footer"><button class="kds-bump-btn">&#10004; HAZIR</button></div>
+    </div>
+    <div class="kds-ticket fresh">
+      <div class="kds-ticket-header">
+        <div class="kds-ticket-table">M2</div>
+        <div class="kds-ticket-time fresh">3:42</div>
+      </div>
+      <div class="kds-ticket-meta"><span>#0129</span><span>Mehmet</span></div>
+      <div class="kds-ticket-items">
+        <div class="kds-item"><span class="kds-item-qty">1</span><div><div class="kds-item-name">Iskender</div><div class="kds-item-mods">Yogurtlu, Bol Sos</div></div></div>
+        <div class="kds-item"><span class="kds-item-qty">1</span><div><div class="kds-item-name">Tavuk Sis</div></div></div>
+        <div class="kds-item"><span class="kds-item-qty">2</span><div><div class="kds-item-name">Cacik</div></div></div>
+      </div>
+      <div class="kds-ticket-footer"><button class="kds-bump-btn">&#10004; HAZIR</button></div>
+    </div>
+    <div class="kds-ticket fresh">
+      <div class="kds-ticket-header">
+        <div class="kds-ticket-table">B2</div>
+        <div class="kds-ticket-time fresh">1:10</div>
+      </div>
+      <div class="kds-ticket-meta"><span>#0130 &bull; Kurs 2</span><span>Elif</span></div>
+      <div class="kds-ticket-items">
+        <div class="kds-item"><span class="kds-item-qty">2</span><div><div class="kds-item-name">Kunefe</div><div class="kds-item-mods">Ekstra Fistik</div></div></div>
+        <div class="kds-item"><span class="kds-item-qty">1</span><div><div class="kds-item-name">Baklava (6'li)</div></div></div>
+      </div>
+      <div class="kds-ticket-footer"><button class="kds-bump-btn">&#10004; HAZIR</button></div>
+    </div>
+    <div class="kds-ticket fresh">
+      <div class="kds-ticket-header">
+        <div class="kds-ticket-table">L1</div>
+        <div class="kds-ticket-time fresh">0:25</div>
+      </div>
+      <div class="kds-ticket-meta"><span>#0131</span><span>Ahmet</span></div>
+      <div class="kds-ticket-items">
+        <div class="kds-item"><span class="kds-item-qty">3</span><div><div class="kds-item-name">Karisik Izgara</div></div></div>
+        <div class="kds-item"><span class="kds-item-qty">2</span><div><div class="kds-item-name">Ali Nazik</div></div></div>
+        <div class="kds-item"><span class="kds-item-qty">2</span><div><div class="kds-item-name">Beyti Sarma</div></div></div>
+        <div class="kds-item"><span class="kds-item-qty">1</span><div><div class="kds-item-name">Kofte</div><div class="kds-item-note">Az pismiis</div></div></div>
+        <div class="kds-item"><span class="kds-item-qty">4</span><div><div class="kds-item-name">Sigara Boregi</div></div></div>
+      </div>
+      <div class="kds-ticket-footer"><button class="kds-bump-btn">&#10004; HAZIR</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN 6: PAYMENT ===== -->
+<div id="payment" class="screen">
+  <div style="position:absolute;top:16px;left:16px;">
+    <div class="topbar-btn" onclick="goTo('pos')">&#8592; Siparise Don</div>
+  </div>
+  <div class="payment-container">
+    <div class="payment-summary">
+      <div class="payment-summary-title">Siparis #0128 &bull; Masa 7</div>
+      <div class="payment-items">
+        <div class="payment-item"><span>2x Adana Kebap</span><span>57.00</span></div>
+        <div class="payment-item"><span>1x Iskender</span><span>32.00</span></div>
+        <div class="payment-item"><span>1x Mercimek Corbasi</span><span>9.50</span></div>
+        <div class="payment-item"><span>2x Ayran</span><span>9.00</span></div>
+        <div class="payment-item"><span>1x Kunefe</span><span>16.00</span></div>
+      </div>
+      <div class="payment-total-section">
+        <div class="payment-total-row"><span style="color:var(--text-secondary)">Ara Toplam</span><span>123.50</span></div>
+        <div class="payment-total-row"><span style="color:var(--text-secondary)">KDV (%8.1)</span><span>10.00</span></div>
+        <div class="payment-total-row" style="justify-content:center;margin-top:12px;">
+          <span class="payment-grand">CHF 123.50</span>
+        </div>
+      </div>
+    </div>
+    <div class="payment-methods">
+      <div class="payment-methods-title">Odeme Yontemi</div>
+      <div class="payment-method-grid">
+        <div class="method-btn selected"><div class="method-icon">&#128181;</div><div class="method-label">Nakit</div></div>
+        <div class="method-btn"><div class="method-icon">&#128179;</div><div class="method-label">Kredi Karti</div></div>
+        <div class="method-btn"><div class="method-icon">&#128178;</div><div class="method-label">Banka Karti</div></div>
+        <div class="method-btn"><div class="method-icon">&#9986;</div><div class="method-label">Bol Ode</div></div>
+      </div>
+      <div class="payment-tendered">CHF 150.00</div>
+      <div class="payment-numpad">
+        <div class="pay-key">1</div><div class="pay-key">2</div><div class="pay-key">3</div>
+        <div class="pay-key">4</div><div class="pay-key">5</div><div class="pay-key">6</div>
+        <div class="pay-key">7</div><div class="pay-key">8</div><div class="pay-key">9</div>
+        <div class="pay-key" style="color:var(--red)">C</div><div class="pay-key">0</div><div class="pay-key">.</div>
+      </div>
+      <div class="payment-change">
+        <div class="change-label">Para Ustu</div>
+        <div class="change-amount">CHF 26.50</div>
+      </div>
+      <button class="btn-complete-payment">&#10004; Odemeyi Tamamla</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN 7: SHIFT CLOSE ===== -->
+<div id="shift-close" class="screen">
+  <div style="position:absolute;top:16px;left:16px;">
+    <div class="topbar-btn" onclick="goTo('pos')">&#8592; POS</div>
+  </div>
+  <div style="text-align:center;margin-bottom:24px;padding-top:20px;">
+    <div style="font-size:20px;font-weight:700;">Vardiya Kapat</div>
+    <div style="color:var(--text-secondary);font-size:13px;margin-top:4px;">20 Mart 2026 &bull; 09:15 - 23:30 &bull; Ahmet Yilmaz</div>
+  </div>
+  <div class="close-container" style="margin:0 auto;">
+    <div class="close-summary">
+      <div class="close-title">Vardiya Ozeti</div>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-card-value" style="color:var(--green);">CHF 4,285.50</div><div class="summary-card-label">Toplam Satis</div></div>
+        <div class="summary-card"><div class="summary-card-value">47</div><div class="summary-card-label">Siparis Sayisi</div></div>
+        <div class="summary-card"><div class="summary-card-value">CHF 91.18</div><div class="summary-card-label">Ortalama Siparis</div></div>
+        <div class="summary-card"><div class="summary-card-value">132</div><div class="summary-card-label">Misafir Sayisi</div></div>
+      </div>
+      <div class="close-title" style="font-size:14px;">Odeme Dagilimi</div>
+      <div class="close-breakdown">
+        <div class="breakdown-row"><span>&#128181; Nakit</span><span style="font-weight:700;">CHF 2,156.00</span></div>
+        <div class="breakdown-row"><span>&#128179; Kredi Karti</span><span style="font-weight:700;">CHF 1,832.50</span></div>
+        <div class="breakdown-row"><span>&#128178; Banka Karti</span><span style="font-weight:700;">CHF 297.00</span></div>
+      </div>
+      <div class="close-title" style="font-size:14px;margin-top:16px;">Islemler</div>
+      <div class="close-breakdown">
+        <div class="breakdown-row"><span>Iptal (Void)</span><span style="color:var(--red);font-weight:700;">2 (CHF 48.00)</span></div>
+        <div class="breakdown-row"><span>Indirim</span><span style="color:var(--orange);font-weight:700;">5 (CHF 62.50)</span></div>
+        <div class="breakdown-row"><span>Iade</span><span style="color:var(--red);font-weight:700;">1 (CHF 28.50)</span></div>
+      </div>
+    </div>
+    <div class="close-cash">
+      <div class="close-title">Kasa Sayimi</div>
+      <div class="cash-input-group">
+        <div class="cash-label">Kasadaki Nakit</div>
+        <input class="cash-input" type="text" value="2,648.00" readonly style="font-size:24px;">
+      </div>
+      <div class="variance-display">
+        <div class="variance-amount variance-off">-CHF 8.00</div>
+        <div class="variance-label">Beklenen: CHF 2,656.00</div>
+      </div>
+      <div class="cash-input-group" style="margin-top:12px;">
+        <div class="cash-label">Notlar (opsiyonel)</div>
+        <input class="cash-input" type="text" placeholder="Aciklama..." style="font-size:14px;text-align:left;">
+      </div>
+      <div style="margin-top:auto;">
+        <button class="btn-primary" onclick="goTo('login')">Vardiyayi Kapat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Navigation -->
+<div class="screen-nav">
+  <div class="nav-dot active" onclick="goTo('login')">Giris</div>
+  <div class="nav-dot" onclick="goTo('shift-open')">Vardiya Ac</div>
+  <div class="nav-dot" onclick="goTo('pos')">POS</div>
+  <div class="nav-dot" onclick="goTo('floor-plan')">Masalar</div>
+  <div class="nav-dot" onclick="goTo('kds')">Mutfak</div>
+  <div class="nav-dot" onclick="goTo('payment')">Odeme</div>
+  <div class="nav-dot" onclick="goTo('shift-close')">Vardiya Kapat</div>
+</div>
+
+<script>
+function goTo(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  document.querySelectorAll('.nav-dot').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('.nav-dot').forEach(d => {
+    if(d.textContent.toLowerCase().includes(getNavLabel(screenId))) d.classList.add('active');
+  });
+}
+function getNavLabel(id) {
+  const map = {'login':'giris','shift-open':'vardiya ac','pos':'pos','floor-plan':'masa','kds':'mutfak','payment':'odeme','shift-close':'vardiya kapat'};
+  return map[id] || '';
+}
+function selectAvatar(el) {
+  document.querySelectorAll('.avatar-btn').forEach(a => a.classList.remove('selected'));
+  el.classList.add('selected');
+}
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+document.querySelectorAll('.method-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+  });
+});
+</script>
+</body>
+</html>

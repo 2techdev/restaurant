@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GastroCore POS - S03 Sales Screen</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "error-container": "#93000a",
+                        "on-primary-fixed-variant": "#004398",
+                        "primary-container": "#528dff",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed-variant": "#00531c",
+                        "on-secondary-container": "#003a11",
+                        "on-tertiary-container": "#460066",
+                        "on-surface": "#e2e2eb",
+                        "inverse-surface": "#e2e2eb",
+                        "surface-tint": "#afc6ff",
+                        "on-primary-container": "#00275f",
+                        "primary-fixed-dim": "#afc6ff",
+                        "tertiary-container": "#c567f4",
+                        "on-secondary": "#003911",
+                        "surface-variant": "#33343b",
+                        "tertiary-fixed": "#f6d9ff",
+                        "tertiary-fixed-dim": "#e8b3ff",
+                        "surface-container-high": "#282a30",
+                        "primary-fixed": "#d9e2ff",
+                        "surface-container": "#1e1f26",
+                        "outline": "#8c909f",
+                        "surface-bright": "#373940",
+                        "inverse-on-surface": "#2e3037",
+                        "on-tertiary-fixed": "#310048",
+                        "surface-container-lowest": "#0c0e14",
+                        "secondary-fixed": "#72fe88",
+                        "on-primary": "#002d6c",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed": "#001a43",
+                        "tertiary": "#e8b3ff",
+                        "on-background": "#e2e2eb",
+                        "secondary-container": "#05b046",
+                        "inverse-primary": "#0059c6",
+                        "outline-variant": "#424753",
+                        "secondary": "#53e16f",
+                        "surface-container-highest": "#33343b",
+                        "on-tertiary": "#510074",
+                        "secondary-fixed-dim": "#53e16f",
+                        "surface": "#111319",
+                        "background": "#111319",
+                        "primary": "#afc6ff",
+                        "on-surface-variant": "#c2c6d6",
+                        "surface-container-low": "#191b22",
+                        "on-error": "#690005",
+                        "surface-dim": "#111319",
+                        "on-secondary-fixed": "#002107",
+                        "on-tertiary-fixed-variant": "#7201a2"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #33343b; border-radius: 10px; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface overflow-hidden h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 docked full-width h-[56px] bg-[#111319] dark:bg-[#111319] backdrop-blur-md bg-opacity-80 shadow-[0px_0px_48px_0px_rgba(79,140,255,0.06)] no-border">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#4f8cff] text-2xl" data-icon="restaurant">restaurant</span>
+<h1 class="font-['Inter'] tracking-tight font-extrabold text-[1.5rem] text-[#F0F0F5]">GastroCore</h1>
+<div class="ml-6 flex items-center gap-3">
+<span class="flex items-center gap-1.5 px-2 py-0.5 bg-secondary-container text-on-secondary-container rounded-full text-[10px] font-bold uppercase tracking-wider">
+<span class="w-1.5 h-1.5 rounded-full bg-[#53e16f] animate-pulse"></span>
+                    Online
+                </span>
+<span class="text-[#8E8E9A] text-xs font-medium">Shift #0047</span>
+</div>
+</div>
+<nav class="hidden md:flex items-center gap-6 h-full">
+<button class="text-[#F0F0F5] border-b-2 border-[#4f8cff] pb-1 h-full flex items-center px-2">Tables</button>
+<button class="text-[#8E8E9A] font-medium hover:bg-[#373940] transition-colors duration-200 px-2 h-full">Kitchen</button>
+<button class="text-[#8E8E9A] font-medium hover:bg-[#373940] transition-colors duration-200 px-2 h-full">Reports</button>
+</nav>
+<div class="flex items-center gap-3">
+<div class="text-right hidden sm:block">
+<p class="text-[0.875rem] font-bold text-[#F0F0F5] leading-none">Staff Member</p>
+<p class="text-[0.7rem] text-[#8E8E9A]">Floor Manager</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center overflow-hidden">
+<img alt="Staff Member" class="w-full h-full object-cover" data-alt="Professional male staff member portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDL7vaDNMFHeUmc7X6yEMbY9djBzFkjn-xhvQL24FFvuf8gtwrj-FZwbn2TRchlsKRC4DNcKRDEJNO5WRt3CxrluR3iRmHWunJJP7A5F0qszZf1rDqqRZT_F5yKitQPEIO0qVhQh4Jp0MlC7L9aAug3jS29XrTecOz-rk702NLdsq8tsDiPTk6ZuTkvx2LX9bO-UJ4Z5Syq5Y9b3F8Um-sdZUrKLqUjjEw9-x1fjvqzm-NC4b7fK6qyue5Jny198zk0fKhn1kr7XG0k"/>
+</div>
+</div>
+</header>
+<!-- Main Content Container (Post-TopBar) -->
+<main class="flex flex-1 pt-[56px] overflow-hidden">
+<!-- Left Sidebar: Categories (Fixed ~90px) -->
+<aside class="w-[100px] flex flex-col bg-surface-container-low overflow-y-auto scrollbar-hide py-4 gap-2">
+<!-- Active Category -->
+<button class="flex flex-col items-center justify-center py-4 px-1 gap-1 text-[#4f8cff] bg-[#4f8cff]/10 border-l-4 border-[#4f8cff] transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="text-[10px] font-bold">Populer</span>
+</button>
+<!-- Inactive Categories -->
+<button class="flex flex-col items-center justify-center py-4 px-1 gap-1 text-[#8E8E9A] hover:bg-surface-bright transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="restaurant_menu">restaurant_menu</span>
+<span class="text-[10px] font-medium">Ana Yemek</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 px-1 gap-1 text-[#8E8E9A] hover:bg-surface-bright transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="local_pizza">local_pizza</span>
+<span class="text-[10px] font-medium">Pizza</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 px-1 gap-1 text-[#8E8E9A] hover:bg-surface-bright transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="nutrition">nutrition</span>
+<span class="text-[10px] font-medium">Salata</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 px-1 gap-1 text-[#8E8E9A] hover:bg-surface-bright transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="lunch_dining">lunch_dining</span>
+<span class="text-[10px] font-medium">Burger</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 px-1 gap-1 text-[#8E8E9A] hover:bg-surface-bright transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="dinner_dining">dinner_dining</span>
+<span class="text-[10px] font-medium">Makarna</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 px-1 gap-1 text-[#8E8E9A] hover:bg-surface-bright transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="cake">cake</span>
+<span class="text-[10px] font-medium">Tatli</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 px-1 gap-1 text-[#8E8E9A] hover:bg-surface-bright transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="local_bar">local_bar</span>
+<span class="text-[10px] font-medium">Icecek</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 px-1 gap-1 text-[#8E8E9A] hover:bg-surface-bright transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="wine_bar">wine_bar</span>
+<span class="text-[10px] font-medium">Sarap</span>
+</button>
+<button class="flex flex-col items-center justify-center py-4 px-1 gap-1 text-[#8E8E9A] hover:bg-surface-bright transition-all duration-200">
+<span class="material-symbols-outlined text-2xl" data-icon="coffee">coffee</span>
+<span class="text-[10px] font-medium">Sicak Icecek</span>
+</button>
+</aside>
+<!-- Center: Product Grid -->
+<section class="flex-1 flex flex-col bg-surface p-6 gap-6 overflow-hidden">
+<!-- Search Bar -->
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-[#4f8cff] transition-colors" data-icon="search">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-xl py-3.5 pl-12 pr-4 text-on-surface placeholder:text-outline focus:ring-2 focus:ring-[#4f8cff]/40 focus:bg-surface-bright transition-all" placeholder="Urun ara..." type="text"/>
+</div>
+<!-- Grid -->
+<div class="flex-1 overflow-y-auto pr-2">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+<!-- Product Card 1 -->
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Margherita Pizza</span>
+<div class="flex justify-between items-end mt-2">
+<span class="text-[15px] font-black text-[#4f8cff]">240,00 ₺</span>
+<span class="material-symbols-outlined text-sm text-outline-variant" data-icon="add_circle">add_circle</span>
+</div>
+</div>
+<!-- Product Card 2 -->
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Cheeseburger XL</span>
+<div class="flex justify-between items-end mt-2">
+<span class="text-[15px] font-black text-[#4f8cff]">310,00 ₺</span>
+<span class="material-symbols-outlined text-sm text-outline-variant" data-icon="add_circle">add_circle</span>
+</div>
+</div>
+<!-- Product Card 3 -->
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Sezar Salata</span>
+<div class="flex justify-between items-end mt-2">
+<span class="text-[15px] font-black text-[#4f8cff]">185,00 ₺</span>
+<span class="material-symbols-outlined text-sm text-outline-variant" data-icon="add_circle">add_circle</span>
+</div>
+</div>
+<!-- Product Card 4 -->
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm border border-[#4f8cff]/20">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Izgara Kofte</span>
+<div class="flex justify-between items-end mt-2">
+<span class="text-[15px] font-black text-[#4f8cff]">295,00 ₺</span>
+<span class="material-symbols-outlined text-sm text-[#4f8cff]" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<!-- More Product Cards -->
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Fettuccine Alfredo</span>
+<span class="text-[15px] font-black text-[#4f8cff] mt-2">265,00 ₺</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Tiramisu</span>
+<span class="text-[15px] font-black text-[#4f8cff] mt-2">145,00 ₺</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Limonata (Ev Yapimi)</span>
+<span class="text-[15px] font-black text-[#4f8cff] mt-2">75,00 ₺</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Americano</span>
+<span class="text-[15px] font-black text-[#4f8cff] mt-2">65,00 ₺</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Coca-Cola Zero</span>
+<span class="text-[15px] font-black text-[#4f8cff] mt-2">55,00 ₺</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Caprese Panini</span>
+<span class="text-[15px] font-black text-[#4f8cff] mt-2">190,00 ₺</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Mercimek Corbasi</span>
+<span class="text-[15px] font-black text-[#4f8cff] mt-2">90,00 ₺</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl min-h-[100px] flex flex-col justify-between hover:bg-surface-bright active:scale-95 transition-all cursor-pointer shadow-sm">
+<span class="text-[13px] font-semibold text-on-surface leading-tight">Karisik Izgara</span>
+<span class="text-[15px] font-black text-[#4f8cff] mt-2">480,00 ₺</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Sidebar: Order Panel (~340px) -->
+<aside class="w-[380px] flex flex-col bg-surface-container border-l border-outline-variant/10 shadow-2xl relative z-10">
+<!-- Order Header -->
+<div class="p-5 flex justify-between items-center border-b border-outline-variant/10 bg-surface-container-high/50">
+<div class="flex flex-col">
+<span class="text-xs font-bold text-[#8E8E9A] uppercase tracking-widest">Order #0412</span>
+<h2 class="text-xl font-extrabold text-[#F0F0F5]">Masa 7</h2>
+</div>
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined" data-icon="person_add">person_add</span>
+</button>
+<button class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Order List (Scrollable) -->
+<div class="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
+<!-- Example Item 1 -->
+<div class="flex items-center gap-3 p-3 rounded-xl bg-surface-container-low/50 group hover:bg-surface-container-highest transition-all">
+<div class="w-8 h-8 rounded-full bg-[#4f8cff]/20 text-[#4f8cff] flex items-center justify-center text-xs font-black">1</div>
+<div class="flex-1">
+<p class="text-[13px] font-semibold text-[#F0F0F5]">Margherita Pizza</p>
+<p class="text-[11px] text-[#8E8E9A]">Ince hamur, ekstra kekik</p>
+</div>
+<p class="text-[14px] font-bold text-[#F0F0F5]">240,00 ₺</p>
+</div>
+<!-- Example Item 2 -->
+<div class="flex items-center gap-3 p-3 rounded-xl bg-surface-container-low/50 group hover:bg-surface-container-highest transition-all">
+<div class="w-8 h-8 rounded-full bg-[#4f8cff]/20 text-[#4f8cff] flex items-center justify-center text-xs font-black">2</div>
+<div class="flex-1">
+<p class="text-[13px] font-semibold text-[#F0F0F5]">Coca-Cola Zero</p>
+</div>
+<p class="text-[14px] font-bold text-[#F0F0F5]">110,00 ₺</p>
+</div>
+<!-- Empty State Visual (Hidden when items exist, but coded for logic) -->
+<div class="hidden flex-1 flex flex-col items-center justify-center text-center opacity-40 py-20">
+<span class="material-symbols-outlined text-5xl mb-4" data-icon="shopping_basket">shopping_basket</span>
+<p class="text-sm font-medium">Urun ekleyerek baslayiniz</p>
+</div>
+</div>
+<!-- Totals & Actions -->
+<div class="p-6 bg-surface-container-high border-t border-outline-variant/10">
+<div class="flex flex-col gap-2 mb-6">
+<div class="flex justify-between text-sm">
+<span class="text-[#8E8E9A]">Ara Toplam</span>
+<span class="text-[#F0F0F5]">350,00 ₺</span>
+</div>
+<div class="flex justify-between text-sm">
+<span class="text-[#8E8E9A]">KDV (%10)</span>
+<span class="text-[#F0F0F5]">35,00 ₺</span>
+</div>
+<div class="flex justify-between items-baseline mt-2">
+<span class="text-base font-bold text-[#F0F0F5]">Genel Toplam</span>
+<span class="text-[2.25rem] font-black text-[#4f8cff] leading-none tracking-tight">385,00 ₺</span>
+</div>
+</div>
+<div class="flex flex-col gap-3">
+<button class="w-full h-14 bg-gradient-to-r from-[#ff9500] to-[#ffab00] text-white rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-lg shadow-[#ff9500]/10">
+<span class="material-symbols-outlined" data-icon="restaurant">restaurant</span>
+                        Mutfaga Gonder
+                    </button>
+<div class="grid grid-cols-2 gap-3">
+<button class="h-14 bg-surface-container-highest text-[#F0F0F5] rounded-xl font-bold border border-outline-variant/10 active:scale-[0.98] transition-all">
+                            Indirim
+                        </button>
+<button class="h-14 bg-gradient-to-r from-[#05b046] to-[#34c759] text-white rounded-xl font-bold active:scale-[0.98] transition-all shadow-lg shadow-[#05b046]/10">
+                            Odeme
+                        </button>
+</div>
+</div>
+</div>
+</aside>
+</main>
+<!-- Navigation Drawer (Hidden in Desktop but included for structure consistency) -->
+<!-- Positioned for tablet accessibility if needed -->
+<div class="hidden fixed left-0 top-[56px] h-[calc(100%-56px)] w-[80px] bg-[#1E1F26] flex-col items-center py-4 gap-6 border-r border-outline-variant/10">
+<span class="material-symbols-outlined text-[#4f8cff]" data-icon="grid_view" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span class="material-symbols-outlined text-[#8E8E9A]" data-icon="countertops">countertops</span>
+<span class="material-symbols-outlined text-[#8E8E9A]" data-icon="schedule">schedule</span>
+<span class="material-symbols-outlined text-[#8E8E9A]" data-icon="assessment">assessment</span>
+<span class="material-symbols-outlined text-[#8E8E9A] mt-auto" data-icon="settings">settings</span>
+</div>
+</body></html>

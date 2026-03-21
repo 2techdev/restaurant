@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GastroCore – Table Management</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #1a1a2e;
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    color: #fff;
+  }
+  .topbar {
+    background: #16213e;
+    padding: 18px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #0f3460;
+  }
+  .logo { font-size: 26px; font-weight: 700; color: #e94560; }
+  .section-title { font-size: 20px; font-weight: 600; color: #fff; }
+  .clock { font-size: 22px; font-weight: 700; }
+
+  .zone-tabs {
+    display: flex;
+    gap: 0;
+    background: #0f1b35;
+    border-bottom: 2px solid #0f3460;
+  }
+  .zone-tab {
+    padding: 16px 36px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: #a0a0b0;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+  }
+  .zone-tab.active { color: #e94560; border-bottom-color: #e94560; background: #16213e; }
+
+  .legend {
+    display: flex;
+    gap: 24px;
+    padding: 14px 30px;
+    background: #0f1b35;
+    border-bottom: 1px solid #0f3460;
+    align-items: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #aaa; }
+  .legend-dot { width: 16px; height: 16px; border-radius: 4px; }
+  .dot-free { background: #2ecc71; }
+  .dot-occupied { background: #e94560; }
+  .dot-reserved { background: #f39c12; }
+  .dot-cleaning { background: #9b59b6; }
+
+  .floorplan {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    height: calc(1920px - 200px);
+    background:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-color: #0f1b35;
+    overflow: hidden;
+  }
+
+  /* Room decorations */
+  .room-label {
+    position: absolute;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #2a3a5e;
+    text-transform: uppercase;
+  }
+  .wall {
+    position: absolute;
+    background: #1e2d50;
+    border-radius: 4px;
+  }
+
+  /* Table styles */
+  .table {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 3px solid transparent;
+    transition: transform 0.2s;
+  }
+  .table:hover { transform: scale(1.05); }
+  .table.free { background: #0d2d1a; border-color: #2ecc71; }
+  .table.occupied { background: #2d0a12; border-color: #e94560; }
+  .table.reserved { background: #2d1f0a; border-color: #f39c12; }
+  .table.cleaning { background: #1e0d2d; border-color: #9b59b6; }
+
+  .table-num { font-size: 20px; font-weight: 700; color: #fff; }
+  .table-info { font-size: 12px; margin-top: 3px; }
+  .table.free .table-info { color: #2ecc71; }
+  .table.occupied .table-info { color: #e94560; }
+  .table.reserved .table-info { color: #f39c12; }
+  .table.cleaning .table-info { color: #9b59b6; }
+  .table-seats { font-size: 11px; color: #708090; margin-top: 2px; }
+
+  /* Chairs */
+  .chair {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #2a3a5e;
+    border: 2px solid #3a4a6e;
+  }
+
+  /* Sidebar info */
+  .sidebar {
+    position: absolute;
+    right: 20px;
+    top: 110px;
+    width: 240px;
+    background: #16213e;
+    border-radius: 16px;
+    border: 2px solid #0f3460;
+    overflow: hidden;
+  }
+  .sidebar-header {
+    background: #e94560;
+    padding: 14px 18px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .sidebar-body { padding: 16px 18px; }
+  .info-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #0f3460; font-size: 14px; }
+  .info-row:last-child { border: none; }
+  .info-label { color: #a0a0b0; }
+  .info-val { font-weight: 600; color: #fff; }
+  .open-btn {
+    margin: 12px 18px 16px;
+    background: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    width: calc(100% - 36px);
+    cursor: pointer;
+  }
+
+  .stats-bottom {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    gap: 16px;
+  }
+  .stat-card {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 14px 22px;
+    text-align: center;
+    border: 1px solid #0f3460;
+  }
+  .stat-num { font-size: 28px; font-weight: 700; }
+  .stat-num.green { color: #2ecc71; }
+  .stat-num.red { color: #e94560; }
+  .stat-num.orange { color: #f39c12; }
+  .stat-lbl { font-size: 12px; color: #708090; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo">GastroCore</div>
+  <div class="section-title">Tischplan</div>
+  <div class="clock">19:34</div>
+</div>
+<div class="zone-tabs">
+  <button class="zone-tab active">Innenbereich</button>
+  <button class="zone-tab">Terrasse</button>
+  <button class="zone-tab">Privatraum</button>
+  <button class="zone-tab">Bar</button>
+</div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot dot-free"></div>Frei</div>
+  <div class="legend-item"><div class="legend-dot dot-occupied"></div>Besetzt</div>
+  <div class="legend-item"><div class="legend-dot dot-reserved"></div>Reserviert</div>
+  <div class="legend-item"><div class="legend-dot dot-cleaning"></div>Reinigung</div>
+</div>
+
+<div class="floorplan">
+
+  <!-- Tables - Row 1 -->
+  <div class="table occupied" style="width:120px;height:120px;left:60px;top:80px;">
+    <div class="table-num">T1</div>
+    <div class="table-info">CHF 48.50</div>
+    <div class="table-seats">2 Pers · 22 min</div>
+  </div>
+  <div class="table free" style="width:120px;height:120px;left:220px;top:80px;">
+    <div class="table-num">T2</div>
+    <div class="table-info">Frei</div>
+    <div class="table-seats">4 Plätze</div>
+  </div>
+  <div class="table occupied" style="width:140px;height:120px;left:380px;top:80px;">
+    <div class="table-num">T3</div>
+    <div class="table-info">CHF 127.00</div>
+    <div class="table-seats">4 Pers · 35 min</div>
+  </div>
+  <div class="table reserved" style="width:120px;height:120px;left:560px;top:80px;">
+    <div class="table-num">T4</div>
+    <div class="table-info">20:00 Uhr</div>
+    <div class="table-seats">Muster / 4 Pers</div>
+  </div>
+
+  <!-- Tables - Row 2 -->
+  <div class="table free" style="width:120px;height:120px;left:60px;top:260px;">
+    <div class="table-num">T5</div>
+    <div class="table-info">Frei</div>
+    <div class="table-seats">2 Plätze</div>
+  </div>
+  <div class="table occupied" style="width:160px;height:140px;left:220px;top:250px;">
+    <div class="table-num">T6</div>
+    <div class="table-info">CHF 213.80</div>
+    <div class="table-seats">6 Pers · 48 min</div>
+  </div>
+  <div class="table occupied" style="width:120px;height:120px;left:430px;top:260px;">
+    <div class="table-num">T7</div>
+    <div class="table-info">CHF 76.90</div>
+    <div class="table-seats">4 Pers · 12 min</div>
+  </div>
+  <div class="table cleaning" style="width:120px;height:120px;left:590px;top:260px;">
+    <div class="table-num">T8</div>
+    <div class="table-info">Reinigung</div>
+    <div class="table-seats">4 Plätze</div>
+  </div>
+
+  <!-- Tables - Row 3 (round tables) -->
+  <div class="table free" style="width:110px;height:110px;left:80px;top:450px;border-radius:50%;">
+    <div class="table-num">T9</div>
+    <div class="table-info">Frei</div>
+    <div class="table-seats">2 Plätze</div>
+  </div>
+  <div class="table occupied" style="width:110px;height:110px;left:230px;top:450px;border-radius:50%;">
+    <div class="table-num">T10</div>
+    <div class="table-info">CHF 34.50</div>
+    <div class="table-seats">2 Pers · 8 min</div>
+  </div>
+  <div class="table free" style="width:110px;height:110px;left:380px;top:450px;border-radius:50%;">
+    <div class="table-num">T11</div>
+    <div class="table-info">Frei</div>
+    <div class="table-seats">2 Plätze</div>
+  </div>
+  <div class="table reserved" style="width:180px;height:140px;left:530px;top:430px;">
+    <div class="table-num">T12</div>
+    <div class="table-info">19:45 Uhr</div>
+    <div class="table-seats">Schmidt / 8 Pers</div>
+  </div>
+
+  <!-- Tables - Row 4 -->
+  <div class="table occupied" style="width:200px;height:120px;left:60px;top:640px;">
+    <div class="table-num">T13</div>
+    <div class="table-info">CHF 89.00</div>
+    <div class="table-seats">6 Pers · 31 min</div>
+  </div>
+  <div class="table free" style="width:120px;height:120px;left:300px;top:640px;">
+    <div class="table-num">T14</div>
+    <div class="table-info">Frei</div>
+    <div class="table-seats">4 Plätze</div>
+  </div>
+
+  <!-- Selected table info panel -->
+  <div class="sidebar">
+    <div class="sidebar-header">Tisch 7 — Besetzt</div>
+    <div class="sidebar-body">
+      <div class="info-row"><span class="info-label">Gäste</span><span class="info-val">4 Personen</span></div>
+      <div class="info-row"><span class="info-label">Geöffnet</span><span class="info-val">19:22 Uhr</span></div>
+      <div class="info-row"><span class="info-label">Dauer</span><span class="info-val">12 min</span></div>
+      <div class="info-row"><span class="info-label">Kellner</span><span class="info-val">Maria S.</span></div>
+      <div class="info-row"><span class="info-label">Total</span><span class="info-val" style="color:#e94560">CHF 76.90</span></div>
+      <div class="info-row"><span class="info-label">Status KDS</span><span class="info-val" style="color:#f39c12">In Arbeit</span></div>
+    </div>
+    <button class="open-btn">Bestellung öffnen →</button>
+  </div>
+
+  <!-- Bottom stats -->
+  <div class="stats-bottom">
+    <div class="stat-card"><div class="stat-num green">6</div><div class="stat-lbl">Frei</div></div>
+    <div class="stat-card"><div class="stat-num red">6</div><div class="stat-lbl">Besetzt</div></div>
+    <div class="stat-card"><div class="stat-num orange">2</div><div class="stat-lbl">Reserviert</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#9b59b6">1</div><div class="stat-lbl">Reinigung</div></div>
+  </div>
+</div>
+</body>
+</html>

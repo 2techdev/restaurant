@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gastrocore-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gastrocore
+      POSTGRES_USER: gastrocore
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-GC_2tech_2026!secure}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gastrocore"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gastrocore-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      ENV: production
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://gastrocore:${DB_PASSWORD:-GC_2tech_2026!secure}@postgres:5432/gastrocore?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-gc-jwt-secret-change-in-prod-2026}
+      LICENSE_SIGNING_KEY: ${LICENSE_KEY:-gc-license-key-change-in-prod}
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  redis:
+    image: redis:7-alpine
+    container_name: gastrocore-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:

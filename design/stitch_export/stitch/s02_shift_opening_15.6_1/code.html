@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GastroCore - Open Shift</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-secondary-fixed": "#002107",
+            "secondary-fixed": "#72fe88",
+            "error": "#ffb4ab",
+            "surface-container-lowest": "#0c0e14",
+            "secondary-fixed-dim": "#53e16f",
+            "surface-bright": "#373940",
+            "on-tertiary-fixed-variant": "#7201a2",
+            "primary-container": "#528dff",
+            "tertiary": "#e8b3ff",
+            "secondary": "#53e16f",
+            "on-error-container": "#ffdad6",
+            "on-background": "#e2e2eb",
+            "surface-dim": "#111319",
+            "surface-container-highest": "#33343b",
+            "on-surface-variant": "#c2c6d6",
+            "primary-fixed": "#d9e2ff",
+            "on-tertiary": "#510074",
+            "on-secondary-container": "#003a11",
+            "on-secondary": "#003911",
+            "on-primary-fixed": "#001a43",
+            "surface-container-low": "#191b22",
+            "primary": "#afc6ff",
+            "inverse-on-surface": "#2e3037",
+            "on-surface": "#e2e2eb",
+            "outline-variant": "#424753",
+            "inverse-primary": "#0059c6",
+            "primary-fixed-dim": "#afc6ff",
+            "outline": "#8c909f",
+            "tertiary-fixed": "#f6d9ff",
+            "surface-tint": "#afc6ff",
+            "on-primary-fixed-variant": "#004398",
+            "on-tertiary-container": "#460066",
+            "tertiary-fixed-dim": "#e8b3ff",
+            "on-error": "#690005",
+            "surface-variant": "#33343b",
+            "surface-container-high": "#282a30",
+            "on-secondary-fixed-variant": "#00531c",
+            "on-primary-container": "#00275f",
+            "tertiary-container": "#c567f4",
+            "inverse-surface": "#e2e2eb",
+            "background": "#111319",
+            "on-tertiary-fixed": "#310048",
+            "on-primary": "#002d6c",
+            "surface-container": "#1e1f26",
+            "surface": "#111319",
+            "secondary-container": "#05b046",
+            "error-container": "#93000a"
+          },
+          fontFamily: {
+            "headline": ["Inter"],
+            "body": ["Inter"],
+            "label": ["Inter"]
+          },
+          borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+<style>
+    body { font-family: 'Inter', sans-serif; }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .glass-effect {
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+  </style>
+</head>
+<body class="bg-surface-dim text-on-surface h-screen w-screen overflow-hidden selection:bg-primary-container/30">
+<!-- Top Navigation Shell (Suppressed as per focused task but keeping minimal brand anchor if needed, however, the "Linear/Transactional" rule suggests suppression. Following "Task-Focused" rule: sub-page implies departure. But user requested a professional POS tablet screen. Let's include the branding anchor TopNavBar as background/context but dimmed.) -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-6 bg-[#111319]/80 backdrop-blur-2xl h-16 shadow-[0px_0px_48px_0px_rgba(79,140,255,0.06)]">
+<div class="text-2xl font-black italic text-[#F0F0F5] tracking-tighter">GastroCore</div>
+<div class="flex items-center gap-6">
+<span class="material-symbols-outlined text-outline" data-icon="wifi">wifi</span>
+<span class="material-symbols-outlined text-outline" data-icon="notifications">notifications</span>
+<div class="h-8 w-8 rounded-full bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-xs text-outline" data-icon="person">person</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="relative h-full w-full flex items-center justify-center p-6 pt-16">
+<!-- Centered Shift Opening Card -->
+<div class="w-full max-w-lg bg-surface-container-low rounded-3xl p-10 flex flex-col items-center gap-8 shadow-2xl relative overflow-hidden">
+<!-- Decorative Background Gradient for Depth -->
+<div class="absolute -top-24 -right-24 w-64 h-64 bg-primary-container/5 rounded-full blur-[80px]"></div>
+<!-- Back Action -->
+<button class="absolute top-6 left-6 flex items-center gap-2 text-outline hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="arrow_back">arrow_back</span>
+<span class="text-xs font-semibold tracking-wide">EXIT TO LOGIN</span>
+</button>
+<!-- Header Section -->
+<div class="flex flex-col items-center gap-4 mt-4">
+<div class="w-20 h-20 bg-surface-container-highest rounded-2xl flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-4xl text-primary-container" data-icon="payments" style="font-variation-settings: 'FILL' 1;">payments</span>
+</div>
+<div class="text-center">
+<h1 class="text-3xl font-extrabold tracking-tight text-on-surface">Vardiya Aç</h1>
+<p class="text-outline text-sm font-medium">Open Shift &amp; Enter Opening Balance</p>
+</div>
+</div>
+<!-- Amount Input Display -->
+<div class="w-full flex flex-col items-center">
+<div class="text-[0.6875rem] font-bold text-primary-container tracking-widest uppercase mb-2">INITIAL CASH FLOAT</div>
+<div class="flex items-baseline gap-3">
+<span class="text-5xl font-extrabold tracking-tighter text-on-surface">250.00</span>
+<span class="text-2xl font-bold text-outline">EUR</span>
+</div>
+<div class="h-1 w-32 bg-primary-container rounded-full mt-4 opacity-40"></div>
+</div>
+<!-- Numeric Keypad (Optimized for 15.6" Touch) -->
+<div class="grid grid-cols-3 gap-3 w-full max-w-[360px]">
+<!-- Keys 1-9 -->
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">1</button>
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">2</button>
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">3</button>
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">4</button>
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">5</button>
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">6</button>
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">7</button>
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">8</button>
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">9</button>
+<!-- Bottom Row -->
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">.</button>
+<button class="h-16 bg-surface-container-high hover:bg-surface-bright active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">0</button>
+<button class="h-16 bg-surface-container-high hover:bg-error/10 text-error active:scale-95 transition-all rounded-xl text-xl font-bold flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="backspace">backspace</span>
+</button>
+</div>
+<!-- Action Button -->
+<button class="w-full h-16 bg-gradient-to-br from-[#afc6ff] to-[#4f8cff] text-on-primary-container rounded-2xl text-lg font-extrabold tracking-tight flex items-center justify-center gap-3 shadow-lg shadow-primary-container/20 active:scale-95 transition-transform">
+<span>START SHIFT</span>
+<span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<!-- Extra Context Info -->
+<div class="flex items-center gap-4 text-outline text-[0.6875rem] font-medium tracking-wide">
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+          STATION 01 - ACTIVE
+        </div>
+<div class="h-3 w-px bg-outline-variant/30"></div>
+<div>MANAGER: ALEX REED</div>
+</div>
+</div>
+<!-- Background Decorative Elements -->
+<div class="fixed bottom-12 right-12 flex flex-col items-end opacity-20 pointer-events-none">
+<div class="text-6xl font-black italic tracking-tighter text-outline">GASTRO</div>
+<div class="text-6xl font-black italic tracking-tighter text-outline leading-[0.8]">CORE</div>
+</div>
+</main>
+<!-- Side Indicator (Subtle reference to SideNavBar structure but minimized for transaction) -->
+<aside class="fixed left-6 top-1/2 -translate-y-1/2 flex flex-col gap-8 opacity-10">
+<span class="material-symbols-outlined text-3xl" data-icon="restaurant">restaurant</span>
+<span class="material-symbols-outlined text-3xl" data-icon="delivery_dining">delivery_dining</span>
+<span class="material-symbols-outlined text-3xl" data-icon="payments">payments</span>
+<span class="material-symbols-outlined text-3xl" data-icon="badge">badge</span>
+</aside>
+</body></html>

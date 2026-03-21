@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GastroCore Back Office</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111319;
+            color: #F0F0F5;
+            margin: 0;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(42, 47, 61, 0.2);
+            backdrop-filter: blur(20px);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111319;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2A2F3D;
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "surface-container-high": "#282a30",
+                "on-secondary-fixed": "#171b28",
+                "on-primary-fixed": "#001944",
+                "tertiary": "#afc6ff",
+                "tertiary-fixed": "#d9e2ff",
+                "surface-container": "#1d1f26",
+                "secondary": "#c3c6d7",
+                "outline-variant": "#424753",
+                "tertiary-container": "#7990c6",
+                "on-tertiary": "#152f5e",
+                "on-tertiary-fixed": "#001943",
+                "on-surface-variant": "#c2c6d6",
+                "on-error-container": "#ffdad6",
+                "on-tertiary-fixed-variant": "#2e4676",
+                "on-primary-fixed-variant": "#004299",
+                "inverse-primary": "#0059c7",
+                "secondary-fixed-dim": "#c3c6d7",
+                "surface": "#111319",
+                "on-secondary": "#2c303d",
+                "surface-tint": "#afc6ff",
+                "on-secondary-container": "#b4b8c9",
+                "primary-fixed": "#d9e2ff",
+                "primary-container": "#528dff",
+                "surface-bright": "#373940",
+                "surface-container-lowest": "#0c0e14",
+                "on-secondary-fixed-variant": "#424654",
+                "surface-container-low": "#191b22",
+                "surface-variant": "#33343b",
+                "secondary-fixed": "#dfe2f3",
+                "tertiary-fixed-dim": "#afc6ff",
+                "on-background": "#e2e2eb",
+                "inverse-on-surface": "#2e3037",
+                "error-container": "#93000a",
+                "on-primary-container": "#00275f",
+                "outline": "#8c909f",
+                "error": "#ffb4ab",
+                "primary": "#afc6ff",
+                "inverse-surface": "#e2e2eb",
+                "surface-container-highest": "#33343b",
+                "on-tertiary-container": "#0c2857",
+                "on-primary": "#002d6d",
+                "secondary-container": "#454957",
+                "background": "#111319",
+                "surface-dim": "#111319",
+                "on-surface": "#e2e2eb",
+                "primary-fixed-dim": "#afc6ff",
+                "on-error": "#690005"
+              },
+              fontFamily: {
+                "headline": ["Inter"],
+                "body": ["Inter"],
+                "label": ["Inter"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- Top Navigation Anchor -->
+<header class="fixed top-0 left-0 right-0 h-20 bg-[#1A1D27] z-40 flex justify-between items-center px-8 w-full z-40">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-black text-[#F0F0F5] tracking-tighter">GastroCore</span>
+<div class="ml-8 hidden md:flex gap-6">
+<span class="text-[#F0F0F5] font-bold cursor-pointer transition-colors duration-200">Dashboard</span>
+<span class="text-[#8E8E9A] hover:bg-[#2A2F3D] px-3 py-1 rounded-lg transition-colors duration-200 cursor-pointer">Live View</span>
+<span class="text-[#8E8E9A] hover:bg-[#2A2F3D] px-3 py-1 rounded-lg transition-colors duration-200 cursor-pointer">Inventory</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 bg-surface px-4 py-2 rounded-xl text-primary-container">
+<span class="material-symbols-outlined text-sm">notifications</span>
+<span class="text-xs font-bold uppercase tracking-widest">Shift Active</span>
+</div>
+<div class="flex items-center gap-3 ml-4">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden">
+<img alt="User Profile Avatar" data-alt="Headshot of a professional chef in black uniform" src="https://lh3.googleusercontent.com/aida-public/AB6AXuARnBxZ6MuRjafYnGMd_gG5ACKkuS8qT0rFBKKpQ61G1v4A_uvCu_i4rgMOUmF3o-lkBsfJJMrh_SoiVevR3OfhjQZ7TOUVuTVYOjeWN3yHkvxJS8JIPzX4cYdFp95t2MLL0zMU3Y9YTBqHI9odlfyqfuekGyA_FGWqbmf0xCui2zAkOG6Z8jPIY9FDbyudL6l7X3XISCUV3b91vMQIidKRQYj2Me8Z3_MxB_xKyo66JZDz5gA5ERQvSxcT9Bqpw7zBmR7FOWBbQBs"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Side Navigation -->
+<nav class="fixed left-0 top-0 bottom-0 flex flex-col z-50 py-8 bg-[#1A1D27] w-64 shadow-[8px_0_24px_rgba(0,0,0,0.15)] mt-20">
+<div class="flex flex-col gap-2 flex-grow">
+<!-- Reports Active -->
+<a class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="restaurant_menu">restaurant_menu</span>
+<span class="font-medium text-sm">Menu Management</span>
+</a>
+<a class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="font-medium text-sm">Table Management</span>
+</a>
+<a class="bg-[#222633] text-[#F0F0F5] border-l-4 border-[#528DFF] px-6 py-4 flex items-center gap-4 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="font-medium text-sm">Reports</span>
+</a>
+<a class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="badge">badge</span>
+<span class="font-medium text-sm">Staff</span>
+</a>
+</div>
+<div class="px-6 pb-8 flex flex-col gap-4">
+<a class="text-[#8E8E9A] flex items-center gap-4 hover:text-[#F0F0F5] transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="text-sm">Support</span>
+</a>
+<a class="text-[#8E8E9A] flex items-center gap-4 hover:text-error transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="text-sm">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-64 pt-28 px-10 pb-12 min-h-screen">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+<div>
+<p class="text-[#8E8E9A] text-sm font-medium mb-1">Back Office Intelligence</p>
+<h1 class="text-4xl font-extrabold tracking-tight text-[#F0F0F5]">Sales Reports</h1>
+</div>
+<div class="flex gap-4">
+<div class="bg-surface-container-low px-6 py-3 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-secondary">calendar_today</span>
+<span class="text-sm font-bold">Last 30 Days</span>
+</div>
+<button class="bg-gradient-to-br from-[#AFC6FF] to-[#528DFF] text-on-primary-fixed px-8 py-3 rounded-xl font-bold tracking-tight shadow-lg shadow-primary-container/20">
+                    Export PDF
+                </button>
+</div>
+</div>
+<!-- Key Stats Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+<!-- Metric 1 -->
+<div class="bg-surface-container p-8 rounded-2xl flex flex-col justify-between">
+<div class="flex justify-between items-start mb-6">
+<span class="p-3 bg-primary-container/10 rounded-xl text-primary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">payments</span>
+</span>
+<span class="text-green-400 text-xs font-bold bg-green-400/10 px-2 py-1 rounded">+12.4%</span>
+</div>
+<div>
+<p class="text-[#8E8E9A] text-sm font-medium">Total Revenue</p>
+<p class="text-4xl font-extrabold text-[#F0F0F5] tracking-tight mt-1">$42,890.00</p>
+</div>
+</div>
+<!-- Metric 2 -->
+<div class="bg-surface-container p-8 rounded-2xl flex flex-col justify-between">
+<div class="flex justify-between items-start mb-6">
+<span class="p-3 bg-tertiary-container/10 rounded-xl text-tertiary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">shopping_bag</span>
+</span>
+<span class="text-green-400 text-xs font-bold bg-green-400/10 px-2 py-1 rounded">+3.1%</span>
+</div>
+<div>
+<p class="text-[#8E8E9A] text-sm font-medium">Avg. Order Value</p>
+<p class="text-4xl font-extrabold text-[#F0F0F5] tracking-tight mt-1">$84.50</p>
+</div>
+</div>
+<!-- Metric 3 -->
+<div class="bg-surface-container p-8 rounded-2xl flex flex-col justify-between">
+<div class="flex justify-between items-start mb-6">
+<span class="p-3 bg-[#AFC6FF]/10 rounded-xl text-[#AFC6FF]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">groups</span>
+</span>
+<span class="text-error text-xs font-bold bg-error/10 px-2 py-1 rounded">-2.4%</span>
+</div>
+<div>
+<p class="text-[#8E8E9A] text-sm font-medium">Guest Count</p>
+<p class="text-4xl font-extrabold text-[#F0F0F5] tracking-tight mt-1">1,204</p>
+</div>
+</div>
+</div>
+<!-- Bento Dashboard Layout -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Main Sales Chart -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container p-8 rounded-2xl">
+<div class="flex justify-between items-center mb-10">
+<h3 class="text-lg font-bold text-[#F0F0F5]">Revenue Performance</h3>
+<div class="flex gap-4">
+<span class="flex items-center gap-2 text-xs text-[#8E8E9A]">
+<span class="w-3 h-3 rounded-full bg-primary-container"></span> Current Period
+                        </span>
+<span class="flex items-center gap-2 text-xs text-[#8E8E9A]">
+<span class="w-3 h-3 rounded-full bg-surface-container-highest"></span> Previous Period
+                        </span>
+</div>
+</div>
+<!-- Visual Placeholder for Chart -->
+<div class="h-64 flex items-end justify-between gap-4 px-2">
+<div class="flex-1 bg-surface-container-highest rounded-t-lg h-[40%]"></div>
+<div class="flex-1 bg-surface-container-highest rounded-t-lg h-[55%]"></div>
+<div class="flex-1 bg-surface-container-highest rounded-t-lg h-[35%]"></div>
+<div class="flex-1 bg-surface-container-highest rounded-t-lg h-[70%]"></div>
+<div class="flex-1 bg-primary-container rounded-t-lg h-[85%] relative">
+<div class="absolute -top-10 left-1/2 -translate-x-1/2 bg-surface-high px-2 py-1 rounded text-[10px] font-bold">$12.4k</div>
+</div>
+<div class="flex-1 bg-primary-container rounded-t-lg h-[60%]"></div>
+<div class="flex-1 bg-primary-container rounded-t-lg h-[95%]"></div>
+<div class="flex-1 bg-primary-container rounded-t-lg h-[45%]"></div>
+<div class="flex-1 bg-primary-container rounded-t-lg h-[75%]"></div>
+<div class="flex-1 bg-primary-container rounded-t-lg h-[50%]"></div>
+</div>
+<div class="flex justify-between mt-6 text-[#5A5A6A] text-xs font-medium uppercase tracking-tighter">
+<span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+</div>
+</div>
+<!-- Top Products -->
+<div class="col-span-12 lg:col-span-4 bg-surface-container-low p-8 rounded-2xl">
+<h3 class="text-lg font-bold text-[#F0F0F5] mb-8">Top Selling Products</h3>
+<div class="flex flex-col gap-6">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-highest rounded-xl flex items-center justify-center overflow-hidden">
+<img alt="Ribeye Steak" data-alt="Close up photo of a cooked ribeye steak" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAf3LgO_fUqi3p0niFmXJH2eg44WenyAVSCEwhXXxl2qcIRaCtTfoAXeaVyXl6I_3UA8zDAgG98Ef_WnIs7N-gD_LRmu5gt7odrfZGb_o4lE_njWo8uJyZQPrh0KI8_taYL4amRtIzpEIz6KT6-QXOkw521ot0wcqx1vHiNeF4jMqiqMWhKoX8yANOF2u0MhD_sAXQ4LNCY2KLh1lqRWewJuKdgrML9NzVyxrnARKfRS2Bn3GRKH0udWcQK4baYHD4UqxDLGQ4gdvI"/>
+</div>
+<div>
+<p class="text-sm font-bold text-[#F0F0F5]">Prime Ribeye</p>
+<p class="text-xs text-[#8E8E9A]">124 units sold</p>
+</div>
+</div>
+<p class="text-sm font-extrabold text-primary-container">$4,812</p>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-highest rounded-xl flex items-center justify-center overflow-hidden">
+<img alt="Red Wine" data-alt="A glass of expensive red wine on a dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxs6-Hy_alOO0Bq0x-jYyMgbHADASOjy3v3LILM-SWCNEQpJI-5sgXkpTbUzLnqWmSakygkwo7RedzyWhXieX6B8vgQW62BWizXzhweDH-5SFAh2f9pF9_WWBtEVZxQnX4SUAimVMju3G4E1Q4XLHbT9DrbCF20AREuBpzXpmgUGtfwvXUdubNygVIrVFoC_X3Cxjie2dobGgBXKGjxR2yhUgQjFpvKyBeqvHKV2mMihwY2OLcThAt1qyTK6ufgZaDaNtCKSx_s6E"/>
+</div>
+<div>
+<p class="text-sm font-bold text-[#F0F0F5]">Napa Cabernet</p>
+<p class="text-xs text-[#8E8E9A]">88 units sold</p>
+</div>
+</div>
+<p class="text-sm font-extrabold text-primary-container">$3,960</p>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-highest rounded-xl flex items-center justify-center overflow-hidden">
+<img alt="Burrata Salad" data-alt="Fresh burrata salad with tomatoes and basil" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyzwoLjcMPHRG-MIyI02DtVfCiNVQnB_uDZP7if1oAizeRG-W8ve7AzMu1380moecpsh0fQg2uu4p_suD5RwH5qfFwmGvIsZAi4lGhRtV2QIryAzmm_hmHwUxr6abEiOuyqgBKRUMxt66pzLJt29SNQ96WUKudJOCGh_A0KPIuqoQ8epRlgPsUdZhfiNdmwJlnxpJ2VGj0d0OylHArcThl1a3zL9Ekpe1vdQRaUubrXvoJSy9sj4qBOZhjEpPCiZvCKUqrYfM5MP0"/>
+</div>
+<div>
+<p class="text-sm font-bold text-[#F0F0F5]">Burrata Salad</p>
+<p class="text-xs text-[#8E8E9A]">210 units sold</p>
+</div>
+</div>
+<p class="text-sm font-extrabold text-primary-container">$3,780</p>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-surface-container-highest rounded-xl flex items-center justify-center overflow-hidden">
+<img alt="Tiramisu" data-alt="Elegant slice of tiramisu dessert on a dark plate" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcv2HurlPTtH7WA351RT9L5wNibh9mq85y27LKNagb4020M_UNEaJeiCOZkPFmR8BfjBXPldwNOl3wDyI_zaoi2qlxqpQbPG5XQIYsVwM3witccAbieRtI_AcrfAk927QFOiq0rrVGYzXCjtS09WemDq8Xl4l8kNjJYJg8le7n0bq6fEPld73KyKn3SBePwR0p6vFzhYkQW_OMYdyWk8iBRiMI0UlW1bSOdNWtyrAWm2tJLS2sPCddRNkwhGplFtYaKDy0T3CM9t4"/>
+</div>
+<div>
+<p class="text-sm font-bold text-[#F0F0F5]">Grand Tiramisu</p>
+<p class="text-xs text-[#8E8E9A]">156 units sold</p>
+</div>
+</div>
+<p class="text-sm font-extrabold text-primary-container">$2,184</p>
+</div>
+</div>
+<button class="w-full mt-8 py-3 text-xs font-bold text-[#8E8E9A] bg-surface-container-high rounded-xl hover:text-[#F0F0F5] transition-colors">
+                    VIEW FULL INVENTORY
+                </button>
+</div>
+<!-- Payment Distribution -->
+<div class="col-span-12 lg:col-span-5 bg-surface-container p-8 rounded-2xl">
+<h3 class="text-lg font-bold text-[#F0F0F5] mb-8">Payment Distribution</h3>
+<div class="flex flex-col gap-6">
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold uppercase tracking-wider">
+<span class="text-[#8E8E9A]">Credit Card (Visa/MC)</span>
+<span class="text-[#F0F0F5]">72%</span>
+</div>
+<div class="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary-container w-[72%]"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold uppercase tracking-wider">
+<span class="text-[#8E8E9A]">Cash Payments</span>
+<span class="text-[#F0F0F5]">18%</span>
+</div>
+<div class="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-tertiary w-[18%]"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold uppercase tracking-wider">
+<span class="text-[#8E8E9A]">Apple Pay / Digital</span>
+<span class="text-[#F0F0F5]">10%</span>
+</div>
+<div class="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-[#AFC6FF] w-[10%]"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Recent Transactions Table (Lite) -->
+<div class="col-span-12 lg:col-span-7 bg-surface-container-low p-8 rounded-2xl">
+<div class="flex justify-between items-center mb-8">
+<h3 class="text-lg font-bold text-[#F0F0F5]">Flagged Transactions</h3>
+<span class="text-xs font-bold text-error bg-error/10 px-3 py-1 rounded-full">Requires Review</span>
+</div>
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between py-4 hover:bg-surface-container-high px-4 rounded-xl transition-colors cursor-pointer">
+<div class="flex gap-4 items-center">
+<span class="text-[#8E8E9A] font-mono text-xs">#99284</span>
+<div>
+<p class="text-sm font-bold text-[#F0F0F5]">Voided Item - Table 14</p>
+<p class="text-xs text-[#8E8E9A]">Server: Marco R. • 14:22 PM</p>
+</div>
+</div>
+<p class="text-sm font-extrabold text-error">-$145.00</p>
+</div>
+<div class="flex items-center justify-between py-4 hover:bg-surface-container-high px-4 rounded-xl transition-colors cursor-pointer">
+<div class="flex gap-4 items-center">
+<span class="text-[#8E8E9A] font-mono text-xs">#99281</span>
+<div>
+<p class="text-sm font-bold text-[#F0F0F5]">Comped Meal - VIP Guest</p>
+<p class="text-xs text-[#8E8E9A]">Server: Elena V. • 13:45 PM</p>
+</div>
+</div>
+<p class="text-sm font-extrabold text-error">-$88.50</p>
+</div>
+<div class="flex items-center justify-between py-4 hover:bg-surface-container-high px-4 rounded-xl transition-colors cursor-pointer">
+<div class="flex gap-4 items-center">
+<span class="text-[#8E8E9A] font-mono text-xs">#99279</span>
+<div>
+<p class="text-sm font-bold text-[#F0F0F5]">Split Check (4 Ways)</p>
+<p class="text-xs text-[#8E8E9A]">Server: Marco R. • 12:30 PM</p>
+</div>
+</div>
+<p class="text-sm font-extrabold text-primary-container">$342.20</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

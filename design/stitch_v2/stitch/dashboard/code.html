@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-high": "#282a30",
+              "secondary": "#c3c6d7",
+              "error-container": "#93000a",
+              "surface-dim": "#111319",
+              "on-secondary-container": "#b4b8c9",
+              "tertiary-fixed": "#d9e2ff",
+              "inverse-on-surface": "#2e3037",
+              "outline-variant": "#424753",
+              "inverse-surface": "#e2e2eb",
+              "on-tertiary-fixed": "#001943",
+              "primary-fixed-dim": "#afc6ff",
+              "on-secondary": "#2c303d",
+              "on-background": "#e2e2eb",
+              "secondary-fixed-dim": "#c3c6d7",
+              "primary": "#afc6ff",
+              "background": "#111319",
+              "surface-container-low": "#191b22",
+              "surface-variant": "#33343b",
+              "on-surface": "#e2e2eb",
+              "surface-container-lowest": "#0c0e14",
+              "on-primary-container": "#00275f",
+              "on-tertiary-container": "#0c2857",
+              "on-tertiary": "#152f5e",
+              "on-primary": "#002d6d",
+              "inverse-primary": "#0059c7",
+              "surface-container-highest": "#33343b",
+              "surface-bright": "#373940",
+              "on-primary-fixed": "#001944",
+              "surface-tint": "#afc6ff",
+              "surface": "#111319",
+              "on-primary-fixed-variant": "#004299",
+              "on-error": "#690005",
+              "error": "#ffb4ab",
+              "on-secondary-fixed-variant": "#424654",
+              "outline": "#8c909f",
+              "surface-container": "#1d1f26",
+              "on-secondary-fixed": "#171b28",
+              "primary-container": "#528dff",
+              "tertiary-fixed-dim": "#afc6ff",
+              "on-error-container": "#ffdad6",
+              "tertiary": "#afc6ff",
+              "secondary-container": "#454957",
+              "secondary-fixed": "#dfe2f3",
+              "primary-fixed": "#d9e2ff",
+              "on-tertiary-fixed-variant": "#2e4676",
+              "tertiary-container": "#7990c6",
+              "on-surface-variant": "#c2c6d6"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .kinetic-monolith-gradient {
+        background: linear-gradient(135deg, #AFC6FF 0%, #528DFF 100%);
+      }
+      .glass-card {
+        background: rgba(42, 47, 61, 0.2);
+        backdrop-filter: blur(20px);
+      }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body overflow-hidden">
+<!-- Sidebar Navigation Shell -->
+<aside class="fixed left-0 top-0 bottom-0 z-50 overflow-y-auto bg-[#111319] h-full w-24 flex flex-col items-center py-6 font-['Inter'] font-medium antialiased">
+<div class="mb-10 text-xl font-extrabold tracking-tight text-[#F0F0F5]">
+<span class="text-2xl font-black bg-gradient-to-br from-[#AFC6FF] to-[#528DFF] bg-clip-text text-transparent">G</span>
+</div>
+<nav class="flex flex-col gap-4 flex-grow">
+<!-- Order Tab (Active) -->
+<button class="bg-[#2A2F3D] text-[#F0F0F5] rounded-lg w-16 h-16 flex flex-col items-center justify-center transition-all duration-200 scale-95 active:scale-90">
+<span class="material-symbols-outlined text-2xl" data-icon="shopping_cart">shopping_cart</span>
+<span class="text-[10px] mt-1 uppercase tracking-tighter">Order</span>
+</button>
+<button class="text-[#8E8E9A] w-16 h-16 flex flex-col items-center justify-center hover:bg-[#222633] transition-all duration-200 hover:text-[#F0F0F5] scale-95 active:scale-90">
+<span class="material-symbols-outlined text-2xl" data-icon="receipt_long">receipt_long</span>
+<span class="text-[10px] mt-1 uppercase tracking-tighter">Records</span>
+</button>
+<button class="text-[#8E8E9A] w-16 h-16 flex flex-col items-center justify-center hover:bg-[#222633] transition-all duration-200 hover:text-[#F0F0F5] scale-95 active:scale-90">
+<span class="material-symbols-outlined text-2xl" data-icon="grid_view">grid_view</span>
+<span class="text-[10px] mt-1 uppercase tracking-tighter">Table</span>
+</button>
+<button class="text-[#8E8E9A] w-16 h-16 flex flex-col items-center justify-center hover:bg-[#222633] transition-all duration-200 hover:text-[#F0F0F5] scale-95 active:scale-90">
+<span class="material-symbols-outlined text-2xl" data-icon="restaurant_menu">restaurant_menu</span>
+<span class="text-[10px] mt-1 uppercase tracking-tighter">Menu</span>
+</button>
+<button class="text-[#8E8E9A] w-16 h-16 flex flex-col items-center justify-center hover:bg-[#222633] transition-all duration-200 hover:text-[#F0F0F5] scale-95 active:scale-90">
+<span class="material-symbols-outlined text-2xl" data-icon="kitchen">kitchen</span>
+<span class="text-[10px] mt-1 uppercase tracking-tighter">KDS</span>
+</button>
+</nav>
+<div class="mt-auto">
+<img alt="User Profile Avatar" class="w-10 h-10 rounded-full bg-surface-container-high" data-alt="User profile circular avatar placeholder" src="https://lh3.googleusercontent.com/aida-public/AB6AXuABd5sxAoBmmtut0b8HlJbi7FjYNzc8cAInhbl8Pi5MKxXqTWrJAUBX4UHF0VW4Rbtr3JpNFvQXfZPG_Mgu3ke08ZwVb9AxPT-dpUiuSrpmpi79rPeUGjenZNziHY4C9yy_HSusQHsX4MTwCQvXeet0deff1jH2VThwil8078XNi905agPHwt-_RhLHhHvIW58sH1AU0OVeizgrZCzz2Vqc9fKo6HyWKKvAYtMvKZM_7PNgPNdAJxvLZqPmmnSPhGVWmndeOwJIwfM"/>
+</div>
+</aside>
+<!-- Top Navigation Bar Shell -->
+<header class="fixed top-0 right-0 left-24 h-20 z-40 flex justify-between items-center bg-[#111319] px-8 font-['Inter'] font-extrabold text-[#F0F0F5]">
+<div class="flex items-center gap-6">
+<h1 class="text-2xl font-black bg-gradient-to-br from-[#AFC6FF] to-[#528DFF] bg-clip-text text-transparent">GastroCore POS</h1>
+<div class="flex gap-2">
+<span class="text-[#8E8E9A] font-medium px-4">ADMIN</span>
+<div class="flex items-center gap-2 bg-green-500/10 text-green-400 px-3 py-1 rounded-full text-xs tracking-wider font-bold border border-green-500/20">
+<span class="w-2 h-2 bg-green-400 rounded-full"></span>
+                   SHIFT OPEN
+                </div>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="text-right">
+<div class="text-sm text-[#8E8E9A] font-medium">Monday, Oct 24</div>
+<div class="text-xl tracking-tight">12:45 PM</div>
+</div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-[#8E8E9A]" data-icon="cloud_done">cloud_done</span>
+<span class="material-symbols-outlined text-[#8E8E9A]" data-icon="account_circle">account_circle</span>
+</div>
+</div>
+</header>
+<!-- Main Content Stage -->
+<main class="ml-24 mt-20 p-10 h-[calc(100vh-80px)] flex flex-col">
+<!-- Bento Grid Dashboard -->
+<div class="grid grid-cols-3 grid-rows-4 gap-6 flex-grow">
+<!-- Row 1 -->
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-green-400">
+<span class="material-symbols-outlined text-[48px]" data-icon="shopping_cart">shopping_cart</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Order</span>
+</button>
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-orange-400">
+<span class="material-symbols-outlined text-[48px]" data-icon="receipt_long">receipt_long</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Order Records</span>
+</button>
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-yellow-400">
+<span class="material-symbols-outlined text-[48px]" data-icon="payments">payments</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Transactions</span>
+</button>
+<!-- Row 2 -->
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-orange-400">
+<span class="material-symbols-outlined text-[48px]" data-icon="point_of_sale">point_of_sale</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Cash Drawer</span>
+</button>
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-green-400">
+<span class="material-symbols-outlined text-[48px]" data-icon="groups">groups</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Customer</span>
+</button>
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-green-400">
+<span class="material-symbols-outlined text-[48px]" data-icon="person_check">person_check</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Attendance</span>
+</button>
+<!-- Row 3 -->
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-orange-400">
+<span class="material-symbols-outlined text-[48px]" data-icon="schedule">schedule</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Shift</span>
+</button>
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-red-400">
+<span class="material-symbols-outlined text-[48px]" data-icon="inventory_2">inventory_2</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Products</span>
+</button>
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-blue-400">
+<span class="material-symbols-outlined text-[48px]" data-icon="settings">settings</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Settings</span>
+</button>
+<!-- Row 4 -->
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-blue-500">
+<span class="material-symbols-outlined text-[48px]" data-icon="admin_panel_settings">admin_panel_settings</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Back Office</span>
+</button>
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-red-500">
+<span class="material-symbols-outlined text-[48px]" data-icon="analytics">analytics</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Report</span>
+</button>
+<button class="bg-surface-container-low rounded-xl p-8 flex flex-col justify-center items-center gap-4 group transition-all hover:bg-surface-container-high active:scale-95 text-gray-500">
+<span class="material-symbols-outlined text-[48px]" data-icon="lock">lock</span>
+<span class="text-lg font-bold text-on-surface uppercase tracking-widest">Lock Screen</span>
+</button>
+</div>
+<!-- Dashboard Footer -->
+<footer class="mt-8 flex justify-between items-center text-[#5A5A6A]">
+<div class="text-sm font-medium tracking-wide">
+                GastroCore <span class="text-[#8E8E9A]">v0.1.0</span>
+</div>
+<button class="flex items-center gap-2 px-6 py-3 bg-surface-container hover:bg-surface-container-high transition-colors text-[#F0F0F5] font-bold rounded-xl active:scale-95">
+<span class="material-symbols-outlined text-xl" data-icon="logout">logout</span>
+                Sign Out
+            </button>
+</footer>
+</main>
+</body></html>

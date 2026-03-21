@@ -1,0 +1,109 @@
+version: "3.9"
+
+services:
+  # ---------------------------------------------------------------------------
+  # GastroCore API server
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gastrocore-server:latest
+    container_name: gastrocore_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      ENV: "production"
+      LOG_LEVEL: "info"
+      DATABASE_URL: "postgres://gastrocore:gastrocore@postgres:5432/gastrocore?sslmode=disable"
+      JWT_SECRET: "${JWT_SECRET:-change-me-in-production-use-256-bit-random}"
+      JWT_EXPIRY: "24h"
+      LICENSE_SIGNING_KEY: "${LICENSE_SIGNING_KEY:-}"
+      FISKALY_API_KEY: "${FISKALY_API_KEY:-}"
+      FISKALY_API_SECRET: "${FISKALY_API_SECRET:-}"
+      FISKALY_ENV: "${FISKALY_ENV:-test}"
+      ERPNEXT_URL: "${ERPNEXT_URL:-}"
+      ERPNEXT_API_KEY: "${ERPNEXT_API_KEY:-}"
+      ERPNEXT_API_SECRET: "${ERPNEXT_API_SECRET:-}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - gastrocore
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: gastrocore_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gastrocore
+      POSTGRES_PASSWORD: gastrocore
+      POSTGRES_DB: gastrocore
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gastrocore -d gastrocore"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - gastrocore
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 (optional — for future session store / pub-sub / queue)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: gastrocore_redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - gastrocore
+
+  # ---------------------------------------------------------------------------
+  # DB migration runner (one-shot job)
+  # ---------------------------------------------------------------------------
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrate
+    container_name: gastrocore_migrate
+    environment:
+      DATABASE_URL: "postgres://gastrocore:gastrocore@postgres:5432/gastrocore?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gastrocore
+    restart: "no"
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  gastrocore:
+    driver: bridge

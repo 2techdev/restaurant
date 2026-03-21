@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Split Bill | GastroCore POS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-high": "#282a30",
+              "on-secondary-fixed": "#171b28",
+              "on-primary-fixed": "#001944",
+              "tertiary": "#afc6ff",
+              "tertiary-fixed": "#d9e2ff",
+              "surface-container": "#1d1f26",
+              "secondary": "#c3c6d7",
+              "outline-variant": "#424753",
+              "tertiary-container": "#7990c6",
+              "on-tertiary": "#152f5e",
+              "on-tertiary-fixed": "#001943",
+              "on-surface-variant": "#c2c6d6",
+              "on-error-container": "#ffdad6",
+              "on-tertiary-fixed-variant": "#2e4676",
+              "on-primary-fixed-variant": "#004299",
+              "inverse-primary": "#0059c7",
+              "secondary-fixed-dim": "#c3c6d7",
+              "surface": "#111319",
+              "on-secondary": "#2c303d",
+              "surface-tint": "#afc6ff",
+              "on-secondary-container": "#b4b8c9",
+              "primary-fixed": "#d9e2ff",
+              "primary-container": "#528dff",
+              "surface-bright": "#373940",
+              "surface-container-lowest": "#0c0e14",
+              "on-secondary-fixed-variant": "#424654",
+              "surface-container-low": "#191b22",
+              "surface-variant": "#33343b",
+              "secondary-fixed": "#dfe2f3",
+              "tertiary-fixed-dim": "#afc6ff",
+              "on-background": "#e2e2eb",
+              "inverse-on-surface": "#2e3037",
+              "error-container": "#93000a",
+              "on-primary-container": "#00275f",
+              "outline": "#8c909f",
+              "error": "#ffb4ab",
+              "primary": "#afc6ff",
+              "inverse-surface": "#e2e2eb",
+              "surface-container-highest": "#33343b",
+              "on-tertiary-container": "#0c2857",
+              "on-primary": "#002d6d",
+              "secondary-container": "#454957",
+              "background": "#111319",
+              "surface-dim": "#111319",
+              "on-surface": "#e2e2eb",
+              "primary-fixed-dim": "#afc6ff",
+              "on-error": "#690005"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-primary-gradient {
+            background: linear-gradient(135deg, #AFC6FF 0%, #528DFF 100%);
+        }
+        .glass-panel {
+            background: rgba(42, 47, 61, 0.2);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary-container selection:text-on-primary-container">
+<!-- Sidebar Navigation (Anchored from JSON) -->
+<aside class="fixed left-0 top-0 bottom-0 flex flex-col z-50 py-8 bg-[#1A1D27] w-24 md:w-64 shadow-[8px_0_24px_rgba(0,0,0,0.15)] transition-all duration-300 ease-in-out">
+<div class="px-8 mb-12">
+<span class="text-xl font-extrabold bg-gradient-to-br from-[#AFC6FF] to-[#528DFF] bg-clip-text text-transparent">GastroCore</span>
+<p class="text-[10px] text-outline mt-1 tracking-widest uppercase">Station 01</p>
+</div>
+<nav class="flex-1 space-y-2">
+<!-- Active State Logic applied to Order -->
+<a class="bg-[#222633] text-[#F0F0F5] border-l-4 border-[#528DFF] px-6 py-4 flex items-center gap-4 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+<span class="hidden md:block font-medium text-sm">Order</span>
+</a>
+<a class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="hidden md:block font-medium text-sm">Records</span>
+</a>
+<a class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="hidden md:block font-medium text-sm">Tables</span>
+</a>
+<a class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="restaurant_menu">restaurant_menu</span>
+<span class="hidden md:block font-medium text-sm">Menu</span>
+</a>
+<a class="text-[#8E8E9A] px-6 py-4 flex items-center gap-4 hover:bg-[#2A2F3D] hover:text-[#F0F0F5] transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span class="hidden md:block font-medium text-sm">KDS</span>
+</a>
+</nav>
+<div class="mt-auto px-6 space-y-2">
+<a class="text-[#8E8E9A] py-3 flex items-center gap-4 hover:text-[#F0F0F5] transition-colors" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="help">help</span>
+<span class="hidden md:block text-xs">Support</span>
+</a>
+<div class="flex items-center gap-3 pt-6 border-t border-outline-variant/20">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Chef Profile Avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1aDiu-Izk2oJaKSn-eDeVdbOrNZc_u9QIvGGADBNiRw2pto3lvn2B3DCNo0bEkgWabuYYHx3jsOTZ4QkhO0fmhfLo2rnBRkgPDHyafol_lmfZJb0vVXEei0qbUUQN14A7UiZIWBYfrs4scQem8Scn-wQSmaX0yufA81cLhY-VZMcD9Cv81B_1UBuoyeUYFkzPS1mfDezZYdz0bpY9VwrMn5V1OKWTxlnr9dcNWDpf-F9rxkKZJaRk3mopL8n5s6sbMYLP5R0ioz0"/>
+</div>
+<div class="hidden md:block">
+<p class="text-sm font-bold text-on-surface">Marco R.</p>
+<p class="text-[10px] text-outline">Lead Chef</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-24 md:ml-64 min-h-screen flex flex-col overflow-hidden">
+<!-- Header -->
+<header class="h-24 px-10 flex items-center justify-between bg-surface-container-low">
+<div class="flex items-center gap-6">
+<button class="w-12 h-12 rounded-xl flex items-center justify-center bg-surface-container-high hover:bg-surface-bright transition-colors">
+<span class="material-symbols-outlined text-on-surface" data-icon="arrow_back">arrow_back</span>
+</button>
+<div>
+<h1 class="text-2xl font-extrabold tracking-tight text-[#F0F0F5]">Split Bill</h1>
+<p class="text-secondary font-medium uppercase text-xs tracking-widest">Table #12 — 4 Guests</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-xs text-outline font-bold uppercase tracking-widest">Total Balance</p>
+<p class="text-4xl font-black text-[#F0F0F5] tracking-tighter">CHF 123.50</p>
+</div>
+</header>
+<!-- Tab Selection -->
+<div class="px-10 py-6 bg-surface">
+<div class="flex p-1 bg-surface-container-low rounded-xl w-fit">
+<button class="px-8 py-3 rounded-lg text-sm font-bold transition-all bg-surface-container-high text-[#F0F0F5] shadow-lg">Equal Split</button>
+<button class="px-8 py-3 rounded-lg text-sm font-medium transition-all text-[#8E8E9A] hover:text-[#F0F0F5]">By Item</button>
+<button class="px-8 py-3 rounded-lg text-sm font-medium transition-all text-[#8E8E9A] hover:text-[#F0F0F5]">Custom Amount</button>
+</div>
+</div>
+<!-- Split Interface -->
+<div class="flex-1 px-10 pb-10 grid grid-cols-1 lg:grid-cols-12 gap-8 overflow-hidden">
+<!-- Left Column: Equal Split Controls -->
+<div class="lg:col-span-5 flex flex-col gap-6">
+<div class="bg-surface-container rounded-3xl p-8 flex flex-col justify-center items-center text-center">
+<p class="text-outline font-bold uppercase tracking-widest mb-6">Number of Guests</p>
+<div class="flex items-center gap-12">
+<button class="w-16 h-16 rounded-2xl bg-surface-container-high flex items-center justify-center hover:bg-surface-bright active:scale-95 transition-all">
+<span class="material-symbols-outlined text-3xl" data-icon="remove">remove</span>
+</button>
+<span class="text-7xl font-black text-[#F0F0F5]">3</span>
+<button class="w-16 h-16 rounded-2xl bg-surface-container-high flex items-center justify-center hover:bg-surface-bright active:scale-95 transition-all">
+<span class="material-symbols-outlined text-3xl" data-icon="add">add</span>
+</button>
+</div>
+</div>
+<div class="bg-surface-container rounded-3xl p-8 flex-1 flex flex-col justify-center items-center relative overflow-hidden">
+<div class="absolute inset-0 bg-primary-gradient opacity-5"></div>
+<p class="text-primary font-bold uppercase tracking-widest mb-2 relative z-10">Calculated Per Person</p>
+<p class="text-6xl font-black text-[#F0F0F5] tracking-tighter relative z-10">CHF 41.17</p>
+<p class="text-outline text-sm mt-4 relative z-10">Remaining: CHF 0.01 (Rounding adjustment)</p>
+</div>
+</div>
+<!-- Right Column: Sub-bills Preview -->
+<div class="lg:col-span-7 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar">
+<!-- Sub-bill 1 -->
+<div class="bg-surface-container-low rounded-2xl p-6 flex items-center justify-between group hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-6">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary font-black text-xl">1</div>
+<div>
+<p class="text-lg font-bold text-[#F0F0F5]">Guest 01</p>
+<span class="text-xs text-secondary font-medium px-2 py-0.5 bg-surface-container rounded-full">Unpaid</span>
+</div>
+</div>
+<div class="text-right">
+<p class="text-2xl font-black text-[#F0F0F5]">CHF 41.17</p>
+<button class="text-primary font-bold text-sm hover:underline">Settle Card</button>
+</div>
+</div>
+<!-- Sub-bill 2 -->
+<div class="bg-surface-container-low rounded-2xl p-6 flex items-center justify-between border-l-4 border-green-500 bg-green-500/5">
+<div class="flex items-center gap-6">
+<div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
+<span class="material-symbols-outlined" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div>
+<p class="text-lg font-bold text-[#F0F0F5]">Guest 02</p>
+<span class="text-xs text-green-500 font-bold px-2 py-0.5 bg-green-500/10 rounded-full">Paid Cash</span>
+</div>
+</div>
+<div class="text-right opacity-60">
+<p class="text-2xl font-black text-[#F0F0F5]">CHF 41.17</p>
+<p class="text-xs text-outline">Receipt #8821</p>
+</div>
+</div>
+<!-- Sub-bill 3 -->
+<div class="bg-surface-container-low rounded-2xl p-6 flex items-center justify-between group hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-6">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-primary font-black text-xl">3</div>
+<div>
+<p class="text-lg font-bold text-[#F0F0F5]">Guest 03</p>
+<span class="text-xs text-secondary font-medium px-2 py-0.5 bg-surface-container rounded-full">Unpaid</span>
+</div>
+</div>
+<div class="text-right">
+<p class="text-2xl font-black text-[#F0F0F5]">CHF 41.17</p>
+<button class="text-primary font-bold text-sm hover:underline">Settle Card</button>
+</div>
+</div>
+<!-- Sub-bill Remaining (Rounding) -->
+<div class="bg-surface-container-low rounded-2xl p-6 flex items-center justify-between opacity-40">
+<div class="flex items-center gap-6">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-outline" data-icon="info">info</span>
+</div>
+<div>
+<p class="text-sm font-bold text-outline">Rounding Adjustment</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-lg font-black text-outline">CHF 0.01</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Actions -->
+<footer class="h-32 px-10 flex items-center justify-between bg-surface-container shadow-[0_-8px_24px_rgba(0,0,0,0.2)]">
+<div class="flex gap-4">
+<button class="px-8 h-16 rounded-2xl bg-surface-container-high text-[#F0F0F5] font-bold flex items-center gap-3 hover:bg-surface-bright transition-all">
+<span class="material-symbols-outlined" data-icon="print">print</span>
+                    Print All Drafts
+                </button>
+<button class="px-8 h-16 rounded-2xl bg-surface-container-high text-[#F0F0F5] font-bold flex items-center gap-3 hover:bg-surface-bright transition-all">
+<span class="material-symbols-outlined" data-icon="undo">undo</span>
+                    Reset Split
+                </button>
+</div>
+<button class="px-12 h-16 rounded-2xl bg-primary-gradient text-white font-black text-lg shadow-2xl shadow-primary-container/20 flex items-center gap-4 hover:scale-[1.02] active:scale-95 transition-all">
+                Settle All Bills
+                <span class="material-symbols-outlined" data-icon="payments">payments</span>
+</button>
+</footer>
+</main>
+<!-- Overlay "Totalizer" Anchor -->
+<div class="fixed bottom-36 right-10 z-20 pointer-events-none">
+<div class="glass-panel p-6 rounded-3xl border border-white/5 shadow-2xl pointer-events-auto">
+<p class="text-[10px] text-primary font-black uppercase tracking-[0.2em] mb-1">Unpaid Balance</p>
+<p class="text-4xl font-black text-[#F0F0F5] tracking-tighter">CHF 82.35</p>
+</div>
+</div>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #2A2F3D;
+            border-radius: 10px;
+        }
+    </style>
+</body></html>

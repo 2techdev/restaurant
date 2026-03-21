@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    USB cihaz filtresi — GastroCore POS yazıcı desteği.
+
+    Burada tanımlanan vendor ID'li cihazlar takıldığında sistem
+    otomatik olarak MainActivity'yi başlatır ve USB iznini sunar.
+
+    vendor-id değerleri ondalık (decimal) formattadır.
+-->
+<resources>
+    <!-- Epson (0x04B8 = 1208) -->
+    <usb-device vendor-id="1208" />
+
+    <!-- Star Micronics (0x0519 = 1305) -->
+    <usb-device vendor-id="1305" />
+
+    <!-- Bixolon (0x154F = 5455) -->
+    <usb-device vendor-id="5455" />
+
+    <!-- Citizen 0x2730 = 10032 -->
+    <usb-device vendor-id="10032" />
+    <!-- Citizen eski (0x0665 = 1637) -->
+    <usb-device vendor-id="1637" />
+
+    <!-- Xprinter (0x0483 = 1155) -->
+    <usb-device vendor-id="1155" />
+    <!-- Xprinter alt. (0x0416 = 1046) -->
+    <usb-device vendor-id="1046" />
+    <!-- Xprinter alt. (0x1504 = 5380) -->
+    <usb-device vendor-id="5380" />
+
+    <!-- SNBC / Sewoo (0x0FE6 = 4070) -->
+    <usb-device vendor-id="4070" />
+
+    <!-- POS-X / Custom (0x0DD4 = 3540) -->
+    <usb-device vendor-id="3540" />
+
+    <!-- HPRT (0x0485 = 1157) -->
+    <usb-device vendor-id="1157" />
+
+    <!-- Gainscha / Gprinter (0x28E9 = 10473) -->
+    <usb-device vendor-id="10473" />
+
+    <!-- Generic POS (0x0456 = 1110) -->
+    <usb-device vendor-id="1110" />
+
+    <!-- CH340 / CH341 (0x1A86 = 6790) -->
+    <usb-device vendor-id="6790" />
+
+    <!-- FTDI FT232 (0x0403 = 1027) -->
+    <usb-device vendor-id="1027" />
+
+    <!-- Prolific PL2303 (0x067B = 1659) -->
+    <usb-device vendor-id="1659" />
+
+    <!-- Silicon Labs CP210x (0x10C4 = 4292) -->
+    <usb-device vendor-id="4292" />
+</resources>

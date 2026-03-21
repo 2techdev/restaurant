@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy – GastroCore POS | Datenschutzerklärung</title>
+  <style>
+    :root {
+      --primary: #1a1a2e;
+      --accent: #e94560;
+      --bg: #f9f9f9;
+      --card: #ffffff;
+      --text: #333333;
+      --muted: #666666;
+      --border: #e0e0e0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    header .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    header .logo span { color: var(--accent); }
+    header nav a {
+      color: #ccc;
+      text-decoration: none;
+      margin-left: 1.5rem;
+      font-size: 0.9rem;
+    }
+    header nav a:hover { color: #fff; }
+    .lang-switcher {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .lang-btn {
+      background: transparent;
+      border: 1px solid #555;
+      color: #ccc;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    .lang-btn.active, .lang-btn:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .container {
+      max-width: 860px;
+      margin: 3rem auto;
+      padding: 0 1.5rem;
+    }
+    .page-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+    }
+    .page-subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 2.5rem;
+    }
+    .badge {
+      display: inline-block;
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #a5d6a7;
+      border-radius: 20px;
+      padding: 0.2rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-right: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+    section h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--accent);
+      display: inline-block;
+    }
+    section h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin: 1.25rem 0 0.5rem;
+    }
+    p { margin-bottom: 0.85rem; color: var(--text); }
+    ul, ol {
+      padding-left: 1.5rem;
+      margin-bottom: 0.85rem;
+    }
+    li { margin-bottom: 0.4rem; }
+    .highlight-box {
+      background: #fff8e1;
+      border-left: 4px solid #f9a825;
+      padding: 1rem 1.25rem;
+      border-radius: 0 6px 6px 0;
+      margin: 1rem 0;
+    }
+    .highlight-box p { margin: 0; font-size: 0.95rem; }
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .contact-item {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    .contact-item .label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.25rem;
+    }
+    .contact-item .value {
+      font-weight: 600;
+      color: var(--primary);
+    }
+    .contact-item a { color: var(--accent); text-decoration: none; }
+    .contact-item a:hover { text-decoration: underline; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th {
+      background: var(--primary);
+      color: #fff;
+      padding: 0.65rem 1rem;
+      text-align: left;
+    }
+    td {
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    tr:nth-child(even) td { background: #f9f9f9; }
+    .lang-section { display: none; }
+    .lang-section.active { display: block; }
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    @media (max-width: 600px) {
+      .page-title { font-size: 1.5rem; }
+      section { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Gastro<span>Core</span> POS</div>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="mailto:developer@2tech.ch">Contact</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="lang-switcher">
+    <button class="lang-btn active" onclick="switchLang('en')">🇬🇧 English</button>
+    <button class="lang-btn" onclick="switchLang('de')">🇩🇪 Deutsch</button>
+  </div>
+
+  <!-- ===== ENGLISH ===== -->
+  <div id="lang-en" class="lang-section active">
+    <h1 class="page-title">Privacy Policy</h1>
+    <p class="page-subtitle">GastroCore POS &nbsp;·&nbsp; Last updated: March 20, 2026</p>
+
+    <span class="badge">✓ GDPR Compliant</span>
+    <span class="badge">✓ Swiss DSG Compliant</span>
+    <span class="badge">✓ Offline-First</span>
+
+    <section>
+      <h2>1. Controller / Data Responsible</h2>
+      <div class="contact-grid">
+        <div class="contact-item">
+          <div class="label">Company</div>
+          <div class="value">2Tech GmbH</div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Address</div>
+          <div class="value">Zürich, Switzerland</div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Email</div>
+          <div class="value"><a href="mailto:developer@2tech.ch">developer@2tech.ch</a></div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Jurisdiction</div>
+          <div class="value">Swiss DSG / EU GDPR (Art. 3)</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. About GastroCore POS</h2>
+      <p>GastroCore POS is a point-of-sale application designed for restaurants, cafés, and food-service businesses. The app operates <strong>offline-first</strong> — all core data is stored locally on the device. An optional cloud synchronization feature may be enabled by the user.</p>
+    </section>
+
+    <section>
+      <h2>3. Data We Collect</h2>
+
+      <h3>3.1 Restaurant Operational Data</h3>
+      <p>The following data is entered and managed by the restaurant operator:</p>
+      <ul>
+        <li>Orders and order items (products, quantities, prices, timestamps)</li>
+        <li>Product catalog (names, categories, prices, descriptions)</li>
+        <li>Table and floor plan configurations</li>
+        <li>Employee records (name, role, PIN / access code)</li>
+        <li>Customer receipts and transaction records</li>
+        <li>Daily reports and sales summaries</li>
+      </ul>
+      <div class="highlight-box">
+        <p><strong>Note:</strong> This data belongs exclusively to the restaurant operator. We do not access, analyse, or monetise this data.</p>
+      </div>
+
+      <h3>3.2 Device Information</h3>
+      <p>The app collects minimal device information required for operation:</p>
+      <ul>
+        <li>Device model and Android version (for compatibility)</li>
+        <li>App version number</li>
+        <li>Unique device identifier (for license management only)</li>
+      </ul>
+
+      <h3>3.3 Data We Do NOT Collect</h3>
+      <ul>
+        <li>No personal data of restaurant end-customers (diners)</li>
+        <li>No location data</li>
+        <li>No advertising identifiers (AAID)</li>
+        <li>No behavioural tracking or analytics</li>
+        <li>No microphone, camera, or contacts access</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Data Storage &amp; Retention</h2>
+
+      <h3>4.1 Local Storage (Default)</h3>
+      <p>All operational data is stored locally on the Android device using an encrypted SQLite database. Data remains on the device until manually deleted by the operator or the app is uninstalled.</p>
+
+      <h3>4.2 Optional Cloud Sync</h3>
+      <p>If the operator enables cloud synchronisation, data is transmitted via encrypted HTTPS connections to secure servers. Operators can disable cloud sync and request deletion of cloud data at any time by contacting <a href="mailto:developer@2tech.ch">developer@2tech.ch</a>.</p>
+
+      <h3>4.3 Retention Periods</h3>
+      <table>
+        <tr><th>Data Type</th><th>Retention</th></tr>
+        <tr><td>Local operational data</td><td>Until manually deleted or app uninstalled</td></tr>
+        <tr><td>Cloud sync data (if enabled)</td><td>Until deletion requested by operator</td></tr>
+        <tr><td>Payment transaction records</td><td>Per Wallee / MyPOS provider policy (typically 10 years for legal compliance)</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>5. Third-Party Services</h2>
+      <p>GastroCore POS integrates with the following third-party services:</p>
+
+      <table>
+        <tr><th>Service</th><th>Purpose</th><th>Data Shared</th><th>Privacy Policy</th></tr>
+        <tr>
+          <td><strong>Wallee</strong></td>
+          <td>Payment processing (card terminals)</td>
+          <td>Transaction amount, currency, order reference</td>
+          <td><a href="https://www.wallee.com/legal/privacy-policy" target="_blank" rel="noopener">wallee.com</a></td>
+        </tr>
+        <tr>
+          <td><strong>MyPOS</strong></td>
+          <td>Payment processing (card terminals)</td>
+          <td>Transaction amount, currency, order reference</td>
+          <td><a href="https://www.mypos.com/en-gb/privacy-policy" target="_blank" rel="noopener">mypos.com</a></td>
+        </tr>
+        <tr>
+          <td><strong>Google Play</strong></td>
+          <td>App distribution &amp; updates</td>
+          <td>App installation data per Google's policy</td>
+          <td><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">google.com</a></td>
+        </tr>
+      </table>
+
+      <p>Payment processors act as independent data controllers for payment data. We recommend reviewing their privacy policies. We do not store full card numbers or sensitive payment credentials.</p>
+    </section>
+
+    <section>
+      <h2>6. Legal Basis for Processing (GDPR Art. 6)</h2>
+      <ul>
+        <li><strong>Art. 6(1)(b)</strong> – Processing necessary for the performance of a contract (app licence agreement with the operator)</li>
+        <li><strong>Art. 6(1)(c)</strong> – Compliance with legal obligations (financial record keeping)</li>
+        <li><strong>Art. 6(1)(f)</strong> – Legitimate interests (app security, fraud prevention, licence enforcement)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>7. Your Rights</h2>
+      <p>Under GDPR and Swiss DSG, you have the right to:</p>
+      <ul>
+        <li><strong>Access</strong> – Request a copy of data we hold about you</li>
+        <li><strong>Rectification</strong> – Correct inaccurate data</li>
+        <li><strong>Erasure</strong> – Request deletion of your data ("right to be forgotten")</li>
+        <li><strong>Portability</strong> – Receive your data in a machine-readable format</li>
+        <li><strong>Objection</strong> – Object to certain processing activities</li>
+        <li><strong>Restriction</strong> – Request restriction of processing</li>
+        <li><strong>Complaint</strong> – Lodge a complaint with the Swiss FDPIC or your national supervisory authority</li>
+      </ul>
+      <p>To exercise any of these rights, contact us at <a href="mailto:developer@2tech.ch">developer@2tech.ch</a>. We will respond within 30 days.</p>
+    </section>
+
+    <section>
+      <h2>8. Data Security</h2>
+      <ul>
+        <li>Local data is stored in an encrypted database on the device</li>
+        <li>All network communications use TLS 1.2+ encryption</li>
+        <li>Employee PINs are hashed and never stored in plain text</li>
+        <li>No sensitive payment credentials are stored by the app</li>
+        <li>Access to backend systems is protected by authentication</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>9. Children's Privacy</h2>
+      <p>GastroCore POS is a business application intended solely for use by restaurant operators and their staff. It is not directed at children under 16. We do not knowingly collect data from minors.</p>
+    </section>
+
+    <section>
+      <h2>10. Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time. The updated version will be published on this page with a revised "Last updated" date. For significant changes, we will notify operators via the app or email. Continued use of the app after changes constitutes acceptance of the updated policy.</p>
+    </section>
+
+    <section>
+      <h2>11. Contact</h2>
+      <p>For any questions, data requests, or complaints regarding this Privacy Policy:</p>
+      <div class="contact-grid">
+        <div class="contact-item">
+          <div class="label">Email</div>
+          <div class="value"><a href="mailto:developer@2tech.ch">developer@2tech.ch</a></div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Company</div>
+          <div class="value">2Tech GmbH</div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Location</div>
+          <div class="value">Zürich, Switzerland</div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Response Time</div>
+          <div class="value">Within 30 days</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== DEUTSCH ===== -->
+  <div id="lang-de" class="lang-section">
+    <h1 class="page-title">Datenschutzerklärung</h1>
+    <p class="page-subtitle">GastroCore POS &nbsp;·&nbsp; Stand: 20. März 2026</p>
+
+    <span class="badge">✓ DSGVO-konform</span>
+    <span class="badge">✓ DSG-konform (Schweiz)</span>
+    <span class="badge">✓ Offline-First</span>
+
+    <section>
+      <h2>1. Verantwortlicher</h2>
+      <div class="contact-grid">
+        <div class="contact-item">
+          <div class="label">Unternehmen</div>
+          <div class="value">2Tech GmbH</div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Adresse</div>
+          <div class="value">Zürich, Schweiz</div>
+        </div>
+        <div class="contact-item">
+          <div class="label">E-Mail</div>
+          <div class="value"><a href="mailto:developer@2tech.ch">developer@2tech.ch</a></div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Rechtsgrundlage</div>
+          <div class="value">CH-DSG / EU-DSGVO (Art. 3)</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Über GastroCore POS</h2>
+      <p>GastroCore POS ist eine Kassensoftware (Point-of-Sale-Anwendung) für Restaurants, Cafés und Gastronomiebetriebe. Die App arbeitet <strong>offline-first</strong> – alle Kerndaten werden lokal auf dem Gerät gespeichert. Eine optionale Cloud-Synchronisierung kann vom Betreiber aktiviert werden.</p>
+    </section>
+
+    <section>
+      <h2>3. Erhobene Daten</h2>
+
+      <h3>3.1 Betriebsdaten des Restaurants</h3>
+      <p>Folgende Daten werden vom Restaurantbetreiber eingegeben und verwaltet:</p>
+      <ul>
+        <li>Bestellungen und Bestellpositionen (Produkte, Mengen, Preise, Zeitstempel)</li>
+        <li>Produktkatalog (Namen, Kategorien, Preise, Beschreibungen)</li>
+        <li>Tisch- und Raumplankonfigurationen</li>
+        <li>Mitarbeiterdaten (Name, Rolle, PIN / Zugangscode)</li>
+        <li>Quittungen und Transaktionsbelege</li>
+        <li>Tagesberichte und Verkaufsübersichten</li>
+      </ul>
+      <div class="highlight-box">
+        <p><strong>Hinweis:</strong> Diese Daten gehören ausschliesslich dem Restaurantbetreiber. Wir greifen auf diese Daten nicht zu, analysieren oder vermarkten sie nicht.</p>
+      </div>
+
+      <h3>3.2 Geräteinformationen</h3>
+      <p>Die App erhebt minimale Geräteinformationen, die für den Betrieb erforderlich sind:</p>
+      <ul>
+        <li>Gerätemodell und Android-Version (für Kompatibilität)</li>
+        <li>App-Versionsnummer</li>
+        <li>Eindeutige Gerätekennung (nur für Lizenzverwaltung)</li>
+      </ul>
+
+      <h3>3.3 Nicht erhobene Daten</h3>
+      <ul>
+        <li>Keine personenbezogenen Daten der Restaurantgäste</li>
+        <li>Keine Standortdaten</li>
+        <li>Keine Werbe-IDs (AAID)</li>
+        <li>Kein Verhaltens-Tracking oder Analytics</li>
+        <li>Kein Zugriff auf Mikrofon, Kamera oder Kontakte</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Datenspeicherung &amp; Aufbewahrung</h2>
+
+      <h3>4.1 Lokale Speicherung (Standard)</h3>
+      <p>Alle Betriebsdaten werden lokal auf dem Android-Gerät in einer verschlüsselten SQLite-Datenbank gespeichert. Die Daten verbleiben auf dem Gerät, bis sie vom Betreiber manuell gelöscht werden oder die App deinstalliert wird.</p>
+
+      <h3>4.2 Optionale Cloud-Synchronisierung</h3>
+      <p>Wenn der Betreiber die Cloud-Synchronisierung aktiviert, werden Daten über verschlüsselte HTTPS-Verbindungen an sichere Server übertragen. Betreiber können die Cloud-Sync jederzeit deaktivieren und die Löschung von Cloud-Daten unter <a href="mailto:developer@2tech.ch">developer@2tech.ch</a> anfordern.</p>
+
+      <h3>4.3 Aufbewahrungsfristen</h3>
+      <table>
+        <tr><th>Datenart</th><th>Aufbewahrung</th></tr>
+        <tr><td>Lokale Betriebsdaten</td><td>Bis zur manuellen Löschung oder Deinstallation</td></tr>
+        <tr><td>Cloud-Sync-Daten (falls aktiviert)</td><td>Bis zur Löschanforderung des Betreibers</td></tr>
+        <tr><td>Zahlungstransaktionen</td><td>Gemäss Wallee/MyPOS-Richtlinien (i.d.R. 10 Jahre gesetzlich)</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>5. Drittanbieter-Dienste</h2>
+      <p>GastroCore POS ist mit folgenden Drittanbieter-Diensten integriert:</p>
+
+      <table>
+        <tr><th>Dienst</th><th>Zweck</th><th>Übermittelte Daten</th><th>Datenschutz</th></tr>
+        <tr>
+          <td><strong>Wallee</strong></td>
+          <td>Zahlungsabwicklung (Kartenterminals)</td>
+          <td>Betrag, Währung, Bestellreferenz</td>
+          <td><a href="https://www.wallee.com/legal/privacy-policy" target="_blank" rel="noopener">wallee.com</a></td>
+        </tr>
+        <tr>
+          <td><strong>MyPOS</strong></td>
+          <td>Zahlungsabwicklung (Kartenterminals)</td>
+          <td>Betrag, Währung, Bestellreferenz</td>
+          <td><a href="https://www.mypos.com/en-gb/privacy-policy" target="_blank" rel="noopener">mypos.com</a></td>
+        </tr>
+        <tr>
+          <td><strong>Google Play</strong></td>
+          <td>App-Verteilung &amp; Updates</td>
+          <td>Installationsdaten gemäss Google-Richtlinie</td>
+          <td><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">google.com</a></td>
+        </tr>
+      </table>
+
+      <p>Zahlungsanbieter handeln als eigenständige Verantwortliche für Zahlungsdaten. Vollständige Kartennummern oder sensible Zahlungsdaten werden von der App nicht gespeichert.</p>
+    </section>
+
+    <section>
+      <h2>6. Rechtsgrundlagen (DSGVO Art. 6)</h2>
+      <ul>
+        <li><strong>Art. 6 Abs. 1 lit. b DSGVO</strong> – Vertragserfüllung (App-Lizenzvertrag mit dem Betreiber)</li>
+        <li><strong>Art. 6 Abs. 1 lit. c DSGVO</strong> – Erfüllung rechtlicher Pflichten (Buchführungspflicht)</li>
+        <li><strong>Art. 6 Abs. 1 lit. f DSGVO</strong> – Berechtigte Interessen (App-Sicherheit, Betrugsprävention, Lizenzdurchsetzung)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>7. Ihre Rechte</h2>
+      <p>Gemäss DSGVO und Schweizer DSG haben Sie folgende Rechte:</p>
+      <ul>
+        <li><strong>Auskunft</strong> – Kopie der über Sie gespeicherten Daten anfordern</li>
+        <li><strong>Berichtigung</strong> – Unrichtige Daten korrigieren lassen</li>
+        <li><strong>Löschung</strong> – Löschung Ihrer Daten verlangen („Recht auf Vergessenwerden")</li>
+        <li><strong>Datenübertragbarkeit</strong> – Daten in maschinenlesbarem Format erhalten</li>
+        <li><strong>Widerspruch</strong> – Bestimmten Verarbeitungen widersprechen</li>
+        <li><strong>Einschränkung</strong> – Einschränkung der Verarbeitung verlangen</li>
+        <li><strong>Beschwerde</strong> – Beschwerde beim EDÖB (Schweiz) oder Ihrer nationalen Aufsichtsbehörde einreichen</li>
+      </ul>
+      <p>Zur Ausübung Ihrer Rechte wenden Sie sich an <a href="mailto:developer@2tech.ch">developer@2tech.ch</a>. Wir antworten innerhalb von 30 Tagen.</p>
+    </section>
+
+    <section>
+      <h2>8. Datensicherheit</h2>
+      <ul>
+        <li>Lokale Daten werden in einer verschlüsselten Datenbank auf dem Gerät gespeichert</li>
+        <li>Alle Netzwerkkommunikation erfolgt mit TLS 1.2+ Verschlüsselung</li>
+        <li>Mitarbeiter-PINs werden gehasht und nie im Klartext gespeichert</li>
+        <li>Sensible Zahlungsdaten werden von der App nicht gespeichert</li>
+        <li>Zugang zu Backend-Systemen ist durch Authentifizierung geschützt</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>9. Minderjährigenschutz</h2>
+      <p>GastroCore POS ist eine Geschäftsanwendung, die ausschliesslich für Restaurantbetreiber und ihr Personal bestimmt ist. Sie richtet sich nicht an Kinder unter 16 Jahren. Wir erheben wissentlich keine Daten von Minderjährigen.</p>
+    </section>
+
+    <section>
+      <h2>10. Änderungen dieser Erklärung</h2>
+      <p>Wir können diese Datenschutzerklärung von Zeit zu Zeit aktualisieren. Die aktualisierte Version wird auf dieser Seite mit einem neuen Datum veröffentlicht. Bei wesentlichen Änderungen benachrichtigen wir Betreiber über die App oder per E-Mail.</p>
+    </section>
+
+    <section>
+      <h2>11. Kontakt</h2>
+      <p>Bei Fragen, Datenanfragen oder Beschwerden zu dieser Datenschutzerklärung:</p>
+      <div class="contact-grid">
+        <div class="contact-item">
+          <div class="label">E-Mail</div>
+          <div class="value"><a href="mailto:developer@2tech.ch">developer@2tech.ch</a></div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Unternehmen</div>
+          <div class="value">2Tech GmbH</div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Standort</div>
+          <div class="value">Zürich, Schweiz</div>
+        </div>
+        <div class="contact-item">
+          <div class="label">Antwortzeit</div>
+          <div class="value">Innerhalb von 30 Tagen</div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<footer>
+  <p>&copy; 2026 2Tech GmbH, Zürich, Switzerland &nbsp;|&nbsp; <a href="index.html">GastroCore POS</a> &nbsp;|&nbsp; <a href="mailto:developer@2tech.ch">developer@2tech.ch</a></p>
+</footer>
+
+<script>
+  function switchLang(lang) {
+    document.querySelectorAll('.lang-section').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.lang-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('lang-' + lang).classList.add('active');
+    event.target.classList.add('active');
+    document.documentElement.lang = lang;
+  }
+</script>
+
+</body>
+</html>

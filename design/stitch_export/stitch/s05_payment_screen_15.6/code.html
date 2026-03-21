@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Kinetic Architecture: No-line separators, using tonal elevation */
+        .glass-panel {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "tertiary": "#e8b3ff",
+                "on-tertiary": "#510074",
+                "surface-container-lowest": "#0c0e14",
+                "primary-fixed": "#d9e2ff",
+                "on-surface-variant": "#c2c6d6",
+                "on-error": "#690005",
+                "on-secondary": "#003911",
+                "on-error-container": "#ffdad6",
+                "on-tertiary-container": "#460066",
+                "error-container": "#93000a",
+                "background": "#111319",
+                "primary-container": "#528dff",
+                "on-primary-container": "#00275f",
+                "on-primary": "#002d6c",
+                "primary-fixed-dim": "#afc6ff",
+                "on-primary-fixed-variant": "#004398",
+                "on-surface": "#e2e2eb",
+                "tertiary-container": "#c567f4",
+                "on-tertiary-fixed": "#310048",
+                "secondary-container": "#05b046",
+                "error": "#ffb4ab",
+                "surface-container-highest": "#33343b",
+                "primary": "#afc6ff",
+                "secondary-fixed": "#72fe88",
+                "outline-variant": "#424753",
+                "surface-container": "#1e1f26",
+                "surface-bright": "#373940",
+                "on-secondary-fixed-variant": "#00531c",
+                "inverse-on-surface": "#2e3037",
+                "surface": "#111319",
+                "secondary": "#53e16f",
+                "surface-container-low": "#191b22",
+                "surface-tint": "#afc6ff",
+                "tertiary-fixed": "#f6d9ff",
+                "on-primary-fixed": "#001a43",
+                "inverse-primary": "#0059c6",
+                "on-secondary-fixed": "#002107",
+                "on-secondary-container": "#003a11",
+                "inverse-surface": "#e2e2eb",
+                "surface-variant": "#33343b",
+                "outline": "#8c909f",
+                "on-tertiary-fixed-variant": "#7201a2",
+                "surface-container-high": "#282a30",
+                "surface-dim": "#111319",
+                "secondary-fixed-dim": "#53e16f"
+              },
+              fontFamily: {
+                "headline": ["Inter"],
+                "body": ["Inter"],
+                "label": ["Inter"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-background overflow-hidden h-screen w-screen flex flex-col">
+<!-- Top Navigation Anchor -->
+<header class="bg-[#191B22] border-none shadow-[0_0_48px_0_rgba(79,140,255,0.06)] flex justify-between items-center w-full px-6 h-16 backdrop-blur-md bg-opacity-80 z-50">
+<div class="flex items-center gap-4">
+<span class="text-xl font-extrabold text-[#F0F0F5] tracking-tighter">Precision POS</span>
+<div class="h-6 w-[1px] bg-outline-variant opacity-20 mx-2"></div>
+<span class="text-[#F0F0F5] font-semibold tracking-tight text-lg">Odeme Ozeti</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors cursor-pointer">notifications</span>
+<span class="material-symbols-outlined text-[#8E8E9A] hover:text-[#F0F0F5] transition-colors cursor-pointer">settings</span>
+</div>
+<div class="flex items-center gap-3 pl-6 border-l border-outline-variant border-opacity-20">
+<div class="text-right">
+<p class="text-xs text-[#8E8E9A]">Station 01</p>
+<p class="text-sm font-bold text-[#F0F0F5]">Lead Server</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center overflow-hidden">
+<img alt="User Avatar" data-alt="User profile avatar placeholder" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAR7JHvUVPZwvS9PdamuPSLRCQ1ROt33-stE9M0wBfVO8ZUubYPHGz-RkELjMnakVtSZ5R1gxf0B7UhhtMsXtX6Wz7qTUXeENat2JwKL-6vHfdus5JermHYv8T3Rhfdm0D0k6Sy8_HhWer2EdUh1Bbiw5aSRPlJAI9miz07mkLVz1Y0EiYInKO2TTA0JKsPsreF1-xvlPYJt03Mf0vvpsbfyi6upsj799An-Q9orULdqkgtdY_EhonrZTecp_G9h7SO9G5pl_RBIEAk"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex overflow-hidden p-6 gap-6">
+<!-- Left Column: Summary (The "Tray") -->
+<section class="w-[35%] flex flex-col gap-6">
+<div class="bg-surface-container-low rounded-xl p-6 flex-1 flex flex-col shadow-sm">
+<div class="flex justify-between items-start mb-8">
+<div>
+<h2 class="text-[#8E8E9A] text-xs font-medium uppercase tracking-widest">Order Details</h2>
+<p class="text-[#F0F0F5] text-2xl font-extrabold tracking-tight mt-1">Order #0412</p>
+</div>
+<div class="bg-secondary-container px-3 py-1 rounded-full">
+<span class="text-on-secondary-container text-xs font-bold">Masa 12</span>
+</div>
+</div>
+<div class="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
+<!-- Item 1 -->
+<div class="flex justify-between items-center group">
+<div>
+<p class="text-[#F0F0F5] font-semibold">Gastro Burger XL</p>
+<p class="text-xs text-[#8E8E9A]">Adet: 1</p>
+</div>
+<p class="text-[#F0F0F5] font-bold">395 ₺</p>
+</div>
+<!-- Item 2 -->
+<div class="flex justify-between items-center group">
+<div>
+<p class="text-[#F0F0F5] font-semibold">Margherita Pizza</p>
+<p class="text-xs text-[#8E8E9A]">Adet: 1</p>
+</div>
+<p class="text-[#F0F0F5] font-bold">320 ₺</p>
+</div>
+<!-- Item 3 -->
+<div class="flex justify-between items-center group">
+<div>
+<p class="text-[#F0F0F5] font-semibold">Coca-Cola Zero</p>
+<p class="text-xs text-[#8E8E9A]">Adet: 1</p>
+</div>
+<p class="text-[#F0F0F5] font-bold">110 ₺</p>
+</div>
+</div>
+<!-- Totals Section -->
+<div class="mt-8 pt-8 border-t border-outline-variant border-opacity-10 space-y-3">
+<div class="flex justify-between items-center text-[#8E8E9A]">
+<span>Ara Toplam</span>
+<span>687.50 ₺</span>
+</div>
+<div class="flex justify-between items-center text-[#8E8E9A]">
+<span>KDV (20%)</span>
+<span>137.50 ₺</span>
+</div>
+<div class="flex justify-between items-center pt-4">
+<span class="text-[#F0F0F5] text-lg font-semibold">Genel Toplam</span>
+<span class="text-primary-container text-4xl font-extrabold tracking-tighter">825.00 ₺</span>
+</div>
+</div>
+</div>
+<!-- Quick Actions -->
+<div class="flex gap-3">
+<button class="flex-1 bg-surface-container-highest py-4 rounded-xl font-bold text-[#F0F0F5] hover:bg-surface-bright transition-colors">
+                    Fiş Yazdır
+                </button>
+<button class="flex-1 bg-surface-container-highest py-4 rounded-xl font-bold text-[#F0F0F5] hover:bg-surface-bright transition-colors">
+                    İptal
+                </button>
+</div>
+</section>
+<!-- Right Column: Payment (The "Control Deck") -->
+<section class="flex-1 bg-surface-container rounded-xl flex flex-col p-6 shadow-2xl relative overflow-hidden">
+<!-- Background Decorative Element -->
+<div class="absolute -top-24 -right-24 w-64 h-64 bg-primary-container opacity-[0.03] rounded-full blur-3xl"></div>
+<!-- Payment Methods Grid -->
+<div class="grid grid-cols-4 gap-4 mb-8">
+<!-- Method: Nakit (Selected) -->
+<button class="bg-surface-container-high border-2 border-primary-container p-4 rounded-xl flex flex-col items-center justify-center gap-2 group transition-all transform active:scale-[0.98]">
+<span class="material-symbols-outlined text-primary-container text-3xl">payments</span>
+<span class="text-primary-container font-bold text-sm">Nakit</span>
+</button>
+<!-- Method: Kredi Karti -->
+<button class="bg-surface-container-high border-2 border-transparent p-4 rounded-xl flex flex-col items-center justify-center gap-2 group hover:bg-surface-bright transition-all transform active:scale-[0.98]">
+<span class="material-symbols-outlined text-[#8E8E9A] text-3xl group-hover:text-[#F0F0F5]">credit_card</span>
+<span class="text-[#8E8E9A] font-bold text-sm group-hover:text-[#F0F0F5]">Kredi Kartı</span>
+</button>
+<!-- Method: Banka Karti -->
+<button class="bg-surface-container-high border-2 border-transparent p-4 rounded-xl flex flex-col items-center justify-center gap-2 group hover:bg-surface-bright transition-all transform active:scale-[0.98]">
+<span class="material-symbols-outlined text-[#8E8E9A] text-3xl group-hover:text-[#F0F0F5]">account_balance</span>
+<span class="text-[#8E8E9A] font-bold text-sm group-hover:text-[#F0F0F5]">Banka Kartı</span>
+</button>
+<!-- Method: Bol Ode -->
+<button class="bg-surface-container-high border-2 border-transparent p-4 rounded-xl flex flex-col items-center justify-center gap-2 group hover:bg-surface-bright transition-all transform active:scale-[0.98]">
+<span class="material-symbols-outlined text-[#8E8E9A] text-3xl group-hover:text-[#F0F0F5]">call_split</span>
+<span class="text-[#8E8E9A] font-bold text-sm group-hover:text-[#F0F0F5]">Böl Öde</span>
+</button>
+</div>
+<!-- Main Input Area -->
+<div class="flex-1 flex gap-6">
+<!-- Numerical Keypad -->
+<div class="flex-1 flex flex-col gap-4">
+<div class="bg-surface-container-highest rounded-xl p-4 flex flex-col items-end justify-center h-24 shadow-inner">
+<span class="text-[#8E8E9A] text-xs font-bold uppercase tracking-wider mb-1">Girilen Tutar</span>
+<div class="text-4xl font-extrabold text-[#F0F0F5] tracking-tight">825.00</div>
+</div>
+<div class="grid grid-cols-3 gap-3 flex-1">
+<!-- Keys -->
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">1</button>
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">2</button>
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">3</button>
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">4</button>
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">5</button>
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">6</button>
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">7</button>
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">8</button>
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">9</button>
+<button class="bg-surface-container-high text-2xl font-bold text-error rounded-xl hover:bg-error-container hover:text-on-error-container active:scale-95 transition-all">C</button>
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">0</button>
+<button class="bg-surface-container-high text-2xl font-bold text-[#F0F0F5] rounded-xl hover:bg-surface-bright active:scale-95 transition-all">.</button>
+</div>
+</div>
+<!-- Side Actions & Change -->
+<div class="w-48 flex flex-col gap-4">
+<!-- Quick Amounts -->
+<div class="grid grid-cols-1 gap-3 flex-1">
+<button class="bg-primary-container bg-opacity-10 border border-primary-container border-opacity-20 text-primary-container font-extrabold rounded-xl hover:bg-opacity-20 active:scale-95 transition-all">TAM</button>
+<button class="bg-surface-container-high text-[#F0F0F5] font-bold rounded-xl hover:bg-surface-bright active:scale-95 transition-all">850</button>
+<button class="bg-surface-container-high text-[#F0F0F5] font-bold rounded-xl hover:bg-surface-bright active:scale-95 transition-all">900</button>
+<button class="bg-surface-container-high text-[#F0F0F5] font-bold rounded-xl hover:bg-surface-bright active:scale-95 transition-all">1000</button>
+</div>
+<!-- Change Display -->
+<div class="bg-on-secondary bg-opacity-10 p-4 rounded-xl border border-secondary-container border-opacity-10">
+<p class="text-secondary text-xs font-bold uppercase tracking-wider mb-1">Para Üstü</p>
+<p class="text-secondary text-2xl font-extrabold">0.00 ₺</p>
+</div>
+</div>
+</div>
+<!-- Main CTA -->
+<div class="mt-8 flex justify-end">
+<button class="group relative overflow-hidden bg-gradient-to-br from-[#05B046] to-[#003911] text-[#F0F0F5] px-12 py-5 rounded-xl flex items-center gap-4 shadow-[0_8px_32px_rgba(5,176,70,0.3)] transition-all hover:translate-y-[-2px] active:translate-y-[1px] active:scale-[0.98]">
+<div class="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
+<span class="text-xl font-extrabold tracking-tight">Ödemeyi Tamamla</span>
+<span class="material-symbols-outlined font-bold">check_circle</span>
+</button>
+</div>
+</section>
+</main>
+<!-- Side Navigation Blueprint (Minimized for Focus Screen) -->
+<aside class="fixed left-0 top-16 bottom-0 w-20 flex flex-col items-center py-6 bg-[#191B22] border-r border-outline-variant border-opacity-5 z-40 hidden md:flex">
+<div class="flex flex-col gap-6">
+<button class="w-12 h-12 rounded-xl flex items-center justify-center text-[#8E8E9A] hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined">grid_view</span>
+</button>
+<button class="w-12 h-12 rounded-xl flex items-center justify-center text-[#8E8E9A] hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined">bolt</span>
+</button>
+<button class="w-12 h-12 rounded-xl flex items-center justify-center text-[#8E8E9A] hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined">receipt_long</span>
+</button>
+<button class="w-12 h-12 rounded-xl flex items-center justify-center text-[#8E8E9A] hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined">history</span>
+</button>
+</div>
+<div class="mt-auto flex flex-col gap-6">
+<button class="w-12 h-12 rounded-xl flex items-center justify-center text-error opacity-60 hover:opacity-100 hover:bg-error-container hover:text-on-error-container transition-all">
+<span class="material-symbols-outlined">lock</span>
+</button>
+</div>
+</aside>
+</body></html>

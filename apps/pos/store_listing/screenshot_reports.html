@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GastroCore – Reports & Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #1a1a2e;
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    color: #fff;
+  }
+  .topbar {
+    background: #16213e;
+    padding: 18px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #0f3460;
+  }
+  .logo { font-size: 26px; font-weight: 700; color: #e94560; }
+  .section-title { font-size: 20px; font-weight: 600; }
+  .date-badge {
+    background: #0f3460;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 14px;
+    color: #a0c4ff;
+  }
+
+  .period-tabs {
+    display: flex;
+    gap: 0;
+    background: #0f1b35;
+    border-bottom: 1px solid #0f3460;
+  }
+  .period-tab {
+    flex: 1;
+    padding: 14px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: #a0a0b0;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px;
+  }
+  .period-tab.active { color: #e94560; border-bottom-color: #e94560; }
+
+  .content { padding: 20px; }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid #0f3460;
+  }
+  .kpi-label { font-size: 13px; color: #708090; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .kpi-value { font-size: 30px; font-weight: 700; color: #fff; }
+  .kpi-sub { font-size: 13px; margin-top: 6px; }
+  .kpi-sub.up { color: #2ecc71; }
+  .kpi-sub.down { color: #e94560; }
+  .kpi-sub.neutral { color: #708090; }
+
+  /* Chart area */
+  .chart-card {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid #0f3460;
+    margin-bottom: 16px;
+  }
+  .chart-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #e0e0e0; }
+
+  /* Bar chart */
+  .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
+  .bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .bar-wrap { display: flex; gap: 3px; align-items: flex-end; height: 120px; }
+  .bar {
+    width: 22px;
+    border-radius: 4px 4px 0 0;
+    min-height: 4px;
+  }
+  .bar.food { background: #e94560; }
+  .bar.drinks { background: #3498db; }
+  .bar-label { font-size: 12px; color: #708090; }
+
+  /* Line chart SVG */
+  .line-chart { width: 100%; }
+
+  /* Top items table */
+  .items-table { width: 100%; border-collapse: collapse; }
+  .items-table th {
+    text-align: left;
+    font-size: 12px;
+    color: #708090;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 8px 10px;
+    border-bottom: 1px solid #0f3460;
+  }
+  .items-table td {
+    padding: 12px 10px;
+    font-size: 14px;
+    border-bottom: 1px solid #0f3460;
+  }
+  .items-table tr:last-child td { border-bottom: none; }
+  .rank { color: #708090; font-weight: 700; }
+  .item-name-cell { color: #e0e0e0; font-weight: 600; }
+  .amount { color: #e94560; font-weight: 700; text-align: right; }
+  .qty { color: #a0a0b0; text-align: center; }
+  .progress-bar-bg { background: #0f3460; border-radius: 4px; height: 6px; width: 100px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: #e94560; border-radius: 4px; }
+
+  /* VAT summary */
+  .vat-card {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid #0f3460;
+    margin-bottom: 16px;
+  }
+  .vat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #0f3460;
+  }
+  .vat-row:last-child { border-bottom: none; }
+  .vat-rate { font-size: 15px; font-weight: 600; }
+  .vat-base { font-size: 14px; color: #a0a0b0; }
+  .vat-amount { font-size: 15px; font-weight: 700; color: #e94560; }
+
+  .shift-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0f1b35;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+  }
+  .shift-name { font-size: 15px; font-weight: 600; }
+  .shift-time { font-size: 12px; color: #708090; margin-top: 3px; }
+  .shift-total { font-size: 18px; font-weight: 700; color: #2ecc71; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo">GastroCore</div>
+  <div class="section-title">Berichte</div>
+  <div class="date-badge">21. März 2026</div>
+</div>
+<div class="period-tabs">
+  <button class="period-tab">Heute</button>
+  <button class="period-tab active">Diese Woche</button>
+  <button class="period-tab">Monat</button>
+  <button class="period-tab">Benutzerdefiniert</button>
+</div>
+
+<div class="content">
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Gesamtumsatz</div>
+      <div class="kpi-value">CHF 12'847</div>
+      <div class="kpi-sub up">▲ 8.3% ggü. Vorwoche</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Transaktionen</div>
+      <div class="kpi-value">347</div>
+      <div class="kpi-sub up">▲ 12 mehr</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Ø Bon-Wert</div>
+      <div class="kpi-value">CHF 37.02</div>
+      <div class="kpi-sub down">▼ 1.4%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Gedecke gesamt</div>
+      <div class="kpi-value">824</div>
+      <div class="kpi-sub neutral">→ stabil</div>
+    </div>
+  </div>
+
+  <!-- Revenue bar chart -->
+  <div class="chart-card">
+    <div class="chart-title">Umsatz nach Tag (CHF)</div>
+    <div class="bar-chart">
+      <div class="bar-group">
+        <div class="bar-wrap">
+          <div class="bar food" style="height:60px"></div>
+          <div class="bar drinks" style="height:30px"></div>
+        </div>
+        <div class="bar-label">Mo</div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-wrap">
+          <div class="bar food" style="height:75px"></div>
+          <div class="bar drinks" style="height:38px"></div>
+        </div>
+        <div class="bar-label">Di</div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-wrap">
+          <div class="bar food" style="height:55px"></div>
+          <div class="bar drinks" style="height:28px"></div>
+        </div>
+        <div class="bar-label">Mi</div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-wrap">
+          <div class="bar food" style="height:90px"></div>
+          <div class="bar drinks" style="height:45px"></div>
+        </div>
+        <div class="bar-label">Do</div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-wrap">
+          <div class="bar food" style="height:105px"></div>
+          <div class="bar drinks" style="height:52px"></div>
+        </div>
+        <div class="bar-label">Fr</div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-wrap">
+          <div class="bar food" style="height:115px"></div>
+          <div class="bar drinks" style="height:58px"></div>
+        </div>
+        <div class="bar-label">Sa</div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-wrap">
+          <div class="bar food" style="height:80px"></div>
+          <div class="bar drinks" style="height:40px"></div>
+        </div>
+        <div class="bar-label">So</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:20px;margin-top:10px;">
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:#a0a0b0"><div style="width:14px;height:14px;background:#e94560;border-radius:3px"></div>Speisen</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:#a0a0b0"><div style="width:14px;height:14px;background:#3498db;border-radius:3px"></div>Getränke</div>
+    </div>
+  </div>
+
+  <!-- Top selling items -->
+  <div class="chart-card">
+    <div class="chart-title">Top-Artikel diese Woche</div>
+    <table class="items-table">
+      <tr><th>#</th><th>Artikel</th><th>Menge</th><th style="text-align:right">Umsatz</th></tr>
+      <tr>
+        <td class="rank">1</td>
+        <td class="item-name-cell">Wiener Schnitzel</td>
+        <td class="qty">142</td>
+        <td class="amount">CHF 2'485</td>
+      </tr>
+      <tr>
+        <td class="rank">2</td>
+        <td class="item-name-cell">Hauswein dl</td>
+        <td class="qty">318</td>
+        <td class="amount">CHF 1'908</td>
+      </tr>
+      <tr>
+        <td class="rank">3</td>
+        <td class="item-name-cell">Pizza Margherita</td>
+        <td class="qty">98</td>
+        <td class="amount">CHF 1'666</td>
+      </tr>
+      <tr>
+        <td class="rank">4</td>
+        <td class="item-name-cell">Mineralwasser 0.5L</td>
+        <td class="qty">412</td>
+        <td class="amount">CHF 1'565</td>
+      </tr>
+      <tr>
+        <td class="rank">5</td>
+        <td class="item-name-cell">Zürcher Geschnetzeltes</td>
+        <td class="qty">76</td>
+        <td class="amount">CHF 1'368</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Swiss VAT summary -->
+  <div class="vat-card">
+    <div class="chart-title">MWST-Abrechnung (Schweiz)</div>
+    <div class="vat-row">
+      <div><div class="vat-rate">8.1% — Speisen</div><div class="vat-base">Basis: CHF 8'234.10</div></div>
+      <div class="vat-amount">CHF 666.96</div>
+    </div>
+    <div class="vat-row">
+      <div><div class="vat-rate">2.6% — Getränke (Take-away)</div><div class="vat-base">Basis: CHF 1'204.80</div></div>
+      <div class="vat-amount">CHF 31.32</div>
+    </div>
+    <div class="vat-row">
+      <div><div class="vat-rate">3.8% — Beherbergung</div><div class="vat-base">Basis: CHF 0.00</div></div>
+      <div class="vat-amount">CHF 0.00</div>
+    </div>
+    <div class="vat-row" style="margin-top:6px">
+      <div style="font-weight:700;font-size:16px">Total MWST</div>
+      <div style="font-size:18px;font-weight:700;color:#e94560">CHF 698.28</div>
+    </div>
+  </div>
+
+  <!-- Shifts today -->
+  <div class="chart-card">
+    <div class="chart-title">Schichten heute</div>
+    <div class="shift-row">
+      <div><div class="shift-name">Frühschicht – Maria S.</div><div class="shift-time">08:00 – 15:30 · Z-Report #41</div></div>
+      <div class="shift-total">CHF 1'842</div>
+    </div>
+    <div class="shift-row">
+      <div><div class="shift-name">Spätschicht – Luca B.</div><div class="shift-time">15:30 – offen · laufend</div></div>
+      <div class="shift-total" style="color:#f39c12">CHF 987</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GastroCore POS – Order Screen</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #1a1a2e;
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    color: #fff;
+  }
+  .topbar {
+    background: #16213e;
+    padding: 20px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #0f3460;
+  }
+  .logo { font-size: 28px; font-weight: 700; color: #e94560; letter-spacing: 1px; }
+  .topbar-info { font-size: 18px; color: #a0a0b0; }
+  .topbar-time { font-size: 22px; font-weight: 600; color: #fff; }
+  .main { display: flex; height: calc(1920px - 80px); }
+
+  /* Menu panel */
+  .menu-panel {
+    flex: 1;
+    background: #0f1b35;
+    padding: 20px;
+    overflow: hidden;
+  }
+  .category-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .cat-tab {
+    padding: 12px 22px;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+  }
+  .cat-tab.active { background: #e94560; color: #fff; }
+  .cat-tab:not(.active) { background: #16213e; color: #a0a0b0; }
+  .items-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .item-card {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 20px 14px;
+    text-align: center;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s;
+  }
+  .item-card:hover { border-color: #e94560; }
+  .item-icon { font-size: 40px; margin-bottom: 10px; }
+  .item-name { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: #e0e0e0; }
+  .item-price { font-size: 17px; font-weight: 700; color: #e94560; }
+
+  /* Order panel */
+  .order-panel {
+    width: 380px;
+    background: #16213e;
+    display: flex;
+    flex-direction: column;
+    border-left: 2px solid #0f3460;
+  }
+  .order-header {
+    padding: 20px 24px 14px;
+    border-bottom: 1px solid #0f3460;
+  }
+  .order-title { font-size: 20px; font-weight: 700; color: #fff; }
+  .table-badge {
+    display: inline-block;
+    background: #e94560;
+    color: #fff;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+  .order-items { flex: 1; overflow: hidden; padding: 14px 24px; }
+  .order-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #0f3460;
+  }
+  .order-row-name { font-size: 15px; color: #e0e0e0; }
+  .order-row-qty {
+    background: #0f3460;
+    color: #e94560;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .order-row-price { font-size: 15px; font-weight: 600; color: #fff; min-width: 70px; text-align: right; }
+  .order-totals {
+    padding: 16px 24px;
+    border-top: 1px solid #0f3460;
+    background: #0f1b35;
+  }
+  .total-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 15px; color: #a0a0b0; }
+  .total-row.grand { font-size: 22px; font-weight: 700; color: #fff; padding-top: 12px; border-top: 1px solid #0f3460; margin-top: 8px; }
+  .vat-label { font-size: 12px; color: #708090; margin-top: 4px; text-align: right; }
+  .pay-btn {
+    margin: 16px 24px 24px;
+    background: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 22px;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 0 24px 20px;
+  }
+  .num-btn {
+    background: #0f3460;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  .num-btn.del { background: #c0392b; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo">GastroCore</div>
+  <div class="topbar-info">Maria S. &nbsp;·&nbsp; Shift #42</div>
+  <div class="topbar-time">19:34</div>
+</div>
+<div class="main">
+  <div class="menu-panel">
+    <div class="category-tabs">
+      <button class="cat-tab active">Vorspeisen</button>
+      <button class="cat-tab">Hauptgerichte</button>
+      <button class="cat-tab">Pizza</button>
+      <button class="cat-tab">Desserts</button>
+      <button class="cat-tab">Getränke</button>
+      <button class="cat-tab">Alkohol</button>
+    </div>
+    <div class="items-grid">
+      <div class="item-card"><div class="item-icon">🥗</div><div class="item-name">Gemischter Salat</div><div class="item-price">CHF 12.50</div></div>
+      <div class="item-card"><div class="item-icon">🥣</div><div class="item-name">Tagessuppe</div><div class="item-price">CHF 9.00</div></div>
+      <div class="item-card"><div class="item-icon">🧅</div><div class="item-name">Zwiebelsuppe</div><div class="item-price">CHF 11.00</div></div>
+      <div class="item-card"><div class="item-icon">🧆</div><div class="item-name">Falafel-Teller</div><div class="item-price">CHF 14.50</div></div>
+      <div class="item-card"><div class="item-icon">🫕</div><div class="item-name">Carpaccio</div><div class="item-price">CHF 16.00</div></div>
+      <div class="item-card"><div class="item-icon">🍢</div><div class="item-name">Antipasti</div><div class="item-price">CHF 13.00</div></div>
+      <div class="item-card"><div class="item-icon">🍖</div><div class="item-name">Chicken Wings</div><div class="item-price">CHF 15.50</div></div>
+      <div class="item-card"><div class="item-icon">🫒</div><div class="item-name">Oliven-Mix</div><div class="item-price">CHF 7.50</div></div>
+      <div class="item-card"><div class="item-icon">🥙</div><div class="item-name">Bruschetta</div><div class="item-price">CHF 10.50</div></div>
+      <div class="item-card"><div class="item-icon">🍜</div><div class="item-name">Ramen Vorspeise</div><div class="item-price">CHF 11.50</div></div>
+      <div class="item-card"><div class="item-icon">🥚</div><div class="item-name">Deviled Eggs</div><div class="item-price">CHF 8.00</div></div>
+      <div class="item-card"><div class="item-icon">🫙</div><div class="item-name">Hummus Deluxe</div><div class="item-price">CHF 12.00</div></div>
+    </div>
+  </div>
+
+  <div class="order-panel">
+    <div class="order-header">
+      <div class="order-title">Aktuelle Bestellung</div>
+      <div class="table-badge">Tisch 7</div>
+    </div>
+    <div class="order-items">
+      <div class="order-row">
+        <div>
+          <div class="order-row-name">Gemischter Salat</div>
+        </div>
+        <div class="order-row-qty">×2</div>
+        <div class="order-row-price">CHF 25.00</div>
+      </div>
+      <div class="order-row">
+        <div>
+          <div class="order-row-name">Tagessuppe</div>
+        </div>
+        <div class="order-row-qty">×1</div>
+        <div class="order-row-price">CHF 9.00</div>
+      </div>
+      <div class="order-row">
+        <div>
+          <div class="order-row-name">Mineralwasser 0.5L</div>
+        </div>
+        <div class="order-row-qty">×3</div>
+        <div class="order-row-price">CHF 11.40</div>
+      </div>
+      <div class="order-row">
+        <div>
+          <div class="order-row-name">Hauswein (dl)</div>
+        </div>
+        <div class="order-row-qty">×2</div>
+        <div class="order-row-price">CHF 16.00</div>
+      </div>
+      <div class="order-row">
+        <div>
+          <div class="order-row-name">Chicken Wings</div>
+        </div>
+        <div class="order-row-qty">×1</div>
+        <div class="order-row-price">CHF 15.50</div>
+      </div>
+    </div>
+    <div class="order-totals">
+      <div class="total-row"><span>Zwischentotal</span><span>CHF 76.90</span></div>
+      <div class="total-row"><span>MWST 8.1% (Speisen)</span><span>CHF 4.57</span></div>
+      <div class="total-row"><span>MWST 2.6% (Getränke)</span><span>CHF 0.72</span></div>
+      <div class="total-row grand"><span>Total</span><span>CHF 76.90</span></div>
+      <div class="vat-label">inkl. MWST nach CH-Satz</div>
+    </div>
+    <div class="numpad">
+      <button class="num-btn">1</button>
+      <button class="num-btn">2</button>
+      <button class="num-btn">3</button>
+      <button class="num-btn">4</button>
+      <button class="num-btn">5</button>
+      <button class="num-btn">6</button>
+      <button class="num-btn">7</button>
+      <button class="num-btn">8</button>
+      <button class="num-btn">9</button>
+      <button class="num-btn">.</button>
+      <button class="num-btn">0</button>
+      <button class="num-btn del">⌫</button>
+    </div>
+    <button class="pay-btn">BEZAHLEN →</button>
+  </div>
+</div>
+</body>
+</html>

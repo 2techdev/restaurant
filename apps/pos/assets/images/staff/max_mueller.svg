@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <circle cx="40" cy="40" r="40" fill="#007AFF"/>
+  <circle cx="40" cy="30" r="14" fill="#fff" opacity="0.9"/>
+  <ellipse cx="40" cy="68" rx="22" ry="16" fill="#fff" opacity="0.9"/>
+  <text x="40" y="36" font-family="system-ui,sans-serif" font-size="14" font-weight="700"
+        fill="#007AFF" text-anchor="middle" dominant-baseline="middle">MM</text>
+</svg>

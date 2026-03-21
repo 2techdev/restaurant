@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GastroCore - Split Bill</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary": "#e8b3ff",
+              "on-secondary": "#003911",
+              "on-tertiary": "#510074",
+              "primary-fixed-dim": "#afc6ff",
+              "secondary-container": "#05b046",
+              "outline": "#8c909f",
+              "tertiary-container": "#c567f4",
+              "on-error-container": "#ffdad6",
+              "primary-fixed": "#d9e2ff",
+              "on-primary-container": "#00275f",
+              "error-container": "#93000a",
+              "surface-bright": "#373940",
+              "secondary-fixed": "#72fe88",
+              "tertiary-fixed": "#f6d9ff",
+              "inverse-surface": "#e2e2eb",
+              "surface": "#111319",
+              "on-primary-fixed-variant": "#004398",
+              "tertiary-fixed-dim": "#e8b3ff",
+              "on-tertiary-fixed-variant": "#7201a2",
+              "surface-dim": "#111319",
+              "primary-container": "#528dff",
+              "on-primary-fixed": "#001a43",
+              "surface-variant": "#33343b",
+              "inverse-primary": "#0059c6",
+              "inverse-on-surface": "#2e3037",
+              "on-tertiary-fixed": "#310048",
+              "surface-container-highest": "#33343b",
+              "on-background": "#e2e2eb",
+              "surface-container-low": "#191b22",
+              "background": "#111319",
+              "surface-tint": "#afc6ff",
+              "on-secondary-fixed": "#002107",
+              "on-secondary-fixed-variant": "#00531c",
+              "on-error": "#690005",
+              "error": "#ffb4ab",
+              "on-surface-variant": "#c2c6d6",
+              "outline-variant": "#424753",
+              "surface-container-high": "#282a30",
+              "on-secondary-container": "#003a11",
+              "surface-container": "#1e1f26",
+              "secondary": "#53e16f",
+              "on-tertiary-container": "#460066",
+              "on-primary": "#002d6c",
+              "on-surface": "#e2e2eb",
+              "primary": "#afc6ff",
+              "surface-container-lowest": "#0c0e14",
+              "secondary-fixed-dim": "#53e16f"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+    </style>
+</head>
+<body class="bg-surface text-on-surface overflow-hidden">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 bg-[#111319] dark:bg-[#111319] backdrop-blur-xl bg-opacity-80 docked full-width top-0 h-16 no-border tonal-shift-bg-surface-dim shadow-[0px_0px_48px_rgba(79,140,255,0.06)]">
+<div class="flex items-center gap-4">
+<span class="text-xl font-black tracking-tighter text-[#F0F0F5]">GastroCore</span>
+<div class="h-6 w-px bg-outline-variant opacity-20 mx-2"></div>
+<span class="font-['Inter'] tracking-tight font-extrabold display-md text-[#F0F0F5]">Split Bill</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 text-[#8E8E9A]">
+<span class="material-symbols-outlined" data-icon="table_restaurant">table_restaurant</span>
+<span class="font-bold text-[#F0F0F5]">Table 12</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 rounded-lg text-[#8E8E9A] hover:bg-[#1E1F26] transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="wifi">wifi</span>
+</button>
+<button class="p-2 rounded-lg text-[#8E8E9A] hover:bg-[#1E1F26] transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="schedule">schedule</span>
+</button>
+<button class="p-2 rounded-lg text-[#8E8E9A] hover:bg-[#1E1F26] transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="person_2">person_2</span>
+</button>
+</div>
+</div>
+</header>
+<!-- SideNavBar (Suppressed for transactional split screen focus as per guidelines, but maintained structure for context) -->
+<aside class="fixed left-0 top-16 bottom-0 w-64 z-40 flex flex-col py-6 bg-[#191B22] dark:bg-[#191B22] docked left-0 h-full w-64 negative-space-24px flat-tonal-layering">
+<div class="px-6 mb-8">
+<h3 class="font-['Inter'] font-semibold title-lg text-[#F0F0F5]">Shift #402</h3>
+<p class="text-xs text-[#8E8E9A]">Station 01 • Online</p>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="flex items-center gap-4 text-[#8E8E9A] p-4 mx-2 hover:text-[#F0F0F5] hover:bg-[#33343B] rounded-lg cursor-pointer">
+<span class="material-symbols-outlined" data-icon="layers">layers</span>
+<span class="font-semibold">Floor Plan</span>
+</div>
+<div class="flex items-center gap-4 bg-gradient-to-r from-[#4f8cff] to-[#528DFF] text-[#111319] rounded-lg p-4 mx-2 shadow-lg scale-95 duration-150 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="font-semibold">Orders</span>
+</div>
+<div class="flex items-center gap-4 text-[#8E8E9A] p-4 mx-2 hover:text-[#F0F0F5] hover:bg-[#33343B] rounded-lg cursor-pointer">
+<span class="material-symbols-outlined" data-icon="soup_kitchen">soup_kitchen</span>
+<span class="font-semibold">Kitchen</span>
+</div>
+<div class="flex items-center gap-4 text-[#8E8E9A] p-4 mx-2 hover:text-[#F0F0F5] hover:bg-[#33343B] rounded-lg cursor-pointer">
+<span class="material-symbols-outlined" data-icon="bar_chart">bar_chart</span>
+<span class="font-semibold">Reports</span>
+</div>
+</nav>
+<div class="mt-auto space-y-1">
+<div class="flex items-center gap-4 text-[#8E8E9A] p-4 mx-2 hover:text-[#F0F0F5] hover:bg-[#33343B] rounded-lg cursor-pointer">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-semibold">Settings</span>
+</div>
+<div class="flex items-center gap-4 text-[#8E8E9A] p-4 mx-2 hover:text-[#F0F0F5] hover:bg-[#33343B] rounded-lg cursor-pointer">
+<span class="material-symbols-outlined" data-icon="lock">lock</span>
+<span class="font-semibold">Lock</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 mt-16 p-6 h-[calc(100vh-64px)] overflow-hidden flex flex-col gap-6">
+<!-- Tab Selector: Kinetic Architect Style -->
+<div class="flex items-center justify-between">
+<div class="flex bg-surface-container-low p-1.5 rounded-xl">
+<button class="px-8 py-3 rounded-lg text-sm font-bold transition-all bg-surface-container-highest text-on-surface shadow-sm">
+                    Urun Bazli (By Item)
+                </button>
+<button class="px-8 py-3 rounded-lg text-sm font-semibold text-[#8E8E9A] hover:text-on-surface transition-all">
+                    Esit Bol (Equal Split)
+                </button>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-high px-4 py-2 rounded-lg flex flex-col items-end">
+<span class="text-[10px] text-outline uppercase tracking-widest font-bold">Total Bill</span>
+<span class="text-2xl font-extrabold text-on-surface">₺1,450.50</span>
+</div>
+</div>
+</div>
+<!-- Two-Column Asymmetric Layout -->
+<div class="flex-1 grid grid-cols-12 gap-6 overflow-hidden">
+<!-- Left Column: Master Bill (Original Items) -->
+<section class="col-span-5 flex flex-col bg-surface-container rounded-2xl overflow-hidden shadow-2xl">
+<div class="p-6 border-b border-outline-variant/10 flex justify-between items-center">
+<h2 class="title-lg font-bold">Master Bill</h2>
+<span class="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold uppercase tracking-tight">12 Items</span>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-3">
+<!-- Item Card -->
+<div class="flex items-center gap-4 p-4 bg-surface-container-low rounded-xl hover:bg-surface-bright transition-all cursor-pointer group">
+<div class="w-6 h-6 rounded border-2 border-primary/40 flex items-center justify-center group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary scale-0 group-hover:scale-100 transition-transform text-sm" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="flex-1">
+<h4 class="font-semibold text-on-surface">Porterhouse Steak 500g</h4>
+<p class="text-xs text-outline">Medium Rare • No Butter</p>
+</div>
+<div class="text-right">
+<p class="font-extrabold text-on-surface">₺580.00</p>
+<p class="text-[10px] text-primary font-bold">QTY: 1</p>
+</div>
+</div>
+<div class="flex items-center gap-4 p-4 bg-surface-container-low rounded-xl hover:bg-surface-bright transition-all cursor-pointer group">
+<div class="w-6 h-6 rounded border-2 border-primary/40 flex items-center justify-center group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary scale-0 group-hover:scale-100 transition-transform text-sm" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="flex-1">
+<h4 class="font-semibold text-on-surface">Red Wine - Cabernet</h4>
+<p class="text-xs text-outline">Glass • House Selection</p>
+</div>
+<div class="text-right">
+<p class="font-extrabold text-on-surface">₺185.00</p>
+<p class="text-[10px] text-primary font-bold">QTY: 2</p>
+</div>
+</div>
+<div class="flex items-center gap-4 p-4 bg-surface-container-low rounded-xl hover:bg-surface-bright transition-all cursor-pointer group">
+<div class="w-6 h-6 rounded border-2 border-primary/40 flex items-center justify-center group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary scale-0 group-hover:scale-100 transition-transform text-sm" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="flex-1">
+<h4 class="font-semibold text-on-surface">Truffle Fries</h4>
+<p class="text-xs text-outline">Extra Parmesan</p>
+</div>
+<div class="text-right">
+<p class="font-extrabold text-on-surface">₺120.00</p>
+<p class="text-[10px] text-primary font-bold">QTY: 1</p>
+</div>
+</div>
+<div class="flex items-center gap-4 p-4 bg-surface-container-low rounded-xl hover:bg-surface-bright transition-all cursor-pointer group">
+<div class="w-6 h-6 rounded border-2 border-primary/40 flex items-center justify-center group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary scale-0 group-hover:scale-100 transition-transform text-sm" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="flex-1">
+<h4 class="font-semibold text-on-surface">San Pellegrino 750ml</h4>
+<p class="text-xs text-outline">With Lemon</p>
+</div>
+<div class="text-right">
+<p class="font-extrabold text-on-surface">₺65.00</p>
+<p class="text-[10px] text-primary font-bold">QTY: 1</p>
+</div>
+</div>
+</div>
+<div class="p-6 bg-surface-container-high">
+<button class="w-full py-4 bg-surface-container-highest rounded-xl font-bold flex items-center justify-center gap-3 active:scale-[0.98] transition-transform">
+<span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span>
+                        Move Selected to Bill
+                    </button>
+</div>
+</section>
+<!-- Right Column: Sub-Bills Grid -->
+<section class="col-span-7 grid grid-cols-2 gap-4 overflow-y-auto pb-6">
+<!-- Bill 1 Container -->
+<div class="bg-surface-container rounded-2xl flex flex-col h-[400px] border border-primary/20 shadow-[0px_0px_32px_rgba(79,140,255,0.05)]">
+<div class="p-4 flex justify-between items-center bg-surface-container-high rounded-t-2xl">
+<span class="font-bold text-sm tracking-tight">BILL 1</span>
+<span class="text-primary font-black">₺305.00</span>
+</div>
+<div class="flex-1 p-3 space-y-2 overflow-y-auto">
+<!-- Moved Item -->
+<div class="p-3 bg-surface-container-low rounded-lg flex justify-between items-center text-xs">
+<span class="font-medium">Red Wine - Cabernet</span>
+<span class="font-bold">₺185.00</span>
+</div>
+<div class="p-3 bg-surface-container-low rounded-lg flex justify-between items-center text-xs">
+<span class="font-medium">Truffle Fries</span>
+<span class="font-bold">₺120.00</span>
+</div>
+<div class="flex-1 flex flex-col items-center justify-center text-outline opacity-20 py-10">
+<span class="material-symbols-outlined text-4xl" data-icon="add_circle">add_circle</span>
+<span class="text-[10px] font-bold mt-2">DROP ITEMS HERE</span>
+</div>
+</div>
+<div class="p-3">
+<button class="w-full py-4 bg-gradient-to-br from-primary to-primary-container text-on-primary-container rounded-xl font-black text-sm uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                            Odemeyi Tamamla
+                        </button>
+</div>
+</div>
+<!-- Bill 2 Container -->
+<div class="bg-surface-container rounded-2xl flex flex-col h-[400px] border border-outline-variant/10">
+<div class="p-4 flex justify-between items-center bg-surface-container-high rounded-t-2xl">
+<span class="font-bold text-sm tracking-tight text-outline">BILL 2</span>
+<span class="text-on-surface font-black">₺580.00</span>
+</div>
+<div class="flex-1 p-3 space-y-2 overflow-y-auto">
+<div class="p-3 bg-surface-container-low rounded-lg flex justify-between items-center text-xs">
+<span class="font-medium">Porterhouse Steak 500g</span>
+<span class="font-bold">₺580.00</span>
+</div>
+</div>
+<div class="p-3">
+<button class="w-full py-4 bg-surface-container-highest text-on-surface rounded-xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all">
+                            Odemeyi Tamamla
+                        </button>
+</div>
+</div>
+<!-- New Bill Trigger -->
+<button class="bg-surface-container rounded-2xl flex flex-col items-center justify-center h-[400px] border-2 border-dashed border-outline-variant/20 hover:border-primary/50 transition-all group">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl text-outline group-hover:text-primary" data-icon="add">add</span>
+</div>
+<span class="font-bold text-outline uppercase tracking-widest text-xs group-hover:text-on-surface">New Sub-Bill</span>
+</button>
+</section>
+</div>
+<!-- Footer Control Bar -->
+<div class="mt-auto flex items-center justify-between py-6 px-8 bg-surface-container-high rounded-2xl backdrop-blur-md">
+<div class="flex gap-12">
+<div>
+<p class="text-[10px] text-outline font-bold uppercase tracking-widest mb-1">Items Remaning</p>
+<p class="title-lg font-black text-on-surface">8 Items</p>
+</div>
+<div>
+<p class="text-[10px] text-outline font-bold uppercase tracking-widest mb-1">Balance Due</p>
+<p class="title-lg font-black text-on-surface">₺565.50</p>
+</div>
+</div>
+<div class="flex gap-4">
+<button class="px-8 py-4 bg-surface-container-highest rounded-xl font-bold hover:bg-surface-bright transition-colors">
+                    Back to Order
+                </button>
+<button class="px-12 py-4 bg-gradient-to-r from-primary to-primary-container text-on-primary-container rounded-xl font-black shadow-xl shadow-primary/10 active:scale-95 transition-all flex items-center gap-3">
+<span class="material-symbols-outlined" data-icon="check_circle">check_circle</span>
+                    Settle All Bills
+                </button>
+</div>
+</div>
+</main>
+<!-- Floating Action Button (FAB) - Suppressed as per Task Logic (Details/Split screen) -->
+</body></html>

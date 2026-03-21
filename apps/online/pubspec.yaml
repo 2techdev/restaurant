@@ -1,0 +1,49 @@
+name: gastrocore_online
+description: "GastroCore - Online Ordering for Customers"
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Navigation
+  go_router: ^14.8.1
+
+  # Networking
+  http: ^1.3.0
+
+  # Date/Time & i18n
+  intl: ^0.20.2
+
+  # UUID generation
+  uuid: ^4.5.1
+
+  # Persistent state (language pref, last restaurant)
+  shared_preferences: ^2.3.2
+
+  # Icons
+  cupertino_icons: ^1.0.8
+
+  # Collection utilities
+  collection: ^1.19.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  riverpod_generator: ^2.6.3
+  build_runner: ^2.4.14
+
+flutter:
+  generate: true
+  uses-material-design: true

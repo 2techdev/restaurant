@@ -1,0 +1,85 @@
+/// Restaurant profile settings entity.
+///
+/// Stores the restaurant's public identity: name, address, contact details,
+/// Swiss VAT number (MWST-Nummer), and optional logo path.
+library;
+
+import 'dart:convert';
+
+class RestaurantSettings {
+  const RestaurantSettings({
+    this.name = '',
+    this.address = '',
+    this.phone = '',
+    this.mwstNr = '',
+    this.logoPath,
+  });
+
+  /// Restaurant display name shown on receipts and the POS header.
+  final String name;
+
+  /// Full street address (e.g. "Bahnhofstrasse 12, 8001 Zürich").
+  final String address;
+
+  /// Contact phone number.
+  final String phone;
+
+  /// Swiss VAT registration number (e.g. "CHE-123.456.789 MWST").
+  final String mwstNr;
+
+  /// Absolute path to the logo image file on device storage.
+  final String? logoPath;
+
+  RestaurantSettings copyWith({
+    String? name,
+    String? address,
+    String? phone,
+    String? mwstNr,
+    String? logoPath,
+    bool clearLogo = false,
+  }) {
+    return RestaurantSettings(
+      name: name ?? this.name,
+      address: address ?? this.address,
+      phone: phone ?? this.phone,
+      mwstNr: mwstNr ?? this.mwstNr,
+      logoPath: clearLogo ? null : (logoPath ?? this.logoPath),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'address': address,
+        'phone': phone,
+        'mwstNr': mwstNr,
+        'logoPath': logoPath,
+      };
+
+  factory RestaurantSettings.fromJson(Map<String, dynamic> json) =>
+      RestaurantSettings(
+        name: (json['name'] as String?) ?? '',
+        address: (json['address'] as String?) ?? '',
+        phone: (json['phone'] as String?) ?? '',
+        mwstNr: (json['mwstNr'] as String?) ?? '',
+        logoPath: json['logoPath'] as String?,
+      );
+
+  String toJsonString() => jsonEncode(toJson());
+
+  factory RestaurantSettings.fromJsonString(String s) =>
+      RestaurantSettings.fromJson(jsonDecode(s) as Map<String, dynamic>);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RestaurantSettings &&
+          name == other.name &&
+          address == other.address &&
+          phone == other.phone &&
+          mwstNr == other.mwstNr &&
+          logoPath == other.logoPath;
+
+  @override
+  int get hashCode =>
+      Object.hash(name, address, phone, mwstNr, logoPath);
+}

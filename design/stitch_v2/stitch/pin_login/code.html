@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GastroCore POS - Terminal Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-high": "#282a30",
+              "secondary": "#c3c6d7",
+              "error-container": "#93000a",
+              "surface-dim": "#111319",
+              "on-secondary-container": "#b4b8c9",
+              "tertiary-fixed": "#d9e2ff",
+              "inverse-on-surface": "#2e3037",
+              "outline-variant": "#424753",
+              "inverse-surface": "#e2e2eb",
+              "on-tertiary-fixed": "#001943",
+              "primary-fixed-dim": "#afc6ff",
+              "on-secondary": "#2c303d",
+              "on-background": "#e2e2eb",
+              "secondary-fixed-dim": "#c3c6d7",
+              "primary": "#afc6ff",
+              "background": "#111319",
+              "surface-container-low": "#191b22",
+              "surface-variant": "#33343b",
+              "on-surface": "#e2e2eb",
+              "surface-container-lowest": "#0c0e14",
+              "on-primary-container": "#00275f",
+              "on-tertiary-container": "#0c2857",
+              "on-tertiary": "#152f5e",
+              "on-primary": "#002d6d",
+              "inverse-primary": "#0059c7",
+              "surface-container-highest": "#33343b",
+              "surface-bright": "#373940",
+              "on-primary-fixed": "#001944",
+              "surface-tint": "#afc6ff",
+              "surface": "#111319",
+              "on-primary-fixed-variant": "#004299",
+              "on-error": "#690005",
+              "error": "#ffb4ab",
+              "on-secondary-fixed-variant": "#424654",
+              "outline": "#8c909f",
+              "surface-container": "#1d1f26",
+              "on-secondary-fixed": "#171b28",
+              "primary-container": "#528dff",
+              "tertiary-fixed-dim": "#afc6ff",
+              "on-error-container": "#ffdad6",
+              "tertiary": "#afc6ff",
+              "secondary-container": "#454957",
+              "secondary-fixed": "#dfe2f3",
+              "primary-fixed": "#d9e2ff",
+              "on-tertiary-fixed-variant": "#2e4676",
+              "tertiary-container": "#7990c6",
+              "on-surface-variant": "#c2c6d6"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #111319; color: #e2e2eb; }
+        .bg-brand-gradient { background: linear-gradient(135deg, #AFC6FF 0%, #528DFF 100%); }
+        .text-brand-gradient { background: linear-gradient(135deg, #AFC6FF 0%, #528DFF 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col overflow-hidden select-none">
+<!-- Top Status Bar (Mirroring TopNavBar styles from JSON) -->
+<header class="h-20 w-full flex items-center justify-between px-10 bg-[#111319]">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary text-3xl">restaurant</span>
+<h1 class="text-2xl font-black bg-gradient-to-br from-[#AFC6FF] to-[#528DFF] bg-clip-text text-transparent">GastroCore</h1>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex flex-col items-end">
+<span class="text-[#F0F0F5] font-extrabold text-sm tracking-widest uppercase">12:45 PM</span>
+<span class="text-[#8E8E9A] text-xs font-medium uppercase tracking-tighter">Terminal ID: T-001</span>
+</div>
+<span class="material-symbols-outlined text-[#8E8E9A]">cloud_done</span>
+</div>
+</header>
+<main class="flex-1 flex overflow-hidden">
+<!-- Left Section: Branding & Identity -->
+<section class="w-1/4 flex flex-col justify-center px-12 space-y-2">
+<div class="space-y-1">
+<h2 class="text-4xl font-extrabold tracking-tight text-[#F0F0F5]">GastroCore</h2>
+<p class="text-[#8E8E9A] font-medium text-lg leading-tight">Restaurant POS System</p>
+<div class="pt-8">
+<div class="h-1 w-12 bg-brand-gradient rounded-full"></div>
+</div>
+</div>
+<div class="pt-12">
+<div class="bg-surface-container-low p-6 rounded-xl space-y-4">
+<p class="text-xs text-[#5A5A6A] font-bold uppercase tracking-widest">Active Station</p>
+<p class="text-[#F0F0F5] font-extrabold text-xl">Station 01</p>
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-sm">wifi</span>
+<span class="text-xs font-bold">Network Connected</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Center Section: Staff Selection Grid -->
+<section class="flex-1 bg-surface-container-low flex flex-col justify-center px-12 rounded-l-[32px]">
+<div class="max-w-3xl mx-auto w-full">
+<div class="flex justify-between items-end mb-12">
+<h3 class="text-2xl font-extrabold text-[#F0F0F5]">Select Staff Member</h3>
+<span class="text-[#8E8E9A] font-medium">8 Staff Online</span>
+</div>
+<div class="grid grid-cols-4 gap-x-8 gap-y-12">
+<!-- Staff Item (Active/Selected) -->
+<div class="flex flex-col items-center group cursor-pointer">
+<div class="relative w-24 h-24 mb-4">
+<div class="absolute inset-0 rounded-full border-4 border-[#528DFF] animate-pulse"></div>
+<img class="w-full h-full object-cover rounded-full p-1 bg-surface-dim" data-alt="Portrait of server Marco" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDx6n8JUhGMftzgDQ-pXUb95KzfD4cgUvsm6bc924aWHZiYJuQPcFxnwUILKL8HOvBxV188Nrhh4I-1EthubvReYPqejUFNUbZghuRYO4UJAYHVSnGJDI0VETTLbkxZxJzPx7EGx4xES9TD7hxs6W9np9rnu6uTPr9t70WNOfLc-SXUrjLq4CsMnugxhNMDdxFXydMgPkHkDK4m79xruxR4s28j81SyyG4j790KtGWn2719g4Fu3jsClmFqcxS9f2Lg_On58i5sMJo"/>
+</div>
+<span class="text-[#F0F0F5] font-extrabold">Marco</span>
+<span class="text-[#8E8E9A] text-xs font-medium">Captain</span>
+</div>
+<!-- Staff Item -->
+<div class="flex flex-col items-center group cursor-pointer opacity-70 hover:opacity-100 transition-opacity">
+<div class="w-24 h-24 mb-4 rounded-full bg-surface-container-highest flex items-center justify-center text-2xl font-bold text-on-surface">
+                            SY
+                        </div>
+<span class="text-[#F0F0F5] font-bold">Sofia Y.</span>
+<span class="text-[#8E8E9A] text-xs font-medium">Server</span>
+</div>
+<!-- Staff Item -->
+<div class="flex flex-col items-center group cursor-pointer opacity-70 hover:opacity-100 transition-opacity">
+<div class="w-24 h-24 mb-4">
+<img class="w-full h-full object-cover rounded-full bg-surface-container-highest" data-alt="Portrait of manager Elena" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5cPt8OPGESOj3oZgmcrpoD675jOhWa4uj7WR-Pkf7nEvRsUIla45WIVZg_KwLgCvCDBdutVVG8AcmJoSlFVv66stUGjT2movpALmFD0sRK4WvOGZiajU7JP3e-lCG9Si0UmFn6bdUdNvyN2pHcLH7_8Z6waoWB8EsLEfdRxDjR93qhutylYk0Mi2FNdc9mIdgqa6FWgIUHJ_n0IBMcy68RIWt3y-EK74nJo8_KGJ_7AMJSBMl5WXf3jw4bRXKB9eiRnHdP60AWYQ"/>
+</div>
+<span class="text-[#F0F0F5] font-bold">Elena</span>
+<span class="text-[#8E8E9A] text-xs font-medium">Manager</span>
+</div>
+<!-- Staff Item -->
+<div class="flex flex-col items-center group cursor-pointer opacity-70 hover:opacity-100 transition-opacity">
+<div class="w-24 h-24 mb-4 rounded-full bg-surface-container-highest flex items-center justify-center text-2xl font-bold text-on-surface">
+                            JL
+                        </div>
+<span class="text-[#F0F0F5] font-bold">James L.</span>
+<span class="text-[#8E8E9A] text-xs font-medium">Barista</span>
+</div>
+<!-- Staff Item -->
+<div class="flex flex-col items-center group cursor-pointer opacity-70 hover:opacity-100 transition-opacity">
+<div class="w-24 h-24 mb-4">
+<img class="w-full h-full object-cover rounded-full bg-surface-container-highest" data-alt="Portrait of chef David" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRCkJ7izGN8sWSnO64QQhEiJ-iS6a4p__YadNuPkJsb03-8ikfm79LgW3TQruQO1asurLUKwcJa1mG5R9LyMOQMoUm-nEXBRLmpQHMhevh1oh2LLURPG5SVMvB2Duco910Dr2k-jsh1t6IQ7qfCtYdJP06afkkwqBbUdaMvgY2mIJC50hLoUYqW9FZDpByWnkcZrW6RMCyms2e62ixshkFDvggrwD-vUK2uQNGNuDMRswSYr6eb4pbQbKIyS5i9sv6jOsa0QgjHLk"/>
+</div>
+<span class="text-[#F0F0F5] font-bold">David</span>
+<span class="text-[#8E8E9A] text-xs font-medium">Chef</span>
+</div>
+<!-- Staff Item -->
+<div class="flex flex-col items-center group cursor-pointer opacity-70 hover:opacity-100 transition-opacity">
+<div class="w-24 h-24 mb-4 rounded-full bg-surface-container-highest flex items-center justify-center text-2xl font-bold text-on-surface">
+                            AK
+                        </div>
+<span class="text-[#F0F0F5] font-bold">Anna K.</span>
+<span class="text-[#8E8E9A] text-xs font-medium">Hostess</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Section: PIN Pad -->
+<section class="w-[400px] flex flex-col justify-center items-center px-12 bg-surface">
+<div class="w-full max-w-[280px]">
+<!-- PIN Display -->
+<div class="flex justify-center items-center gap-4 mb-12">
+<div class="w-4 h-4 rounded-full bg-primary shadow-[0_0_12px_rgba(82,141,255,0.4)]"></div>
+<div class="w-4 h-4 rounded-full bg-primary shadow-[0_0_12px_rgba(82,141,255,0.4)]"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-highest"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-highest"></div>
+</div>
+<!-- Numpad Grid -->
+<div class="grid grid-cols-3 gap-3 mb-6">
+<!-- Row 1 -->
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#F0F0F5] active:bg-surface-variant transition-colors">1</button>
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#F0F0F5] active:bg-surface-variant transition-colors">2</button>
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#F0F0F5] active:bg-surface-variant transition-colors">3</button>
+<!-- Row 2 -->
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#F0F0F5] active:bg-surface-variant transition-colors">4</button>
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#F0F0F5] active:bg-surface-variant transition-colors">5</button>
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#F0F0F5] active:bg-surface-variant transition-colors">6</button>
+<!-- Row 3 -->
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#F0F0F5] active:bg-surface-variant transition-colors">7</button>
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#F0F0F5] active:bg-surface-variant transition-colors">8</button>
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#F0F0F5] active:bg-surface-variant transition-colors">9</button>
+<!-- Row 4 -->
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#8E8E9A] active:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined">backspace</span>
+</button>
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#F0F0F5] active:bg-surface-variant transition-colors">0</button>
+<button class="h-16 w-full rounded-xl bg-surface-container-high flex items-center justify-center text-2xl font-extrabold text-[#8E8E9A] active:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Primary Action -->
+<button class="w-full h-16 rounded-xl bg-brand-gradient flex items-center justify-center gap-3 text-white font-black text-lg shadow-[0_8px_24px_rgba(0,0,0,0.15)] active:opacity-90 transition-all uppercase tracking-widest">
+<span>ENTER</span>
+<span class="material-symbols-outlined">login</span>
+</button>
+</div>
+<div class="mt-12">
+<p class="text-[#5A5A6A] text-[10px] font-bold uppercase tracking-[0.2em]">Authorized Personnel Only</p>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="h-14 w-full flex items-center justify-between px-10 bg-surface-container-lowest">
+<div class="flex items-center gap-4 text-[10px] font-bold text-[#5A5A6A] uppercase tracking-widest">
+<span>Version 0.1.0</span>
+<div class="w-1 h-1 rounded-full bg-[#5A5A6A]"></div>
+<span>System Stable</span>
+</div>
+<div class="flex items-center gap-6">
+<span class="text-[10px] font-bold text-[#5A5A6A] uppercase tracking-widest">Friday, October 20, 2023</span>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="text-[10px] font-bold text-[#8E8E9A] uppercase tracking-widest">Sync Active</span>
+</div>
+</div>
+</footer>
+</body></html>

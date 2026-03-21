@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GastroCore POS – Restaurant Management Made Simple</title>
+  <style>
+    :root {
+      --primary: #1a1a2e;
+      --secondary: #16213e;
+      --accent: #e94560;
+      --accent2: #f5a623;
+      --bg: #f9f9f9;
+      --card: #ffffff;
+      --text: #333333;
+      --muted: #666666;
+      --border: #e0e0e0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: rgba(26, 26, 46, 0.97);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.9rem 2rem;
+    }
+    .nav-logo {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+    }
+    .nav-logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 1.75rem; list-style: none; }
+    .nav-links a {
+      color: #ccc;
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: #fff; }
+    .nav-cta {
+      background: var(--accent);
+      color: #fff !important;
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(135deg, var(--primary) 0%, #0f3460 100%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 6rem 1.5rem 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(233,69,96,0.15) 0%, transparent 70%);
+      top: -100px; right: -100px;
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(233,69,96,0.15);
+      border: 1px solid rgba(233,69,96,0.4);
+      color: #f9a0b0;
+      padding: 0.3rem 1rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+    }
+    .hero h1 {
+      font-size: clamp(2.2rem, 5vw, 3.75rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 1.25rem;
+      max-width: 720px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .hero h1 em { color: var(--accent); font-style: normal; }
+    .hero p {
+      font-size: 1.15rem;
+      color: #b0bec5;
+      max-width: 540px;
+      margin: 0 auto 2.5rem;
+    }
+    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block;
+      padding: 0.85rem 2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: #c73652; transform: translateY(-1px); }
+    .btn-outline {
+      border: 2px solid rgba(255,255,255,0.3);
+      color: #fff;
+      background: transparent;
+    }
+    .btn-outline:hover { border-color: #fff; background: rgba(255,255,255,0.05); }
+    .hero-stats {
+      display: flex;
+      gap: 2.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 4rem;
+      padding-top: 2.5rem;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .stat { text-align: center; }
+    .stat .num {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--accent);
+      display: block;
+    }
+    .stat .label { font-size: 0.85rem; color: #8899aa; }
+
+    /* ── SECTIONS ── */
+    section { padding: 5rem 1.5rem; }
+    .section-header { text-align: center; max-width: 600px; margin: 0 auto 3.5rem; }
+    .section-tag {
+      display: inline-block;
+      background: rgba(233,69,96,0.1);
+      color: var(--accent);
+      padding: 0.2rem 0.85rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.75rem;
+    }
+    .section-header h2 {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 0.75rem;
+    }
+    .section-header p { color: var(--muted); font-size: 1.05rem; }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    /* ── FEATURES ── */
+    #features { background: #fff; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+    .feature-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+    .feature-card:hover {
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      transform: translateY(-3px);
+    }
+    .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+    .feature-card h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+    .feature-card p { color: var(--muted); font-size: 0.95rem; margin: 0; }
+
+    /* ── HOW IT WORKS ── */
+    #how-it-works { background: var(--bg); }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 2rem;
+      position: relative;
+    }
+    .step {
+      text-align: center;
+      padding: 1.5rem;
+    }
+    .step-num {
+      width: 52px; height: 52px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: 800;
+      margin: 0 auto 1rem;
+    }
+    .step h3 { font-size: 1rem; font-weight: 700; color: var(--primary); margin-bottom: 0.5rem; }
+    .step p { color: var(--muted); font-size: 0.9rem; }
+
+    /* ── TECH ── */
+    #technology { background: #fff; }
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .tech-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      text-align: center;
+      background: var(--bg);
+    }
+    .tech-item .icon { font-size: 1.75rem; display: block; margin-bottom: 0.5rem; }
+    .tech-item .name { font-weight: 700; font-size: 0.9rem; color: var(--primary); }
+    .tech-item .desc { font-size: 0.8rem; color: var(--muted); }
+
+    /* ── PRIVACY HIGHLIGHT ── */
+    #privacy-highlight {
+      background: linear-gradient(135deg, var(--primary) 0%, #0f3460 100%);
+      color: #fff;
+    }
+    #privacy-highlight .section-header h2 { color: #fff; }
+    #privacy-highlight .section-header p { color: #b0bec5; }
+    .privacy-points {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .privacy-point {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .privacy-point .icon { font-size: 1.75rem; display: block; margin-bottom: 0.5rem; }
+    .privacy-point h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .privacy-point p { font-size: 0.85rem; color: #90a4b4; margin: 0; }
+    .privacy-cta { text-align: center; margin-top: 2.5rem; }
+
+    /* ── CONTACT ── */
+    #contact { background: var(--bg); }
+    .contact-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 3rem;
+      max-width: 600px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .contact-card h3 { font-size: 1.5rem; font-weight: 700; color: var(--primary); margin-bottom: 0.5rem; }
+    .contact-card p { color: var(--muted); margin-bottom: 1.75rem; }
+    .contact-email {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      padding: 0.85rem 2rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: background 0.2s;
+      margin-bottom: 1.5rem;
+    }
+    .contact-email:hover { background: var(--accent); }
+    .contact-meta { font-size: 0.85rem; color: var(--muted); }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--primary);
+      color: #8899aa;
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .footer-links { display: flex; justify-content: center; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 700px) {
+      .nav-links { display: none; }
+      .contact-card { padding: 2rem 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">Gastro<span>Core</span> POS</a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#how-it-works">How It Works</a></li>
+    <li><a href="#technology">Technology</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="privacy-policy.html" class="nav-cta">Privacy Policy</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div>
+    <div class="hero-badge">Android POS Application</div>
+    <h1>Modern POS for <em>Restaurants</em> &amp; Cafés</h1>
+    <p>GastroCore POS streamlines order management, payments, and reporting for food-service businesses — offline-first, fast, and reliable.</p>
+    <div class="hero-actions">
+      <a href="https://play.google.com/store" class="btn btn-primary">Get on Google Play</a>
+      <a href="#features" class="btn btn-outline">Explore Features</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><span class="num">Offline</span><span class="label">Works without internet</span></div>
+      <div class="stat"><span class="num">GDPR</span><span class="label">Privacy compliant</span></div>
+      <div class="stat"><span class="num">2</span><span class="label">Payment integrations</span></div>
+      <div class="stat"><span class="num">24/7</span><span class="label">Always-on operation</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">Features</div>
+      <h2>Everything Your Restaurant Needs</h2>
+      <p>A complete point-of-sale solution built specifically for the hospitality industry.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <span class="feature-icon">🍽️</span>
+        <h3>Table Management</h3>
+        <p>Visual floor plan editor with drag-and-drop table layouts. Manage multiple rooms and track table status in real time.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">📋</span>
+        <h3>Order Management</h3>
+        <p>Fast order entry with product categories, modifiers, and notes. Split bills, merge tables, and handle group orders with ease.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">💳</span>
+        <h3>Payment Processing</h3>
+        <p>Accept card payments via Wallee and MyPOS terminal integrations. Cash handling with change calculation built in.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">📦</span>
+        <h3>Product Catalog</h3>
+        <p>Manage your full menu with categories, prices, descriptions, and availability. Quick search and barcode scanning support.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">👥</span>
+        <h3>Staff Management</h3>
+        <p>Multiple employee roles with PIN-based login. Track orders per waiter and manage access permissions by role.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">📊</span>
+        <h3>Reports &amp; Analytics</h3>
+        <p>Daily sales summaries, product performance reports, and shift closing procedures. Export data for your accounting software.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🔌</span>
+        <h3>Offline-First</h3>
+        <p>All core features work without an internet connection. Never lose a sale due to connectivity issues. Data syncs when back online.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🖨️</span>
+        <h3>Receipt Printing</h3>
+        <p>Bluetooth and network printer support. Customisable receipt templates with your restaurant's branding and logo.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">☁️</span>
+        <h3>Optional Cloud Sync</h3>
+        <p>Back up your data and access it across devices with optional cloud synchronisation. You stay in full control of your data.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">How It Works</div>
+      <h2>Up and Running in Minutes</h2>
+      <p>GastroCore POS is designed for simplicity — no technical knowledge required.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Install the App</h3>
+        <p>Download GastroCore POS from Google Play on any Android tablet or phone.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Set Up Your Menu</h3>
+        <p>Add your products, categories, and prices. Design your table layout to match your restaurant floor plan.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Add Your Team</h3>
+        <p>Create staff profiles with roles and PINs. Set permissions for each role in your organisation.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <h3>Start Serving</h3>
+        <p>Take orders, process payments, and run your restaurant — all from one intuitive interface.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TECHNOLOGY -->
+<section id="technology">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">Technology</div>
+      <h2>Built with Modern Tech</h2>
+      <p>Reliable, fast, and maintainable — built on a proven technology stack.</p>
+    </div>
+    <div class="tech-grid">
+      <div class="tech-item">
+        <span class="icon">🐦</span>
+        <div class="name">Flutter</div>
+        <div class="desc">Cross-platform UI framework</div>
+      </div>
+      <div class="tech-item">
+        <span class="icon">🗄️</span>
+        <div class="name">SQLite</div>
+        <div class="desc">Local encrypted database</div>
+      </div>
+      <div class="tech-item">
+        <span class="icon">💳</span>
+        <div class="name">Wallee</div>
+        <div class="desc">Card payment processing</div>
+      </div>
+      <div class="tech-item">
+        <span class="icon">💳</span>
+        <div class="name">MyPOS</div>
+        <div class="desc">Card payment terminals</div>
+      </div>
+      <div class="tech-item">
+        <span class="icon">🤖</span>
+        <div class="name">Android</div>
+        <div class="desc">Tablets &amp; phones supported</div>
+      </div>
+      <div class="tech-item">
+        <span class="icon">🔒</span>
+        <div class="name">TLS 1.2+</div>
+        <div class="desc">End-to-end encryption</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRIVACY HIGHLIGHT -->
+<section id="privacy-highlight">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">Privacy &amp; Security</div>
+      <h2>Your Data Stays Yours</h2>
+      <p>GastroCore POS is designed with privacy at its core. We never sell or share your business data.</p>
+    </div>
+    <div class="privacy-points">
+      <div class="privacy-point">
+        <span class="icon">📱</span>
+        <h4>Local Storage</h4>
+        <p>All data stored on your device by default. No mandatory cloud account required.</p>
+      </div>
+      <div class="privacy-point">
+        <span class="icon">🇨🇭</span>
+        <h4>Swiss Privacy Law</h4>
+        <p>Fully compliant with Switzerland's DSG and EU GDPR requirements.</p>
+      </div>
+      <div class="privacy-point">
+        <span class="icon">🚫</span>
+        <h4>No Tracking</h4>
+        <p>Zero advertising trackers, no analytics collection, no behavioural profiling.</p>
+      </div>
+      <div class="privacy-point">
+        <span class="icon">🔐</span>
+        <h4>Encrypted</h4>
+        <p>Database encryption on-device. PIN hashing. TLS for all network traffic.</p>
+      </div>
+    </div>
+    <div class="privacy-cta">
+      <a href="privacy-policy.html" class="btn btn-outline" style="margin-top:1.5rem;">Read Full Privacy Policy →</a>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">Contact</div>
+      <h2>Get in Touch</h2>
+      <p>Questions about the app, licensing, or your data? We're here to help.</p>
+    </div>
+    <div class="contact-card">
+      <h3>2Tech GmbH</h3>
+      <p>Zürich, Switzerland &nbsp;·&nbsp; Developer of GastroCore POS</p>
+      <a href="mailto:developer@2tech.ch" class="contact-email">developer@2tech.ch</a>
+      <div class="contact-meta">
+        <p>For data requests and privacy inquiries, we respond within 30 days.</p>
+        <p style="margin-top:0.5rem;">Business enquiries, support, and licensing welcome.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-links">
+    <a href="#">Home</a>
+    <a href="#features">Features</a>
+    <a href="#contact">Contact</a>
+    <a href="privacy-policy.html">Privacy Policy</a>
+    <a href="mailto:developer@2tech.ch">developer@2tech.ch</a>
+  </div>
+  <p>&copy; 2026 2Tech GmbH, Zürich, Switzerland. All rights reserved.</p>
+</footer>
+
+</body>
+</html>

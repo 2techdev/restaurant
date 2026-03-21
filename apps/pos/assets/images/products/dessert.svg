@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="12" fill="#FF375F" opacity="0.12"/>
+  <!-- Cake slice -->
+  <path d="M20 60 L20 40 Q20 28 40 28 Q60 28 60 40 L60 60 Z" fill="#FF375F" opacity="0.75"/>
+  <!-- Cream layer -->
+  <rect x="20" y="36" width="40" height="8" rx="0" fill="#fff" opacity="0.6"/>
+  <!-- Top frosting wavy -->
+  <path d="M20 36 Q25 30 30 36 Q35 30 40 36 Q45 30 50 36 Q55 30 60 36"
+        fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <!-- Cherry on top -->
+  <circle cx="40" cy="28" r="4" fill="#FF3B30"/>
+  <line x1="40" y1="24" x2="44" y2="19" stroke="#34C759" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Plate -->
+  <ellipse cx="40" cy="62" rx="22" ry="4" fill="#FF375F" opacity="0.2"/>
+</svg>

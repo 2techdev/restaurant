@@ -1,0 +1,360 @@
+{
+  "@@locale": "de",
+
+  "appTitle": "GastroCore POS",
+  "@appTitle": { "description": "App title" },
+
+  "navHome": "Startseite",
+  "@navHome": { "description": "Navigation: Home" },
+
+  "navOrders": "Bestellungen",
+  "@navOrders": { "description": "Navigation: Orders" },
+
+  "navTables": "Tische",
+  "@navTables": { "description": "Navigation: Tables" },
+
+  "navMenu": "Menü",
+  "@navMenu": { "description": "Navigation: Menu" },
+
+  "navShift": "Schicht",
+  "@navShift": { "description": "Navigation: Shift" },
+
+  "navSettings": "Einstellungen",
+  "@navSettings": { "description": "Navigation: Settings" },
+
+  "navReports": "Berichte",
+  "@navReports": { "description": "Navigation: Reports" },
+
+  "navKitchen": "Küche",
+  "@navKitchen": { "description": "Navigation: Kitchen" },
+
+  "posNewOrder": "Neue Bestellung",
+  "@posNewOrder": { "description": "POS: New Order" },
+
+  "posOrder": "Bestellung",
+  "@posOrder": { "description": "POS: Order" },
+
+  "posPayment": "Zahlung",
+  "@posPayment": { "description": "POS: Payment" },
+
+  "posCash": "Bar",
+  "@posCash": { "description": "POS: Cash" },
+
+  "posCard": "Karte",
+  "@posCard": { "description": "POS: Card" },
+
+  "posTwint": "TWINT",
+  "@posTwint": { "description": "POS: TWINT" },
+
+  "posTotal": "Total",
+  "@posTotal": { "description": "POS: Total" },
+
+  "posSubtotal": "Zwischentotal",
+  "@posSubtotal": { "description": "POS: Subtotal" },
+
+  "posVat": "MWST",
+  "@posVat": { "description": "POS: VAT" },
+
+  "posDiscount": "Rabatt",
+  "@posDiscount": { "description": "POS: Discount" },
+
+  "posCancel": "Abbrechen",
+  "@posCancel": { "description": "POS: Cancel" },
+
+  "posRefund": "Rückerstattung",
+  "@posRefund": { "description": "POS: Refund" },
+
+  "posCharge": "Belasten",
+  "@posCharge": { "description": "POS: Charge" },
+
+  "posGiven": "Gegeben",
+  "@posGiven": { "description": "POS: Amount given" },
+
+  "posChange": "Rückgeld",
+  "@posChange": { "description": "POS: Change" },
+
+  "posSplitBill": "Rechnung teilen",
+  "@posSplitBill": { "description": "POS: Split bill" },
+
+  "posOrderType": "Bestellart",
+  "@posOrderType": { "description": "POS: Order type" },
+
+  "posDineIn": "Vor Ort",
+  "@posDineIn": { "description": "POS: Dine in" },
+
+  "posTakeaway": "Zum Mitnehmen",
+  "@posTakeaway": { "description": "POS: Takeaway" },
+
+  "posDelivery": "Lieferung",
+  "@posDelivery": { "description": "POS: Delivery" },
+
+  "tableEmpty": "Frei",
+  "@tableEmpty": { "description": "Table: Empty/Free" },
+
+  "tableOccupied": "Belegt",
+  "@tableOccupied": { "description": "Table: Occupied" },
+
+  "tableReserved": "Reserviert",
+  "@tableReserved": { "description": "Table: Reserved" },
+
+  "tableDirty": "Schmutzig",
+  "@tableDirty": { "description": "Table: Dirty" },
+
+  "tableMerge": "Zusammenführen",
+  "@tableMerge": { "description": "Table: Merge" },
+
+  "tableTransfer": "Umbuchen",
+  "@tableTransfer": { "description": "Table: Transfer" },
+
+  "tableGuest": "{count,plural, one{1 Gast} other{{count} Gäste}}",
+  "@tableGuest": {
+    "description": "Table: Guest count",
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "tableNewTable": "Neuer Tisch",
+  "@tableNewTable": { "description": "Table: New table" },
+
+  "tableFloor": "Bereich",
+  "@tableFloor": { "description": "Table: Floor/Zone" },
+
+  "tableCapacity": "Kapazität",
+  "@tableCapacity": { "description": "Table: Capacity" },
+
+  "shiftOpen": "Öffnen",
+  "@shiftOpen": { "description": "Shift: Open" },
+
+  "shiftClose": "Schliessen",
+  "@shiftClose": { "description": "Shift: Close" },
+
+  "shiftCashCount": "Kassenstand",
+  "@shiftCashCount": { "description": "Shift: Cash count" },
+
+  "shiftDifference": "Differenz",
+  "@shiftDifference": { "description": "Shift: Difference" },
+
+  "shiftZReport": "Z-Rapport",
+  "@shiftZReport": { "description": "Shift: Z-Report" },
+
+  "shiftXReport": "X-Rapport",
+  "@shiftXReport": { "description": "Shift: X-Report (interim)" },
+
+  "shiftOpenShift": "Schicht öffnen",
+  "@shiftOpenShift": { "description": "Shift: Open shift" },
+
+  "shiftCloseShift": "Schicht schliessen",
+  "@shiftCloseShift": { "description": "Shift: Close shift" },
+
+  "shiftOpeningFloat": "Eröffnungsbestand",
+  "@shiftOpeningFloat": { "description": "Shift: Opening float" },
+
+  "shiftCashIn": "Kassenzugang",
+  "@shiftCashIn": { "description": "Shift: Cash in" },
+
+  "shiftCashOut": "Kassenentnahme",
+  "@shiftCashOut": { "description": "Shift: Cash out" },
+
+  "shiftNoActiveShift": "Keine aktive Schicht",
+  "@shiftNoActiveShift": { "description": "Shift: No active shift" },
+
+  "shiftOpenCashDrawer": "Kassenlade öffnen",
+  "@shiftOpenCashDrawer": { "description": "Shift: Open cash drawer" },
+
+  "receiptNo": "Bon-Nr.",
+  "@receiptNo": { "description": "Receipt: Receipt number" },
+
+  "receiptDate": "Datum",
+  "@receiptDate": { "description": "Receipt: Date" },
+
+  "receiptTime": "Zeit",
+  "@receiptTime": { "description": "Receipt: Time" },
+
+  "receiptCashier": "Kassierer",
+  "@receiptCashier": { "description": "Receipt: Cashier" },
+
+  "receiptThankYou": "Vielen Dank!",
+  "@receiptThankYou": { "description": "Receipt: Thank you" },
+
+  "receiptTable": "Tisch",
+  "@receiptTable": { "description": "Receipt: Table" },
+
+  "settingsPrinter": "Drucker",
+  "@settingsPrinter": { "description": "Settings: Printer" },
+
+  "settingsPayment": "Zahlung",
+  "@settingsPayment": { "description": "Settings: Payment" },
+
+  "settingsLanguage": "Sprache",
+  "@settingsLanguage": { "description": "Settings: Language" },
+
+  "settingsTheme": "Design",
+  "@settingsTheme": { "description": "Settings: Theme" },
+
+  "settingsBackup": "Sicherung",
+  "@settingsBackup": { "description": "Settings: Backup" },
+
+  "settingsRestaurant": "Restaurant",
+  "@settingsRestaurant": { "description": "Settings: Restaurant" },
+
+  "settingsTax": "Steuer (MWST)",
+  "@settingsTax": { "description": "Settings: Tax" },
+
+  "settingsReceipt": "Beleg",
+  "@settingsReceipt": { "description": "Settings: Receipt" },
+
+  "settingsAppearance": "Erscheinungsbild",
+  "@settingsAppearance": { "description": "Settings: Appearance" },
+
+  "settingsAbout": "Über",
+  "@settingsAbout": { "description": "Settings: About" },
+
+  "settingsDemoData": "Demodaten",
+  "@settingsDemoData": { "description": "Settings: Demo Data" },
+
+  "actionSave": "Speichern",
+  "@actionSave": { "description": "Action: Save" },
+
+  "actionCancel": "Abbrechen",
+  "@actionCancel": { "description": "Action: Cancel" },
+
+  "actionDelete": "Löschen",
+  "@actionDelete": { "description": "Action: Delete" },
+
+  "actionEdit": "Bearbeiten",
+  "@actionEdit": { "description": "Action: Edit" },
+
+  "actionAdd": "Hinzufügen",
+  "@actionAdd": { "description": "Action: Add" },
+
+  "actionSearch": "Suchen",
+  "@actionSearch": { "description": "Action: Search" },
+
+  "actionFilter": "Filtern",
+  "@actionFilter": { "description": "Action: Filter" },
+
+  "actionConfirm": "OK",
+  "@actionConfirm": { "description": "Action: Confirm/OK" },
+
+  "actionClose": "Schliessen",
+  "@actionClose": { "description": "Action: Close" },
+
+  "actionBack": "Zurück",
+  "@actionBack": { "description": "Action: Back" },
+
+  "actionPrint": "Drucken",
+  "@actionPrint": { "description": "Action: Print" },
+
+  "actionRefresh": "Aktualisieren",
+  "@actionRefresh": { "description": "Action: Refresh" },
+
+  "statusError": "Fehler",
+  "@statusError": { "description": "Status: Error" },
+
+  "statusSuccess": "Erfolgreich",
+  "@statusSuccess": { "description": "Status: Success" },
+
+  "statusLoading": "Laden...",
+  "@statusLoading": { "description": "Status: Loading" },
+
+  "statusNoData": "Keine Daten",
+  "@statusNoData": { "description": "Status: No data" },
+
+  "statusOffline": "Offline",
+  "@statusOffline": { "description": "Status: Offline" },
+
+  "statusOnline": "Online",
+  "@statusOnline": { "description": "Status: Online" },
+
+  "menuCategory": "Kategorie",
+  "@menuCategory": { "description": "Menu: Category" },
+
+  "menuProduct": "Produkt",
+  "@menuProduct": { "description": "Menu: Product" },
+
+  "menuPrice": "Preis",
+  "@menuPrice": { "description": "Menu: Price" },
+
+  "menuModifier": "Zusatz",
+  "@menuModifier": { "description": "Menu: Modifier" },
+
+  "menuActive": "Aktiv",
+  "@menuActive": { "description": "Menu: Active" },
+
+  "menuInactive": "Inaktiv",
+  "@menuInactive": { "description": "Menu: Inactive" },
+
+  "orderHistory": "Bestellungshistorie",
+  "@orderHistory": { "description": "Orders: Order history" },
+
+  "orderStatus": "Status",
+  "@orderStatus": { "description": "Orders: Status" },
+
+  "orderStatusOpen": "Offen",
+  "@orderStatusOpen": { "description": "Orders: Open" },
+
+  "orderStatusPaid": "Bezahlt",
+  "@orderStatusPaid": { "description": "Orders: Paid" },
+
+  "orderStatusCancelled": "Storniert",
+  "@orderStatusCancelled": { "description": "Orders: Cancelled" },
+
+  "orderStatusRefunded": "Erstattet",
+  "@orderStatusRefunded": { "description": "Orders: Refunded" },
+
+  "dashboardDailyRevenue": "Tagesumsatz",
+  "@dashboardDailyRevenue": { "description": "Dashboard: Daily revenue" },
+
+  "dashboardOrders": "Bestellungen",
+  "@dashboardOrders": { "description": "Dashboard: Orders count" },
+
+  "dashboardAvgOrder": "Ø Bestellung",
+  "@dashboardAvgOrder": { "description": "Dashboard: Average order" },
+
+  "dashboardTableOccupancy": "Tischauslastung",
+  "@dashboardTableOccupancy": { "description": "Dashboard: Table occupancy" },
+
+  "dashboardRecentOrders": "Letzte Bestellungen",
+  "@dashboardRecentOrders": { "description": "Dashboard: Recent orders" },
+
+  "dashboardHourlySales": "Stündlicher Umsatz",
+  "@dashboardHourlySales": { "description": "Dashboard: Hourly sales" },
+
+  "floorPlan": "Saalplan",
+  "@floorPlan": { "description": "Floor plan" },
+
+  "editMode": "Bearbeitungsmodus",
+  "@editMode": { "description": "Edit mode" },
+
+  "confirmDelete": "Löschen bestätigen",
+  "@confirmDelete": { "description": "Confirm delete dialog title" },
+
+  "confirmDeleteMessage": "Möchten Sie diesen Eintrag wirklich löschen?",
+  "@confirmDeleteMessage": { "description": "Confirm delete dialog message" },
+
+  "pinLogin": "PIN eingeben",
+  "@pinLogin": { "description": "PIN login prompt" },
+
+  "pinWrong": "Falscher PIN",
+  "@pinWrong": { "description": "Wrong PIN message" },
+
+  "shiftStatusOpen": "Schicht offen",
+  "@shiftStatusOpen": { "description": "Shift indicator: shift is open" },
+
+  "shiftNoShiftTapToOpen": "Keine Schicht – tippen zum Öffnen",
+  "@shiftNoShiftTapToOpen": { "description": "Shift indicator: no active shift, tap to open" },
+
+  "quickActionNewOrder": "Neue Bestellung",
+  "@quickActionNewOrder": { "description": "Quick action: New Order" },
+
+  "quickActionFloorPlan": "Saalplan",
+  "@quickActionFloorPlan": { "description": "Quick action: Floor Plan" },
+
+  "quickActionOpenShift": "Schicht öffnen",
+  "@quickActionOpenShift": { "description": "Quick action: Open Shift" },
+
+  "quickActionCloseShift": "Schicht schliessen",
+  "@quickActionCloseShift": { "description": "Quick action: Close Shift" },
+
+  "quickActionOrderHistory": "Bestellungshistorie",
+  "@quickActionOrderHistory": { "description": "Quick action: Order History" }
+}
