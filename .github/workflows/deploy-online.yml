@@ -147,3 +147,48 @@ jobs:
           echo "    • gastrocore-server-linux  (Go binary, linux/amd64)"
           echo "    • online-web               (Flutter web build)"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          mkdir -p ~/.ssh
+          printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy web files
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER }}
+          WEB_PATH: /home/tech/gastrocore/web/dist
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $USER@$HOST \
+            "mkdir -p $WEB_PATH && rm -rf $WEB_PATH/*"
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+            ./web/* $USER@$HOST:$WEB_PATH/
+
+      - name: Deploy nginx config
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER }}
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            infra/deploy/nginx-gastrocore.conf $USER@$HOST:/tmp/nginx-gastrocore.conf
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $USER@$HOST "
+            sudo mv /tmp/nginx-gastrocore.conf /etc/nginx/sites-available/gastrocore
+            sudo ln -sf /etc/nginx/sites-available/gastrocore /etc/nginx/sites-enabled/gastrocore 2>/dev/null || true
+            sudo nginx -t && sudo systemctl reload nginx
+            echo 'nginx reloaded'
+          "
+
+      - name: Deploy Go binary and restart
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER }}
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            server/bin/gastrocore-server-linux $USER@$HOST:/tmp/gastrocore-server-new
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $USER@$HOST "
+            chmod +x /tmp/gastrocore-server-new
+            sudo mv /tmp/gastrocore-server-new /usr/local/bin/gastrocore-server
+            sudo systemctl restart gastrocore 2>/dev/null || \
+            sudo pkill -f gastrocore-server && sleep 1 && \
+            sudo /usr/local/bin/gastrocore-server &
+            echo 'Deployed successfully'
+          "
