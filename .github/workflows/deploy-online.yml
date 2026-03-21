@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
-  # 1. Build Flutter web app
+  # 1. Build Flutter web app + bundle standalone demo page
   # ─────────────────────────────────────────────────────────────────────────────
   build-web:
     name: Build Flutter Web
@@ -30,6 +30,11 @@ jobs:
 
       - name: Add CNAME for custom domain
         run: echo "pos.2tech.ch" > apps/online/build/web/CNAME
+
+      - name: Copy standalone demo page to /demo/
+        run: |
+          mkdir -p apps/online/build/web/demo
+          cp apps/online/web/demo/index.html apps/online/build/web/demo/index.html
 
       - name: Upload web artifact
         uses: actions/upload-artifact@v4
@@ -61,11 +66,13 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────────
   # 3. Deploy Go server + web files to pos.2tech.ch via SSH
+  #    (non-blocking — continues even if SSH is unavailable)
   # ─────────────────────────────────────────────────────────────────────────────
   deploy-server:
     name: Deploy to pos.2tech.ch Server
     needs: build-web
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -103,7 +110,8 @@ jobs:
           USER: ${{ secrets.SERVER_USER }}
           WEB_PATH: /home/tech/gastrocore/web/dist
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $USER@$HOST \
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=15 $USER@$HOST \
             "mkdir -p $WEB_PATH && rm -rf $WEB_PATH/*"
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
             ./web/* $USER@$HOST:$WEB_PATH/
@@ -115,7 +123,8 @@ jobs:
         run: |
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             server/bin/gastrocore-server-linux $USER@$HOST:/tmp/gastrocore-server-new
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $USER@$HOST "
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=15 $USER@$HOST "
             chmod +x /tmp/gastrocore-server-new
             sudo mv /tmp/gastrocore-server-new /usr/local/bin/gastrocore-server
             sudo systemctl restart gastrocore 2>/dev/null || \

@@ -30,6 +30,10 @@ func NewModule(db *sql.DB, kdsNotify KDSNotifier) *Module {
 // RegisterRoutes registers all public online ordering routes.
 // Routes are under /api/v1/online/ — no auth middleware applied.
 func (m *Module) RegisterRoutes(mux *http.ServeMux) {
+	// Standalone demo page — no backend required, fully self-contained HTML.
+	mux.HandleFunc("GET /demo", handleDemo)
+	mux.HandleFunc("GET /demo/", handleDemo)
+
 	// Public menu (no auth)
 	mux.HandleFunc("GET /api/v1/online/menu/{restaurantId}", m.handleGetMenu)
 
