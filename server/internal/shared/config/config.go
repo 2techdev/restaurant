@@ -28,6 +28,11 @@ type Config struct {
 	ERPNextURL       string
 	ERPNextAPIKey    string
 	ERPNextAPISecret string
+
+	// Stripe (online payment)
+	StripeSecretKey       string
+	StripeWebhookSecret   string
+	StripeSuccessURLBase  string // e.g. "https://order.gastrocore.ch"
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -46,6 +51,9 @@ func Load() *Config {
 		ERPNextURL:        getEnv("ERPNEXT_URL", ""),
 		ERPNextAPIKey:     getEnv("ERPNEXT_API_KEY", ""),
 		ERPNextAPISecret:  getEnv("ERPNEXT_API_SECRET", ""),
+		StripeSecretKey:       getEnv("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret:   getEnv("STRIPE_WEBHOOK_SECRET", ""),
+		StripeSuccessURLBase:  getEnv("STRIPE_SUCCESS_URL_BASE", "http://localhost:3000"),
 	}
 	return cfg
 }

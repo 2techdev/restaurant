@@ -15,16 +15,29 @@ type KDSNotifier interface {
 	NotifyNewOrder(tenantID, ticketID string, orderNumber int)
 }
 
+// StripeConfig holds Stripe credentials loaded from environment variables.
+type StripeConfig struct {
+	SecretKey      string
+	WebhookSecret  string
+	SuccessURLBase string
+}
+
 // Module is the online-ordering module.
 type Module struct {
-	db         *sql.DB
-	kdsNotify  KDSNotifier // optional; nil means no KDS notification
+	db        *sql.DB
+	kdsNotify KDSNotifier // optional; nil means no KDS notification
+	stripeCfg StripeConfig
 }
 
 // NewModule creates a new online ordering module.
 // kdsNotify may be nil if KDS integration is not needed.
 func NewModule(db *sql.DB, kdsNotify KDSNotifier) *Module {
 	return &Module{db: db, kdsNotify: kdsNotify}
+}
+
+// NewModuleWithStripe creates a new online ordering module with Stripe support.
+func NewModuleWithStripe(db *sql.DB, kdsNotify KDSNotifier, stripe StripeConfig) *Module {
+	return &Module{db: db, kdsNotify: kdsNotify, stripeCfg: stripe}
 }
 
 // RegisterRoutes registers all public online ordering routes.
@@ -42,4 +55,10 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 
 	// Order status polling (no auth)
 	mux.HandleFunc("GET /api/v1/online/orders/{orderId}/status", m.handleGetOrderStatus)
+
+	// Stripe payment (no auth — validated by order_id + restaurant_id)
+	mux.HandleFunc("POST /api/v1/online/payment/checkout", m.handleCreateCheckout)
+
+	// Stripe webhook (signature verified internally)
+	mux.HandleFunc("POST /api/v1/online/payment/webhook", m.handleStripeWebhook)
 }

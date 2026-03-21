@@ -51,6 +51,30 @@ class ApiClient {
     return _decode(response);
   }
 
+  /// POST /api/v1/online/payment/checkout
+  /// Creates a Stripe Checkout Session.
+  /// Returns { checkout_url, session_id, order_id }.
+  Future<Map<String, dynamic>> createPaymentCheckout({
+    required String orderId,
+    required String restaurantId,
+    required int amountCents,
+    String currency = 'chf',
+    String? description,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/online/payment/checkout');
+    final payload = {
+      'order_id': orderId,
+      'restaurant_id': restaurantId,
+      'amount_cents': amountCents,
+      'currency': currency,
+      if (description != null) 'description': description,
+    };
+    final response = await http
+        .post(uri, headers: _headers, body: json.encode(payload))
+        .timeout(const Duration(seconds: 20));
+    return _decode(response);
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------

@@ -46,6 +46,9 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
   // Tracks positions being dragged (table ID → Offset) before committing to DB.
   final Map<String, Offset> _dragOffsets = {};
 
+  // Shows a brief "Saved" indicator after a position is persisted to SQLite.
+  String? _savedLabel;
+
   Color _statusColor(TableStatus status) => switch (status) {
         TableStatus.available => AppColors.green,
         TableStatus.occupied => AppColors.red,
@@ -485,6 +488,14 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
                       textColor: AppColors.orange,
                     ),
                   ],
+                  if (_savedLabel != null) ...[
+                    const SizedBox(width: 8),
+                    _CountBadge(
+                      '✓ $_savedLabel',
+                      color: AppColors.green.withValues(alpha: 0.15),
+                      textColor: AppColors.green,
+                    ),
+                  ],
                   const Spacer(),
                   // Status legend
                   ...[
@@ -773,6 +784,11 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
                         await ref
                             .read(tableManagementProvider.notifier)
                             .updateTablePosition(table.id, pos.dx, pos.dy);
+                        // Show brief "Saved" indicator
+                        setState(() => _savedLabel = '${table.name} saved');
+                        Future.delayed(const Duration(seconds: 2), () {
+                          if (mounted) setState(() => _savedLabel = null);
+                        });
                       }
                     },
                   ),

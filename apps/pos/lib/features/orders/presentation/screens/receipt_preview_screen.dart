@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 
 // ---------------------------------------------------------------------------
@@ -681,6 +682,45 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // QR-Bill button
+          GestureDetector(
+            onTap: () => context.go(
+              AppRoutes.qrBill,
+              extra: {
+                'ticketId': widget.ticketId,
+                'amountCents': _receipt.grandTotal,
+                'invoiceId': _receipt.receiptNumber,
+              },
+            ),
+            child: Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.qr_code_2_rounded,
+                      size: 18, color: AppColors.accent),
+                  SizedBox(width: 6),
+                  Text(
+                    'QR-Bill',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accent,
                     ),
                   ),
                 ],

@@ -19,6 +19,7 @@ import (
 	"github.com/gastrocore/server/internal/menu"
 	"github.com/gastrocore/server/internal/online"
 	"github.com/gastrocore/server/internal/orders"
+	"github.com/gastrocore/server/internal/qrbill"
 	"github.com/gastrocore/server/internal/reports"
 	"github.com/gastrocore/server/internal/shared/config"
 	"github.com/gastrocore/server/internal/shared/database"
@@ -60,12 +61,17 @@ func main() {
 	syncModule := gosync.NewModule(db, cfg)
 	menuModule := menu.NewModule(db)
 	ordersModule := orders.NewModule(db)
-	onlineModule := online.NewModule(db, kdsHub) // kdsHub satisfies KDSNotifier
+	onlineModule := online.NewModuleWithStripe(db, kdsHub, online.StripeConfig{
+		SecretKey:      cfg.StripeSecretKey,
+		WebhookSecret:  cfg.StripeWebhookSecret,
+		SuccessURLBase: cfg.StripeSuccessURLBase,
+	})
 	reportsModule := reports.NewModule(db)
 	devicesModule := devices.NewModule(db)
 	licensesModule := licenses.NewModule(db, cfg)
 	storesModule := stores.NewModule(db, cfg)
 	kdsModule := kds.NewModule(db, kdsHub)
+	qrbillModule := qrbill.NewModule()
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -117,6 +123,7 @@ func main() {
 	licensesModule.RegisterRoutes(mux)
 	storesModule.RegisterRoutes(mux)
 	kdsModule.RegisterRoutes(mux)
+	qrbillModule.RegisterRoutes(mux) // POST /api/invoices/qrbill — JWT required at call site
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain

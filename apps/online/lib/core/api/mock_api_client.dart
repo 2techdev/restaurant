@@ -108,4 +108,21 @@ class MockApiClient extends ApiClient {
       'estimated_wait_minutes': 20,
     };
   }
+
+  @override
+  Future<Map<String, dynamic>> createPaymentCheckout({
+    required String orderId,
+    required String restaurantId,
+    required int amountCents,
+    String currency = 'chf',
+    String? description,
+  }) async {
+    // In demo mode, return a mock Stripe checkout URL (demo.stripe.com)
+    await Future.delayed(const Duration(milliseconds: 300));
+    return {
+      'checkout_url': 'https://checkout.stripe.com/demo',
+      'session_id': 'cs_demo_${DateTime.now().millisecondsSinceEpoch}',
+      'order_id': orderId,
+    };
+  }
 }
