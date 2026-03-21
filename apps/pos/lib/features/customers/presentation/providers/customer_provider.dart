@@ -92,7 +92,7 @@ class CustomerNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       final now = DateTime.now();
       final customer = CustomerEntity(
-        id: IdGenerator.uuid(),
+        id: IdGenerator.generateId(),
         tenantId: tenantId,
         name: name,
         phone: phone,

@@ -10,30 +10,28 @@ import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/features/reservations/domain/entities/reservation_entity.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/providers/reservation_provider.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/widgets/reservation_status_chip.dart';
-import 'package:gastrocore_pos/l10n/app_localizations.dart';
 
 class ReservationListScreen extends ConsumerWidget {
   const ReservationListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
     final upcoming = ref.watch(upcomingReservationsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.reservationList),
+        title: const Text('Reservations'),
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_month),
-            tooltip: l10n.reservationCalendar,
+            tooltip: 'Calendar',
             onPressed: () => context.push(AppRoutes.reservationCalendar),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
-        label: Text(l10n.reservationNew),
+        label: const Text('New Reservation'),
         onPressed: () => context.push(AppRoutes.reservationNew),
       ),
       body: upcoming.when(
@@ -48,7 +46,7 @@ class ReservationListScreen extends ConsumerWidget {
                   Icon(Icons.event_available,
                       size: 64, color: Theme.of(context).colorScheme.outline),
                   const SizedBox(height: 16),
-                  Text(l10n.reservationNoUpcoming,
+                  Text('No upcoming reservations',
                       style: Theme.of(context).textTheme.bodyLarge),
                 ],
               ),
@@ -78,7 +76,7 @@ class ReservationListScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                     child: Text(
                       isToday
-                          ? l10n.reservationToday
+                          ? 'Today'
                           : DateFormat('EEEE, d MMMM').format(date),
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             color: isToday

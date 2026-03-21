@@ -215,7 +215,7 @@ void main() {
       await repo.completeTicket(ktRow.id);
 
       // Active tickets should be empty (only pending/preparing).
-      final active = await repo.watchActiveTickets().first;
+      final active = await repo.watchActiveTickets(_tenantId).first;
       expect(active, isEmpty);
     });
   });
@@ -258,7 +258,7 @@ void main() {
       await repo.completeTicket(ktRow.id);
       await repo.recallTicket(ktRow.id);
 
-      final active = await repo.watchActiveTickets().first;
+      final active = await repo.watchActiveTickets(_tenantId).first;
       expect(active.length, equals(1));
       expect(active.first.status, equals(KitchenTicketStatus.preparing));
     });
@@ -280,7 +280,7 @@ void main() {
     tearDown(() async => db.close());
 
     test('returns empty list when no tickets', () async {
-      final active = await repo.watchActiveTickets().first;
+      final active = await repo.watchActiveTickets(_tenantId).first;
       expect(active, isEmpty);
     });
 
@@ -289,7 +289,7 @@ void main() {
       final items = [_makeItem(ticketId: ticket.id, productName: 'Schnitzel')];
       await repo.createTicketFromOrder(ticket: ticket, items: items);
 
-      final active = await repo.watchActiveTickets().first;
+      final active = await repo.watchActiveTickets(_tenantId).first;
       expect(active.length, equals(1));
       expect(active.first.status, equals(KitchenTicketStatus.pending));
       expect(active.first.items.first.productName, equals('Schnitzel'));
@@ -307,7 +307,7 @@ void main() {
           (await db.select(db.kitchenTickets).get()).first;
       await repo.completeTicket(kt1.id);
 
-      final active = await repo.watchActiveTickets().first;
+      final active = await repo.watchActiveTickets(_tenantId).first;
       expect(active.length, equals(1));
     });
 
@@ -321,7 +321,7 @@ void main() {
       await repo.createTicketFromOrder(
           ticket: t2, items: [_makeItem(ticketId: t2.id)]);
 
-      final active = await repo.watchActiveTickets().first;
+      final active = await repo.watchActiveTickets(_tenantId).first;
       expect(active.length, equals(2));
       // First item should be the older one.
       expect(active.first.ticketId, equals(t1.id));
@@ -332,7 +332,7 @@ void main() {
       await repo.createTicketFromOrder(
           ticket: ticket, items: [_makeItem(ticketId: ticket.id)]);
 
-      final active = await repo.watchActiveTickets().first;
+      final active = await repo.watchActiveTickets(_tenantId).first;
       expect(active.first.orderNumber, equals('0042'));
     });
   });

@@ -23,7 +23,6 @@ func testConfig() *config.Config {
 	}
 }
 
-// newTestModule creates a Module with a real JWTService but no DB (nil).
 // newTestAuthModule creates a Module with a real JWTService but no DB (nil).
 // Tests that require DB access must supply a *sql.DB directly.
 func newTestAuthModule(db *sql.DB) *Module {
@@ -36,7 +35,6 @@ func newTestAuthModule(db *sql.DB) *Module {
 }
 
 // postJSON is a convenience helper for POST requests with JSON body.
-func postJSON(t *testing.T, mod *Module, path string, body any, handler func(http.ResponseWriter, *http.Request)) *httptest.ResponseRecorder {
 func postJSON(t *testing.T, path string, body any, handler func(http.ResponseWriter, *http.Request)) *httptest.ResponseRecorder {
 	t.Helper()
 	b, err := json.Marshal(body)
@@ -102,8 +100,6 @@ func TestJWT_GenerateAndValidate(t *testing.T) {
 func TestJWT_ExpiredTokenIsRejected(t *testing.T) {
 	// Use a negative expiry to produce an already-expired token.
 	svc := NewJWTService("my-secret", -1*time.Second)
-
-	svc := NewJWTService("my-secret", -1*time.Second)
 	token, err := svc.GenerateToken(Claims{TenantID: "t", Role: "device"})
 	if err != nil {
 		t.Fatalf("GenerateToken: %v", err)
@@ -120,7 +116,6 @@ func TestJWT_TamperedSignatureIsRejected(t *testing.T) {
 
 	token, _ := svc.GenerateToken(Claims{TenantID: "t", Role: "device"})
 	// Flip one character in the signature (last segment).
-	token, _ := svc.GenerateToken(Claims{TenantID: "t", Role: "device"})
 
 	last := token[len(token)-1]
 	var tampered string
@@ -222,14 +217,6 @@ func TestJWT_RefreshRoleStripping(t *testing.T) {
 
 func TestHandleDeviceRegister_MissingTenantID(t *testing.T) {
 	mod := newTestAuthModule(nil)
-	w := postJSON(t, mod, "/api/v1/auth/device/register",
-		map[string]string{
-			"device_name": "Main POS",
-			"license_key": "lic-123",
-		},
-		mod.handleDeviceRegister,
-	)
-
 	w := postJSON(t, "/api/v1/auth/device/register",
 		map[string]string{"device_name": "Main POS", "license_key": "lic-123"},
 		mod.handleDeviceRegister,
@@ -242,14 +229,6 @@ func TestHandleDeviceRegister_MissingTenantID(t *testing.T) {
 
 func TestHandleDeviceRegister_MissingDeviceName(t *testing.T) {
 	mod := newTestAuthModule(nil)
-	w := postJSON(t, mod, "/api/v1/auth/device/register",
-		map[string]string{
-			"tenant_id":   "t-1",
-			"license_key": "lic-123",
-		},
-		mod.handleDeviceRegister,
-	)
-
 	w := postJSON(t, "/api/v1/auth/device/register",
 		map[string]string{"tenant_id": "t-1", "license_key": "lic-123"},
 		mod.handleDeviceRegister,
@@ -261,14 +240,6 @@ func TestHandleDeviceRegister_MissingDeviceName(t *testing.T) {
 
 func TestHandleDeviceRegister_MissingLicenseKey(t *testing.T) {
 	mod := newTestAuthModule(nil)
-	w := postJSON(t, mod, "/api/v1/auth/device/register",
-		map[string]string{
-			"tenant_id":   "t-1",
-			"device_name": "POS-1",
-		},
-		mod.handleDeviceRegister,
-	)
-
 	w := postJSON(t, "/api/v1/auth/device/register",
 		map[string]string{"tenant_id": "t-1", "device_name": "POS-1"},
 		mod.handleDeviceRegister,
@@ -297,11 +268,6 @@ func TestHandleDeviceRegister_InvalidBody(t *testing.T) {
 
 func TestHandleDeviceToken_MissingDeviceID(t *testing.T) {
 	mod := newTestAuthModule(nil)
-	w := postJSON(t, mod, "/api/v1/auth/device/token",
-		map[string]string{"device_token": "some-token"},
-		mod.handleDeviceToken,
-	)
-
 	w := postJSON(t, "/api/v1/auth/device/token",
 		map[string]string{"device_token": "some-token"},
 		mod.handleDeviceToken,
@@ -314,11 +280,6 @@ func TestHandleDeviceToken_MissingDeviceID(t *testing.T) {
 
 func TestHandleDeviceToken_MissingDeviceToken(t *testing.T) {
 	mod := newTestAuthModule(nil)
-	w := postJSON(t, mod, "/api/v1/auth/device/token",
-		map[string]string{"device_id": "dev-1"},
-		mod.handleDeviceToken,
-	)
-
 	w := postJSON(t, "/api/v1/auth/device/token",
 		map[string]string{"device_id": "dev-1"},
 		mod.handleDeviceToken,
@@ -335,10 +296,6 @@ func TestHandleDeviceToken_InvalidBody(t *testing.T) {
 	)
 	w := httptest.NewRecorder()
 	mod.handleDeviceToken(w, req)
-
-		bytes.NewReader([]byte(`{bad json`)))
-	w := httptest.NewRecorder()
-	mod.handleDeviceToken(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", w.Code)
 	}
@@ -350,11 +307,6 @@ func TestHandleDeviceToken_InvalidBody(t *testing.T) {
 
 func TestHandleAdminLogin_MissingEmail(t *testing.T) {
 	mod := newTestAuthModule(nil)
-	w := postJSON(t, mod, "/api/v1/auth/admin/login",
-		map[string]string{"password": "secret"},
-		mod.handleAdminLogin,
-	)
-
 	w := postJSON(t, "/api/v1/auth/admin/login",
 		map[string]string{"password": "secret"},
 		mod.handleAdminLogin,
@@ -367,11 +319,6 @@ func TestHandleAdminLogin_MissingEmail(t *testing.T) {
 
 func TestHandleAdminLogin_MissingPassword(t *testing.T) {
 	mod := newTestAuthModule(nil)
-	w := postJSON(t, mod, "/api/v1/auth/admin/login",
-		map[string]string{"email": "admin@example.com"},
-		mod.handleAdminLogin,
-	)
-
 	w := postJSON(t, "/api/v1/auth/admin/login",
 		map[string]string{"email": "admin@example.com"},
 		mod.handleAdminLogin,
@@ -388,10 +335,6 @@ func TestHandleAdminLogin_InvalidBody(t *testing.T) {
 	)
 	w := httptest.NewRecorder()
 	mod.handleAdminLogin(w, req)
-
-		bytes.NewReader([]byte(`not-json`)))
-	w := httptest.NewRecorder()
-	mod.handleAdminLogin(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", w.Code)
 	}
@@ -404,11 +347,6 @@ func TestHandleAdminLogin_InvalidBody(t *testing.T) {
 
 func TestHandleTokenRefresh_MissingToken(t *testing.T) {
 	mod := newTestAuthModule(nil)
-	w := postJSON(t, mod, "/api/v1/auth/token/refresh",
-		map[string]string{},
-		mod.handleTokenRefresh,
-	)
-
 	w := postJSON(t, "/api/v1/auth/token/refresh",
 		map[string]string{},
 		mod.handleTokenRefresh,
@@ -421,11 +359,6 @@ func TestHandleTokenRefresh_MissingToken(t *testing.T) {
 
 func TestHandleTokenRefresh_InvalidToken(t *testing.T) {
 	mod := newTestAuthModule(nil)
-	w := postJSON(t, mod, "/api/v1/auth/token/refresh",
-		map[string]string{"refresh_token": "this.is.garbage"},
-		mod.handleTokenRefresh,
-	)
-
 	w := postJSON(t, "/api/v1/auth/token/refresh",
 		map[string]string{"refresh_token": "this.is.garbage"},
 		mod.handleTokenRefresh,
@@ -448,11 +381,6 @@ func TestHandleTokenRefresh_ExpiredToken(t *testing.T) {
 		Role:     "device_refresh",
 	})
 
-	w := postJSON(t, mod, "/api/v1/auth/token/refresh",
-		map[string]string{"refresh_token": expiredToken},
-		mod.handleTokenRefresh,
-	)
-
 	w := postJSON(t, "/api/v1/auth/token/refresh",
 		map[string]string{"refresh_token": expiredToken},
 		mod.handleTokenRefresh,
@@ -462,11 +390,6 @@ func TestHandleTokenRefresh_ExpiredToken(t *testing.T) {
 	}
 }
 
-func TestHandleTokenRefresh_ValidRefreshToken(t *testing.T) {
-	cfg := testConfig()
-	mod := &Module{cfg: cfg, jwt: NewJWTService(cfg.JWTSecret, cfg.JWTExpiry)}
-
-	// Generate a valid refresh token with the same secret.
 func TestHandleTokenRefresh_ValidDeviceRefreshToken(t *testing.T) {
 	cfg := testConfig()
 	mod := &Module{cfg: cfg, jwt: NewJWTService(cfg.JWTSecret, cfg.JWTExpiry)}
@@ -480,11 +403,6 @@ func TestHandleTokenRefresh_ValidDeviceRefreshToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	w := postJSON(t, mod, "/api/v1/auth/token/refresh",
-		map[string]string{"refresh_token": refreshToken},
-		mod.handleTokenRefresh,
-	)
 
 	w := postJSON(t, "/api/v1/auth/token/refresh",
 		map[string]string{"refresh_token": refreshToken},
@@ -508,14 +426,6 @@ func TestHandleTokenRefresh_ValidDeviceRefreshToken(t *testing.T) {
 		t.Errorf("expected token_type=Bearer, got %q", resp.TokenType)
 	}
 }
-
-func TestHandleTokenRefresh_InvalidBody(t *testing.T) {
-	mod := newTestAuthModule(nil)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/token/refresh",
-		bytes.NewReader([]byte(`{bad`)),
-	)
-	w := httptest.NewRecorder()
-	mod.handleTokenRefresh(w, req)
 
 func TestHandleTokenRefresh_ValidAdminRefreshToken(t *testing.T) {
 	cfg := testConfig()
@@ -558,20 +468,5 @@ func TestHandleTokenRefresh_InvalidBody(t *testing.T) {
 	mod.handleTokenRefresh(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", w.Code)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Helper assertions
-// ---------------------------------------------------------------------------
-
-func assertErrorCode(t *testing.T, w *httptest.ResponseRecorder, code string) {
-	t.Helper()
-	var body map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body["code"] != code {
-		t.Errorf("expected error code %q, got %v", code, body["code"])
 	}
 }

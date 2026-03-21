@@ -37,7 +37,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
       case TableStatus.available:
         return const Color(0xFF22C55E);
       case TableStatus.occupied:
-        return const AppColors.primary;
+        return AppColors.primary;
       case TableStatus.reserved:
         return const Color(0xFFFB923C);
       case TableStatus.dirty:
@@ -117,7 +117,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
               children: [
                 _buildFilterChip('All Tables', _TableFilter.all, null),
                 _buildFilterChip('Available', _TableFilter.available, const Color(0xFF22C55E)),
-                _buildFilterChip('Occupied', _TableFilter.occupied, const AppColors.primary),
+                _buildFilterChip('Occupied', _TableFilter.occupied, AppColors.primary),
                 _buildFilterChip('Unpaid', _TableFilter.unpaid, const Color(0xFFFB923C)),
               ],
             ),
@@ -176,7 +176,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
                 fontSize: 14,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                 color: isActive
-                    ? const AppColors.primaryLight
+                    ? AppColors.primaryLight
                     : AppColors.textSecondary,
               ),
             ),
@@ -265,7 +265,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
             // Stats
             _buildStatCard('$freeCount', 'Free', const Color(0xFF22C55E)),
             const SizedBox(height: 12),
-            _buildStatCard('${busyCount.toString().padLeft(2, '0')}', 'Busy', const AppColors.primary),
+            _buildStatCard('${busyCount.toString().padLeft(2, '0')}', 'Busy', AppColors.primary),
             const SizedBox(height: 12),
             _buildStatCard('${checkCount.toString().padLeft(2, '0')}', 'Check', const Color(0xFFFB923C)),
             const SizedBox(height: 12),
@@ -436,7 +436,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
           boxShadow: isOccupied
               ? [
                   BoxShadow(
-                    color: const AppColors.primary.withValues(alpha: 0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     blurRadius: 15,
                   ),
                 ]
@@ -481,7 +481,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
                               ? const Color(0xFFE2E2EB).withValues(alpha: 0.4)
                               : isUnpaid
                                   ? const Color(0xFFFB923C)
-                                  : const AppColors.primary,
+                                  : AppColors.primary,
                           letterSpacing: -2.0,
                         ),
                       ),

@@ -32,8 +32,8 @@ class SupplierListScreen extends ConsumerWidget {
             color: AppColors.textSecondary,
           ),
         ),
-        title: Text(
-          l10n.invSuppliers,
+        title: const Text(
+          'Suppliers',
           style: const TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w700,
@@ -46,7 +46,7 @@ class SupplierListScreen extends ConsumerWidget {
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.surfaceDim,
         icon: const Icon(Icons.add_rounded),
-        label: Text(l10n.invAddSupplier),
+        label: const Text('Add Supplier'),
       ),
       body: suppliersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -369,7 +369,7 @@ class _SupplierSheetState extends ConsumerState<_SupplierSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                isEdit ? l10n.actionEdit : l10n.invAddSupplier,
+                isEdit ? l10n.actionEdit : 'Add Supplier',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -377,17 +377,17 @@ class _SupplierSheetState extends ConsumerState<_SupplierSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              _field(l10n.invSupplierName, _nameCtrl, required: true),
+              _field('Name', _nameCtrl, required: true),
               const SizedBox(height: 12),
-              _field(l10n.invSupplierEmail, _emailCtrl),
+              _field('Email', _emailCtrl),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: _field(l10n.invSupplierPhone, _phoneCtrl)),
+                  Expanded(child: _field('Phone', _phoneCtrl)),
                 ],
               ),
               const SizedBox(height: 12),
-              _field(l10n.invSupplierAddress, _addressCtrl),
+              _field('Address', _addressCtrl),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,

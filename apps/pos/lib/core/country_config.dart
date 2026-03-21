@@ -62,7 +62,7 @@ class CountryConfig {
   // ---------------------------------------------------------------------------
 
   /// Switzerland: MWST 8.1% / 2.6% / 3.8%, QR-Bill, Rappen rounding, no TSE.
-  static const ch = CountryConfig(
+  static final ch = CountryConfig(
     code: CountryCode.ch,
     name: 'Schweiz / Suisse / Svizzera',
     currency: 'CHF',
@@ -81,7 +81,7 @@ class CountryConfig {
   );
 
   /// Germany: MwSt 19% / 7%, Fiskaly TSE required, DSFinV-K export, EUR.
-  static const de = CountryConfig(
+  static final de = CountryConfig(
     code: CountryCode.de,
     name: 'Deutschland',
     currency: 'EUR',

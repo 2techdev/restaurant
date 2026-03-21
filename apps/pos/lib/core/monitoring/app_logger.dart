@@ -63,8 +63,6 @@ class AppLogger {
       CrashReporter.captureException(
         error,
         stackTrace: stack,
-        hint: '[$tag] $message',
-        tags: data?.map((k, v) => MapEntry(k, v.toString())),
       );
     }
   }

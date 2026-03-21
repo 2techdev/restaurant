@@ -37,6 +37,10 @@ func TestHub_NotifyDeliversTenant(t *testing.T) {
 	select {
 	case <-other:
 		t.Error("cross-tenant notification should not be delivered")
+	default:
+	}
+}
+
 func TestHub_NewHub(t *testing.T) {
 	h := NewHub()
 	if h == nil {
@@ -138,7 +142,7 @@ func TestHub_Broadcast_SkipsOtherTenants(t *testing.T) {
 	}
 }
 
-func TestHub_NotifyNewOrder(t *testing.T) {
+func TestHub_NotifyNewOrder_Integration(t *testing.T) {
 	hub := NewHub()
 	go hub.Run()
 
@@ -181,6 +185,9 @@ func TestHub_RegisterReplaces(t *testing.T) {
 
 	if current != fresh {
 		t.Error("expected fresh client to replace the old one")
+	}
+}
+
 func TestHub_Broadcast_MultipleClients_SameTenant(t *testing.T) {
 	h := NewHub()
 

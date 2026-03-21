@@ -527,7 +527,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
                   shape: BoxShape.circle,
                   color: AppColors.surfaceDim,
                   border: isSelected
-                      ? Border.all(color: const AppColors.primary, width: 4)
+                      ? Border.all(color: AppColors.primary, width: 4)
                       : null,
                 ),
                 child: Center(
@@ -650,12 +650,12 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
                 color: _showError
                     ? AppColors.red
                     : isFilled
-                        ? const AppColors.primaryLight
+                        ? AppColors.primaryLight
                         : const Color(0xFF33343B),
                 boxShadow: isFilled && !_showError
                     ? [
                         BoxShadow(
-                          color: const AppColors.primary.withValues(alpha: 0.4),
+                          color: AppColors.primary.withValues(alpha: 0.4),
                           blurRadius: 12,
                         ),
                       ]
@@ -713,11 +713,11 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
                   }
                 },
                 borderRadius: BorderRadius.circular(12),
-                splashColor: const AppColors.primary.withValues(alpha: 0.15),
+                splashColor: AppColors.primary.withValues(alpha: 0.15),
                 child: Ink(
                   height: 64,
                   decoration: BoxDecoration(
-                    color: const AppColors.surfaceContainerHigh,
+                    color: AppColors.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(

@@ -41,7 +41,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surfaceContainer,
         title: Text(
-          l10n.invRestock,
+          'Restock',
           style: const TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w700,
@@ -107,7 +107,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
                                 ),
                               ),
                               Text(
-                                '${l10n.invCurrentStock}: ${_fmtQty(item.quantity)} ${item.unit}',
+                                'Current Stock: ${_fmtQty(item.quantity)} ${item.unit}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: AppColors.textDim,
@@ -122,7 +122,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
 
                   const SizedBox(height: 24),
 
-                  _label(l10n.invQuantity),
+                  _label('Quantity'),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _qtyCtrl,
@@ -178,7 +178,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
 
                   const SizedBox(height: 20),
 
-                  _label(l10n.invNotes),
+                  _label('Notes'),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _notesCtrl,
@@ -187,7 +187,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
                       color: AppColors.textPrimary,
                     ),
                     maxLines: 3,
-                    decoration: _inputDecoration(l10n.invNotes),
+                    decoration: _inputDecoration('Notes'),
                   ),
 
                   const SizedBox(height: 32),
@@ -208,7 +208,7 @@ class _RestockScreenState extends ConsumerState<RestockScreen> {
                             )
                           : const Icon(Icons.add_circle_outline_rounded),
                       label: Text(
-                        l10n.invRestock,
+                        'Restock',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,

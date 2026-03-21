@@ -1,19 +1,12 @@
 package online
 
 import (
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-)
-
-// ---------------------------------------------------------------------------
-// Pure-function unit tests (no DB, no HTTP)
 	"bytes"
 	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
@@ -116,38 +109,6 @@ func TestHandlePlaceOrder_EmptyBody(t *testing.T) {
 	}
 }
 
-func TestHandlePlaceOrder_MissingRestaurantID(t *testing.T) {
-	m := newTestModule()
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v1/online/orders", m.handlePlaceOrder)
-
-	body := `{"order_type":"dine_in","items":[{"product_id":"p1","product_name":"Test","quantity":1,"unit_price":1000}]}`
-	req := httptest.NewRequest("POST", "/api/v1/online/orders", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for missing restaurant_id, got %d", w.Code)
-	}
-}
-
-func TestHandlePlaceOrder_NoItems(t *testing.T) {
-	m := newTestModule()
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v1/online/orders", m.handlePlaceOrder)
-
-	body := `{"restaurant_id":"r1","order_type":"dine_in","items":[]}`
-	req := httptest.NewRequest("POST", "/api/v1/online/orders", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for empty items, got %d", w.Code)
-	}
-}
-
 func TestHandleUpdateOrderStatus_EmptyBody(t *testing.T) {
 	m := newTestModule()
 	mux := http.NewServeMux()
@@ -176,23 +137,6 @@ func TestHandleUpdateOrderStatus_InvalidStatus(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for invalid status, got %d", w.Code)
-	}
-}
-
-func TestHandleGetMenu_MissingRestaurantID(t *testing.T) {
-	// Route doesn't match without a restaurantId segment; the mux returns 405/404.
-	// Test directly: call with a request that won't match the wildcard segment.
-	m := newTestModule()
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/online/menu/{restaurantId}", m.handleGetMenu)
-
-	req := httptest.NewRequest("GET", "/api/v1/online/menu/", nil)
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	// The mux will 404 for an unmatched pattern (empty segment).
-	if w.Code == http.StatusOK {
-		t.Error("expected non-200 when restaurantId is missing")
 	}
 }
 
@@ -294,12 +238,17 @@ func TestVATRate_Selection(t *testing.T) {
 		{"dine_in", 8.1},
 		{"delivery", 8.1},
 		{"", 8.1},
-func TestNullString(t *testing.T) {
-	if nullString("") != nil {
-		t.Error("expected nil for empty string")
 	}
-	if v, ok := nullString("hello").(string); !ok || v != "hello" {
-		t.Errorf("expected string 'hello', got %v", nullString("hello"))
+	for _, tc := range cases {
+		var vatRate float64
+		if tc.orderType == "takeaway" {
+			vatRate = 2.6
+		} else {
+			vatRate = 8.1
+		}
+		if vatRate != tc.wantRate {
+			t.Errorf("order_type=%q: want %.1f%%, got %.1f%%", tc.orderType, tc.wantRate, vatRate)
+		}
 	}
 }
 
@@ -326,8 +275,6 @@ func TestVATRateCalculation(t *testing.T) {
 		} else {
 			vatRate = 8.1
 		}
-		if vatRate != tc.wantRate {
-			t.Errorf("order_type=%q: want %.1f%%, got %.1f%%", tc.orderType, tc.wantRate, vatRate)
 		got := vatAmount(tc.subtotal, vatRate)
 		if got != tc.wantVAT {
 			t.Errorf("orderType=%s subtotal=%d: VAT=%d, want %d",
@@ -357,6 +304,19 @@ func TestPlaceOnlineOrderRequest_Fields(t *testing.T) {
 				UnitPrice:   2500,
 				Modifiers: []OnlineOrderModifier{
 					{ModifierID: "mod-1", ModifierName: "Spicy", PriceDelta: 100},
+				},
+			},
+		},
+	}
+	if req.RestaurantID != "rest-abc" {
+		t.Errorf("expected RestaurantID=rest-abc, got %s", req.RestaurantID)
+	}
+	if len(req.Items) != 1 || len(req.Items[0].Modifiers) != 1 {
+		t.Errorf("unexpected items/modifiers: %+v", req.Items)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // handlePlaceOrder — validation (no DB)
 // ---------------------------------------------------------------------------
 
@@ -576,34 +536,6 @@ func TestHandlePlaceOrder_WithModifiers(t *testing.T) {
 			},
 		},
 	}
-
-	if req.RestaurantID == "" {
-		t.Error("RestaurantID should not be empty")
-	}
-	if len(req.Items) != 1 {
-		t.Errorf("Items: want 1, got %d", len(req.Items))
-	}
-	if len(req.Items[0].Modifiers) != 1 {
-		t.Errorf("Modifiers: want 1, got %d", len(req.Items[0].Modifiers))
-	}
-	if req.TableNumber == nil || *req.TableNumber != 5 {
-		t.Errorf("TableNumber: want 5, got %v", req.TableNumber)
-	}
-}
-
-func TestOrderStatusResponse_Fields(t *testing.T) {
-	s := OrderStatusResponse{
-		OrderID:              "order-123",
-		OrderNumber:          42,
-		Status:               "preparing",
-		EstimatedWaitMinutes: estimatedWaitForStatus("preparing"),
-	}
-
-	if s.OrderID != "order-123" {
-		t.Errorf("OrderID: %q", s.OrderID)
-	}
-	if s.EstimatedWaitMinutes != 12 {
-		t.Errorf("EstimatedWaitMinutes: want 12, got %d", s.EstimatedWaitMinutes)
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/online/orders", bytes.NewReader(b))
 	w := httptest.NewRecorder()
@@ -744,18 +676,6 @@ func (n *mockKDSNotifier) NotifyNewOrder(tenantID, ticketID string, orderNumber 
 }
 
 // ---------------------------------------------------------------------------
-// handleGetOrderStatus — validation (path value absent)
-// ---------------------------------------------------------------------------
-
-func TestHandleGetOrderStatus_MissingOrderID(t *testing.T) {
-	m := newTestModule()
-	// Direct call without mux so PathValue returns "".
-	req := httptest.NewRequest("GET", "/api/v1/online/orders//status", nil)
-	w := httptest.NewRecorder()
-	m.handleGetOrderStatus(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for missing order_id, got %d", w.Code)
 // handleGetOrderStatus — validation (no DB)
 // ---------------------------------------------------------------------------
 
@@ -1010,5 +930,25 @@ func TestHandleGetMenu_Found_WithProducts(t *testing.T) {
 	}
 	if resp.Products[0].Price != 1500 {
 		t.Errorf("want price=1500, got %d", resp.Products[0].Price)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// OrderStatusResponse — field checks
+// ---------------------------------------------------------------------------
+
+func TestOrderStatusResponse_Fields(t *testing.T) {
+	s := OrderStatusResponse{
+		OrderID:              "order-123",
+		OrderNumber:          42,
+		Status:               "preparing",
+		EstimatedWaitMinutes: estimatedWaitForStatus("preparing"),
+	}
+
+	if s.OrderID != "order-123" {
+		t.Errorf("OrderID: %q", s.OrderID)
+	}
+	if s.EstimatedWaitMinutes != 12 {
+		t.Errorf("EstimatedWaitMinutes: want 12, got %d", s.EstimatedWaitMinutes)
 	}
 }

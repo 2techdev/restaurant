@@ -341,7 +341,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get confirmDelete => 'Löschen bestätigen';
 
   @override
-  String get confirmDeleteMessage => 'Möchten Sie diesen Eintrag wirklich löschen?';
+  String get confirmDeleteMessage =>
+      'Möchten Sie diesen Eintrag wirklich löschen?';
 
   @override
   String get pinLogin => 'PIN eingeben';
@@ -371,19 +372,22 @@ class AppLocalizationsDe extends AppLocalizations {
   String get quickActionOrderHistory => 'Bestellungshistorie';
 
   @override
-  String get navCrm => 'Kunden';
+  String get navCustomers => 'Kunden';
 
   @override
-  String get navReservations => 'Reservierungen';
-
-  @override
-  String get crmCustomers => 'Kunden';
+  String get crmTitle => 'Kundenverwaltung';
 
   @override
   String get crmNewCustomer => 'Neuer Kunde';
 
   @override
-  String get crmCustomerName => 'Name';
+  String get crmEditCustomer => 'Kunde bearbeiten';
+
+  @override
+  String get crmDeleteCustomer => 'Kunde löschen';
+
+  @override
+  String get crmName => 'Name';
 
   @override
   String get crmPhone => 'Telefon';
@@ -392,107 +396,101 @@ class AppLocalizationsDe extends AppLocalizations {
   String get crmEmail => 'E-Mail';
 
   @override
+  String get crmAddress => 'Adresse';
+
+  @override
   String get crmBirthday => 'Geburtstag';
 
   @override
   String get crmNotes => 'Notizen';
 
   @override
+  String get crmTotalOrders => 'Bestellungen';
+
+  @override
+  String get crmTotalSpent => 'Umsatz';
+
+  @override
   String get crmLoyaltyPoints => 'Treuepunkte';
 
   @override
-  String get crmLoyaltyBalance => 'Punktestand';
+  String get crmTierBronze => 'Bronze';
 
   @override
-  String get crmAddPoints => 'Punkte hinzufügen';
+  String get crmTierSilver => 'Silber';
 
   @override
-  String get crmRedeemPoints => 'Punkte einlösen';
+  String get crmTierGold => 'Gold';
 
   @override
-  String get crmTotalVisits => 'Besuche';
+  String crmBirthdayReminder(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Geburtstage',
+      one: '1 Geburtstag',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get crmTotalSpent => 'Gesamtumsatz';
+  String get loyaltyTitle => 'Treuepunkte';
 
   @override
-  String get crmLastVisit => 'Letzter Besuch';
+  String get loyaltyRedeem => 'Punkte einlösen';
 
   @override
-  String get crmSearchCustomers => 'Kunden suchen';
+  String get loyaltyAdjust => 'Punkte anpassen';
 
   @override
-  String get crmNoCustomers => 'Keine Kunden';
+  String get loyaltyEarnRule => '1 CHF ausgeben = 1 Punkt sammeln';
 
   @override
-  String get crmLoyaltyEarn => 'Punkte verdienen';
+  String get loyaltyRedeemRule => '100 Punkte = CHF 1.00 Rabatt';
 
   @override
-  String get crmLoyaltyRedeem => 'Punkte einlösen';
+  String get loyaltyTransactionEarn => 'Punkte gesammelt';
 
   @override
-  String get crmLoyaltyAdjust => 'Punkte anpassen';
+  String get loyaltyTransactionRedeem => 'Punkte eingelöst';
 
   @override
-  String get crmLoyaltyHistory => 'Punkteverlauf';
+  String get loyaltyTransactionAdjust => 'Manuelle Anpassung';
+
+  @override
+  String get loyaltyTransactionExpire => 'Punkte abgelaufen';
 
   @override
   String get reservationNew => 'Neue Reservierung';
 
   @override
-  String get reservationDate => 'Datum';
+  String get reservationEdit => 'Reservierung bearbeiten';
 
   @override
-  String get reservationTime => 'Uhrzeit';
+  String get reservationNoShow => 'Nicht erschienen';
 
   @override
-  String get reservationGuests => 'Gäste';
+  String get reservationCancel => 'Reservierung stornieren';
 
   @override
-  String get reservationTable => 'Tisch';
+  String get reservationErrorTimeRange => 'Endzeit muss nach Startzeit liegen';
 
   @override
-  String get reservationStatus => 'Status';
+  String get reservationErrorConflict =>
+      'Dieser Zeitraum überschneidet sich mit einer bestehenden Reservierung';
 
   @override
-  String get reservationStatusConfirmed => 'Bestätigt';
+  String get reservationCustomerInfo => 'Kundeninformationen';
 
   @override
-  String get reservationStatusPending => 'Ausstehend';
+  String get reservationCustomerName => 'Kundenname';
 
   @override
-  String get reservationStatusCancelled => 'Storniert';
+  String get reservationNameRequired => 'Name ist erforderlich';
 
   @override
-  String get reservationStatusSeated => 'Platziert';
+  String get reservationCustomerPhone => 'Telefonnummer';
 
   @override
-  String get reservationStatusNoShow => 'Nicht erschienen';
-
-  @override
-  String get reservationCustomerName => 'Gastname';
-
-  @override
-  String get reservationPhone => 'Telefon';
-
-  @override
-  String get reservationNotes => 'Notizen';
-
-  @override
-  String get reservationConflict => 'Tischkonflikt erkannt';
-
-  @override
-  String get reservationNoReservations => 'Keine Reservierungen';
-
-  @override
-  String get reservationToday => 'Heute';
-
-  @override
-  String get reservationCalendar => 'Kalender';
-
-  @override
-  String get reservationDuration => 'Dauer (Min.)';
-
-  @override
-  String get reservationCheckConflict => 'Konflikt prüfen';
+  String get reservationCustomerEmail => 'E-Mail-Adresse';
 }

@@ -174,7 +174,8 @@ func TestRecover_NormalRequestPassesThrough(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCORS_AddsHeaders(t *testing.T) {
-	handler := CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	cors := CORS(CORSConfig{AllowedOrigins: []string{"*"}})
+	handler := cors(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -191,7 +192,8 @@ func TestCORS_AddsHeaders(t *testing.T) {
 }
 
 func TestCORS_OptionsReturns204(t *testing.T) {
-	handler := CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	cors := CORS(CORSConfig{AllowedOrigins: []string{"*"}})
+	handler := cors(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("should not reach inner handler for OPTIONS")
 	}))
 

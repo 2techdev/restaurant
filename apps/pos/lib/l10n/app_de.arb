@@ -440,5 +440,17 @@
   "@loyaltyTransactionAdjust": { "description": "Loyalty: Adjust transaction" },
 
   "loyaltyTransactionExpire": "Punkte abgelaufen",
-  "@loyaltyTransactionExpire": { "description": "Loyalty: Expire transaction" }
+  "@loyaltyTransactionExpire": { "description": "Loyalty: Expire transaction" },
+
+  "reservationNew": "Neue Reservierung",
+  "reservationEdit": "Reservierung bearbeiten",
+  "reservationNoShow": "Nicht erschienen",
+  "reservationCancel": "Reservierung stornieren",
+  "reservationErrorTimeRange": "Endzeit muss nach Startzeit liegen",
+  "reservationErrorConflict": "Dieser Zeitraum überschneidet sich mit einer bestehenden Reservierung",
+  "reservationCustomerInfo": "Kundeninformationen",
+  "reservationCustomerName": "Kundenname",
+  "reservationNameRequired": "Name ist erforderlich",
+  "reservationCustomerPhone": "Telefonnummer",
+  "reservationCustomerEmail": "E-Mail-Adresse"
 }

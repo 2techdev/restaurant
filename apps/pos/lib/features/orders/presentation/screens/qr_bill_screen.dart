@@ -111,7 +111,7 @@ class _QRBillScreenState extends ConsumerState<QRBillScreen> {
 
   void _prefill() {
     final settings = ref.read(restaurantSettingsProvider).valueOrNull;
-    if (settings != null && settings.vatNumber.isNotEmpty) {
+    if (settings != null && settings.mwstNr.isNotEmpty) {
       // Use VAT number area as placeholder until IBAN configured
     }
   }

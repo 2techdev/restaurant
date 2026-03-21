@@ -41,7 +41,7 @@ class InventoryDetailScreen extends ConsumerWidget {
                   style: const TextStyle(color: AppColors.textSecondary)),
             );
           }
-          return _DetailBody(item: item, txAsync: txAsync, l10n: l10n);
+          return _DetailBody(item: item, txAsync: txAsync, actionCancel: l10n.actionCancel, actionSave: l10n.actionSave, statusNoData: l10n.statusNoData);
         },
       ),
     );
@@ -52,12 +52,16 @@ class _DetailBody extends ConsumerWidget {
   const _DetailBody({
     required this.item,
     required this.txAsync,
-    required this.l10n,
+    required this.actionCancel,
+    required this.actionSave,
+    required this.statusNoData,
   });
 
   final InventoryItemEntity item;
   final AsyncValue<List<InventoryTransactionEntity>> txAsync;
-  final AppLocalizations l10n;
+  final String actionCancel;
+  final String actionSave;
+  final String statusNoData;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -70,7 +74,7 @@ class _DetailBody extends ConsumerWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
             child: Text(
-              l10n.invTransactionHistory,
+              'Transaction History',
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -115,9 +119,9 @@ class _DetailBody extends ConsumerWidget {
       StockStatus.normal => AppColors.green,
     };
     final statusLabel = switch (status) {
-      StockStatus.out => l10n.invOutOfStock,
-      StockStatus.low => l10n.invLowStock,
-      StockStatus.normal => l10n.invNormal,
+      StockStatus.out => 'Out of Stock',
+      StockStatus.low => 'Low Stock',
+      StockStatus.normal => 'Normal',
     };
 
     final currencyFmt = NumberFormat.currency(symbol: 'CHF ', decimalDigits: 2);
@@ -181,7 +185,7 @@ class _DetailBody extends ConsumerWidget {
 
           if (item.minQuantity > 0)
             Text(
-              '${l10n.invMinStock}: ${_fmtQty(item.minQuantity)} ${item.unit}',
+              'Min. Stock: ${_fmtQty(item.minQuantity)} ${item.unit}',
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.textDim,
@@ -205,20 +209,20 @@ class _DetailBody extends ConsumerWidget {
           Row(
             children: [
               _MetaCell(
-                label: l10n.invCostPrice,
+                label: 'Cost Price',
                 value: currencyFmt
                     .format(item.costPriceCents / 100)
                     .replaceFirst('CHF ', 'CHF '),
               ),
               const SizedBox(width: 24),
               _MetaCell(
-                label: l10n.invStockValue,
+                label: 'Stock Value',
                 value: currencyFmt.format(item.stockValueCents / 100),
               ),
               if (item.lastRestockDate != null) ...[
                 const SizedBox(width: 24),
                 _MetaCell(
-                  label: l10n.invLastRestock,
+                  label: 'Last Restock',
                   value: DateFormat('dd.MM.yy').format(item.lastRestockDate!),
                 ),
               ],
@@ -237,7 +241,7 @@ class _DetailBody extends ConsumerWidget {
           Expanded(
             child: _ActionButton(
               icon: Icons.add_circle_outline_rounded,
-              label: l10n.invRestock,
+              label: 'Restock',
               color: AppColors.green,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
@@ -250,7 +254,7 @@ class _DetailBody extends ConsumerWidget {
           Expanded(
             child: _ActionButton(
               icon: Icons.delete_sweep_outlined,
-              label: l10n.invRecordWaste,
+              label: 'Record Waste',
               color: AppColors.orange,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
@@ -263,7 +267,7 @@ class _DetailBody extends ConsumerWidget {
           Expanded(
             child: _ActionButton(
               icon: Icons.tune_rounded,
-              label: l10n.invAdjustment,
+              label: 'Adjustment',
               color: AppColors.primary,
               onTap: () => _showAdjustDialog(context, ref),
             ),
@@ -280,9 +284,9 @@ class _DetailBody extends ConsumerWidget {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surfaceContainer,
-        title: Text(
-          l10n.invAdjustment,
-          style: const TextStyle(color: AppColors.textPrimary),
+        title: const Text(
+          'Adjustment',
+          style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -292,7 +296,7 @@ class _DetailBody extends ConsumerWidget {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               style: const TextStyle(color: AppColors.textPrimary),
               decoration: InputDecoration(
-                labelText: l10n.invQuantity,
+                labelText: 'Quantity',
                 labelStyle: const TextStyle(color: AppColors.textSecondary),
                 filled: true,
                 fillColor: AppColors.bgInput,
@@ -307,7 +311,7 @@ class _DetailBody extends ConsumerWidget {
               controller: notesCtrl,
               style: const TextStyle(color: AppColors.textPrimary),
               decoration: InputDecoration(
-                labelText: l10n.invNotes,
+                labelText: 'Notes',
                 labelStyle: const TextStyle(color: AppColors.textSecondary),
                 filled: true,
                 fillColor: AppColors.bgInput,
@@ -322,7 +326,7 @@ class _DetailBody extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(l10n.actionCancel,
+            child: Text(actionCancel,
                 style: const TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
@@ -342,7 +346,7 @@ class _DetailBody extends ConsumerWidget {
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.surfaceDim,
             ),
-            child: Text(l10n.actionSave),
+            child: Text(actionSave),
           ),
         ],
       ),
@@ -373,7 +377,7 @@ class _DetailBody extends ConsumerWidget {
                   padding: const EdgeInsets.all(32),
                   child: Center(
                     child: Text(
-                      l10n.statusNoData,
+                      statusNoData,
                       style: const TextStyle(color: AppColors.textDim),
                     ),
                   ),

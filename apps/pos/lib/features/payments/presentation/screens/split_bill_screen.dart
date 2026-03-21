@@ -455,8 +455,8 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  const AppColors.primaryLight.withValues(alpha: 0.05),
-                                  const AppColors.primary.withValues(alpha: 0.05),
+                                  AppColors.primaryLight.withValues(alpha: 0.05),
+                                  AppColors.primary.withValues(alpha: 0.05),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -811,7 +811,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const AppColors.primary.withValues(alpha: 0.2),
+                    color: AppColors.primary.withValues(alpha: 0.2),
                     blurRadius: 24,
                   ),
                 ],

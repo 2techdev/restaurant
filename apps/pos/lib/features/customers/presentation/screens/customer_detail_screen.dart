@@ -10,7 +10,7 @@ import 'package:gastrocore_pos/features/customers/presentation/providers/custome
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_form_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/loyalty_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/widgets/loyalty_badge.dart';
-import 'package:gastrocore_pos/shared/widgets/pos_loading.dart';
+
 
 class CustomerDetailScreen extends ConsumerWidget {
   final String customerId;
@@ -37,7 +37,7 @@ class CustomerDetailScreen extends ConsumerWidget {
       },
       loading: () => const Scaffold(
         backgroundColor: AppColors.surfaceDim,
-        body: PosLoading(),
+        body: Center(child: CircularProgressIndicator()),
       ),
       error: (e, _) => Scaffold(
         backgroundColor: AppColors.surfaceDim,
@@ -251,7 +251,7 @@ class CustomerDetailScreen extends ConsumerWidget {
         const SizedBox(width: 12),
         _StatCard(
           label: 'Umsatz',
-          value: Money.format(customer.totalSpent),
+          value: Money(customer.totalSpent).format('CHF'),
           icon: Icons.payments_rounded,
           color: AppColors.green,
         ),
@@ -302,7 +302,7 @@ class CustomerDetailScreen extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  '= ${Money.format(discountCents)} Rabatt verfügbar',
+                  '= ${Money(discountCents).format('CHF')} Rabatt verfügbar',
                   style: const TextStyle(
                       fontSize: 13, color: AppColors.textSecondary),
                 ),

@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/inventory/presentation/providers/inventory_provider.dart';
-import 'package:gastrocore_pos/l10n/app_localizations.dart';
+
 
 class WasteScreen extends ConsumerStatefulWidget {
   const WasteScreen({super.key, required this.itemId});
@@ -41,7 +41,6 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final itemAsync = ref.watch(inventoryItemDetailProvider(widget.itemId));
 
     return Scaffold(
@@ -49,7 +48,7 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surfaceContainer,
         title: Text(
-          l10n.invRecordWaste,
+          'Record Waste',
           style: const TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w700,
@@ -115,7 +114,7 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
                                 ),
                               ),
                               Text(
-                                '${l10n.invCurrentStock}: ${_fmtQty(item.quantity)} ${item.unit}',
+                                'Current Stock: ${_fmtQty(item.quantity)} ${item.unit}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: AppColors.textDim,
@@ -130,7 +129,7 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
 
                   const SizedBox(height: 24),
 
-                  _label(l10n.invQuantity),
+                  _label('Quantity'),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _qtyCtrl,
@@ -167,7 +166,7 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
 
                   const SizedBox(height: 20),
 
-                  _label(l10n.invReason),
+                  _label('Reason'),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
                     initialValue: _reason,
@@ -190,7 +189,7 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
                         .map(
                           (r) => DropdownMenuItem(
                             value: r,
-                            child: Text(_reasonLabel(r, l10n)),
+                            child: Text(_reasonLabel(r)),
                           ),
                         )
                         .toList(),
@@ -199,7 +198,7 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
 
                   const SizedBox(height: 20),
 
-                  _label(l10n.invNotes),
+                  _label('Notes'),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _notesCtrl,
@@ -209,7 +208,7 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
                     ),
                     maxLines: 3,
                     decoration: InputDecoration(
-                      hintText: l10n.invNotes,
+                      hintText: 'Notes',
                       hintStyle: const TextStyle(color: AppColors.textDim),
                       filled: true,
                       fillColor: AppColors.bgInput,
@@ -240,7 +239,7 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
                             )
                           : const Icon(Icons.delete_sweep_outlined),
                       label: Text(
-                        l10n.invRecordWaste,
+                        'Record Waste',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -264,12 +263,12 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
     );
   }
 
-  String _reasonLabel(String reason, AppLocalizations l10n) => switch (reason) {
-        'spoilage' => l10n.invWasteSpoilage,
-        'breakage' => l10n.invWasteBreakage,
-        'theft' => l10n.invWasteTheft,
-        'expiry' => l10n.invWasteExpiry,
-        _ => l10n.invWasteOther,
+  String _reasonLabel(String reason) => switch (reason) {
+        'spoilage' => 'Spoilage',
+        'breakage' => 'Breakage',
+        'theft' => 'Theft',
+        'expiry' => 'Expiry',
+        _ => 'Other',
       };
 
   Future<void> _save(BuildContext context) async {
@@ -277,7 +276,7 @@ class _WasteScreenState extends ConsumerState<WasteScreen> {
     setState(() => _saving = true);
     final qty = double.parse(_qtyCtrl.text);
     final notes =
-        '${_reasonLabel(_reason, AppLocalizations.of(context))}${_notesCtrl.text.trim().isNotEmpty ? ': ${_notesCtrl.text.trim()}' : ''}';
+        '${_reasonLabel(_reason)}${_notesCtrl.text.trim().isNotEmpty ? ': ${_notesCtrl.text.trim()}' : ''}';
     final navigator = Navigator.of(context);
 
     final ok = await ref.read(inventoryActionsProvider.notifier).recordWaste(

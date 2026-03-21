@@ -167,5 +167,18 @@
   "loyaltyTransactionEarn": "Points gagnés",
   "loyaltyTransactionRedeem": "Points échangés",
   "loyaltyTransactionAdjust": "Ajustement manuel",
-  "loyaltyTransactionExpire": "Points expirés"
+
+  "loyaltyTransactionExpire": "Points expirés",
+
+  "reservationNew": "Nouvelle réservation",
+  "reservationEdit": "Modifier la réservation",
+  "reservationNoShow": "Non présenté",
+  "reservationCancel": "Annuler la réservation",
+  "reservationErrorTimeRange": "L'heure de fin doit être après l'heure de début",
+  "reservationErrorConflict": "Ce créneau est en conflit avec une réservation existante",
+  "reservationCustomerInfo": "Informations client",
+  "reservationCustomerName": "Nom du client",
+  "reservationNameRequired": "Le nom est obligatoire",
+  "reservationCustomerPhone": "Numéro de téléphone",
+  "reservationCustomerEmail": "Adresse e-mail"
 }

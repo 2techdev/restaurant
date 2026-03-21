@@ -8,7 +8,7 @@ import 'package:gastrocore_pos/features/customers/presentation/screens/customer_
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_form_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/widgets/customer_card.dart';
 import 'package:gastrocore_pos/shared/widgets/pos_empty_state.dart';
-import 'package:gastrocore_pos/shared/widgets/pos_loading.dart';
+
 
 class CustomerListScreen extends ConsumerStatefulWidget {
   const CustomerListScreen({super.key});
@@ -218,7 +218,7 @@ class _CustomerListScreenState
         if (list.isEmpty) {
           return const PosEmptyState(
             icon: Icons.people_outline_rounded,
-            message: 'Keine Kunden gefunden',
+            title: 'Keine Kunden gefunden',
           );
         }
         return RefreshIndicator(
@@ -236,7 +236,7 @@ class _CustomerListScreenState
           ),
         );
       },
-      loading: () => const PosLoading(),
+      loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
         child: Text('Fehler: $e',
             style: const TextStyle(color: AppColors.red)),

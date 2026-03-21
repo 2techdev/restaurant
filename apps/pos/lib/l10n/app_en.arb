@@ -167,5 +167,17 @@
   "loyaltyTransactionEarn": "Points earned",
   "loyaltyTransactionRedeem": "Points redeemed",
   "loyaltyTransactionAdjust": "Manual adjustment",
-  "loyaltyTransactionExpire": "Points expired"
+  "loyaltyTransactionExpire": "Points expired",
+
+  "reservationNew": "New Reservation",
+  "reservationEdit": "Edit Reservation",
+  "reservationNoShow": "No Show",
+  "reservationCancel": "Cancel Reservation",
+  "reservationErrorTimeRange": "End time must be after start time",
+  "reservationErrorConflict": "This time slot conflicts with an existing reservation",
+  "reservationCustomerInfo": "Customer Information",
+  "reservationCustomerName": "Customer Name",
+  "reservationNameRequired": "Name is required",
+  "reservationCustomerPhone": "Phone Number",
+  "reservationCustomerEmail": "Email Address"
 }

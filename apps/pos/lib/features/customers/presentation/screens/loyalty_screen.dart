@@ -8,7 +8,7 @@ import 'package:gastrocore_pos/features/customers/domain/entities/customer_entit
 import 'package:gastrocore_pos/features/customers/domain/entities/loyalty_transaction_entity.dart';
 import 'package:gastrocore_pos/features/customers/presentation/providers/customer_provider.dart';
 import 'package:gastrocore_pos/features/customers/presentation/widgets/loyalty_badge.dart';
-import 'package:gastrocore_pos/shared/widgets/pos_loading.dart';
+
 
 class LoyaltyScreen extends ConsumerWidget {
   final String customerId;
@@ -51,7 +51,7 @@ class LoyaltyScreen extends ConsumerWidget {
             ],
           );
         },
-        loading: () => const PosLoading(),
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Text('$e',
               style: const TextStyle(color: AppColors.red)),
@@ -135,7 +135,7 @@ class LoyaltyScreen extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    '= ${Money.format(customer.redeemableDiscountCents)} Rabatt',
+                    '= ${Money(customer.redeemableDiscountCents).format('CHF')} Rabatt',
                     style: const TextStyle(
                         fontSize: 13, color: AppColors.textSecondary),
                   ),
@@ -164,7 +164,7 @@ class LoyaltyScreen extends ConsumerWidget {
               ),
               _PointStat(
                 label: 'Gesamt Umsatz',
-                value: Money.format(customer.totalSpent),
+                value: Money(customer.totalSpent).format('CHF'),
                 icon: Icons.receipt_rounded,
                 color: AppColors.primary,
               ),
@@ -472,7 +472,7 @@ class LoyaltyScreen extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '$points Punkte eingelöst — ${Money.format(points)} Rabatt',
+                '$points Punkte eingelöst — ${Money(points).format('CHF')} Rabatt',
               ),
               backgroundColor: AppColors.green,
             ),

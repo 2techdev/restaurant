@@ -260,6 +260,7 @@ GoRouter createAppRouter() => GoRouter(
         reservationId: state.pathParameters['id'],
       ),
     ),
+    GoRoute(
       path: AppRoutes.customers,
       builder: (context, state) => const CustomerListScreen(),
     ),
@@ -269,6 +270,8 @@ GoRouter createAppRouter() => GoRouter(
         final customerId = state.pathParameters['customerId'] ?? '';
         return CustomerDetailScreen(customerId: customerId);
       },
+    ),
+    GoRoute(
       path: AppRoutes.analytics,
       builder: (context, state) => const AnalyticsScreen(),
     ),

@@ -101,14 +101,13 @@ class _ReservationFormScreenState
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final l10n = AppLocalizations.of(context);
     final notifier = ref.read(reservationManagementProvider.notifier);
     final timeStart = _toDateTime(_date, _timeStart);
     final timeEnd = _toDateTime(_date, _timeEnd);
 
     if (!timeEnd.isAfter(timeStart)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.reservationErrorTimeRange)),
+        const SnackBar(content: Text('End time must be after start time')),
       );
       return;
     }
@@ -160,7 +159,7 @@ class _ReservationFormScreenState
     if (state.conflictTableId != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.reservationErrorConflict),
+          content: const Text('Table already reserved at that time'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -208,7 +207,7 @@ class _ReservationFormScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit ? l10n.reservationEdit : l10n.reservationNew),
+        title: Text(_isEdit ? 'Edit Reservation' : 'New Reservation'),
       ),
       body: Form(
         key: _formKey,
@@ -216,44 +215,44 @@ class _ReservationFormScreenState
           padding: const EdgeInsets.all(16),
           children: [
             // ---- Customer ----
-            Text(l10n.reservationCustomerInfo,
+            Text('Guest Information',
                 style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             TextFormField(
               controller: _nameCtrl,
-              decoration: InputDecoration(
-                labelText: l10n.reservationCustomerName,
-                prefixIcon: const Icon(Icons.person),
-                border: const OutlineInputBorder(),
+              decoration: const InputDecoration(
+                labelText: 'Guest Name',
+                prefixIcon: Icon(Icons.person),
+                border: OutlineInputBorder(),
               ),
               textCapitalization: TextCapitalization.words,
               validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? l10n.reservationNameRequired : null,
+                  (v == null || v.trim().isEmpty) ? 'Name required' : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _phoneCtrl,
-              decoration: InputDecoration(
-                labelText: l10n.reservationCustomerPhone,
-                prefixIcon: const Icon(Icons.phone),
-                border: const OutlineInputBorder(),
+              decoration: const InputDecoration(
+                labelText: 'Phone',
+                prefixIcon: Icon(Icons.phone),
+                border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.phone,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _emailCtrl,
-              decoration: InputDecoration(
-                labelText: l10n.reservationCustomerEmail,
-                prefixIcon: const Icon(Icons.email),
-                border: const OutlineInputBorder(),
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.email),
+                border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 20),
 
             // ---- Date & Time ----
-            Text(l10n.reservationDateTime,
+            Text('Date & Time',
                 style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Row(
@@ -283,7 +282,7 @@ class _ReservationFormScreenState
               children: [
                 TextButton(
                   onPressed: () => _pickTime(false),
-                  child: Text(l10n.reservationChangeEndTime),
+                  child: const Text('Change End Time'),
                 ),
               ],
             ),
@@ -293,7 +292,7 @@ class _ReservationFormScreenState
             Row(
               children: [
                 Expanded(
-                  child: Text(l10n.reservationPartySize,
+                  child: Text('Party Size',
                       style: Theme.of(context).textTheme.titleSmall),
                 ),
                 IconButton(
@@ -313,7 +312,7 @@ class _ReservationFormScreenState
             const SizedBox(height: 20),
 
             // ---- Table ----
-            Text(l10n.reservationTable,
+            Text('Table',
                 style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             allTables.when(
@@ -327,15 +326,15 @@ class _ReservationFormScreenState
                     .toList();
                 return DropdownButtonFormField<String?>(
                   initialValue: _selectedTableId,
-                  decoration: InputDecoration(
-                    labelText: l10n.reservationTableOptional,
-                    prefixIcon: const Icon(Icons.table_restaurant),
-                    border: const OutlineInputBorder(),
+                  decoration: const InputDecoration(
+                    labelText: 'Table (optional)',
+                    prefixIcon: Icon(Icons.table_restaurant),
+                    border: OutlineInputBorder(),
                   ),
                   items: [
-                    DropdownMenuItem(
+                    const DropdownMenuItem(
                       value: null,
-                      child: Text(l10n.reservationNoTable),
+                      child: Text('No table assigned'),
                     ),
                     ...eligible.map(
                       (t) => DropdownMenuItem(
@@ -351,20 +350,20 @@ class _ReservationFormScreenState
             const SizedBox(height: 20),
 
             // ---- Channel & Status ----
-            Text(l10n.reservationMeta,
+            Text('Booking Info',
                 style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             DropdownButtonFormField<ReservationChannel>(
               initialValue: _channel,
-              decoration: InputDecoration(
-                labelText: l10n.reservationChannel,
-                prefixIcon: const Icon(Icons.record_voice_over),
-                border: const OutlineInputBorder(),
+              decoration: const InputDecoration(
+                labelText: 'Source',
+                prefixIcon: Icon(Icons.record_voice_over),
+                border: OutlineInputBorder(),
               ),
               items: ReservationChannel.values
                   .map((c) => DropdownMenuItem(
                         value: c,
-                        child: Text(_channelLabel(l10n, c)),
+                        child: Text(_channelLabel(c)),
                       ))
                   .toList(),
               onChanged: (v) => setState(() => _channel = v!),
@@ -372,10 +371,10 @@ class _ReservationFormScreenState
             const SizedBox(height: 12),
             DropdownButtonFormField<ReservationStatus>(
               initialValue: _status,
-              decoration: InputDecoration(
-                labelText: l10n.reservationStatus,
-                prefixIcon: const Icon(Icons.flag),
-                border: const OutlineInputBorder(),
+              decoration: const InputDecoration(
+                labelText: 'Status',
+                prefixIcon: Icon(Icons.flag),
+                border: OutlineInputBorder(),
               ),
               items: [
                 ReservationStatus.pending,
@@ -383,7 +382,7 @@ class _ReservationFormScreenState
               ]
                   .map((s) => DropdownMenuItem(
                         value: s,
-                        child: Text(_statusLabel(l10n, s)),
+                        child: Text(_statusLabel(s)),
                       ))
                   .toList(),
               onChanged: (v) => setState(() => _status = v!),
@@ -393,10 +392,10 @@ class _ReservationFormScreenState
             // ---- Notes ----
             TextFormField(
               controller: _notesCtrl,
-              decoration: InputDecoration(
-                labelText: l10n.reservationNotes,
-                prefixIcon: const Icon(Icons.notes),
-                border: const OutlineInputBorder(),
+              decoration: const InputDecoration(
+                labelText: 'Notes',
+                prefixIcon: Icon(Icons.notes),
+                border: OutlineInputBorder(),
               ),
               maxLines: 3,
             ),
@@ -419,17 +418,17 @@ class _ReservationFormScreenState
     );
   }
 
-  String _channelLabel(AppLocalizations l, ReservationChannel c) =>
+  String _channelLabel(ReservationChannel c) =>
       switch (c) {
-        ReservationChannel.walkIn => l.reservationChannelWalkIn,
-        ReservationChannel.online => l.reservationChannelOnline,
-        ReservationChannel.phone => l.reservationChannelPhone,
+        ReservationChannel.walkIn => 'Walk-In',
+        ReservationChannel.online => 'Online',
+        ReservationChannel.phone => 'Phone',
       };
 
-  String _statusLabel(AppLocalizations l, ReservationStatus s) =>
+  String _statusLabel(ReservationStatus s) =>
       switch (s) {
-        ReservationStatus.pending => l.reservationStatusPending,
-        ReservationStatus.confirmed => l.reservationStatusConfirmed,
-        _ => l.reservationStatusPending,
+        ReservationStatus.pending => 'Pending',
+        ReservationStatus.confirmed => 'Confirmed',
+        _ => 'Pending',
       };
 }

@@ -164,7 +164,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: const AppColors.primaryLight.withValues(alpha: 0.1),
+                      color: AppColors.primaryLight.withValues(alpha: 0.1),
                       blurRadius: 16,
                     ),
                   ],
@@ -229,7 +229,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
               height: 384,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const AppColors.primaryLight.withValues(alpha: 0.05),
+                color: AppColors.primaryLight.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -241,7 +241,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
               height: 384,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const AppColors.primaryLight.withValues(alpha: 0.10),
+                color: AppColors.primaryLight.withValues(alpha: 0.10),
               ),
             ),
           ),
@@ -413,7 +413,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
                 : AppColors.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(8),
             border: isSelected
-                ? Border.all(color: const AppColors.primaryLight.withValues(alpha: 0.2), width: 2)
+                ? Border.all(color: AppColors.primaryLight.withValues(alpha: 0.2), width: 2)
                 : null,
           ),
           child: Center(
@@ -423,7 +423,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: isSelected
-                    ? const AppColors.primaryLight
+                    ? AppColors.primaryLight
                     : const Color(0xFFE2E2EB),
               ),
             ),

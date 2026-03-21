@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:gastrocore_pos/features/reservations/domain/entities/reservation_entity.dart';
-import 'package:gastrocore_pos/l10n/app_localizations.dart';
 
 class ReservationStatusChip extends StatelessWidget {
   final ReservationStatus status;
@@ -15,8 +14,7 @@ class ReservationStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final (label, color) = _labelAndColor(l10n, status);
+    final (label, color) = _labelAndColor(status);
     return Chip(
       label: Text(
         label,
@@ -35,16 +33,13 @@ class ReservationStatusChip extends StatelessWidget {
     );
   }
 
-  static (String, MaterialColor) _labelAndColor(
-    AppLocalizations l10n,
-    ReservationStatus status,
-  ) {
+  static (String, MaterialColor) _labelAndColor(ReservationStatus status) {
     return switch (status) {
-      ReservationStatus.pending => (l10n.reservationStatusPending, Colors.orange),
-      ReservationStatus.confirmed => (l10n.reservationStatusConfirmed, Colors.blue),
-      ReservationStatus.seated => (l10n.reservationStatusSeated, Colors.green),
-      ReservationStatus.cancelled => (l10n.reservationStatusCancelled, Colors.red),
-      ReservationStatus.noShow => (l10n.reservationStatusNoShow, Colors.grey),
+      ReservationStatus.pending => ('Pending', Colors.orange),
+      ReservationStatus.confirmed => ('Confirmed', Colors.blue),
+      ReservationStatus.seated => ('Seated', Colors.green),
+      ReservationStatus.cancelled => ('Cancelled', Colors.red),
+      ReservationStatus.noShow => ('No-Show', Colors.grey),
     };
   }
 }

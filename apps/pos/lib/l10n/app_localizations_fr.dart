@@ -341,7 +341,8 @@ class AppLocalizationsFr extends AppLocalizations {
   String get confirmDelete => 'Confirmer la suppression';
 
   @override
-  String get confirmDeleteMessage => 'Voulez-vous vraiment supprimer cet élément?';
+  String get confirmDeleteMessage =>
+      'Voulez-vous vraiment supprimer cet élément?';
 
   @override
   String get pinLogin => 'Entrer le PIN';
@@ -371,19 +372,22 @@ class AppLocalizationsFr extends AppLocalizations {
   String get quickActionOrderHistory => 'Historique des commandes';
 
   @override
-  String get navCrm => 'Clients';
+  String get navCustomers => 'Clients';
 
   @override
-  String get navReservations => 'Réservations';
-
-  @override
-  String get crmCustomers => 'Clients';
+  String get crmTitle => 'Gestion clients';
 
   @override
   String get crmNewCustomer => 'Nouveau client';
 
   @override
-  String get crmCustomerName => 'Nom';
+  String get crmEditCustomer => 'Modifier le client';
+
+  @override
+  String get crmDeleteCustomer => 'Supprimer le client';
+
+  @override
+  String get crmName => 'Nom';
 
   @override
   String get crmPhone => 'Téléphone';
@@ -392,107 +396,102 @@ class AppLocalizationsFr extends AppLocalizations {
   String get crmEmail => 'E-mail';
 
   @override
+  String get crmAddress => 'Adresse';
+
+  @override
   String get crmBirthday => 'Anniversaire';
 
   @override
   String get crmNotes => 'Notes';
 
   @override
+  String get crmTotalOrders => 'Commandes';
+
+  @override
+  String get crmTotalSpent => 'Chiffre d\'affaires';
+
+  @override
   String get crmLoyaltyPoints => 'Points fidélité';
 
   @override
-  String get crmLoyaltyBalance => 'Solde de points';
+  String get crmTierBronze => 'Bronze';
 
   @override
-  String get crmAddPoints => 'Ajouter des points';
+  String get crmTierSilver => 'Argent';
 
   @override
-  String get crmRedeemPoints => 'Utiliser des points';
+  String get crmTierGold => 'Or';
 
   @override
-  String get crmTotalVisits => 'Visites';
+  String crmBirthdayReminder(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Anniversaires',
+      one: '1 Anniversaire',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get crmTotalSpent => 'Total dépensé';
+  String get loyaltyTitle => 'Points fidélité';
 
   @override
-  String get crmLastVisit => 'Dernière visite';
+  String get loyaltyRedeem => 'Échanger des points';
 
   @override
-  String get crmSearchCustomers => 'Rechercher des clients';
+  String get loyaltyAdjust => 'Ajuster les points';
 
   @override
-  String get crmNoCustomers => 'Aucun client';
+  String get loyaltyEarnRule => 'Dépenser CHF 1 = gagner 1 point';
 
   @override
-  String get crmLoyaltyEarn => 'Gagner des points';
+  String get loyaltyRedeemRule => '100 points = CHF 1.00 de remise';
 
   @override
-  String get crmLoyaltyRedeem => 'Utiliser';
+  String get loyaltyTransactionEarn => 'Points gagnés';
 
   @override
-  String get crmLoyaltyAdjust => 'Ajuster les points';
+  String get loyaltyTransactionRedeem => 'Points échangés';
 
   @override
-  String get crmLoyaltyHistory => 'Historique des points';
+  String get loyaltyTransactionAdjust => 'Ajustement manuel';
+
+  @override
+  String get loyaltyTransactionExpire => 'Points expirés';
 
   @override
   String get reservationNew => 'Nouvelle réservation';
 
   @override
-  String get reservationDate => 'Date';
+  String get reservationEdit => 'Modifier la réservation';
 
   @override
-  String get reservationTime => 'Heure';
+  String get reservationNoShow => 'Non présenté';
 
   @override
-  String get reservationGuests => 'Couverts';
+  String get reservationCancel => 'Annuler la réservation';
 
   @override
-  String get reservationTable => 'Table';
+  String get reservationErrorTimeRange =>
+      'L\'heure de fin doit être après l\'heure de début';
 
   @override
-  String get reservationStatus => 'Statut';
+  String get reservationErrorConflict =>
+      'Ce créneau est en conflit avec une réservation existante';
 
   @override
-  String get reservationStatusConfirmed => 'Confirmée';
-
-  @override
-  String get reservationStatusPending => 'En attente';
-
-  @override
-  String get reservationStatusCancelled => 'Annulée';
-
-  @override
-  String get reservationStatusSeated => 'Placée';
-
-  @override
-  String get reservationStatusNoShow => 'Absent';
+  String get reservationCustomerInfo => 'Informations client';
 
   @override
   String get reservationCustomerName => 'Nom du client';
 
   @override
-  String get reservationPhone => 'Téléphone';
+  String get reservationNameRequired => 'Le nom est obligatoire';
 
   @override
-  String get reservationNotes => 'Notes';
+  String get reservationCustomerPhone => 'Numéro de téléphone';
 
   @override
-  String get reservationConflict => 'Conflit de table détecté';
-
-  @override
-  String get reservationNoReservations => 'Aucune réservation';
-
-  @override
-  String get reservationToday => 'Aujourd\'hui';
-
-  @override
-  String get reservationCalendar => 'Calendrier';
-
-  @override
-  String get reservationDuration => 'Durée (min)';
-
-  @override
-  String get reservationCheckConflict => 'Vérifier les conflits';
+  String get reservationCustomerEmail => 'Adresse e-mail';
 }

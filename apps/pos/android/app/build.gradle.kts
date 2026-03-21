@@ -17,7 +17,7 @@ if (keyPropertiesFile.exists()) {
 android {
     namespace = "com.gastrocore.gastrocore_pos"
     // Explicit SDK versions — do not rely on flutter.* variables for release.
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -32,7 +32,7 @@ android {
     defaultConfig {
         applicationId = "com.gastrocore.gastrocore_pos"
         // Android 5.0 Lollipop (API 21) — covers >98% of active Android devices.
-        minSdk = 21
+        minSdk = flutter.minSdkVersion
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName

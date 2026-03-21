@@ -92,7 +92,7 @@ class _DetailBody extends StatelessWidget {
               ReservationStatusChip(status: reservation.status),
               const SizedBox(width: 8),
               Chip(
-                label: Text(_channelLabel(l10n, reservation.channel)),
+                label: Text(_channelLabel(reservation.channel)),
                 avatar: const Icon(Icons.record_voice_over, size: 14),
               ),
             ],
@@ -108,24 +108,24 @@ class _DetailBody extends StatelessWidget {
                 children: [
                   _InfoRow(
                     icon: Icons.calendar_today,
-                    label: l10n.reservationDate,
+                    label: 'Date',
                     value: dateFmt.format(reservation.date),
                   ),
                   _InfoRow(
                     icon: Icons.schedule,
-                    label: l10n.reservationTime,
+                    label: 'Time',
                     value:
                         '${timeFmt.format(reservation.timeStart)} – ${timeFmt.format(reservation.timeEnd)}',
                   ),
                   _InfoRow(
                     icon: Icons.people,
-                    label: l10n.reservationPartySize,
+                    label: 'Party Size',
                     value: '${reservation.partySize} pax',
                   ),
                   if (reservation.tableId != null)
                     _InfoRow(
                       icon: Icons.table_restaurant,
-                      label: l10n.reservationTable,
+                      label: 'Table',
                       value: reservation.tableId!,
                     ),
                 ],
@@ -143,19 +143,19 @@ class _DetailBody extends StatelessWidget {
                 children: [
                   _InfoRow(
                     icon: Icons.person,
-                    label: l10n.reservationCustomerName,
+                    label: 'Guest Name',
                     value: reservation.customerName,
                   ),
                   if (reservation.customerPhone != null)
                     _InfoRow(
                       icon: Icons.phone,
-                      label: l10n.reservationCustomerPhone,
+                      label: 'Phone',
                       value: reservation.customerPhone!,
                     ),
                   if (reservation.customerEmail != null)
                     _InfoRow(
                       icon: Icons.email,
-                      label: l10n.reservationCustomerEmail,
+                      label: 'Email',
                       value: reservation.customerEmail!,
                     ),
                 ],
@@ -171,8 +171,8 @@ class _DetailBody extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.reservationNotes,
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    const Text('Notes',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
                     Text(reservation.notes!),
                   ],
@@ -184,10 +184,10 @@ class _DetailBody extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Status actions
-          Text(l10n.reservationChangeStatus,
+          Text('Change Status',
               style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
-          _StatusActions(reservation: reservation, notifier: notifier, l10n: l10n),
+          _StatusActions(reservation: reservation, notifier: notifier),
         ],
       ),
     );
@@ -217,23 +217,21 @@ class _DetailBody extends StatelessWidget {
     }
   }
 
-  String _channelLabel(AppLocalizations l, ReservationChannel c) =>
+  String _channelLabel(ReservationChannel c) =>
       switch (c) {
-        ReservationChannel.walkIn => l.reservationChannelWalkIn,
-        ReservationChannel.online => l.reservationChannelOnline,
-        ReservationChannel.phone => l.reservationChannelPhone,
+        ReservationChannel.walkIn => 'Walk-In',
+        ReservationChannel.online => 'Online',
+        ReservationChannel.phone => 'Phone',
       };
 }
 
 class _StatusActions extends StatelessWidget {
   final ReservationEntity reservation;
   final ReservationManagementNotifier notifier;
-  final AppLocalizations l10n;
 
   const _StatusActions({
     required this.reservation,
     required this.notifier,
-    required this.l10n,
   });
 
   @override
@@ -247,13 +245,13 @@ class _StatusActions extends StatelessWidget {
         if (status == ReservationStatus.pending)
           FilledButton.icon(
             icon: const Icon(Icons.check_circle),
-            label: Text(l10n.reservationConfirm),
+            label: const Text('Confirm'),
             onPressed: () => notifier.markConfirmed(id),
           ),
         if (status == ReservationStatus.confirmed)
           FilledButton.icon(
             icon: const Icon(Icons.restaurant),
-            label: Text(l10n.reservationSeat),
+            label: const Text('Seat Guests'),
             style: FilledButton.styleFrom(
               backgroundColor: Colors.green,
             ),
@@ -264,14 +262,14 @@ class _StatusActions extends StatelessWidget {
             status != ReservationStatus.seated)
           OutlinedButton.icon(
             icon: const Icon(Icons.person_off),
-            label: Text(l10n.reservationNoShow),
+            label: const Text('No-Show'),
             onPressed: () => notifier.markNoShow(id),
           ),
         if (status != ReservationStatus.cancelled &&
             status != ReservationStatus.seated)
           OutlinedButton.icon(
             icon: const Icon(Icons.cancel_outlined),
-            label: Text(l10n.reservationCancel),
+            label: const Text('Cancel'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),

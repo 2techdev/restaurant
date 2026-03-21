@@ -10,8 +10,6 @@ import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/features/reservations/domain/entities/reservation_entity.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/providers/reservation_provider.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/widgets/reservation_status_chip.dart';
-import 'package:gastrocore_pos/l10n/app_localizations.dart';
-
 class ReservationCalendarScreen extends ConsumerStatefulWidget {
   const ReservationCalendarScreen({super.key});
 
@@ -26,18 +24,17 @@ class _ReservationCalendarScreenState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final selectedDate = ref.watch(selectedReservationDateProvider);
     final reservationsAsync = ref.watch(reservationsForDateProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.reservationCalendar),
+        title: const Text('Calendar'),
         actions: [
           SegmentedButton<bool>(
-            segments: [
-              ButtonSegment(value: false, label: Text(l10n.reservationViewDay)),
-              ButtonSegment(value: true, label: Text(l10n.reservationViewWeek)),
+            segments: const [
+              ButtonSegment(value: false, label: Text('Day')),
+              ButtonSegment(value: true, label: Text('Week')),
             ],
             selected: {_weekMode},
             onSelectionChanged: (v) => setState(() => _weekMode = v.first),
@@ -50,7 +47,7 @@ class _ReservationCalendarScreenState
       ),
       floatingActionButton: FloatingActionButton.extended(
         icon: const Icon(Icons.add),
-        label: Text(l10n.reservationNew),
+        label: const Text('New Reservation'),
         onPressed: () => context.push(AppRoutes.reservationNew),
       ),
       body: Column(
@@ -165,7 +162,6 @@ class _DayView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     if (reservations.isEmpty) {
       return Center(
         child: Column(
@@ -174,7 +170,7 @@ class _DayView extends StatelessWidget {
             Icon(Icons.event_available,
                 size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 12),
-            Text(l10n.reservationNoReservations,
+            Text('No reservations',
                 style: Theme.of(context).textTheme.bodyLarge),
           ],
         ),

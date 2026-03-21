@@ -123,7 +123,7 @@ class CustomerRepositoryImpl {
 
     // Record loyalty transaction
     await _insertLoyaltyTransaction(LoyaltyTransactionEntity(
-      id: IdGenerator.uuid(),
+      id: IdGenerator.generateId(),
       customerId: customerId,
       points: pointsEarned,
       type: LoyaltyTransactionType.earn,
@@ -151,7 +151,7 @@ class CustomerRepositoryImpl {
     ));
 
     await _insertLoyaltyTransaction(LoyaltyTransactionEntity(
-      id: IdGenerator.uuid(),
+      id: IdGenerator.generateId(),
       customerId: customerId,
       points: -points,
       type: LoyaltyTransactionType.redeem,
@@ -262,7 +262,7 @@ class CustomerRepositoryImpl {
     ));
 
     await _insertLoyaltyTransaction(LoyaltyTransactionEntity(
-      id: IdGenerator.uuid(),
+      id: IdGenerator.generateId(),
       customerId: customerId,
       points: delta,
       type: LoyaltyTransactionType.adjust,

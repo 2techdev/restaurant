@@ -167,5 +167,17 @@
   "loyaltyTransactionEarn": "Punti guadagnati",
   "loyaltyTransactionRedeem": "Punti riscattati",
   "loyaltyTransactionAdjust": "Rettifica manuale",
-  "loyaltyTransactionExpire": "Punti scaduti"
+  "loyaltyTransactionExpire": "Punti scaduti",
+
+  "reservationNew": "Nuova prenotazione",
+  "reservationEdit": "Modifica prenotazione",
+  "reservationNoShow": "Non presentato",
+  "reservationCancel": "Annulla prenotazione",
+  "reservationErrorTimeRange": "L'ora di fine deve essere dopo l'ora di inizio",
+  "reservationErrorConflict": "Questa fascia oraria è in conflitto con una prenotazione esistente",
+  "reservationCustomerInfo": "Informazioni cliente",
+  "reservationCustomerName": "Nome cliente",
+  "reservationNameRequired": "Il nome è obbligatorio",
+  "reservationCustomerPhone": "Numero di telefono",
+  "reservationCustomerEmail": "Indirizzo e-mail"
 }

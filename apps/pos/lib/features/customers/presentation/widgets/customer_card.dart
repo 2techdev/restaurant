@@ -124,7 +124,7 @@ class CustomerCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    Money.format(customer.totalSpent),
+                    Money(customer.totalSpent).format('CHF'),
                     style: const TextStyle(
                         fontSize: 11, color: AppColors.textDim),
                   ),

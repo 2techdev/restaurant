@@ -664,7 +664,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: const AppColors.primaryLight.withValues(alpha: 0.2),
+                                color: AppColors.primaryLight.withValues(alpha: 0.2),
                                 blurRadius: 24,
                               ),
                             ],
@@ -724,17 +724,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 : AppColors.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(12),
             border: isSelected
-                ? Border.all(color: const AppColors.primary, width: 2)
+                ? Border.all(color: AppColors.primary, width: 2)
                 : null,
             boxShadow: isSelected
-                ? [BoxShadow(color: const AppColors.primary.withValues(alpha: 0.1), blurRadius: 12)]
+                ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.1), blurRadius: 12)]
                 : null,
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 22, color: isSelected ? const AppColors.primary : const Color(0xFFC3C6D7)),
+              Icon(icon, size: 22, color: isSelected ? AppColors.primary : const Color(0xFFC3C6D7)),
               const SizedBox(height: 2),
               Text(
                 label,
@@ -743,7 +743,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: isSelected ? const AppColors.primary : const Color(0xFFC3C6D7),
+                  color: isSelected ? AppColors.primary : const Color(0xFFC3C6D7),
                 ),
               ),
             ],

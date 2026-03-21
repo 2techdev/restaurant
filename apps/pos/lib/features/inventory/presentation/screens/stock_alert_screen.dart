@@ -10,14 +10,11 @@ import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/inventory/domain/entities/inventory_item_entity.dart';
 import 'package:gastrocore_pos/features/inventory/presentation/providers/inventory_provider.dart';
 import 'package:gastrocore_pos/features/inventory/presentation/screens/inventory_detail_screen.dart';
-import 'package:gastrocore_pos/l10n/app_localizations.dart';
-
 class StockAlertScreen extends ConsumerWidget {
   const StockAlertScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
     final alertsAsync = ref.watch(alertItemsProvider);
 
     return Scaffold(
@@ -37,8 +34,8 @@ class StockAlertScreen extends ConsumerWidget {
             const Icon(Icons.warning_amber_rounded,
                 color: AppColors.orange, size: 20),
             const SizedBox(width: 8),
-            Text(
-              l10n.invAlerts,
+            const Text(
+              'Alerts',
               style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -71,17 +68,17 @@ class StockAlertScreen extends ConsumerWidget {
                     color: AppColors.green,
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    l10n.invNoAlerts,
-                    style: const TextStyle(
+                  const Text(
+                    'No Alerts',
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    l10n.invAllStockOk,
+                  const Text(
+                    'All stock levels are OK',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textDim,
@@ -102,7 +99,7 @@ class StockAlertScreen extends ConsumerWidget {
             children: [
               if (outItems.isNotEmpty) ...[
                 _SectionHeader(
-                  label: l10n.invOutOfStock,
+                  label: 'Out of Stock',
                   count: outItems.length,
                   color: AppColors.red,
                 ),
@@ -112,7 +109,7 @@ class StockAlertScreen extends ConsumerWidget {
               ],
               if (lowItems.isNotEmpty) ...[
                 _SectionHeader(
-                  label: l10n.invLowStock,
+                  label: 'Low Stock',
                   count: lowItems.length,
                   color: AppColors.orange,
                 ),
