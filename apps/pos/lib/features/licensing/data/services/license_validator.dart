@@ -292,9 +292,10 @@ class LicenseValidator {
         return const InvalidLicense('Missing "businessId"');
       }
 
-      final tierStr = payload['tier'];
-      if (tierStr == null || tierStr is! String) {
-        return const InvalidLicense('Missing "tier"');
+      // Accept 'edition' (new token format) as an alias for 'tier' (legacy).
+      final tierStr = (payload['tier'] ?? payload['edition']) as String?;
+      if (tierStr == null || tierStr.isEmpty) {
+        return const InvalidLicense('Missing "tier" or "edition" field');
       }
       final tier = LicenseTier.fromString(tierStr);
 
