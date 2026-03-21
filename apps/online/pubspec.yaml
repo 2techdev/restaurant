@@ -12,6 +12,14 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
+  # GastroCore shared packages
+  gastrocore_models:
+    path: ../../packages/gastrocore_models
+  gastrocore_api:
+    path: ../../packages/gastrocore_api
+  gastrocore_ui:
+    path: ../../packages/gastrocore_ui
+
   # State Management
   flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.6.1

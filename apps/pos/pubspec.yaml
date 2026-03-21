@@ -12,6 +12,16 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
+  # GastroCore shared packages
+  gastrocore_models:
+    path: ../../packages/gastrocore_models
+  gastrocore_api:
+    path: ../../packages/gastrocore_api
+  gastrocore_sync:
+    path: ../../packages/gastrocore_sync
+  gastrocore_ui:
+    path: ../../packages/gastrocore_ui
+
   # Database - Drift ORM (SQLite)
   drift: ^2.22.1
   sqlite3_flutter_libs: ^0.5.28

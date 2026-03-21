@@ -1,0 +1,21 @@
+name: gastrocore_ui
+description: "GastroCore shared Flutter widgets, theme, and design system. Depends on gastrocore_models."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  gastrocore_models:
+    path: ../gastrocore_models
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
