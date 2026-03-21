@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
@@ -40,7 +38,7 @@ jobs:
           path: apps/online/build/web/
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 2. Deploy to GitHub Pages (serves at pos.2tech.ch after CNAME DNS update)
+  # 2. Deploy to GitHub Pages (custom domain: pos.2tech.ch)
   # ─────────────────────────────────────────────────────────────────────────────
   deploy-pages:
     name: Deploy to GitHub Pages
@@ -54,7 +52,7 @@ jobs:
           path: ./web
 
       - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./web
@@ -62,13 +60,12 @@ jobs:
           cname: pos.2tech.ch
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 3. Deploy to pos.2tech.ch server (updates nginx static files + Go binary)
+  # 3. Deploy Go server + web files to pos.2tech.ch via SSH
   # ─────────────────────────────────────────────────────────────────────────────
   deploy-server:
     name: Deploy to pos.2tech.ch Server
     needs: build-web
     runs-on: ubuntu-latest
-    if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -90,38 +87,39 @@ jobs:
         env:
           GOOS: linux
           GOARCH: amd64
-          CGO_ENABLED: 0
+          CGO_ENABLED: '0'
         run: go build -ldflags="-s -w" -o bin/gastrocore-server-linux ./cmd/server
 
-      - name: Setup SSH key
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy web files to server
+      - name: Deploy web files
         env:
-          SSH_OPTS: "-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=10"
-          USER: ${{ secrets.SERVER_USER }}
           HOST: ${{ secrets.SERVER_HOST }}
-          WEB_PATH: ${{ secrets.SERVER_WEB_PATH || '/home/tech/gastrocore/web/dist' }}
+          USER: ${{ secrets.SERVER_USER }}
+          WEB_PATH: /home/tech/gastrocore/web/dist
         run: |
-          # Clear old files and copy new web build
-          ssh $SSH_OPTS $USER@$HOST "mkdir -p $WEB_PATH && rm -rf $WEB_PATH/*"
-          scp $SSH_OPTS -r ./web/* $USER@$HOST:$WEB_PATH/
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $USER@$HOST \
+            "mkdir -p $WEB_PATH && rm -rf $WEB_PATH/*"
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+            ./web/* $USER@$HOST:$WEB_PATH/
 
-      - name: Deploy Go binary and restart service
+      - name: Deploy Go binary and restart
         env:
-          SSH_OPTS: "-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=10"
-          USER: ${{ secrets.SERVER_USER }}
           HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER }}
         run: |
-          scp $SSH_OPTS server/bin/gastrocore-server-linux $USER@$HOST:/tmp/gastrocore-server-new
-          ssh $SSH_OPTS $USER@$HOST "
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            server/bin/gastrocore-server-linux $USER@$HOST:/tmp/gastrocore-server-new
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $USER@$HOST "
             chmod +x /tmp/gastrocore-server-new
             sudo mv /tmp/gastrocore-server-new /usr/local/bin/gastrocore-server
-            sudo systemctl restart gastrocore || sudo pkill -f gastrocore-server || true
-            sleep 2
-            echo 'Deploy complete'
+            sudo systemctl restart gastrocore 2>/dev/null || \
+            sudo pkill -f gastrocore-server && sleep 1 && \
+            sudo /usr/local/bin/gastrocore-server &
+            echo 'Deployed successfully'
           "
