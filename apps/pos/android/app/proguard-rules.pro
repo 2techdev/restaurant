@@ -3,6 +3,13 @@
 # These rules protect native integrations and third-party SDKs.
 
 # -----------------------------------------------------------------------
+# flutter_secure_storage (Android Keystore encrypted storage for tokens)
+# -----------------------------------------------------------------------
+-keep class com.it_nomads.fluttersecurestorage.** { *; }
+-keep class androidx.security.crypto.** { *; }
+-dontwarn com.it_nomads.fluttersecurestorage.**
+
+# -----------------------------------------------------------------------
 # Flutter / Dart
 # -----------------------------------------------------------------------
 # Flutter engine classes must not be stripped
