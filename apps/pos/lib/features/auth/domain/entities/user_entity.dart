@@ -37,6 +37,13 @@ class UserEntity {
   final String tenantId;
   final String name;
   final String pinHash;
+
+  /// Optional separate PIN used exclusively for manager override authorisation.
+  ///
+  /// When set, this PIN is checked first in [ManagerPinDialog].  If null,
+  /// [pinHash] is used for both login and override flows.
+  final String? managerPinHash;
+
   final UserRole role;
   final bool isActive;
   final DateTime createdAt;
@@ -47,11 +54,24 @@ class UserEntity {
     required this.tenantId,
     required this.name,
     required this.pinHash,
+    this.managerPinHash,
     required this.role,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
   });
+
+  /// The PIN hash that should be compared during manager override.
+  ///
+  /// Returns [managerPinHash] if set, otherwise falls back to [pinHash].
+  String get effectiveManagerPinHash => managerPinHash ?? pinHash;
+
+  /// Whether this user can approve manager override requests.
+  bool get canApproveOverride =>
+      role == UserRole.manager || role == UserRole.admin;
+
+  /// Whether this user can approve high-value (admin-only) overrides.
+  bool get canApproveAdminOverride => role == UserRole.admin;
 
   /// Create a copy with selectively overridden fields.
   UserEntity copyWith({
@@ -59,6 +79,7 @@ class UserEntity {
     String? tenantId,
     String? name,
     String? pinHash,
+    Object? managerPinHash = _sentinel,
     UserRole? role,
     bool? isActive,
     DateTime? createdAt,
@@ -69,12 +90,17 @@ class UserEntity {
       tenantId: tenantId ?? this.tenantId,
       name: name ?? this.name,
       pinHash: pinHash ?? this.pinHash,
+      managerPinHash: managerPinHash == _sentinel
+          ? this.managerPinHash
+          : managerPinHash as String?,
       role: role ?? this.role,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
+
+  static const _sentinel = Object();
 
   @override
   bool operator ==(Object other) =>
@@ -85,6 +111,7 @@ class UserEntity {
           tenantId == other.tenantId &&
           name == other.name &&
           pinHash == other.pinHash &&
+          managerPinHash == other.managerPinHash &&
           role == other.role &&
           isActive == other.isActive &&
           createdAt == other.createdAt &&
@@ -96,6 +123,7 @@ class UserEntity {
         tenantId,
         name,
         pinHash,
+        managerPinHash,
         role,
         isActive,
         createdAt,

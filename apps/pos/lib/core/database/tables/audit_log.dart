@@ -6,8 +6,17 @@ class AuditLog extends Table {
   TextColumn get tenantId => text()();
   TextColumn get branchId => text().nullable()();
   TextColumn get deviceId => text()();
+
+  /// The staff member who performed the action.
   TextColumn get userId => text()();
   TextColumn get userName => text()();
+
+  /// The manager / admin who authorised the action (overrides, voids, etc.).
+  ///
+  /// Null when no authorisation was required.
+  TextColumn get managerId => text().nullable()();
+  TextColumn get managerName => text().nullable()();
+
   TextColumn get action => text()(); // AuditAction enum name
   TextColumn get entityType => text()();
   TextColumn get entityId => text()();

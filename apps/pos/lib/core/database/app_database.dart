@@ -111,10 +111,13 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(dayCloseSummaries);
       }
       if (from < 7) {
-        // Add inventory tables introduced in v7.
+        // v7: inventory tables + manager PIN columns + audit log authorizer.
         await m.createTable(inventoryItems);
         await m.createTable(inventoryTransactions);
         await m.createTable(suppliers);
+        await m.addColumn(users, users.managerPinHash);
+        await m.addColumn(auditLog, auditLog.managerId);
+        await m.addColumn(auditLog, auditLog.managerName);
       }
     },
     onCreate: (m) async {

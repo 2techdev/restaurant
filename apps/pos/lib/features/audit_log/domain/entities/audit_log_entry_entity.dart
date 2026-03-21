@@ -13,6 +13,8 @@ class AuditLogEntryEntity {
     required this.entityId,
     required this.timestamp,
     this.branchId,
+    this.managerId,
+    this.managerName,
     this.oldValueJson,
     this.newValueJson,
     this.reason,
@@ -23,8 +25,15 @@ class AuditLogEntryEntity {
   final String tenantId;
   final String? branchId;
   final String deviceId;
+
+  /// Staff member who performed the action.
   final String userId;
   final String userName;
+
+  /// Manager / admin who authorised the action, if applicable.
+  final String? managerId;
+  final String? managerName;
+
   final AuditAction action;
   final String entityType;
   final String entityId;

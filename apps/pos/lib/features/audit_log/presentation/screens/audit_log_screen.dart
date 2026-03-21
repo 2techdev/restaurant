@@ -25,15 +25,57 @@ class _AuditLogScreenState extends ConsumerState<AuditLogScreen> {
   final _tsFormat = DateFormat('dd.MM.yyyy HH:mm:ss');
 
   @override
+  void initState() {
+    super.initState();
+    // Listen to export state changes to show feedback.
+    ref.listenManual(auditLogExportProvider, (_, next) {
+      if (!mounted) return;
+      switch (next) {
+        case AuditExportSuccess(:final filePath):
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.green,
+              duration: const Duration(seconds: 5),
+              content: Text(
+                'CSV exported: $filePath',
+                style: const TextStyle(
+                    color: Color(0xFF003A11), fontWeight: FontWeight.w600),
+              ),
+            ),
+          );
+          ref.read(auditLogExportProvider.notifier).reset();
+        case AuditExportError(:final message):
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.red,
+              content: Text(message,
+                  style: const TextStyle(color: Colors.white)),
+            ),
+          );
+          ref.read(auditLogExportProvider.notifier).reset();
+        default:
+          break;
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final filter = ref.watch(auditLogFilterProvider);
     final entriesAsync = ref.watch(auditLogEntriesProvider);
+    final exportState = ref.watch(auditLogExportProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
       body: Column(
         children: [
-          _TopBar(onBack: () => Navigator.of(context).maybePop()),
+          _TopBar(
+            onBack: () => Navigator.of(context).maybePop(),
+            onExport: exportState is AuditExportBusy
+                ? null
+                : () => ref.read(auditLogExportProvider.notifier).exportCsv(),
+            isExporting: exportState is AuditExportBusy,
+          ),
           _FilterBar(filter: filter, dateFormat: _dateFormat),
           Expanded(
             child: entriesAsync.when(
@@ -62,8 +104,14 @@ class _AuditLogScreenState extends ConsumerState<AuditLogScreen> {
 // ---------------------------------------------------------------------------
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onBack});
+  const _TopBar({
+    required this.onBack,
+    required this.onExport,
+    required this.isExporting,
+  });
   final VoidCallback onBack;
+  final VoidCallback? onExport;
+  final bool isExporting;
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +122,8 @@ class _TopBar extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textSecondary),
+            icon: const Icon(Icons.arrow_back_rounded,
+                color: AppColors.textSecondary),
             onPressed: onBack,
           ),
           const SizedBox(width: 8),
@@ -86,6 +135,47 @@ class _TopBar extends StatelessWidget {
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
+            ),
+          ),
+          const Spacer(),
+          // CSV export button
+          GestureDetector(
+            onTap: onExport,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 150),
+              opacity: onExport == null ? 0.5 : 1.0,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: isExporting
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppColors.primary),
+                      )
+                    : const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.download_rounded,
+                              size: 14, color: AppColors.primary),
+                          SizedBox(width: 6),
+                          Text(
+                            'Export CSV',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
             ),
           ),
         ],
@@ -474,6 +564,11 @@ class _DetailSheet extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           _DetailRow('User', '${entry.userName} (${entry.userId})'),
+          if (entry.managerId != null && entry.managerId!.isNotEmpty)
+            _DetailRow(
+              'Authorised By',
+              '${entry.managerName ?? ''} (${entry.managerId})',
+            ),
           _DetailRow('Entity', '${entry.entityType} / ${entry.entityId}'),
           _DetailRow('Device', entry.deviceId),
           if (entry.reason != null && entry.reason!.isNotEmpty)

@@ -30,6 +30,7 @@ import 'package:gastrocore_pos/features/menu/presentation/screens/menu_managemen
 import 'package:gastrocore_pos/features/license/flag_gate_widget.dart';
 import 'package:gastrocore_pos/features/license/license_models.dart';
 import 'package:gastrocore_pos/features/license/license_screen.dart';
+import 'package:gastrocore_pos/features/orders/presentation/screens/void_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Route path constants
@@ -50,6 +51,7 @@ abstract final class AppRoutes {
   static const String receipt = '/receipt/:ticketId';
   static const String splitBill = '/split-bill/:ticketId';
   static const String refund = '/refund/:ticketId';
+  static const String voidOrder = '/void/:ticketId';
   static const String shiftHistory = '/shift-history';
   static const String menuManagement = '/menu-management';
   static const String auditLog = '/audit-log';
@@ -70,6 +72,9 @@ abstract final class AppRoutes {
 
   /// Build a refund route for a specific ticket.
   static String refundFor(String ticketId) => '/refund/$ticketId';
+
+  /// Build a void route for a specific ticket.
+  static String voidFor(String ticketId) => '/void/$ticketId';
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +168,13 @@ GoRouter createAppRouter() => GoRouter(
       builder: (context, state) {
         final ticketId = state.pathParameters['ticketId'] ?? '';
         return RefundScreen(ticketId: ticketId);
+      },
+    ),
+    GoRoute(
+      path: AppRoutes.voidOrder,
+      builder: (context, state) {
+        final ticketId = state.pathParameters['ticketId'] ?? '';
+        return VoidScreen(ticketId: ticketId);
       },
     ),
     GoRoute(

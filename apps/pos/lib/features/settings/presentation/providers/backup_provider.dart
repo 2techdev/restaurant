@@ -9,6 +9,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/services/backup_service.dart';
+import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_log_provider.dart';
 
 // ---------------------------------------------------------------------------
 // BackupService singleton
@@ -65,6 +66,8 @@ class BackupOperationNotifier extends StateNotifier<BackupOpState> {
     try {
       final info = await _svc.createBackup();
       _ref.invalidate(backupListProvider);
+      // Audit log
+      await _ref.read(auditServiceProvider).logBackupCreated(info.name);
       state = BackupOpSuccess('Backup created: ${info.name}  (${info.sizeLabel})');
     } catch (e) {
       state = BackupOpError('Backup failed: $e');
@@ -75,6 +78,8 @@ class BackupOperationNotifier extends StateNotifier<BackupOpState> {
     state = const BackupOpBusy('Restoring backup…');
     try {
       await _svc.restoreBackup(backup);
+      // Audit log
+      await _ref.read(auditServiceProvider).logBackupRestored(backup.name);
       state = BackupOpSuccess(
         'Restore complete. Please restart the app to apply changes.',
       );

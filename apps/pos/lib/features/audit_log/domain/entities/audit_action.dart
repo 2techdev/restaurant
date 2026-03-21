@@ -8,17 +8,21 @@ enum AuditAction {
   orderEdited('Order Edited'),
   orderCancelled('Order Cancelled'),
   orderVoided('Order Voided'),
+  itemVoided('Item Voided'),
 
   // Payments
   paymentReceived('Payment Received'),
   paymentRefunded('Payment Refunded'),
+  itemRefunded('Item Refunded'),
 
   // Discounts
   discountApplied('Discount Applied'),
 
-  // Shifts
+  // Shifts & Day close
   shiftOpened('Shift Opened'),
   shiftClosed('Shift Closed'),
+  dayOpened('Day Opened'),
+  dayClosed('Day Closed'),
 
   // Prices
   priceChanged('Price Changed'),
@@ -34,7 +38,11 @@ enum AuditAction {
   settingChanged('Setting Changed'),
 
   // Cash drawer
-  cashDrawerOpened('Cash Drawer Opened');
+  cashDrawerOpened('Cash Drawer Opened'),
+
+  // Backup
+  backupCreated('Backup Created'),
+  backupRestored('Backup Restored');
 
   const AuditAction(this.label);
 

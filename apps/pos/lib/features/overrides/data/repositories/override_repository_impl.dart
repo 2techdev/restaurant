@@ -25,21 +25,39 @@ class OverrideRepositoryImpl {
 
   /// Verify [pinHash] belongs to an active manager or admin within [tenantId].
   ///
+  /// Checks both [Users.managerPinHash] (dedicated override PIN) and
+  /// [Users.pinHash] (login PIN) — whichever matches first wins.
+  ///
   /// Returns the approver's [UserEntity] on success, or `null` if the PIN is
   /// incorrect or the user does not have sufficient privilege.
   Future<UserEntity?> verifyManagerPin(
     String tenantId,
     String pinHash,
   ) async {
-    final query = _db.select(_db.users)
+    // 1. Check dedicated manager override PIN first.
+    final overrideQuery = _db.select(_db.users)
       ..where(
         (u) =>
             u.tenantId.equals(tenantId) &
-            u.pinHash.equals(pinHash) &
+            u.managerPinHash.equals(pinHash) &
             u.isActive.equals(true) &
             u.isDeleted.equals(false),
       );
-    final row = await query.getSingleOrNull();
+    var row = await overrideQuery.getSingleOrNull();
+
+    // 2. Fall back to regular login PIN.
+    if (row == null) {
+      final loginQuery = _db.select(_db.users)
+        ..where(
+          (u) =>
+              u.tenantId.equals(tenantId) &
+              u.pinHash.equals(pinHash) &
+              u.isActive.equals(true) &
+              u.isDeleted.equals(false),
+        );
+      row = await loginQuery.getSingleOrNull();
+    }
+
     if (row == null) return null;
 
     // Require manager or admin role.
@@ -50,8 +68,9 @@ class OverrideRepositoryImpl {
       tenantId: row.tenantId,
       name: row.name,
       pinHash: row.pinHash,
+      managerPinHash: row.managerPinHash,
       role: UserRole.values.firstWhere(
-        (r) => r.name == row.role,
+        (r) => r.name == row!.role,
         orElse: () => UserRole.waiter,
       ),
       isActive: row.isActive,
@@ -75,6 +94,8 @@ class OverrideRepositoryImpl {
             deviceId: Value(log.deviceId),
             userId: Value(log.approvedByUserId),
             userName: Value(log.approvedByName),
+            managerId: Value(log.approvedByUserId),
+            managerName: Value(log.approvedByName),
             entityType: Value(log.entityType),
             entityId: Value(log.entityId),
             action: Value(log.action.auditKey),
@@ -131,7 +152,7 @@ class OverrideRepositoryImpl {
     String tenantId, {
     String? entityId,
   }) async {
-    var query = _db.select(_db.auditLog)
+    final query = _db.select(_db.auditLog)
       ..where(
         (a) =>
             a.tenantId.equals(tenantId) &
