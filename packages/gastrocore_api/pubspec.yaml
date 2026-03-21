@@ -1,0 +1,16 @@
+name: gastrocore_api
+description: "GastroCore HTTP API client for the Go backend. Endpoint methods, DTOs, and error handling."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  gastrocore_models:
+    path: ../gastrocore_models
+  http: ^1.3.0
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.25.0

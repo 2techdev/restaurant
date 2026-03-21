@@ -1,0 +1,18 @@
+name: gastrocore_sync
+description: "GastroCore sync engine — outbox pattern, cursor-based pull, LAN sync, and conflict resolution."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  gastrocore_models:
+    path: ../gastrocore_models
+  gastrocore_api:
+    path: ../gastrocore_api
+  collection: ^1.19.1
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.25.0
