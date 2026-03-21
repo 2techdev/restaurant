@@ -25,6 +25,10 @@ func NewModule(db *sql.DB, cfg *config.Config) *Module {
 	}
 }
 
+// SyncHub returns the module's WebSocket hub so other modules can call
+// NotifyTenant after performing mutations.
+func (m *Module) SyncHub() *Hub { return m.hub }
+
 // RegisterRoutes registers all sync routes on the given mux.
 func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	// Primary sync endpoints

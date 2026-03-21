@@ -114,8 +114,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get orderSentToKitchen =>
-      'Ihre Bestellung wurde an die Küche gesendet.';
+  String get orderSentToKitchen => 'Ihre Bestellung wurde an die Küche gesendet.';
 
   @override
   String get trackOrder => 'Bestellung verfolgen';
@@ -182,15 +181,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get itemAdded => 'Zum Warenkorb hinzugefügt';
 
   @override
-  String get errorLoadingMenu =>
-      'Menü konnte nicht geladen werden. Bitte versuchen Sie es erneut.';
+  String get errorLoadingMenu => 'Menü konnte nicht geladen werden. Bitte versuchen Sie es erneut.';
 
   @override
   String get retry => 'Erneut versuchen';
 
   @override
-  String get orderFailed =>
-      'Bestellung fehlgeschlagen. Bitte versuchen Sie es erneut.';
+  String get orderFailed => 'Bestellung fehlgeschlagen. Bitte versuchen Sie es erneut.';
 
   @override
   String get loading => 'Laden…';

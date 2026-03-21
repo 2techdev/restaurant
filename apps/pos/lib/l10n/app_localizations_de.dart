@@ -341,8 +341,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get confirmDelete => 'Löschen bestätigen';
 
   @override
-  String get confirmDeleteMessage =>
-      'Möchten Sie diesen Eintrag wirklich löschen?';
+  String get confirmDeleteMessage => 'Möchten Sie diesen Eintrag wirklich löschen?';
 
   @override
   String get pinLogin => 'PIN eingeben';
@@ -370,4 +369,130 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get quickActionOrderHistory => 'Bestellungshistorie';
+
+  @override
+  String get navCrm => 'Kunden';
+
+  @override
+  String get navReservations => 'Reservierungen';
+
+  @override
+  String get crmCustomers => 'Kunden';
+
+  @override
+  String get crmNewCustomer => 'Neuer Kunde';
+
+  @override
+  String get crmCustomerName => 'Name';
+
+  @override
+  String get crmPhone => 'Telefon';
+
+  @override
+  String get crmEmail => 'E-Mail';
+
+  @override
+  String get crmBirthday => 'Geburtstag';
+
+  @override
+  String get crmNotes => 'Notizen';
+
+  @override
+  String get crmLoyaltyPoints => 'Treuepunkte';
+
+  @override
+  String get crmLoyaltyBalance => 'Punktestand';
+
+  @override
+  String get crmAddPoints => 'Punkte hinzufügen';
+
+  @override
+  String get crmRedeemPoints => 'Punkte einlösen';
+
+  @override
+  String get crmTotalVisits => 'Besuche';
+
+  @override
+  String get crmTotalSpent => 'Gesamtumsatz';
+
+  @override
+  String get crmLastVisit => 'Letzter Besuch';
+
+  @override
+  String get crmSearchCustomers => 'Kunden suchen';
+
+  @override
+  String get crmNoCustomers => 'Keine Kunden';
+
+  @override
+  String get crmLoyaltyEarn => 'Punkte verdienen';
+
+  @override
+  String get crmLoyaltyRedeem => 'Punkte einlösen';
+
+  @override
+  String get crmLoyaltyAdjust => 'Punkte anpassen';
+
+  @override
+  String get crmLoyaltyHistory => 'Punkteverlauf';
+
+  @override
+  String get reservationNew => 'Neue Reservierung';
+
+  @override
+  String get reservationDate => 'Datum';
+
+  @override
+  String get reservationTime => 'Uhrzeit';
+
+  @override
+  String get reservationGuests => 'Gäste';
+
+  @override
+  String get reservationTable => 'Tisch';
+
+  @override
+  String get reservationStatus => 'Status';
+
+  @override
+  String get reservationStatusConfirmed => 'Bestätigt';
+
+  @override
+  String get reservationStatusPending => 'Ausstehend';
+
+  @override
+  String get reservationStatusCancelled => 'Storniert';
+
+  @override
+  String get reservationStatusSeated => 'Platziert';
+
+  @override
+  String get reservationStatusNoShow => 'Nicht erschienen';
+
+  @override
+  String get reservationCustomerName => 'Gastname';
+
+  @override
+  String get reservationPhone => 'Telefon';
+
+  @override
+  String get reservationNotes => 'Notizen';
+
+  @override
+  String get reservationConflict => 'Tischkonflikt erkannt';
+
+  @override
+  String get reservationNoReservations => 'Keine Reservierungen';
+
+  @override
+  String get reservationToday => 'Heute';
+
+  @override
+  String get reservationCalendar => 'Kalender';
+
+  @override
+  String get reservationDuration => 'Dauer (Min.)';
+
+  @override
+  String get reservationCheckConflict => 'Konflikt prüfen';
 }

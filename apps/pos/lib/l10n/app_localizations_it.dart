@@ -369,4 +369,130 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get quickActionOrderHistory => 'Storico ordini';
+
+  @override
+  String get navCrm => 'Clienti';
+
+  @override
+  String get navReservations => 'Prenotazioni';
+
+  @override
+  String get crmCustomers => 'Clienti';
+
+  @override
+  String get crmNewCustomer => 'Nuovo cliente';
+
+  @override
+  String get crmCustomerName => 'Nome';
+
+  @override
+  String get crmPhone => 'Telefono';
+
+  @override
+  String get crmEmail => 'Email';
+
+  @override
+  String get crmBirthday => 'Compleanno';
+
+  @override
+  String get crmNotes => 'Note';
+
+  @override
+  String get crmLoyaltyPoints => 'Punti fedeltà';
+
+  @override
+  String get crmLoyaltyBalance => 'Saldo punti';
+
+  @override
+  String get crmAddPoints => 'Aggiungi punti';
+
+  @override
+  String get crmRedeemPoints => 'Riscatta punti';
+
+  @override
+  String get crmTotalVisits => 'Visite';
+
+  @override
+  String get crmTotalSpent => 'Totale speso';
+
+  @override
+  String get crmLastVisit => 'Ultima visita';
+
+  @override
+  String get crmSearchCustomers => 'Cerca clienti';
+
+  @override
+  String get crmNoCustomers => 'Nessun cliente';
+
+  @override
+  String get crmLoyaltyEarn => 'Guadagna punti';
+
+  @override
+  String get crmLoyaltyRedeem => 'Riscatta';
+
+  @override
+  String get crmLoyaltyAdjust => 'Aggiusta punti';
+
+  @override
+  String get crmLoyaltyHistory => 'Storico punti';
+
+  @override
+  String get reservationNew => 'Nuova prenotazione';
+
+  @override
+  String get reservationDate => 'Data';
+
+  @override
+  String get reservationTime => 'Orario';
+
+  @override
+  String get reservationGuests => 'Ospiti';
+
+  @override
+  String get reservationTable => 'Tavolo';
+
+  @override
+  String get reservationStatus => 'Stato';
+
+  @override
+  String get reservationStatusConfirmed => 'Confermata';
+
+  @override
+  String get reservationStatusPending => 'In attesa';
+
+  @override
+  String get reservationStatusCancelled => 'Annullata';
+
+  @override
+  String get reservationStatusSeated => 'Seduta';
+
+  @override
+  String get reservationStatusNoShow => 'Assente';
+
+  @override
+  String get reservationCustomerName => 'Nome ospite';
+
+  @override
+  String get reservationPhone => 'Telefono';
+
+  @override
+  String get reservationNotes => 'Note';
+
+  @override
+  String get reservationConflict => 'Conflitto tavolo rilevato';
+
+  @override
+  String get reservationNoReservations => 'Nessuna prenotazione';
+
+  @override
+  String get reservationToday => 'Oggi';
+
+  @override
+  String get reservationCalendar => 'Calendario';
+
+  @override
+  String get reservationDuration => 'Durata (min)';
+
+  @override
+  String get reservationCheckConflict => 'Controlla conflitti';
 }

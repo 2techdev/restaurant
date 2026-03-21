@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gastrocore/server/internal/auth"
+	"github.com/gastrocore/server/internal/crm"
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
 	"github.com/gastrocore/server/internal/kds"
@@ -20,6 +21,7 @@ import (
 	"github.com/gastrocore/server/internal/online"
 	"github.com/gastrocore/server/internal/orders"
 	"github.com/gastrocore/server/internal/reports"
+	"github.com/gastrocore/server/internal/reservations"
 	"github.com/gastrocore/server/internal/shared/config"
 	"github.com/gastrocore/server/internal/shared/database"
 	"github.com/gastrocore/server/internal/shared/middleware"
@@ -66,6 +68,8 @@ func main() {
 	licensesModule := licenses.NewModule(db, cfg)
 	storesModule := stores.NewModule(db, cfg)
 	kdsModule := kds.NewModule(db, kdsHub)
+	crmModule := crm.NewModule(db, syncModule.SyncHub())
+	reservationsModule := reservations.NewModule(db, syncModule.SyncHub())
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -117,6 +121,8 @@ func main() {
 	licensesModule.RegisterRoutes(mux)
 	storesModule.RegisterRoutes(mux)
 	kdsModule.RegisterRoutes(mux)
+	crmModule.RegisterRoutes(mux)
+	reservationsModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain

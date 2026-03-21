@@ -356,5 +356,131 @@
   "@quickActionCloseShift": { "description": "Quick action: Close Shift" },
 
   "quickActionOrderHistory": "Bestellungshistorie",
-  "@quickActionOrderHistory": { "description": "Quick action: Order History" }
+  "@quickActionOrderHistory": { "description": "Quick action: Order History" },
+
+  "navCrm": "Kunden",
+  "@navCrm": { "description": "Navigation: CRM" },
+
+  "navReservations": "Reservierungen",
+  "@navReservations": { "description": "Navigation: Reservations" },
+
+  "crmCustomers": "Kunden",
+  "@crmCustomers": { "description": "CRM: Customers" },
+
+  "crmNewCustomer": "Neuer Kunde",
+  "@crmNewCustomer": { "description": "CRM: New customer" },
+
+  "crmCustomerName": "Name",
+  "@crmCustomerName": { "description": "CRM: Customer name" },
+
+  "crmPhone": "Telefon",
+  "@crmPhone": { "description": "CRM: Phone" },
+
+  "crmEmail": "E-Mail",
+  "@crmEmail": { "description": "CRM: Email" },
+
+  "crmBirthday": "Geburtstag",
+  "@crmBirthday": { "description": "CRM: Birthday" },
+
+  "crmNotes": "Notizen",
+  "@crmNotes": { "description": "CRM: Notes" },
+
+  "crmLoyaltyPoints": "Treuepunkte",
+  "@crmLoyaltyPoints": { "description": "CRM: Loyalty points" },
+
+  "crmLoyaltyBalance": "Punktestand",
+  "@crmLoyaltyBalance": { "description": "CRM: Loyalty balance" },
+
+  "crmAddPoints": "Punkte hinzufügen",
+  "@crmAddPoints": { "description": "CRM: Add points" },
+
+  "crmRedeemPoints": "Punkte einlösen",
+  "@crmRedeemPoints": { "description": "CRM: Redeem points" },
+
+  "crmTotalVisits": "Besuche",
+  "@crmTotalVisits": { "description": "CRM: Total visits" },
+
+  "crmTotalSpent": "Gesamtumsatz",
+  "@crmTotalSpent": { "description": "CRM: Total spent" },
+
+  "crmLastVisit": "Letzter Besuch",
+  "@crmLastVisit": { "description": "CRM: Last visit" },
+
+  "crmSearchCustomers": "Kunden suchen",
+  "@crmSearchCustomers": { "description": "CRM: Search customers" },
+
+  "crmNoCustomers": "Keine Kunden",
+  "@crmNoCustomers": { "description": "CRM: No customers" },
+
+  "crmLoyaltyEarn": "Punkte verdienen",
+  "@crmLoyaltyEarn": { "description": "CRM: Earn points" },
+
+  "crmLoyaltyRedeem": "Punkte einlösen",
+  "@crmLoyaltyRedeem": { "description": "CRM: Redeem action label" },
+
+  "crmLoyaltyAdjust": "Punkte anpassen",
+  "@crmLoyaltyAdjust": { "description": "CRM: Adjust points" },
+
+  "crmLoyaltyHistory": "Punkteverlauf",
+  "@crmLoyaltyHistory": { "description": "CRM: Loyalty history" },
+
+  "reservationNew": "Neue Reservierung",
+  "@reservationNew": { "description": "Reservation: New" },
+
+  "reservationDate": "Datum",
+  "@reservationDate": { "description": "Reservation: Date" },
+
+  "reservationTime": "Uhrzeit",
+  "@reservationTime": { "description": "Reservation: Time" },
+
+  "reservationGuests": "Gäste",
+  "@reservationGuests": { "description": "Reservation: Guests" },
+
+  "reservationTable": "Tisch",
+  "@reservationTable": { "description": "Reservation: Table" },
+
+  "reservationStatus": "Status",
+  "@reservationStatus": { "description": "Reservation: Status" },
+
+  "reservationStatusConfirmed": "Bestätigt",
+  "@reservationStatusConfirmed": { "description": "Reservation: Confirmed" },
+
+  "reservationStatusPending": "Ausstehend",
+  "@reservationStatusPending": { "description": "Reservation: Pending" },
+
+  "reservationStatusCancelled": "Storniert",
+  "@reservationStatusCancelled": { "description": "Reservation: Cancelled" },
+
+  "reservationStatusSeated": "Platziert",
+  "@reservationStatusSeated": { "description": "Reservation: Seated" },
+
+  "reservationStatusNoShow": "Nicht erschienen",
+  "@reservationStatusNoShow": { "description": "Reservation: No show" },
+
+  "reservationCustomerName": "Gastname",
+  "@reservationCustomerName": { "description": "Reservation: Customer name" },
+
+  "reservationPhone": "Telefon",
+  "@reservationPhone": { "description": "Reservation: Phone" },
+
+  "reservationNotes": "Notizen",
+  "@reservationNotes": { "description": "Reservation: Notes" },
+
+  "reservationConflict": "Tischkonflikt erkannt",
+  "@reservationConflict": { "description": "Reservation: Conflict detected" },
+
+  "reservationNoReservations": "Keine Reservierungen",
+  "@reservationNoReservations": { "description": "Reservation: No reservations" },
+
+  "reservationToday": "Heute",
+  "@reservationToday": { "description": "Reservation: Today" },
+
+  "reservationCalendar": "Kalender",
+  "@reservationCalendar": { "description": "Reservation: Calendar" },
+
+  "reservationDuration": "Dauer (Min.)",
+  "@reservationDuration": { "description": "Reservation: Duration in minutes" },
+
+  "reservationCheckConflict": "Konflikt prüfen",
+  "@reservationCheckConflict": { "description": "Reservation: Check for conflicts" }
 }
