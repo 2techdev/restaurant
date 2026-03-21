@@ -37,6 +37,7 @@ import 'tables/tenants.dart';
 import 'tables/tickets.dart';
 import 'tables/users.dart';
 import 'tables/license_tokens.dart';
+import 'tables/reservations.dart';
 
 part 'app_database.g.dart';
 
@@ -71,6 +72,7 @@ part 'app_database.g.dart';
     ProductSpecifications,
     LicenseTokens,
     DayCloseSummaries,
+    Reservations,
   ],
   daos: [AuditLogDao, SyncEventDao],
 )
@@ -78,7 +80,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -102,6 +104,10 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         // Add day_close_summaries table introduced in v6.
         await m.createTable(dayCloseSummaries);
+      }
+      if (from < 7) {
+        // Add reservations table introduced in v7.
+        await m.createTable(reservations);
       }
     },
     onCreate: (m) async {

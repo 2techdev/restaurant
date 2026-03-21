@@ -370,4 +370,132 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get quickActionOrderHistory => 'Bestellungshistorie';
+
+  @override
+  String get navReservations => 'Reservierungen';
+
+  @override
+  String get reservationList => 'Reservierungen';
+
+  @override
+  String get reservationCalendar => 'Kalender';
+
+  @override
+  String get reservationNew => 'Neue Reservierung';
+
+  @override
+  String get reservationEdit => 'Reservierung bearbeiten';
+
+  @override
+  String get reservationToday => 'Heute';
+
+  @override
+  String get reservationNoUpcoming => 'Keine bevorstehenden Reservierungen';
+
+  @override
+  String get reservationNoReservations => 'Keine Reservierungen für diesen Tag';
+
+  @override
+  String get reservationCustomerInfo => 'Gastinformationen';
+
+  @override
+  String get reservationCustomerName => 'Gastname';
+
+  @override
+  String get reservationCustomerPhone => 'Telefon';
+
+  @override
+  String get reservationCustomerEmail => 'E-Mail';
+
+  @override
+  String get reservationDateTime => 'Datum & Uhrzeit';
+
+  @override
+  String get reservationDate => 'Datum';
+
+  @override
+  String get reservationTime => 'Uhrzeit';
+
+  @override
+  String get reservationPartySize => 'Personenanzahl';
+
+  @override
+  String get reservationTable => 'Tisch';
+
+  @override
+  String get reservationTableOptional => 'Tisch (optional)';
+
+  @override
+  String get reservationNoTable => 'Kein Tisch zugewiesen';
+
+  @override
+  String get reservationNotes => 'Bemerkungen';
+
+  @override
+  String get reservationMeta => 'Buchungsinfo';
+
+  @override
+  String get reservationChannel => 'Quelle';
+
+  @override
+  String get reservationStatus => 'Status';
+
+  @override
+  String get reservationChangeStatus => 'Status ändern';
+
+  @override
+  String get reservationChangeEndTime => 'Endzeit ändern';
+
+  @override
+  String get reservationChannelWalkIn => 'Walk-in';
+
+  @override
+  String get reservationChannelOnline => 'Online';
+
+  @override
+  String get reservationChannelPhone => 'Telefon';
+
+  @override
+  String get reservationStatusPending => 'Ausstehend';
+
+  @override
+  String get reservationStatusConfirmed => 'Bestätigt';
+
+  @override
+  String get reservationStatusSeated => 'Platziert';
+
+  @override
+  String get reservationStatusCancelled => 'Storniert';
+
+  @override
+  String get reservationStatusNoShow => 'No-show';
+
+  @override
+  String get reservationConfirm => 'Bestätigen';
+
+  @override
+  String get reservationSeat => 'Platzieren';
+
+  @override
+  String get reservationNoShow => 'No-show';
+
+  @override
+  String get reservationCancel => 'Reservierung stornieren';
+
+  @override
+  String get reservationViewDay => 'Tag';
+
+  @override
+  String get reservationViewWeek => 'Woche';
+
+  @override
+  String get reservationNameRequired => 'Gastname ist erforderlich';
+
+  @override
+  String get reservationErrorTimeRange =>
+      'Endzeit muss nach der Startzeit liegen';
+
+  @override
+  String get reservationErrorConflict =>
+      'Dieser Tisch ist zu diesem Zeitpunkt bereits reserviert';
 }

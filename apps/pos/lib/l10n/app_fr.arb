@@ -136,5 +136,55 @@
   "quickActionFloorPlan": "Plan de salle",
   "quickActionOpenShift": "Ouvrir le service",
   "quickActionCloseShift": "Fermer le service",
-  "quickActionOrderHistory": "Historique des commandes"
+  "quickActionOrderHistory": "Historique des commandes",
+
+  "navReservations": "Réservations",
+
+  "reservationList": "Réservations",
+  "reservationCalendar": "Calendrier",
+  "reservationNew": "Nouvelle réservation",
+  "reservationEdit": "Modifier la réservation",
+  "reservationToday": "Aujourd'hui",
+  "reservationNoUpcoming": "Aucune réservation à venir",
+  "reservationNoReservations": "Aucune réservation pour ce jour",
+
+  "reservationCustomerInfo": "Informations du client",
+  "reservationCustomerName": "Nom du client",
+  "reservationCustomerPhone": "Téléphone",
+  "reservationCustomerEmail": "E-mail",
+  "reservationDateTime": "Date et heure",
+  "reservationDate": "Date",
+  "reservationTime": "Heure",
+  "reservationPartySize": "Nombre de personnes",
+  "reservationTable": "Table",
+  "reservationTableOptional": "Table (facultatif)",
+  "reservationNoTable": "Aucune table assignée",
+  "reservationNotes": "Remarques",
+  "reservationMeta": "Infos de réservation",
+  "reservationChannel": "Source",
+  "reservationStatus": "Statut",
+  "reservationChangeStatus": "Changer le statut",
+  "reservationChangeEndTime": "Modifier l'heure de fin",
+
+  "reservationChannelWalkIn": "Sans réservation",
+  "reservationChannelOnline": "En ligne",
+  "reservationChannelPhone": "Téléphone",
+
+  "reservationStatusPending": "En attente",
+  "reservationStatusConfirmed": "Confirmé",
+  "reservationStatusSeated": "Installé",
+  "reservationStatusCancelled": "Annulé",
+  "reservationStatusNoShow": "No-show",
+
+  "reservationConfirm": "Confirmer",
+  "reservationSeat": "Installer les clients",
+  "reservationNoShow": "No-show",
+  "reservationCancel": "Annuler la réservation",
+
+  "reservationViewDay": "Jour",
+  "reservationViewWeek": "Semaine",
+
+  "reservationNameRequired": "Le nom du client est obligatoire",
+  "reservationErrorTimeRange": "L'heure de fin doit être après l'heure de début",
+  "reservationErrorConflict": "Cette table est déjà réservée à ce créneau"
 }

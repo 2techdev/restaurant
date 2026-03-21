@@ -27,6 +27,10 @@ import 'package:gastrocore_pos/features/backoffice/presentation/screens/back_off
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_history_screen.dart';
 import 'package:gastrocore_pos/features/audit_log/presentation/screens/audit_log_screen.dart';
 import 'package:gastrocore_pos/features/menu/presentation/screens/menu_management_screen.dart';
+import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_calendar_screen.dart';
+import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_detail_screen.dart';
+import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_form_screen.dart';
+import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_list_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Route path constants
@@ -50,6 +54,14 @@ abstract final class AppRoutes {
   static const String shiftHistory = '/shift-history';
   static const String menuManagement = '/menu-management';
   static const String auditLog = '/audit-log';
+  static const String reservations = '/reservations';
+  static const String reservationCalendar = '/reservations/calendar';
+  static const String reservationNew = '/reservations/new';
+  static const String _reservationDetail = '/reservations/:id';
+  static const String _reservationEdit = '/reservations/:id/edit';
+
+  static String reservationDetail(String id) => '/reservations/$id';
+  static String reservationEdit(String id) => '/reservations/$id/edit';
 
   // Legacy routes kept for backward compatibility
   static const String pos = '/pos';
@@ -176,6 +188,30 @@ GoRouter createAppRouter() => GoRouter(
     GoRoute(
       path: AppRoutes.auditLog,
       builder: (context, state) => const AuditLogScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.reservations,
+      builder: (context, state) => const ReservationListScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.reservationCalendar,
+      builder: (context, state) => const ReservationCalendarScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.reservationNew,
+      builder: (context, state) => const ReservationFormScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes._reservationDetail,
+      builder: (context, state) => ReservationDetailScreen(
+        reservationId: state.pathParameters['id'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: AppRoutes._reservationEdit,
+      builder: (context, state) => ReservationFormScreen(
+        reservationId: state.pathParameters['id'],
+      ),
     ),
   ],
 );
