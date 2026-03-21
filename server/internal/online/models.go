@@ -123,3 +123,11 @@ type OrderStatusResponse struct {
 	Status               string `json:"status"`
 	EstimatedWaitMinutes int    `json:"estimated_wait_minutes"`
 }
+
+// OnlineWSMessage is broadcast over the WebSocket hub to connected clients.
+type OnlineWSMessage struct {
+	Type         string `json:"type"`          // e.g. "new_order", "order_status_changed"
+	RestaurantID string `json:"restaurant_id"` // routes to correct subscribers
+	OrderID      string `json:"order_id,omitempty"`
+	Data         any    `json:"data,omitempty"`
+}

@@ -53,6 +53,9 @@ func main() {
 	kdsHub := kds.NewHub()
 	go kdsHub.Run()
 
+	onlineHub := online.NewOnlineHub()
+	go onlineHub.Run()
+
 	// ---------------------------------------------------------------------------
 	// Initialize modules
 	// ---------------------------------------------------------------------------
@@ -60,7 +63,7 @@ func main() {
 	syncModule := gosync.NewModule(db, cfg)
 	menuModule := menu.NewModule(db)
 	ordersModule := orders.NewModule(db)
-	onlineModule := online.NewModule(db, kdsHub) // kdsHub satisfies KDSNotifier
+	onlineModule := online.NewModule(db, kdsHub, onlineHub)
 	reportsModule := reports.NewModule(db)
 	devicesModule := devices.NewModule(db)
 	licensesModule := licenses.NewModule(db, cfg)

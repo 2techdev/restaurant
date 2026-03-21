@@ -239,31 +239,31 @@ void main() {
     });
 
     test('taxIncludedInPrice defaults to true (gross prices)', () {
-      expect(const TaxSettings().taxIncludedInPrice, isTrue);
+      expect(TaxSettings().taxIncludedInPrice, isTrue);
     });
 
     test('rappenRounding defaults to true', () {
-      expect(const TaxSettings().rappenRounding, isTrue);
+      expect(TaxSettings().rappenRounding, isTrue);
     });
 
     test('rates list contains three entries', () {
-      expect(const TaxSettings().rates.length, 3);
+      expect(TaxSettings().rates.length, 3);
     });
 
     test('rateForCode returns correct rate', () {
-      const s = TaxSettings();
+      final s = TaxSettings();
       expect(s.rateForCode('standard'), 8.1);
       expect(s.rateForCode('accommodation'), 3.8);
       expect(s.rateForCode('reduced'), 2.6);
     });
 
     test('rateForCode falls back to standard for unknown code', () {
-      const s = TaxSettings();
+      final s = TaxSettings();
       expect(s.rateForCode('unknown'), 8.1);
     });
 
     test('JSON round-trip', () {
-      const original = TaxSettings(
+      final original = TaxSettings(
         standardRate: 8.1,
         accommodationRate: 3.8,
         reducedRate: 2.6,
@@ -275,7 +275,7 @@ void main() {
     });
 
     test('copyWith overrides individual rates', () {
-      const s = TaxSettings();
+      final s = TaxSettings();
       final updated = s.copyWith(standardRate: 9.0);
       expect(updated.standardRate, 9.0);
       expect(updated.reducedRate, TaxSettings.defaultReducedRate);

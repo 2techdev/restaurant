@@ -11,6 +11,14 @@ import (
 	"github.com/gastrocore/server/internal/shared/uuid"
 )
 
+// validOrderStatuses is the set of recognised order status strings.
+var validOrderStatuses = map[string]bool{
+	"open": true, "items_added": true, "sent_to_kitchen": true,
+	"preparing": true, "partially_served": true, "fully_served": true,
+	"bill_requested": true, "partially_paid": true, "fully_paid": true,
+	"closed": true, "void": true,
+}
+
 // handleGetMenu returns the public menu for online ordering.
 // GET /api/v1/online/menu/{restaurantId}
 // No authentication required.
@@ -346,6 +354,47 @@ func estimatedWaitForStatus(status string) int {
 	default:
 		return 20
 	}
+}
+
+// handleUpdateOrderStatus updates the status of an online order.
+// PUT /api/v1/online/orders/{orderId}/status
+func (m *Module) handleUpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
+	orderID := r.PathValue("orderId")
+	if orderID == "" {
+		response.Error(w, http.StatusBadRequest, "MISSING_ORDER_ID", "order_id is required")
+		return
+	}
+
+	var req struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Status == "" {
+		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "valid status is required")
+		return
+	}
+	if !validOrderStatuses[req.Status] {
+		response.Error(w, http.StatusBadRequest, "INVALID_STATUS", "unknown order status")
+		return
+	}
+
+	_, err := m.db.ExecContext(r.Context(),
+		`UPDATE tickets SET status = $1, updated_at = $2 WHERE id = $3`,
+		req.Status, time.Now().UTC(), orderID,
+	)
+	if err != nil {
+		slog.Error("handleUpdateOrderStatus: db error", "error", err)
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "failed to update status")
+		return
+	}
+
+	if m.wsHub != nil {
+		m.wsHub.Broadcast(OnlineWSMessage{
+			Type:    "order_status_changed",
+			OrderID: orderID,
+			Data:    map[string]string{"status": req.Status},
+		})
+	}
+	response.JSON(w, http.StatusOK, map[string]string{"status": req.Status})
 }
 
 // nullString returns a *string (nil for empty strings).

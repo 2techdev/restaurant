@@ -12,11 +12,16 @@ library;
 import 'dart:convert';
 
 /// A named tax rate used in Swiss MWST billing.
+///
+/// [effectiveFrom] records when this rate became legally effective.
+/// Use [TaxSettings.rateForCodeAt] to resolve the rate applicable for a
+/// given transaction date when rates change over time.
 class TaxRate {
   const TaxRate({
     required this.code,
     required this.label,
     required this.rate,
+    required this.effectiveFrom,
   });
 
   /// Internal code used in [ProductEntity.taxGroup] (e.g. 'standard').
@@ -28,8 +33,17 @@ class TaxRate {
   /// Rate as a percentage value (e.g. 8.1 for 8.1%).
   final double rate;
 
+  /// Date from which this rate is legally effective (UTC midnight).
+  ///
+  /// Defaults to 2024-01-01 when the current Swiss MWST rates came into force.
+  final DateTime effectiveFrom;
+
+  /// Returns true if this rate was in effect at [transactionDate].
+  bool isEffectiveAt(DateTime transactionDate) =>
+      !transactionDate.isBefore(effectiveFrom);
+
   @override
-  String toString() => '$label ($rate%)';
+  String toString() => '$label ($rate%) from ${effectiveFrom.toIso8601String().substring(0, 10)}';
 }
 
 class TaxSettings {
@@ -42,13 +56,17 @@ class TaxSettings {
   /// Swiss reduced VAT rate for food/books/medicines effective 01.01.2024.
   static const double defaultReducedRate = 2.6;
 
-  const TaxSettings({
+  /// Default effective date for current Swiss MWST rates (01.01.2024).
+  static final DateTime defaultEffectiveFrom = DateTime.utc(2024, 1, 1);
+
+  TaxSettings({
     this.standardRate = defaultStandardRate,
     this.accommodationRate = defaultAccommodationRate,
     this.reducedRate = defaultReducedRate,
     this.taxIncludedInPrice = true,
     this.rappenRounding = true,
-  });
+    DateTime? effectiveFrom,
+  }) : effectiveFrom = effectiveFrom ?? defaultEffectiveFrom;
 
   /// Standard rate (Normalsatz) in percent.
   final double standardRate;
@@ -66,22 +84,32 @@ class TaxSettings {
   /// Required in Switzerland since there are no 1- or 2-Rappen coins.
   final bool rappenRounding;
 
-  /// Returns all three Swiss MWST rates as a list.
+  /// The date from which the current rate set became legally effective (UTC).
+  ///
+  /// All three rates share a single effective-from date because Swiss law
+  /// changes all rates simultaneously (e.g. 01.01.2024).
+  /// When a future rate change occurs, update this date alongside the rates.
+  final DateTime effectiveFrom;
+
+  /// Returns all three Swiss MWST rates as a list, each tagged with [effectiveFrom].
   List<TaxRate> get rates => [
         TaxRate(
           code: 'standard',
           label: 'Standard (Normalsatz)',
           rate: standardRate,
+          effectiveFrom: effectiveFrom,
         ),
         TaxRate(
           code: 'accommodation',
           label: 'Beherbergung (Sondersatz)',
           rate: accommodationRate,
+          effectiveFrom: effectiveFrom,
         ),
         TaxRate(
           code: 'reduced',
           label: 'Reduziert (Sondersatz)',
           rate: reducedRate,
+          effectiveFrom: effectiveFrom,
         ),
       ];
 
@@ -89,12 +117,25 @@ class TaxSettings {
   double rateForCode(String code) =>
       rates.firstWhere((r) => r.code == code, orElse: () => rates.first).rate;
 
+  /// Returns the rate for [code] that was in effect at [transactionDate].
+  ///
+  /// If [transactionDate] is before [effectiveFrom], returns 0.0 (not yet
+  /// valid). Call sites that need a historical rate should store the rate
+  /// at transaction time rather than re-deriving it here.
+  double rateForCodeAt(String code, DateTime transactionDate) {
+    final rate =
+        rates.firstWhere((r) => r.code == code, orElse: () => rates.first);
+    if (rate.isEffectiveAt(transactionDate)) return rate.rate;
+    return 0.0;
+  }
+
   TaxSettings copyWith({
     double? standardRate,
     double? accommodationRate,
     double? reducedRate,
     bool? taxIncludedInPrice,
     bool? rappenRounding,
+    DateTime? effectiveFrom,
   }) =>
       TaxSettings(
         standardRate: standardRate ?? this.standardRate,
@@ -102,6 +143,7 @@ class TaxSettings {
         reducedRate: reducedRate ?? this.reducedRate,
         taxIncludedInPrice: taxIncludedInPrice ?? this.taxIncludedInPrice,
         rappenRounding: rappenRounding ?? this.rappenRounding,
+        effectiveFrom: effectiveFrom ?? this.effectiveFrom,
       );
 
   Map<String, dynamic> toJson() => {
@@ -110,18 +152,21 @@ class TaxSettings {
         'reducedRate': reducedRate,
         'taxIncludedInPrice': taxIncludedInPrice,
         'rappenRounding': rappenRounding,
+        'effectiveFrom': effectiveFrom.toIso8601String(),
       };
 
   factory TaxSettings.fromJson(Map<String, dynamic> json) => TaxSettings(
         standardRate:
             (json['standardRate'] as num?)?.toDouble() ?? defaultStandardRate,
-        accommodationRate:
-            (json['accommodationRate'] as num?)?.toDouble() ??
-                defaultAccommodationRate,
+        accommodationRate: (json['accommodationRate'] as num?)?.toDouble() ??
+            defaultAccommodationRate,
         reducedRate:
             (json['reducedRate'] as num?)?.toDouble() ?? defaultReducedRate,
         taxIncludedInPrice: (json['taxIncludedInPrice'] as bool?) ?? true,
         rappenRounding: (json['rappenRounding'] as bool?) ?? true,
+        effectiveFrom: json['effectiveFrom'] != null
+            ? DateTime.parse(json['effectiveFrom'] as String).toUtc()
+            : null,
       );
 
   String toJsonString() => jsonEncode(toJson());
@@ -137,7 +182,8 @@ class TaxSettings {
           accommodationRate == other.accommodationRate &&
           reducedRate == other.reducedRate &&
           taxIncludedInPrice == other.taxIncludedInPrice &&
-          rappenRounding == other.rappenRounding;
+          rappenRounding == other.rappenRounding &&
+          effectiveFrom == other.effectiveFrom;
 
   @override
   int get hashCode => Object.hash(
@@ -146,5 +192,6 @@ class TaxSettings {
         reducedRate,
         taxIncludedInPrice,
         rappenRounding,
+        effectiveFrom,
       );
 }

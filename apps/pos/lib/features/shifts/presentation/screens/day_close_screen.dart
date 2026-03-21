@@ -23,6 +23,8 @@ import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/printing/models/print_models.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/features/shifts/domain/day_close_calculator.dart';
 import 'package:gastrocore_pos/features/shifts/domain/entities/day_close_summary_entity.dart';
 import 'package:gastrocore_pos/features/shifts/domain/entities/shift_summary_entity.dart';
@@ -120,6 +122,16 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
         for (final e in summary.paymentBreakdown.entries)
           PaymentBreakdownLine.labelFor(e.key): e.value,
       };
+
+      // Compute MWST breakdown from tax settings and total revenue.
+      // Assumes tax-inclusive pricing (Bruttopreise) — MwSt = Brutto × r/(100+r).
+      final taxSettings =
+          ref.read(taxSettingsProvider).valueOrNull ?? TaxSettings();
+      final mwstEntries = _computeMwstEntries(
+        totalRevenueCents: summary.totalRevenueCents,
+        taxSettings: taxSettings,
+      );
+
       final data = ShiftReportData(
         reportTitle: 'Z-RAPPORT',
         reportNo: 0,
@@ -132,6 +144,7 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
         netSales: summary.totalRevenueCents,
         netRevenue: summary.totalRevenueCents,
         paymentBreakdown: reportBreakdown,
+        mwstEntries: mwstEntries,
         orderCount: summary.totalOrders,
         openingFloat: summary.expectedCashCents,
         closingFloat: summary.countedCashCents,
@@ -140,6 +153,24 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
     } catch (_) {
       // Printing failure must never block shift close.
     }
+  }
+
+  /// Compute [MwStReportEntry] list from [totalRevenueCents] and [taxSettings].
+  ///
+  /// When per-item MWST tracking is not available (pilot phase), the entire
+  /// revenue is attributed to the standard rate. This is conservative and
+  /// matches the most common Swiss restaurant scenario (dine-in = Normalsatz).
+  static List<MwStReportEntry> _computeMwstEntries({
+    required int totalRevenueCents,
+    required TaxSettings taxSettings,
+  }) {
+    if (totalRevenueCents <= 0) return [];
+    return [
+      MwStReportEntry(
+        code: MwStCode.a, // 8.1% Normalsatz
+        grossAmount: totalRevenueCents,
+      ),
+    ];
   }
 
   // -------------------------------------------------------------------------
@@ -1152,6 +1183,10 @@ class _StepSummary extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
 
+                // MWST summary card
+                _MwstSummaryCard(totalRevenueCents: totalRevenue),
+                const SizedBox(height: 20),
+
                 // Payment breakdown
                 if (paymentBreakdown.isNotEmpty) ...[
                   Container(
@@ -1531,6 +1566,227 @@ class _StatCard extends StatelessWidget {
             label,
             style:
                 const TextStyle(fontSize: 11, color: AppColors.textDim),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// MWST Summary Card
+// ===========================================================================
+
+/// Displays MwSt breakdown on the day-close summary screen.
+///
+/// During the pilot phase, total revenue is attributed to the Normalsatz (A)
+/// since per-item tax tracking is not yet stored at shift level. The card
+/// clearly labels this as an estimate so the operator is informed.
+class _MwstSummaryCard extends ConsumerWidget {
+  const _MwstSummaryCard({required this.totalRevenueCents});
+
+  final int totalRevenueCents;
+
+  String _fmtChf(int cents) =>
+      'CHF ${DayCloseCalculator.formatCents(cents)}';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final taxSettings =
+        ref.watch(taxSettingsProvider).valueOrNull ?? TaxSettings();
+
+    // Compute MWST entries: attribute all revenue to Normalsatz (pilot).
+    final entries = totalRevenueCents > 0
+        ? [
+            MwStReportEntry(
+              code: MwStCode.a,
+              grossAmount: totalRevenueCents,
+            ),
+          ]
+        : <MwStReportEntry>[];
+
+    final totalTax = entries.fold(0, (s, e) => s + e.taxAmount);
+    final totalNet = entries.fold(0, (s, e) => s + e.netAmount);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.percent_rounded, size: 16, color: AppColors.textDim),
+              SizedBox(width: 8),
+              Text(
+                'MWST-ABRECHNUNG',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDim,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Header row
+          const Row(
+            children: [
+              SizedBox(
+                width: 36,
+                child: Text('Cod',
+                    style: TextStyle(fontSize: 10, color: AppColors.textDim)),
+              ),
+              SizedBox(
+                width: 48,
+                child: Text('Satz',
+                    style: TextStyle(fontSize: 10, color: AppColors.textDim)),
+              ),
+              Expanded(
+                child: Text('Netto',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 10, color: AppColors.textDim)),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text('MwSt',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 10, color: AppColors.textDim)),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text('Brutto',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 10, color: AppColors.textDim)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(color: AppColors.border, height: 1),
+          const SizedBox(height: 8),
+          // Data rows
+          ...entries.map((e) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 36,
+                    child: Text(
+                      e.code.code,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 48,
+                    child: Text(
+                      '${e.code.rate}%',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      _fmtChf(e.netAmount),
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textPrimary,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _fmtChf(e.taxAmount),
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textPrimary,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _fmtChf(e.grossAmount),
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const Divider(color: AppColors.border, height: 1),
+          const SizedBox(height: 8),
+          // Totals row
+          Row(
+            children: [
+              const SizedBox(width: 84),
+              Expanded(
+                child: Text(
+                  _fmtChf(totalNet),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _fmtChf(totalTax),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _fmtChf(totalRevenueCents),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.green,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Effective date note
+          Text(
+            'Gültig ab ${taxSettings.effectiveFrom.year}-'
+            '${taxSettings.effectiveFrom.month.toString().padLeft(2, '0')}-'
+            '${taxSettings.effectiveFrom.day.toString().padLeft(2, '0')} · '
+            'Alle Preise Bruttopreise (MwSt inkl.)',
+            style: const TextStyle(fontSize: 10, color: AppColors.textDim),
           ),
         ],
       ),

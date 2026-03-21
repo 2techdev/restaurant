@@ -216,7 +216,7 @@ class TaxSettingsNotifier extends StateNotifier<AsyncValue<TaxSettings>> {
 
   /// Resets all rates to Swiss MWST defaults (effective 01.01.2024).
   Future<void> resetToSwissDefaults() async {
-    await save(const TaxSettings());
+    await save(TaxSettings());
   }
 }
 
@@ -303,7 +303,7 @@ class _PlaceholderRepository implements SettingsRepository {
   @override
   Future<void> saveReceiptSettings(ReceiptSettings s) async {}
   @override
-  Future<TaxSettings> loadTaxSettings() async => const TaxSettings();
+  Future<TaxSettings> loadTaxSettings() async => TaxSettings();
   @override
   Future<void> saveTaxSettings(TaxSettings s) async {}
   @override

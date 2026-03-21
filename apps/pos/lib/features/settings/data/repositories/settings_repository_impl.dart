@@ -121,11 +121,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<TaxSettings> loadTaxSettings() async {
     final raw = _prefs.getString(_Keys.tax);
-    if (raw == null) return const TaxSettings();
+    if (raw == null) return TaxSettings();
     try {
       return TaxSettings.fromJsonString(raw);
     } catch (_) {
-      return const TaxSettings();
+      return TaxSettings();
     }
   }
 

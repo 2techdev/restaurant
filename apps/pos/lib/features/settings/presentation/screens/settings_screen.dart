@@ -343,6 +343,7 @@ class _Field extends StatelessWidget {
     this.keyboardType,
     this.inputFormatters,
     this.maxLines = 1,
+    this.onChanged,
   });
 
   final String label;
@@ -351,6 +352,7 @@ class _Field extends StatelessWidget {
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final int maxLines;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -373,6 +375,7 @@ class _Field extends StatelessWidget {
             keyboardType: keyboardType,
             inputFormatters: inputFormatters,
             maxLines: maxLines,
+            onChanged: onChanged,
             style: const TextStyle(
               fontSize: 14,
               color: AppColors.textPrimary,
@@ -503,6 +506,7 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
   final _addressCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _mwstCtrl = TextEditingController();
+  String? _mwstError;
   bool _initialised = false;
 
   @override
@@ -524,6 +528,14 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
   }
 
   Future<void> _save() async {
+    // Validate MWST-Nr before saving.
+    final mwstValidation = validateMwstNr(_mwstCtrl.text.trim());
+    if (mwstValidation != null) {
+      setState(() => _mwstError = mwstValidation);
+      return;
+    }
+    setState(() => _mwstError = null);
+
     final notifier =
         ref.read(restaurantSettingsProvider.notifier);
     await notifier.save(RestaurantSettings(
@@ -568,11 +580,45 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
               hint: '+41 44 123 45 67',
               keyboardType: TextInputType.phone,
             ),
+            // MWST-Nr with inline validation
             _Field(
               label: 'MWST-Nr (Swiss VAT Number)',
               controller: _mwstCtrl,
               hint: 'CHE-123.456.789 MWST',
+              onChanged: (v) {
+                final err = validateMwstNr(v.trim());
+                if (err != _mwstError) setState(() => _mwstError = err);
+              },
             ),
+            if (_mwstError != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded,
+                      size: 14, color: AppColors.red),
+                  const SizedBox(width: 6),
+                  Text(
+                    _mwstError!,
+                    style: const TextStyle(
+                        fontSize: 11, color: AppColors.red),
+                  ),
+                ],
+              ),
+            ] else if (_mwstCtrl.text.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              const Row(
+                children: [
+                  Icon(Icons.check_circle_outline_rounded,
+                      size: 14, color: AppColors.green),
+                  SizedBox(width: 6),
+                  Text(
+                    'Valid Swiss MWST-Nr',
+                    style: TextStyle(
+                        fontSize: 11, color: AppColors.green),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
         _Card(
@@ -1135,6 +1181,7 @@ class _TaxSectionState extends ConsumerState<_TaxSection> {
   final _standardCtrl = TextEditingController();
   final _accommodationCtrl = TextEditingController();
   final _reducedCtrl = TextEditingController();
+  DateTime? _effectiveFrom;
   bool _initialised = false;
 
   @override
@@ -1150,12 +1197,25 @@ class _TaxSectionState extends ConsumerState<_TaxSection> {
     _standardCtrl.text = s.standardRate.toString();
     _accommodationCtrl.text = s.accommodationRate.toString();
     _reducedCtrl.text = s.reducedRate.toString();
+    _effectiveFrom = s.effectiveFrom;
     _initialised = true;
+  }
+
+  Future<void> _pickEffectiveFrom() async {
+    final current = _effectiveFrom ?? TaxSettings.defaultEffectiveFrom;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      helpText: 'Effective-from date for this rate set',
+    );
+    if (picked != null) setState(() => _effectiveFrom = picked.toUtc());
   }
 
   Future<void> _save() async {
     final current =
-        ref.read(taxSettingsProvider).valueOrNull ?? const TaxSettings();
+        ref.read(taxSettingsProvider).valueOrNull ?? TaxSettings();
     await ref.read(taxSettingsProvider.notifier).save(current.copyWith(
           standardRate: double.tryParse(_standardCtrl.text) ??
               TaxSettings.defaultStandardRate,
@@ -1163,6 +1223,7 @@ class _TaxSectionState extends ConsumerState<_TaxSection> {
               TaxSettings.defaultAccommodationRate,
           reducedRate: double.tryParse(_reducedCtrl.text) ??
               TaxSettings.defaultReducedRate,
+          effectiveFrom: _effectiveFrom ?? TaxSettings.defaultEffectiveFrom,
         ));
     if (mounted) _showSnack('Tax settings saved.');
   }
@@ -1174,6 +1235,7 @@ class _TaxSectionState extends ConsumerState<_TaxSection> {
       _accommodationCtrl.text =
           TaxSettings.defaultAccommodationRate.toString();
       _reducedCtrl.text = TaxSettings.defaultReducedRate.toString();
+      _effectiveFrom = TaxSettings.defaultEffectiveFrom;
     });
     if (mounted) _showSnack('Reset to Swiss MWST defaults (01.01.2024).');
   }
@@ -1182,19 +1244,80 @@ class _TaxSectionState extends ConsumerState<_TaxSection> {
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(taxSettingsProvider);
     settingsAsync.whenData(_populate);
-    final settings = settingsAsync.valueOrNull ?? const TaxSettings();
+    final settings = settingsAsync.valueOrNull ?? TaxSettings();
 
     return _SectionScaffold(
       title: 'Tax (MWST)',
       action: _SaveBtn(onPressed: _save),
       children: [
         _Card(
-          title: 'SWISS MWST RATES (effective 01.01.2024)',
+          title: 'SWISS MWST RATES',
           children: [
             const Text(
               'These rates are defined by Swiss federal law. '
               'Only modify if the law changes.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            // Effective-from date picker
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Effective-from date',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        'All three rates in this set became effective on this date.',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                GestureDetector(
+                  onTap: _pickEffectiveFrom,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgInput,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.calendar_today_rounded,
+                            size: 14, color: AppColors.textDim),
+                        const SizedBox(width: 8),
+                        Text(
+                          _effectiveFrom != null
+                              ? '${_effectiveFrom!.year}-'
+                                  '${_effectiveFrom!.month.toString().padLeft(2, '0')}-'
+                                  '${_effectiveFrom!.day.toString().padLeft(2, '0')}'
+                              : '—',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             _RateField(

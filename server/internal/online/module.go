@@ -17,14 +17,15 @@ type KDSNotifier interface {
 
 // Module is the online-ordering module.
 type Module struct {
-	db         *sql.DB
-	kdsNotify  KDSNotifier // optional; nil means no KDS notification
+	db        *sql.DB
+	kdsNotify KDSNotifier // optional; nil means no KDS notification
+	wsHub     *OnlineHub  // optional; nil means no real-time WS push
 }
 
 // NewModule creates a new online ordering module.
-// kdsNotify may be nil if KDS integration is not needed.
-func NewModule(db *sql.DB, kdsNotify KDSNotifier) *Module {
-	return &Module{db: db, kdsNotify: kdsNotify}
+// kdsNotify and wsHub may be nil if those integrations are not needed.
+func NewModule(db *sql.DB, kdsNotify KDSNotifier, wsHub *OnlineHub) *Module {
+	return &Module{db: db, kdsNotify: kdsNotify, wsHub: wsHub}
 }
 
 // RegisterRoutes registers all public online ordering routes.
@@ -42,4 +43,12 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 
 	// Order status polling (no auth)
 	mux.HandleFunc("GET /api/v1/online/orders/{orderId}/status", m.handleGetOrderStatus)
+
+	// Order status update (called by POS staff)
+	mux.HandleFunc("PUT /api/v1/online/orders/{orderId}/status", m.handleUpdateOrderStatus)
+
+	// Real-time WebSocket for order updates
+	if m.wsHub != nil {
+		mux.HandleFunc("GET /ws/online/orders/live", m.wsHub.serveWS)
+	}
 }

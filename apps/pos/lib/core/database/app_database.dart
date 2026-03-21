@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'package:gastrocore_pos/features/audit_log/data/daos/audit_log_dao.dart';
+import 'package:gastrocore_pos/features/inventory/data/daos/inventory_dao.dart';
 import 'package:gastrocore_pos/features/sync/data/daos/sync_event_dao.dart';
 
 import 'tables/audit_log.dart';
@@ -36,7 +37,10 @@ import 'tables/tax_profiles.dart';
 import 'tables/tenants.dart';
 import 'tables/tickets.dart';
 import 'tables/users.dart';
+import 'tables/inventory_items.dart';
+import 'tables/inventory_transactions.dart';
 import 'tables/license_tokens.dart';
+import 'tables/suppliers.dart';
 
 part 'app_database.g.dart';
 
@@ -71,14 +75,17 @@ part 'app_database.g.dart';
     ProductSpecifications,
     LicenseTokens,
     DayCloseSummaries,
+    InventoryItems,
+    InventoryTransactions,
+    Suppliers,
   ],
-  daos: [AuditLogDao, SyncEventDao],
+  daos: [AuditLogDao, InventoryDao, SyncEventDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -102,6 +109,12 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         // Add day_close_summaries table introduced in v6.
         await m.createTable(dayCloseSummaries);
+      }
+      if (from < 7) {
+        // Add inventory tables introduced in v7.
+        await m.createTable(inventoryItems);
+        await m.createTable(inventoryTransactions);
+        await m.createTable(suppliers);
       }
     },
     onCreate: (m) async {

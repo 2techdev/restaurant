@@ -6,6 +6,28 @@ library;
 
 import 'dart:convert';
 
+/// Validates a Swiss MWST-Nummer (UID-based VAT number).
+///
+/// Accepted formats:
+///   CHE-123.456.789
+///   CHE-123.456.789 MWST
+///   CHE-123.456.789 TVA
+///   CHE-123.456.789 IVA
+///
+/// Returns `null` if the number is valid (or empty — empty is allowed for
+/// restaurants that are not VAT-registered). Returns an error string otherwise.
+String? validateMwstNr(String value) {
+  if (value.trim().isEmpty) return null; // Optional field.
+  final pattern = RegExp(
+    r'^CHE-\d{3}\.\d{3}\.\d{3}( MWST| TVA| IVA)?$',
+    caseSensitive: false,
+  );
+  if (!pattern.hasMatch(value.trim())) {
+    return 'Format: CHE-XXX.XXX.XXX (e.g. CHE-123.456.789 MWST)';
+  }
+  return null;
+}
+
 class RestaurantSettings {
   const RestaurantSettings({
     this.name = '',

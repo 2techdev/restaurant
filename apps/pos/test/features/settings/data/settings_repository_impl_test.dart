@@ -178,7 +178,7 @@ void main() {
 
     test('save then load round-trips correctly', () async {
       final repo = await _makeRepo();
-      const settings = TaxSettings(
+      final settings = TaxSettings(
         standardRate: 8.1,
         accommodationRate: 3.8,
         reducedRate: 2.6,
@@ -194,7 +194,7 @@ void main() {
       final repo = await _makeRepo();
       await repo.saveRestaurantSettings(
           const RestaurantSettings(name: 'My Restaurant'));
-      const tax = TaxSettings(standardRate: 9.0);
+      final tax = TaxSettings(standardRate: 9.0);
       await repo.saveTaxSettings(tax);
 
       final loadedRestaurant = await repo.loadRestaurantSettings();
@@ -237,7 +237,7 @@ void main() {
       final repo = await _makeRepo();
       await repo.saveRestaurantSettings(
           const RestaurantSettings(name: 'To be cleared'));
-      await repo.saveTaxSettings(const TaxSettings(standardRate: 9.0));
+      await repo.saveTaxSettings(TaxSettings(standardRate: 9.0));
       await repo.saveAppSettings(
           const AppSettings(language: AppLanguage.fr));
 
