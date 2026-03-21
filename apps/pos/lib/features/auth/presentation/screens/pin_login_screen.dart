@@ -182,7 +182,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
         child: usersAsync.when(
           loading: () => const Center(
             child: CircularProgressIndicator(
-              color: Color(0xFFAFC6FF),
+              color: AppColors.primaryLight,
             ),
           ),
           error: (err, _) => Center(
@@ -267,12 +267,12 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
       child: Row(
         children: [
           // Logo
-          const Icon(Icons.restaurant, color: Color(0xFFAFC6FF), size: 30),
+          const Icon(Icons.restaurant, color: AppColors.primaryLight, size: 30),
           const SizedBox(width: 16),
           Flexible(
             child: ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
+                colors: [AppColors.primaryLight, AppColors.primary],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ).createShader(bounds),
@@ -368,7 +368,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(2),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
+                    colors: [AppColors.primaryLight, AppColors.primary],
                   ),
                 ),
               ),
@@ -377,7 +377,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF191B22),
+                  color: AppColors.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -404,7 +404,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.wifi, color: Color(0xFFAFC6FF), size: 16),
+                        const Icon(Icons.wifi, color: AppColors.primaryLight, size: 16),
                         const SizedBox(width: 8),
                         const Flexible(
                           child: Text(
@@ -413,7 +413,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFFAFC6FF),
+                              color: AppColors.primaryLight,
                             ),
                           ),
                         ),
@@ -437,7 +437,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
   Widget _buildStaffGrid(List<UserEntity> users) {
     return DecoratedBox(
       decoration: const BoxDecoration(
-        color: Color(0xFF191B22),
+        color: AppColors.surfaceContainerHigh,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(32),
           bottomLeft: Radius.circular(32),
@@ -527,7 +527,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
                   shape: BoxShape.circle,
                   color: AppColors.surfaceDim,
                   border: isSelected
-                      ? Border.all(color: const Color(0xFF528DFF), width: 4)
+                      ? Border.all(color: const AppColors.primary, width: 4)
                       : null,
                 ),
                 child: Center(
@@ -650,12 +650,12 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
                 color: _showError
                     ? AppColors.red
                     : isFilled
-                        ? const Color(0xFFAFC6FF)
+                        ? const AppColors.primaryLight
                         : const Color(0xFF33343B),
                 boxShadow: isFilled && !_showError
                     ? [
                         BoxShadow(
-                          color: const Color(0xFF528DFF).withValues(alpha: 0.4),
+                          color: const AppColors.primary.withValues(alpha: 0.4),
                           blurRadius: 12,
                         ),
                       ]
@@ -713,11 +713,11 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
                   }
                 },
                 borderRadius: BorderRadius.circular(12),
-                splashColor: const Color(0xFF528DFF).withValues(alpha: 0.15),
+                splashColor: const AppColors.primary.withValues(alpha: 0.15),
                 child: Ink(
                   height: 64,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF282A30),
+                    color: const AppColors.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -763,7 +763,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               gradient: const LinearGradient(
-                colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
+                colors: [AppColors.primaryLight, AppColors.primary],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),

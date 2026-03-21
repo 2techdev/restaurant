@@ -151,14 +151,14 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
                 height: 64,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
+                    colors: [AppColors.primaryLight, AppColors.primary],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFAFC6FF).withValues(alpha: 0.1),
+                      color: const AppColors.primaryLight.withValues(alpha: 0.1),
                       blurRadius: 16,
                     ),
                   ],
@@ -223,7 +223,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
               height: 384,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFAFC6FF).withValues(alpha: 0.05),
+                color: const AppColors.primaryLight.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -235,7 +235,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
               height: 384,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFAFC6FF).withValues(alpha: 0.10),
+                color: const AppColors.primaryLight.withValues(alpha: 0.10),
               ),
             ),
           ),
@@ -246,7 +246,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 480),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF191B22),
+                  color: AppColors.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -261,13 +261,13 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
                             width: 64,
                             height: 64,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF282A30),
+                              color: AppColors.surfaceContainerHigh,
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.payments,
                               size: 30,
-                              color: Color(0xFFAFC6FF),
+                              color: AppColors.primaryLight,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -289,7 +289,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
                                 height: 8,
                                 decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Color(0xFFAFC6FF),
+                                  color: AppColors.primaryLight,
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -353,7 +353,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
                                   style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFFAFC6FF),
+                                    color: AppColors.primaryLight,
                                   ),
                                 ),
                               ],
@@ -404,10 +404,10 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
           decoration: BoxDecoration(
             color: isSelected
                 ? const Color(0xFF33343B)
-                : const Color(0xFF282A30),
+                : AppColors.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(8),
             border: isSelected
-                ? Border.all(color: const Color(0xFFAFC6FF).withValues(alpha: 0.2), width: 2)
+                ? Border.all(color: const AppColors.primaryLight.withValues(alpha: 0.2), width: 2)
                 : null,
           ),
           child: Center(
@@ -417,7 +417,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: isSelected
-                    ? const Color(0xFFAFC6FF)
+                    ? const AppColors.primaryLight
                     : const Color(0xFFE2E2EB),
               ),
             ),
@@ -475,7 +475,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
                         ? const Icon(
                             Icons.backspace_outlined,
                             size: 22,
-                            color: Color(0xFFAFC6FF),
+                            color: AppColors.primaryLight,
                           )
                         : Text(
                             key,

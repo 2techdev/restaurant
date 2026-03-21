@@ -31,6 +31,7 @@ import 'package:gastrocore_pos/features/home/presentation/providers/dashboard_pr
 import 'package:gastrocore_pos/features/home/domain/entities/dashboard_summary.dart';
 import 'package:gastrocore_pos/features/sync/presentation/widgets/sync_status_widget.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
+import 'package:gastrocore_pos/shared/widgets/gc_sidebar.dart';
 
 // ---------------------------------------------------------------------------
 // CHF formatter (Swiss locale)
@@ -81,7 +82,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       backgroundColor: AppColors.surfaceDim,
       body: Row(
         children: [
-          _Sidebar(shift: shift),
+          GcSidebar(
+            activeRoute: '/home',
+            userName: userName,
+            userInitials: userName.isNotEmpty
+                ? userName.substring(0, 1).toUpperCase()
+                : '?',
+          ),
           Expanded(
             child: Column(
               children: [
@@ -127,15 +134,23 @@ class _Sidebar extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 24),
-          ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ).createShader(bounds),
-            child: const Text(
-              'G',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: const Center(
+              child: Text(
+                'GC',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -0.3,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 32),
@@ -144,8 +159,11 @@ class _Sidebar extends StatelessWidget {
           Container(
             width: 40,
             height: 40,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF282A30)),
-            child: const Icon(Icons.person, size: 20, color: AppColors.textSecondary),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primary.withValues(alpha: 0.12),
+            ),
+            child: const Icon(Icons.person, size: 20, color: AppColors.primary),
           ),
           const SizedBox(height: 24),
         ],
@@ -189,7 +207,9 @@ class _SidebarButtonState extends State<_SidebarButton> {
             height: 56,
             clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
-              color: _hovered ? const Color(0xFF2A2F3D) : Colors.transparent,
+              color: _hovered
+                  ? AppColors.primary.withValues(alpha: 0.08)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -197,7 +217,7 @@ class _SidebarButtonState extends State<_SidebarButton> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(widget.item.icon, size: 22,
-                    color: _hovered ? AppColors.textPrimary : AppColors.textSecondary),
+                    color: _hovered ? AppColors.primary : AppColors.textSecondary),
                 const SizedBox(height: 3),
                 Text(widget.item.label,
                     maxLines: 1,
@@ -205,7 +225,7 @@ class _SidebarButtonState extends State<_SidebarButton> {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
-                      color: _hovered ? AppColors.textPrimary : AppColors.textSecondary,
+                      color: _hovered ? AppColors.primary : AppColors.textSecondary,
                       letterSpacing: -0.3,
                     )),
               ],
@@ -239,19 +259,27 @@ class _TopBar extends StatelessWidget {
       color: AppColors.surfaceDim,
       child: Row(
         children: [
-          Flexible(
-            child: ShaderMask(
-              shaderCallback: (b) => const LinearGradient(
-                colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ).createShader(b),
-              child: const Text('GastroCore POS',
+          const Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Gastro',
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 20, fontWeight: FontWeight.w900,
-                    color: Colors.white, letterSpacing: -0.5,
-                  )),
+                    color: AppColors.textPrimary, letterSpacing: -0.5,
+                  ),
+                ),
+                Text(
+                  'Core POS',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.w900,
+                    color: AppColors.primary, letterSpacing: -0.5,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 20),

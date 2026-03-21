@@ -48,9 +48,9 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
 
   Color _statusColor(TableStatus status) => switch (status) {
         TableStatus.available => AppColors.green,
-        TableStatus.occupied => AppColors.red,
-        TableStatus.reserved => AppColors.accent,
-        TableStatus.dirty => AppColors.textDim,
+        TableStatus.occupied => AppColors.primary,
+        TableStatus.reserved => AppColors.orange,
+        TableStatus.dirty => AppColors.red,
       };
 
   String _statusLabel(TableStatus status) => switch (status) {

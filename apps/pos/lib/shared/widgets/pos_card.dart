@@ -1,30 +1,24 @@
-/// Card variants following the Stitch "Precision POS Framework".
+/// Card variants — Lightspeed-inspired professional UI.
 ///
-/// Provides two card types:
+/// White cards with subtle shadow on a light gray background.
+/// Depth is expressed through elevation (shadow), not borders.
 ///
-/// - [PosCard] — General-purpose container with no border ("No-Line" rule).
-///   Background shifts express hierarchy instead of 1px borders.
-///
-/// - [PosStatCard] — Compact stat display for shift summaries, reports,
-///   and dashboard KPIs.
-///
-/// Both follow the Stitch surface hierarchy:
-/// - Default: [AppColors.surfaceContainerLow]
-/// - Active:  [AppColors.surfaceBright]
+/// - [PosCard] — General-purpose container with ripple and scale feedback.
+/// - [PosStatCard] — Compact KPI display for dashboard and shift summaries.
 library;
 
 import 'package:flutter/material.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/core/theme/app_theme.dart';
 
 // ---------------------------------------------------------------------------
 // PosCard
 // ---------------------------------------------------------------------------
 
-/// A borderless surface card following the Stitch "No-Line" philosophy.
+/// A white card with subtle shadow and optional tap interaction.
 ///
-/// Hierarchy is expressed through background color shifts rather than
-/// 1px borders. Supports tap interaction and active state.
+/// Hierarchy is expressed through shadow depth, not borders.
 ///
 /// ```dart
 /// PosCard(
@@ -43,28 +37,29 @@ class PosCard extends StatefulWidget {
     this.borderRadius = 12,
     this.onTap,
     this.isActive = false,
+    this.elevation = true,
   });
 
-  /// Card content.
   final Widget child;
 
   /// Inner padding. Defaults to `EdgeInsets.all(16)` when null.
   final EdgeInsets? padding;
 
-  /// Background color. Defaults to [AppColors.surfaceContainerLow].
-  /// When [isActive] is true, overridden to [AppColors.surfaceBright].
+  /// Background color. Defaults to [AppColors.surface] (white).
+  /// When [isActive] is true, overridden to [AppColors.accentDim].
   final Color? color;
 
-  /// Corner radius. Defaults to 12 (Stitch medium radius).
+  /// Corner radius. Defaults to 12.
   final double borderRadius;
 
-  /// Tap callback. When non-null the card becomes tappable with ripple
-  /// and scale-down feedback.
+  /// Tap callback — card becomes tappable with ripple + scale feedback.
   final VoidCallback? onTap;
 
-  /// Whether the card is in its active/selected state. When true, the
-  /// background shifts to [AppColors.surfaceBright].
+  /// When true, background shifts to [AppColors.accentDim] (teal tint).
   final bool isActive;
+
+  /// Whether to show the card shadow. Set to false for nested cards.
+  final bool elevation;
 
   @override
   State<PosCard> createState() => _PosCardState();
@@ -96,8 +91,8 @@ class _PosCardState extends State<PosCard> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final bgColor = widget.isActive
-        ? AppColors.surfaceBright
-        : (widget.color ?? AppColors.surfaceContainerLow);
+        ? AppColors.accentDim
+        : (widget.color ?? AppColors.surface);
 
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -105,6 +100,10 @@ class _PosCardState extends State<PosCard> with SingleTickerProviderStateMixin {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(widget.borderRadius),
+        border: widget.isActive
+            ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
+            : null,
+        boxShadow: widget.elevation ? kCardShadow : null,
       ),
       child: widget.onTap != null
           ? Material(
@@ -113,8 +112,8 @@ class _PosCardState extends State<PosCard> with SingleTickerProviderStateMixin {
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: widget.onTap,
-                splashColor: AppColors.textPrimary.withValues(alpha: 0.06),
-                highlightColor: AppColors.textPrimary.withValues(alpha: 0.03),
+                splashColor: AppColors.primary.withValues(alpha: 0.06),
+                highlightColor: AppColors.primary.withValues(alpha: 0.03),
                 child: Padding(
                   padding: widget.padding ?? const EdgeInsets.all(16),
                   child: widget.child,
@@ -127,7 +126,6 @@ class _PosCardState extends State<PosCard> with SingleTickerProviderStateMixin {
             ),
     );
 
-    // Only apply scale animation when tappable.
     if (widget.onTap == null) return card;
 
     return ScaleTransition(
@@ -146,16 +144,15 @@ class _PosCardState extends State<PosCard> with SingleTickerProviderStateMixin {
 // PosStatCard
 // ---------------------------------------------------------------------------
 
-/// A compact stat display card for KPIs, shift summaries, and reports.
+/// Compact KPI card for dashboards, shift summaries, and reports.
 ///
-/// Shows a large [value] with a smaller [label] underneath, and an optional
-/// icon. Follows the "No-Line" rule with surfaceContainerLow background.
+/// Shows a large [value] with a [label] underneath and an optional [icon].
 ///
 /// ```dart
 /// PosStatCard(
 ///   value: 'CHF 2,450.00',
-///   label: 'Total Revenue',
-///   valueColor: AppColors.green,
+///   label: 'Revenue',
+///   valueColor: AppColors.primary,
 ///   icon: Icons.trending_up,
 /// )
 /// ```
@@ -166,61 +163,57 @@ class PosStatCard extends StatelessWidget {
     required this.label,
     this.valueColor,
     this.icon,
+    this.iconColor,
     this.borderRadius = 12,
   });
 
-  /// The primary value text (e.g. "CHF 2,450.00", "42", "87%").
   final String value;
-
-  /// Descriptive label shown below the value.
   final String label;
-
-  /// Color for the value text. Defaults to [AppColors.textPrimary].
   final Color? valueColor;
-
-  /// Optional icon displayed to the left of the value.
   final IconData? icon;
-
-  /// Corner radius. Defaults to 12.
+  final Color? iconColor;
   final double borderRadius;
 
   @override
   Widget build(BuildContext context) {
+    final vColor = valueColor ?? AppColors.textPrimary;
+    final iColor = iconColor ?? vColor;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: kCardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: 20,
-                  color: valueColor ?? AppColors.textDim,
-                ),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: valueColor ?? AppColors.textPrimary,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+          if (icon != null) ...[
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
+              child: Center(
+                child: Icon(icon, size: 20, color: iColor),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: vColor,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
