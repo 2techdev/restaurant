@@ -14,6 +14,7 @@ import (
 	"github.com/gastrocore/server/internal/auth"
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
+	"github.com/gastrocore/server/internal/fiscal"
 	"github.com/gastrocore/server/internal/kds"
 	"github.com/gastrocore/server/internal/licenses"
 	"github.com/gastrocore/server/internal/menu"
@@ -66,6 +67,8 @@ func main() {
 	licensesModule := licenses.NewModule(db, cfg)
 	storesModule := stores.NewModule(db, cfg)
 	kdsModule := kds.NewModule(db, kdsHub)
+	// Fiscal compliance (Germany KassenSichV) — enabled when Fiskaly credentials set.
+	fiscalModule := fiscal.NewModule(cfg)
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -117,6 +120,7 @@ func main() {
 	licensesModule.RegisterRoutes(mux)
 	storesModule.RegisterRoutes(mux)
 	kdsModule.RegisterRoutes(mux)
+	fiscalModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain
