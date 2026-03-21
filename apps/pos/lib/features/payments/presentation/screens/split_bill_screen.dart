@@ -107,7 +107,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
   Widget _buildSidebar() {
     return Container(
       width: 240,
-      color: const Color(0xFF1A1D27),
+      color: AppColors.surface,
       child: Column(
         children: [
           // Brand
@@ -118,7 +118,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
               children: [
                 ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
+                    colors: [AppColors.primaryLight, AppColors.primary],
                   ).createShader(bounds),
                   child: const Text(
                     'GastroCore',
@@ -189,9 +189,9 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
-        color: isActive ? const Color(0xFF222633) : Colors.transparent,
+        color: isActive ? AppColors.surfaceContainer : Colors.transparent,
         border: isActive
-            ? const Border(left: BorderSide(color: Color(0xFF528DFF), width: 4))
+            ? const Border(left: BorderSide(color: AppColors.primary, width: 4))
             : null,
       ),
       child: Row(
@@ -219,7 +219,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
     return Container(
       height: 96,
       padding: const EdgeInsets.symmetric(horizontal: 40),
-      color: const Color(0xFF191B22),
+      color: AppColors.surfaceContainerHigh,
       child: Row(
         children: [
           // Back button
@@ -229,7 +229,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFF282A30),
+                color: AppColors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.arrow_back, color: Color(0xFFE2E2EB)),
@@ -305,7 +305,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
         child: Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: const Color(0xFF191B22),
+            color: AppColors.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -318,7 +318,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                   duration: const Duration(milliseconds: 150),
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   decoration: BoxDecoration(
-                    color: isActive ? const Color(0xFF282A30) : Colors.transparent,
+                    color: isActive ? AppColors.surfaceContainerHigh : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: isActive
                         ? [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 12)]
@@ -402,7 +402,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                               width: 64,
                               height: 64,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF282A30),
+                                color: AppColors.surfaceContainerHigh,
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: const Icon(Icons.remove, size: 28, color: Color(0xFFE2E2EB)),
@@ -426,7 +426,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                               width: 64,
                               height: 64,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF282A30),
+                                color: AppColors.surfaceContainerHigh,
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: const Icon(Icons.add, size: 28, color: Color(0xFFE2E2EB)),
@@ -455,8 +455,8 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  const Color(0xFFAFC6FF).withValues(alpha: 0.05),
-                                  const Color(0xFF528DFF).withValues(alpha: 0.05),
+                                  const AppColors.primaryLight.withValues(alpha: 0.05),
+                                  const AppColors.primary.withValues(alpha: 0.05),
                                 ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
@@ -474,7 +474,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFFAFC6FF),
+                                  color: AppColors.primaryLight,
                                   letterSpacing: 2.0,
                                 ),
                               ),
@@ -537,7 +537,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
       decoration: BoxDecoration(
         color: isPaid
             ? const Color(0xFF22C55E).withValues(alpha: 0.05)
-            : const Color(0xFF191B22),
+            : AppColors.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
         border: isPaid
             ? const Border(left: BorderSide(color: Color(0xFF22C55E), width: 4))
@@ -553,7 +553,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
               shape: BoxShape.circle,
               color: isPaid
                   ? const Color(0xFF22C55E).withValues(alpha: 0.2)
-                  : const Color(0xFF282A30),
+                  : AppColors.surfaceContainerHigh,
             ),
             child: Center(
               child: isPaid
@@ -563,7 +563,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
-                        color: Color(0xFFAFC6FF),
+                        color: AppColors.primaryLight,
                       ),
                     ),
             ),
@@ -626,7 +626,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFFAFC6FF),
+                      color: AppColors.primaryLight,
                     ),
                   ),
                 )
@@ -647,7 +647,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF191B22),
+        color: AppColors.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Opacity(
@@ -757,7 +757,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
               height: 64,
               padding: const EdgeInsets.symmetric(horizontal: 32),
               decoration: BoxDecoration(
-                color: const Color(0xFF282A30),
+                color: AppColors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Row(
@@ -780,7 +780,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
               height: 64,
               padding: const EdgeInsets.symmetric(horizontal: 32),
               decoration: BoxDecoration(
-                color: const Color(0xFF282A30),
+                color: AppColors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Row(
@@ -804,14 +804,14 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 48),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
+                  colors: [AppColors.primaryLight, AppColors.primary],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF528DFF).withValues(alpha: 0.2),
+                    color: const AppColors.primary.withValues(alpha: 0.2),
                     blurRadius: 24,
                   ),
                 ],

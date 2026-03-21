@@ -231,7 +231,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         width: 64,
         height: 64,
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF2A2F3D) : Colors.transparent,
+          color: isActive ? AppColors.surfaceContainerHigh : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
@@ -266,7 +266,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           Flexible(
             child: ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
+                colors: [AppColors.primaryLight, AppColors.primary],
               ).createShader(bounds),
               child: const Text(
                 'GastroCore POS',
@@ -299,7 +299,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget _buildOrderSummary() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF191B22),
+        color: AppColors.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -320,7 +320,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF282A30),
+                    color: AppColors.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
@@ -409,7 +409,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         '\u20BA${_formatCents(_grandTotal)}',
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.right,
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFFAFC6FF)),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.primaryLight),
                       ),
                     ),
                   ],
@@ -426,7 +426,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   child: Container(
                     height: 48,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF282A30),
+                      color: AppColors.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Row(
@@ -538,7 +538,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF191B22),
+                          color: AppColors.surfaceContainerHigh,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: _buildNumpad(),
@@ -558,7 +558,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2A2F3D).withValues(alpha: 0.2),
+                          color: AppColors.surfaceContainerHigh.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Column(
@@ -600,7 +600,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
-                                      color: Color(0xFFAFC6FF),
+                                      color: AppColors.primaryLight,
                                       letterSpacing: 2.0,
                                     ),
                                   ),
@@ -611,7 +611,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                     style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w900,
-                                      color: Color(0xFFAFC6FF),
+                                      color: AppColors.primaryLight,
                                     ),
                                   ),
                                 ],
@@ -657,14 +657,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           height: 96,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
+                              colors: [AppColors.primaryLight, AppColors.primary],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFAFC6FF).withValues(alpha: 0.2),
+                                color: const AppColors.primaryLight.withValues(alpha: 0.2),
                                 blurRadius: 24,
                               ),
                             ],
@@ -720,21 +720,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           height: 64,
           decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFF282A30)
-                : const Color(0xFF191B22),
+                ? AppColors.surfaceContainerHigh
+                : AppColors.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(12),
             border: isSelected
-                ? Border.all(color: const Color(0xFF528DFF), width: 2)
+                ? Border.all(color: const AppColors.primary, width: 2)
                 : null,
             boxShadow: isSelected
-                ? [BoxShadow(color: const Color(0xFF528DFF).withValues(alpha: 0.1), blurRadius: 12)]
+                ? [BoxShadow(color: const AppColors.primary.withValues(alpha: 0.1), blurRadius: 12)]
                 : null,
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 22, color: isSelected ? const Color(0xFF528DFF) : const Color(0xFFC3C6D7)),
+              Icon(icon, size: 22, color: isSelected ? const AppColors.primary : const Color(0xFFC3C6D7)),
               const SizedBox(height: 2),
               Text(
                 label,
@@ -743,7 +743,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: isSelected ? const Color(0xFF528DFF) : const Color(0xFFC3C6D7),
+                  color: isSelected ? const AppColors.primary : const Color(0xFFC3C6D7),
                 ),
               ),
             ],

@@ -1,43 +1,34 @@
-/// POS Button variants following the Stitch "Precision POS Framework".
+/// POS Button variants — Lightspeed-inspired professional UI.
 ///
-/// Provides four button types for the GastroCore POS surface hierarchy:
+/// Four button types covering all POS interaction contexts:
 ///
-/// - [PosGradientButton] — Primary actions (pay, confirm, submit).
-///   Linear gradient from `AppColors.primary` to `AppColors.primaryContainer`.
+/// - [PosGradientButton] — Primary CTA (Pay, Confirm, Submit).
+///   Teal gradient, white text. Full-width by default.
 ///
-/// - [PosSolidButton] — Semantic actions (kitchen send = green, void = red).
-///   Single solid color background.
+/// - [PosSolidButton] — Semantic action (Send to Kitchen = coral,
+///   Void = red, Accept = green). Single solid color background.
 ///
-/// - [PosGhostButton] — Tertiary actions (cancel, dismiss).
-///   Transparent background, accent-colored text.
+/// - [PosGhostButton] — Tertiary actions (Cancel, Dismiss).
+///   Transparent background, teal-colored text.
 ///
-/// - [PosSurfaceButton] — Secondary actions (category tabs, mode toggles).
-///   Surface-colored background with active state.
+/// - [PosSurfaceButton] — Secondary actions (Category tabs, toggles).
+///   Light gray background with teal active state.
 ///
-/// All buttons enforce 44px minimum touch targets, use scale-down press
-/// feedback (0.97), and follow the "No-Line" rule (no 1px borders).
+/// All buttons enforce 48px minimum touch targets, scale-down press
+/// feedback (0.97), and 200ms transitions.
 library;
 
 import 'package:flutter/material.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/core/theme/app_theme.dart';
 
 // ---------------------------------------------------------------------------
 // Gradient Primary Button
 // ---------------------------------------------------------------------------
 
-/// A prominent call-to-action button with a 135° linear gradient
-/// from [AppColors.primary] to [AppColors.primaryContainer].
-///
-/// Use for primary actions: Pay, Confirm, Submit, Place Order.
-///
-/// ```dart
-/// PosGradientButton(
-///   label: 'Pay CHF 28.50',
-///   icon: Icons.payment,
-///   onPressed: () => handlePayment(),
-/// )
-/// ```
+/// Primary call-to-action with a teal gradient.
+/// Use for: Pay, Confirm, Submit, Place Order.
 class PosGradientButton extends StatefulWidget {
   const PosGradientButton({
     super.key,
@@ -50,25 +41,12 @@ class PosGradientButton extends StatefulWidget {
     this.expand = true,
   });
 
-  /// Button label text.
   final String label;
-
-  /// Optional leading icon.
   final IconData? icon;
-
-  /// Tap callback. When `null` the button renders in disabled state.
   final VoidCallback? onPressed;
-
-  /// Button height. Minimum enforced at 44px (touch target).
   final double height;
-
-  /// When `true`, shows a circular progress indicator instead of content.
   final bool isLoading;
-
-  /// Corner radius. Defaults to 12 (Stitch medium radius).
   final double borderRadius;
-
-  /// Whether the button expands to fill available width.
   final bool expand;
 
   @override
@@ -105,17 +83,12 @@ class _PosGradientButtonState extends State<PosGradientButton>
     if (_enabled) _scaleController.forward();
   }
 
-  void _onTapUp(TapUpDetails _) {
-    _scaleController.reverse();
-  }
-
-  void _onTapCancel() {
-    _scaleController.reverse();
-  }
+  void _onTapUp(TapUpDetails _) => _scaleController.reverse();
+  void _onTapCancel() => _scaleController.reverse();
 
   @override
   Widget build(BuildContext context) {
-    final effectiveHeight = widget.height.clamp(44.0, double.infinity);
+    final effectiveHeight = widget.height.clamp(48.0, double.infinity);
 
     return ScaleTransition(
       scale: _scaleAnimation,
@@ -125,62 +98,65 @@ class _PosGradientButtonState extends State<PosGradientButton>
         onTapCancel: _onTapCancel,
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 200),
-          opacity: _enabled ? 1.0 : 0.4,
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(widget.borderRadius),
-            clipBehavior: Clip.antiAlias,
-            child: Ink(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.primary, AppColors.primaryContainer],
-                ),
-                borderRadius: BorderRadius.circular(widget.borderRadius),
+          opacity: _enabled ? 1.0 : 0.45,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.primary, AppColors.primaryContainer],
               ),
+              borderRadius: BorderRadius.circular(widget.borderRadius),
+              boxShadow: _enabled ? kButtonShadow : null,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(widget.borderRadius),
+              clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: _enabled ? widget.onPressed : null,
                 splashColor: Colors.white.withValues(alpha: 0.15),
                 highlightColor: Colors.white.withValues(alpha: 0.05),
-                child: Container(
+                child: SizedBox(
                   height: effectiveHeight,
-                  constraints: BoxConstraints(
-                    minWidth: widget.expand ? double.infinity : 120,
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  alignment: Alignment.center,
-                  child: widget.isLoading
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Row(
-                          mainAxisSize: widget.expand
-                              ? MainAxisSize.max
-                              : MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (widget.icon != null) ...[
-                              Icon(widget.icon, size: 20, color: Colors.white),
-                              const SizedBox(width: 10),
-                            ],
-                            Text(
-                              widget.label,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                letterSpacing: 0.3,
+                  width: widget.expand ? double.infinity : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Center(
+                      child: widget.isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
+                            )
+                          : Row(
+                              mainAxisSize: widget.expand
+                                  ? MainAxisSize.max
+                                  : MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (widget.icon != null) ...[
+                                  Icon(widget.icon,
+                                      size: 20, color: Colors.white),
+                                  const SizedBox(width: 10),
+                                ],
+                                Text(
+                                  widget.label,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -195,19 +171,10 @@ class _PosGradientButtonState extends State<PosGradientButton>
 // Solid Color Button
 // ---------------------------------------------------------------------------
 
-/// A solid-colored button for semantic actions.
+/// Solid-colored button for semantic actions.
 ///
-/// Use with [AppColors.green] for "Send to Kitchen", [AppColors.red] for
-/// "Void Item", [AppColors.orange] for warnings, etc.
-///
-/// ```dart
-/// PosSolidButton(
-///   label: 'Send to Kitchen',
-///   icon: Icons.restaurant,
-///   color: AppColors.green,
-///   onPressed: () => sendToKitchen(),
-/// )
-/// ```
+/// Use [AppColors.coral] for "Send to Kitchen",
+/// [AppColors.red] for "Void", [AppColors.green] for "Accept".
 class PosSolidButton extends StatefulWidget {
   const PosSolidButton({
     super.key,
@@ -221,28 +188,13 @@ class PosSolidButton extends StatefulWidget {
     this.isLoading = false,
   });
 
-  /// Button label text.
   final String label;
-
-  /// Optional leading icon.
   final IconData? icon;
-
-  /// Background color. Use semantic colors from [AppColors].
   final Color color;
-
-  /// Tap callback. When `null` the button renders in disabled state.
   final VoidCallback? onPressed;
-
-  /// Button height. Minimum enforced at 44px.
   final double height;
-
-  /// Corner radius. Defaults to 12.
   final double borderRadius;
-
-  /// Whether the button expands to fill available width.
   final bool expand;
-
-  /// When `true`, shows a circular progress indicator instead of content.
   final bool isLoading;
 
   @override
@@ -280,12 +232,11 @@ class _PosSolidButtonState extends State<PosSolidButton>
   }
 
   void _onTapUp(TapUpDetails _) => _scaleController.reverse();
-
   void _onTapCancel() => _scaleController.reverse();
 
   @override
   Widget build(BuildContext context) {
-    final effectiveHeight = widget.height.clamp(44.0, double.infinity);
+    final effectiveHeight = widget.height.clamp(48.0, double.infinity);
 
     return ScaleTransition(
       scale: _scaleAnimation,
@@ -295,7 +246,7 @@ class _PosSolidButtonState extends State<PosSolidButton>
         onTapCancel: _onTapCancel,
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 200),
-          opacity: _enabled ? 1.0 : 0.4,
+          opacity: _enabled ? 1.0 : 0.45,
           child: Material(
             color: widget.color,
             borderRadius: BorderRadius.circular(widget.borderRadius),
@@ -355,18 +306,7 @@ class _PosSolidButtonState extends State<PosSolidButton>
 // Ghost / Text Button
 // ---------------------------------------------------------------------------
 
-/// A transparent button for tertiary actions such as Cancel or Dismiss.
-///
-/// No background color — text and optional icon only, using accent color.
-/// Follows the "No-Line" rule: no borders, hover state uses a subtle
-/// surface-colored overlay.
-///
-/// ```dart
-/// PosGhostButton(
-///   label: 'Cancel',
-///   onPressed: () => Navigator.pop(context),
-/// )
-/// ```
+/// Transparent button for tertiary actions (Cancel, Dismiss, Back).
 class PosGhostButton extends StatefulWidget {
   const PosGhostButton({
     super.key,
@@ -377,19 +317,12 @@ class PosGhostButton extends StatefulWidget {
     this.height = 48,
   });
 
-  /// Button label text.
   final String label;
-
-  /// Optional leading icon.
   final IconData? icon;
-
-  /// Tap callback. When `null` the button renders in disabled state.
   final VoidCallback? onPressed;
 
-  /// Text and icon color. Defaults to [AppColors.textSecondary].
+  /// Text/icon color. Defaults to [AppColors.textSecondary].
   final Color? color;
-
-  /// Button height. Minimum enforced at 44px.
   final double height;
 
   @override
@@ -427,12 +360,11 @@ class _PosGhostButtonState extends State<PosGhostButton>
   }
 
   void _onTapUp(TapUpDetails _) => _scaleController.reverse();
-
   void _onTapCancel() => _scaleController.reverse();
 
   @override
   Widget build(BuildContext context) {
-    final effectiveHeight = widget.height.clamp(44.0, double.infinity);
+    final effectiveHeight = widget.height.clamp(48.0, double.infinity);
     final color = widget.color ?? AppColors.textSecondary;
 
     return ScaleTransition(
@@ -450,8 +382,8 @@ class _PosGhostButtonState extends State<PosGhostButton>
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: _enabled ? widget.onPressed : null,
-              splashColor: color.withValues(alpha: 0.1),
-              highlightColor: color.withValues(alpha: 0.05),
+              splashColor: color.withValues(alpha: 0.08),
+              highlightColor: color.withValues(alpha: 0.04),
               child: Container(
                 height: effectiveHeight,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -483,23 +415,11 @@ class _PosGhostButtonState extends State<PosGhostButton>
 }
 
 // ---------------------------------------------------------------------------
-// Surface Button
+// Surface Button — category tabs, mode toggles
 // ---------------------------------------------------------------------------
 
-/// A surface-colored button for secondary actions, category tabs, and
-/// mode toggles.
-///
-/// Background shifts from [AppColors.surfaceContainerHigh] (default) to
-/// [AppColors.surfaceBright] (active) — following the "No-Line" rule.
-///
-/// ```dart
-/// PosSurfaceButton(
-///   label: 'Dine In',
-///   icon: Icons.restaurant,
-///   isActive: selectedMode == OrderMode.dineIn,
-///   onPressed: () => setMode(OrderMode.dineIn),
-/// )
-/// ```
+/// Light gray button with teal active state.
+/// Use for category tabs, order type toggles, mode selectors.
 class PosSurfaceButton extends StatefulWidget {
   const PosSurfaceButton({
     super.key,
@@ -508,29 +428,18 @@ class PosSurfaceButton extends StatefulWidget {
     this.onPressed,
     this.isActive = false,
     this.height = 48,
-    this.borderRadius = 10,
+    this.borderRadius = 20,
     this.expand = false,
   });
 
-  /// Button label text.
   final String label;
-
-  /// Optional leading icon.
   final IconData? icon;
-
-  /// Tap callback. When `null` the button renders in disabled state.
   final VoidCallback? onPressed;
-
-  /// Whether the button is in its active/selected state.
   final bool isActive;
-
-  /// Button height. Minimum enforced at 44px.
   final double height;
 
-  /// Corner radius. Defaults to 10.
+  /// Defaults to 20 for pill-shaped category tabs.
   final double borderRadius;
-
-  /// Whether the button expands to fill available width.
   final bool expand;
 
   @override
@@ -568,17 +477,15 @@ class _PosSurfaceButtonState extends State<PosSurfaceButton>
   }
 
   void _onTapUp(TapUpDetails _) => _scaleController.reverse();
-
   void _onTapCancel() => _scaleController.reverse();
 
   @override
   Widget build(BuildContext context) {
-    final effectiveHeight = widget.height.clamp(44.0, double.infinity);
-    final bgColor = widget.isActive
-        ? AppColors.surfaceBright
-        : AppColors.surfaceContainerHigh;
+    final effectiveHeight = widget.height.clamp(48.0, double.infinity);
+    final bgColor =
+        widget.isActive ? AppColors.primary : AppColors.surfaceContainerHigh;
     final textColor =
-        widget.isActive ? AppColors.textPrimary : AppColors.textSecondary;
+        widget.isActive ? Colors.white : AppColors.textSecondary;
 
     return ScaleTransition(
       scale: _scaleAnimation,
@@ -588,7 +495,7 @@ class _PosSurfaceButtonState extends State<PosSurfaceButton>
         onTapCancel: _onTapCancel,
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 200),
-          opacity: _enabled ? 1.0 : 0.4,
+          opacity: _enabled ? 1.0 : 0.45,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
@@ -598,26 +505,29 @@ class _PosSurfaceButtonState extends State<PosSurfaceButton>
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: _enabled ? widget.onPressed : null,
-                splashColor: AppColors.textPrimary.withValues(alpha: 0.06),
-                highlightColor: AppColors.textPrimary.withValues(alpha: 0.03),
+                splashColor: widget.isActive
+                    ? Colors.white.withValues(alpha: 0.1)
+                    : AppColors.primary.withValues(alpha: 0.06),
+                highlightColor: widget.isActive
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : AppColors.primary.withValues(alpha: 0.03),
                 child: Container(
                   height: effectiveHeight,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   alignment: Alignment.center,
                   child: Row(
-                    mainAxisSize: widget.expand
-                        ? MainAxisSize.max
-                        : MainAxisSize.min,
+                    mainAxisSize:
+                        widget.expand ? MainAxisSize.max : MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (widget.icon != null) ...[
-                        Icon(widget.icon, size: 18, color: textColor),
-                        const SizedBox(width: 8),
+                        Icon(widget.icon, size: 16, color: textColor),
+                        const SizedBox(width: 6),
                       ],
                       Text(
                         widget.label,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: textColor,
                         ),

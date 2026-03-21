@@ -1,10 +1,18 @@
-/// Main POS Screen for GastroCore POS.
+/// Main POS Screen — Lightspeed-inspired professional UI.
 ///
-/// Three-column layout: category sidebar, product grid, and order panel.
-/// Follows the Stitch "Precision POS Framework" design system
-/// (s03_main_pos reference).
+/// Layout (tablet landscape):
+///   [GcSidebar 64px] | [Product area flex] | [Order panel 340px]
 ///
-/// Wired to real Riverpod providers for categories, products, and tickets.
+/// Product area:
+///   Top bar (logo, status, user) → Category tabs (horizontal pills) →
+///   Product grid (white cards, touch-optimised)
+///
+/// Order panel:
+///   White card with shadow → item list with qty controls →
+///   Totals (subtotal, VAT, grand total) →
+///   Send to Kitchen (coral) + Pay (teal) buttons
+///
+/// Wired to real Riverpod providers — all state management unchanged.
 library;
 
 import 'package:flutter/material.dart';
@@ -13,11 +21,13 @@ import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/core/theme/app_theme.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/shared/widgets/gc_sidebar.dart';
 
 // ---------------------------------------------------------------------------
 // POS Screen
@@ -36,10 +46,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   @override
   void initState() {
     super.initState();
-    // Ensure a draft ticket exists when entering the POS screen.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _ensureTicket();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureTicket());
   }
 
   @override
@@ -48,7 +55,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     super.dispose();
   }
 
-  /// Create a draft ticket if none is currently active.
   Future<void> _ensureTicket() async {
     final ticket = ref.read(currentTicketProvider);
     if (ticket == null) {
@@ -74,24 +80,49 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     return 'CHF $whole.$frac';
   }
 
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.substring(0, name.length.clamp(0, 2)).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider);
+    final userName = user?.name ?? 'Staff';
+
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
-      body: Column(
+      body: Row(
         children: [
-          // -- Top bar --
-          _buildTopBar(),
-          // -- Main 3-col layout --
+          // ── Left nav sidebar (dark navy) ─────────────────────────────────
+          GcSidebar(
+            activeRoute: '/pos',
+            userName: userName,
+            userInitials: _initials(userName),
+            onLogout: () => context.go('/shift-close'),
+          ),
+
+          // ── Main content ─────────────────────────────────────────────────
           Expanded(
-            child: Row(
+            child: Column(
               children: [
-                // LEFT: Category sidebar
-                _buildCategorySidebar(),
-                // CENTER: Product grid
-                Expanded(child: _buildProductArea()),
-                // RIGHT: Order panel
-                _buildOrderPanel(),
+                // Top bar
+                _buildTopBar(userName),
+                // Product area + order panel
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Product area (categories + grid)
+                      Expanded(child: _buildProductArea()),
+                      // Order panel
+                      _buildOrderPanel(),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -104,50 +135,40 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   // Top bar
   // -------------------------------------------------------------------------
 
-  Widget _buildTopBar() {
-    final user = ref.watch(currentUserProvider);
-    final userName = user?.name ?? 'Unknown';
-    final initials = _initials(userName);
-
+  Widget _buildTopBar(String userName) {
     return Container(
       height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
       color: AppColors.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
       child: Row(
         children: [
           // Logo
-          Row(
-            children: [
-              const Text(
-                'Gastro',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryContainer],
-                ).createShader(bounds),
-                child: const Text(
-                  'Core',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-            ],
+          const Text(
+            'Gastro',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.3,
+            ),
           ),
-          const SizedBox(width: 20),
+          const Text(
+            'Core',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.primary,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(width: 16),
 
-          // Online badge
+          // Status badge
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: AppColors.greenDim,
               borderRadius: BorderRadius.circular(6),
@@ -156,8 +177,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 5,
-                  height: 5,
+                  width: 6,
+                  height: 6,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.green,
@@ -167,7 +188,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 const Text(
                   'ONLINE',
                   style: TextStyle(
-                    fontSize: 9,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: AppColors.green,
                     letterSpacing: 0.8,
@@ -176,314 +197,247 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
 
-          // Info text
+          // Terminal info
           const Text(
-            'Terminal 01  \u2022  Main Floor  \u2022  Lunch',
+            'Terminal 01  \u2022  Main Floor',
             style: TextStyle(
               fontSize: 12,
               color: AppColors.textDim,
             ),
           ),
+
           const Spacer(),
 
-          // User avatar
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.accent.withValues(alpha: 0.15),
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.accent,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
+          // User
           Text(
             userName,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
               color: AppColors.textSecondary,
             ),
           ),
+          const SizedBox(width: 10),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primary.withValues(alpha: 0.12),
+            ),
+            child: Center(
+              child: Text(
+                _initials(userName),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return name.substring(0, name.length.clamp(0, 2)).toUpperCase();
-  }
-
   // -------------------------------------------------------------------------
-  // Category sidebar
+  // Product area
   // -------------------------------------------------------------------------
 
-  Widget _buildCategorySidebar() {
+  Widget _buildProductArea() {
+    final productsAsync = ref.watch(filteredProductsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
     final selectedId = ref.watch(selectedCategoryProvider);
 
-    return Container(
-      width: 80,
-      color: AppColors.surface,
-      child: Column(
-        children: [
-          const SizedBox(height: 8),
-          Expanded(
-            child: categoriesAsync.when(
-              loading: () => const Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.accent,
+    return Column(
+      children: [
+        // Category pills (horizontal scrollable)
+        Container(
+          color: AppColors.surface,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              // Search
+              Expanded(
+                flex: 2,
+                child: Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.search_rounded,
+                        size: 18,
+                        color: AppColors.textDim,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (v) => ref
+                              .read(productSearchProvider.notifier)
+                              .state = v,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'Search items...',
+                            hintStyle: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textDim,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              error: (_, __) => const Center(
-                child: Icon(Icons.error_outline,
-                    size: 24, color: AppColors.textDim),
+              const SizedBox(width: 12),
+              // Category tabs
+              Expanded(
+                flex: 3,
+                child: categoriesAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (categories) => SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // All
+                        _buildCategoryPill(
+                          label: 'All',
+                          isActive: selectedId == null,
+                          onTap: () => ref
+                              .read(selectedCategoryProvider.notifier)
+                              .state = null,
+                        ),
+                        ...categories.map((cat) => Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: _buildCategoryPill(
+                                label: cat.name,
+                                isActive: cat.id == selectedId,
+                                onTap: () => ref
+                                    .read(selectedCategoryProvider.notifier)
+                                    .state = cat.id,
+                              ),
+                            )),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              data: (categories) {
-                // Prepend an "All" option
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: categories.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      // "All" category
-                      final isActive = selectedId == null;
-                      return _buildCategoryTile(
-                        icon: '\u2B50',
-                        name: 'Tumu',
-                        isActive: isActive,
-                        onTap: () => ref
-                            .read(selectedCategoryProvider.notifier)
-                            .state = null,
-                      );
-                    }
+            ],
+          ),
+        ),
 
-                    final cat = categories[index - 1];
-                    final isActive = cat.id == selectedId;
-                    return _buildCategoryTile(
-                      icon: cat.icon,
-                      name: cat.name,
-                      isActive: isActive,
-                      onTap: () => ref
-                          .read(selectedCategoryProvider.notifier)
-                          .state = cat.id,
-                    );
-                  },
-                );
-              },
+        // Thin separator
+        Container(height: 1, color: AppColors.border),
+
+        // Product grid
+        Expanded(
+          child: productsAsync.when(
+            loading: () => const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
             ),
+            error: (err, _) => Center(
+              child: Text(
+                'Error: $err',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textDim,
+                ),
+              ),
+            ),
+            data: (products) {
+              if (products.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.search_off_rounded,
+                        size: 48,
+                        color: AppColors.textDim.withValues(alpha: 0.4),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'No items found',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate:
+                    const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 200,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.82,
+                ),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  return _ProductCard(
+                    product: product,
+                    onTap: () => _addProduct(product),
+                    formatPrice: _formatPrice,
+                  );
+                },
+              );
+            },
           ),
-
-          // -- Bottom: Floor Plan & Settings shortcuts --
-          const Divider(
-            color: AppColors.surfaceContainerHigh,
-            height: 1,
-            indent: 12,
-            endIndent: 12,
-          ),
-          _buildSidebarAction(Icons.grid_view_rounded, 'Masalar', () {
-            context.go('/tables');
-          }),
-          _buildSidebarAction(Icons.kitchen_rounded, 'Mutfak', () {
-            context.go('/kitchen');
-          }),
-          _buildSidebarAction(Icons.logout_rounded, 'Kapat', () {
-            context.go('/shift-close');
-          }),
-          const SizedBox(height: 8),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildCategoryTile({
-    required String icon,
-    required String name,
+  Widget _buildCategoryPill({
+    required String label,
     required bool isActive,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.accentDim : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          color: isActive ? AppColors.primary : AppColors.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              icon,
-              style: const TextStyle(fontSize: 20),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              name,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive ? AppColors.accent : AppColors.textDim,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSidebarAction(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Column(
-          children: [
-            Icon(icon, size: 20, color: AppColors.textDim),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 9,
-                color: AppColors.textDim,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------------------
-  // Product area (center)
-  // -------------------------------------------------------------------------
-
-  Widget _buildProductArea() {
-    final productsAsync = ref.watch(filteredProductsProvider);
-
-    return Container(
-      color: AppColors.surfaceDim,
-      child: Column(
-        children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 14),
-                  const Icon(
-                    Icons.search_rounded,
-                    size: 20,
-                    color: AppColors.textDim,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (v) => ref
-                          .read(productSearchProvider.notifier)
-                          .state = v,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: 'Urun ara...',
-                        hintStyle: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textDim,
-                        ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isActive ? Colors.white : AppColors.textSecondary,
             ),
           ),
-
-          // Product grid
-          Expanded(
-            child: productsAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: AppColors.accent),
-              ),
-              error: (err, _) => Center(
-                child: Text(
-                  'Error: $err',
-                  style: const TextStyle(
-                      fontSize: 13, color: AppColors.textDim),
-                ),
-              ),
-              data: (products) {
-                if (products.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'Urun bulunamadi',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textDim,
-                      ),
-                    ),
-                  );
-                }
-                return GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                  gridDelegate:
-                      const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 220,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.85,
-                  ),
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    final product = products[index];
-                    return _ProductCard(
-                      product: product,
-                      onTap: () => _addProduct(product),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -493,7 +447,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   // -------------------------------------------------------------------------
-  // Order panel (right)
+  // Order panel
   // -------------------------------------------------------------------------
 
   Widget _buildOrderPanel() {
@@ -506,15 +460,23 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final isDineIn = ticket?.orderType != OrderType.takeaway;
 
     return Container(
-      width: 320,
-      color: AppColors.surface,
+      width: 340,
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        boxShadow: kPanelShadow,
+      ),
       child: Column(
         children: [
-          // -- Header --
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          // ── Panel header ─────────────────────────────────────────────────
+          Container(
+            height: 56,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.border)),
+            ),
             child: Row(
               children: [
+                // Order number badge
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -527,85 +489,95 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                         ? '#${ticket!.orderNumber}'
                         : 'New Order',
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.accent,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Text(
-                  '${items.length} items',
+                  '${items.length} item${items.length == 1 ? '' : 's'}',
                   style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
                     color: AppColors.textDim,
-                    letterSpacing: 1.0,
                   ),
                 ),
                 const Spacer(),
-                GestureDetector(
-                  onTap: hasItems
-                      ? () {
-                          // Clear all items from ticket.
-                          for (final item in List.of(items)) {
-                            ref
-                                .read(currentTicketProvider.notifier)
-                                .removeItem(item.id);
-                          }
-                        }
-                      : null,
-                  child: Icon(
-                    Icons.delete_outline_rounded,
-                    size: 18,
-                    color: hasItems ? AppColors.textDim : Colors.transparent,
+                if (hasItems)
+                  GestureDetector(
+                    onTap: () {
+                      for (final item in List.of(items)) {
+                        ref
+                            .read(currentTicketProvider.notifier)
+                            .removeItem(item.id);
+                      }
+                    },
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.redDim,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 16,
+                        color: AppColors.red,
+                      ),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
 
-          // Thin separator via color shift
-          Container(height: 1, color: AppColors.surfaceContainerLow),
-
-          // -- Dine-in / Takeaway toggle (Swiss MWST) --
+          // ── Dine-in / Takeaway toggle ─────────────────────────────────────
           _buildServiceTypeToggle(isDineIn),
 
-          // -- Item list --
+          // ── Item list ────────────────────────────────────────────────────
           Expanded(
             child: !hasItems
-                ? const Center(
+                ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.receipt_long_outlined,
-                          size: 40,
-                          color: AppColors.surfaceContainerHigh,
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          'Siparis bos',
-                          style: TextStyle(
-                            fontSize: 13,
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(
+                            Icons.receipt_long_outlined,
+                            size: 32,
                             color: AppColors.textDim,
                           ),
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Urun eklemek icin tiklayiniz',
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Order is empty',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Tap a product to add it',
+                          style: TextStyle(
+                            fontSize: 12,
                             color: AppColors.textDim,
                           ),
                         ),
                       ],
                     ),
                   )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
+                : ListView.separated(
+                    padding: const EdgeInsets.all(12),
                     itemCount: items.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 4),
                     itemBuilder: (context, index) {
                       final item = items[index];
                       return Dismissible(
@@ -621,7 +593,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                           padding: const EdgeInsets.only(right: 16),
                           decoration: BoxDecoration(
                             color: AppColors.redDim,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(
                             Icons.delete_rounded,
@@ -629,158 +601,52 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             size: 20,
                           ),
                         ),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              // Qty controls
-                              GestureDetector(
-                                onTap: () {
-                                  if (item.quantity > 1) {
-                                    ref
-                                        .read(currentTicketProvider.notifier)
-                                        .updateItemQuantity(
-                                            item.id, item.quantity - 1);
-                                  } else {
-                                    ref
-                                        .read(currentTicketProvider.notifier)
-                                        .removeItem(item.id);
-                                  }
-                                },
-                                child: Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceContainerHigh,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Icon(
-                                    Icons.remove,
-                                    size: 14,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${item.quantity.toInt()}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                  fontFeatures: [
-                                    FontFeature.tabularFigures()
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: () {
-                                  ref
-                                      .read(currentTicketProvider.notifier)
-                                      .updateItemQuantity(
-                                          item.id, item.quantity + 1);
-                                },
-                                child: Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceContainerHigh,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Icon(
-                                    Icons.add,
-                                    size: 14,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Name + modifiers
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.productName,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                    if (item.modifiers.isNotEmpty)
-                                      Text(
-                                        item.modifiers
-                                            .map((m) => m.modifierName)
-                                            .join(', '),
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          color: AppColors.textDim,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              // Price
-                              Text(
-                                _formatPrice(item.subtotal),
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                  fontFeatures: [
-                                    FontFeature.tabularFigures()
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        child: _buildOrderItem(item),
                       );
                     },
                   ),
           ),
 
-          // -- Totals --
+          // ── Totals ───────────────────────────────────────────────────────
           Container(
-            color: AppColors.surfaceContainerLow,
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
             child: Column(
               children: [
-                _buildTotalRow('Ara Toplam', _formatCHF(subtotal), false),
-                const SizedBox(height: 4),
-                // MWST breakdown: one line per rate (A=8.1%, B=2.6%, C=3.8%)
+                _buildTotalRow(
+                    'Subtotal', _formatCHF(subtotal), false),
+                const SizedBox(height: 6),
                 if (fare != null)
                   ...fare.dishesTaxes.map((t) => Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
+                        padding: const EdgeInsets.only(bottom: 4),
                         child: _buildTotalRow(
-                          'MwSt ${t.rate}%',
+                          'VAT ${t.rate}%',
                           _formatCHF(t.amount),
                           false,
                         ),
                       ))
                 else
-                  _buildTotalRow('MwSt', _formatCHF(ticket?.taxAmount ?? 0), false),
-                const SizedBox(height: 10),
-                _buildTotalRow('Genel Toplam', _formatCHF(total), true),
+                  _buildTotalRow(
+                      'VAT', _formatCHF(ticket?.taxAmount ?? 0), false),
+                Container(
+                  height: 1,
+                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  color: AppColors.border,
+                ),
+                _buildTotalRow('Total', _formatCHF(total), true),
               ],
             ),
           ),
 
-          // -- Action buttons --
+          // ── Action buttons ───────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
             child: Column(
               children: [
-                // Send to kitchen
+                // Send to kitchen — coral
                 GestureDetector(
                   onTap: hasItems
                       ? () async {
@@ -789,26 +655,50 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                               .sendToKitchen();
                         }
                       : null,
-                  child: Container(
-                    width: double.infinity,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: hasItems
-                          ? AppColors.orange
-                          : AppColors.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'MUTFAGA GONDER',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: hasItems
-                              ? const Color(0xFF1A0A00)
-                              : AppColors.textDim,
-                          letterSpacing: 1.0,
-                        ),
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 200),
+                    opacity: hasItems ? 1.0 : 0.45,
+                    child: Container(
+                      width: double.infinity,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: hasItems
+                            ? AppColors.coral
+                            : AppColors.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: hasItems
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.coral.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.restaurant_rounded,
+                            size: 18,
+                            color: hasItems
+                                ? Colors.white
+                                : AppColors.textDim,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Send to Kitchen',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: hasItems
+                                  ? Colors.white
+                                  : AppColors.textDim,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -820,36 +710,45 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
-                          // TODO: Open discount dialog
+                          // TODO: open discount dialog
                         },
                         child: Container(
-                          height: 48,
+                          height: 52,
                           decoration: BoxDecoration(
                             color: AppColors.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: AppColors.border),
                           ),
-                          child: const Center(
-                            child: Text(
-                              'INDIRIM',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.local_offer_outlined,
+                                size: 16,
                                 color: AppColors.textSecondary,
-                                letterSpacing: 0.8,
                               ),
-                            ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Discount',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Payment
+                    // Pay — teal gradient
                     Expanded(
                       flex: 2,
                       child: GestureDetector(
                         onTap: hasItems
                             ? () async {
-                                // Save the ticket first, then navigate.
                                 final saved = await ref
                                     .read(currentTicketProvider.notifier)
                                     .saveCurrentTicket();
@@ -859,35 +758,65 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                 }
                               }
                             : null,
-                        child: Container(
-                          height: 48,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            gradient: hasItems
-                                ? const LinearGradient(
-                                    colors: [
-                                      Color(0xFF05B046),
-                                      Color(0xFF038A38),
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  )
-                                : null,
-                            color: hasItems
-                                ? null
-                                : AppColors.surfaceContainerHigh,
-                          ),
-                          child: Center(
-                            child: Text(
-                              'ODEME',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: hasItems
-                                    ? const Color(0xFF003A11)
-                                    : AppColors.textDim,
-                                letterSpacing: 1.0,
-                              ),
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 200),
+                          opacity: hasItems ? 1.0 : 0.45,
+                          child: Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              gradient: hasItems
+                                  ? const LinearGradient(
+                                      colors: [
+                                        AppColors.primary,
+                                        AppColors.primaryContainer,
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : null,
+                              color: hasItems
+                                  ? null
+                                  : AppColors.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: hasItems ? kButtonShadow : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.payment_rounded,
+                                  size: 18,
+                                  color: hasItems
+                                      ? Colors.white
+                                      : AppColors.textDim,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Pay',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: hasItems
+                                        ? Colors.white
+                                        : AppColors.textDim,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                                if (hasItems) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _formatCHF(total),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white70,
+                                      fontFeatures: [
+                                        FontFeature.tabularFigures()
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         ),
@@ -903,33 +832,146 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     );
   }
 
+  Widget _buildOrderItem(dynamic item) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+        boxShadow: kCardShadow,
+      ),
+      child: Row(
+        children: [
+          // Qty controls
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                _qtyButton(
+                  icon: Icons.remove,
+                  onTap: () {
+                    if (item.quantity > 1) {
+                      ref
+                          .read(currentTicketProvider.notifier)
+                          .updateItemQuantity(item.id, item.quantity - 1);
+                    } else {
+                      ref
+                          .read(currentTicketProvider.notifier)
+                          .removeItem(item.id);
+                    }
+                  },
+                ),
+                SizedBox(
+                  width: 28,
+                  child: Center(
+                    child: Text(
+                      '${item.quantity.toInt()}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ),
+                _qtyButton(
+                  icon: Icons.add,
+                  onTap: () => ref
+                      .read(currentTicketProvider.notifier)
+                      .updateItemQuantity(item.id, item.quantity + 1),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Name
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.productName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (item.modifiers.isNotEmpty)
+                  Text(
+                    item.modifiers
+                        .map((m) => m.modifierName)
+                        .join(', '),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textDim,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Price
+          Text(
+            _formatPrice(item.subtotal),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _qtyButton({required IconData icon, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 28,
+        height: 28,
+        child: Icon(icon, size: 14, color: AppColors.textSecondary),
+      ),
+    );
+  }
+
   // -------------------------------------------------------------------------
-  // Service type toggle (Hier essen / Zum Mitnehmen)
+  // Service type toggle
   // -------------------------------------------------------------------------
 
-  /// Two-segment toggle for dine-in vs takeaway.
-  ///
-  /// Switching changes the MWST rate on food items (8.1% ↔ 2.6%).
   Widget _buildServiceTypeToggle(bool isDineIn) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
       child: Container(
-        height: 36,
+        height: 38,
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(8),
+          color: AppColors.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
             _buildToggleSegment(
-              label: 'Hier essen',
+              label: 'Dine In',
+              icon: Icons.restaurant_rounded,
               isActive: isDineIn,
               onTap: () => ref
                   .read(currentTicketProvider.notifier)
                   .updateOrderType(OrderType.dineIn),
             ),
             _buildToggleSegment(
-              label: 'Zum Mitnehmen',
+              label: 'Takeaway',
+              icon: Icons.takeout_dining_rounded,
               isActive: !isDineIn,
               onTap: () => ref
                   .read(currentTicketProvider.notifier)
@@ -943,6 +985,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   Widget _buildToggleSegment({
     required String label,
+    required IconData icon,
     required bool isActive,
     required VoidCallback onTap,
   }) {
@@ -953,30 +996,37 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           duration: const Duration(milliseconds: 150),
           margin: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
+            color: isActive ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
+                      color: AppColors.primary.withValues(alpha: 0.2),
                       blurRadius: 4,
-                      offset: const Offset(0, 1),
+                      offset: const Offset(0, 2),
                     ),
                   ]
                 : null,
           ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight:
-                    isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive
-                    ? AppColors.textPrimary
-                    : AppColors.textDim,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isActive ? Colors.white : AppColors.textDim,
               ),
-            ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                      isActive ? FontWeight.w600 : FontWeight.w400,
+                  color: isActive ? Colors.white : AppColors.textDim,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -992,8 +1042,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           style: TextStyle(
             fontSize: isTotal ? 14 : 12,
             fontWeight: isTotal ? FontWeight.w600 : FontWeight.w400,
-            color:
-                isTotal ? AppColors.textPrimary : AppColors.textSecondary,
+            color: isTotal
+                ? AppColors.textPrimary
+                : AppColors.textSecondary,
           ),
         ),
         Text(
@@ -1001,7 +1052,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           style: TextStyle(
             fontSize: isTotal ? 20 : 13,
             fontWeight: isTotal ? FontWeight.w800 : FontWeight.w500,
-            color: isTotal ? AppColors.accent : AppColors.textPrimary,
+            color: isTotal ? AppColors.textPrimary : AppColors.textSecondary,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
@@ -1015,10 +1066,15 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 // ---------------------------------------------------------------------------
 
 class _ProductCard extends StatefulWidget {
+  const _ProductCard({
+    required this.product,
+    required this.onTap,
+    required this.formatPrice,
+  });
+
   final ProductEntity product;
   final VoidCallback onTap;
-
-  const _ProductCard({required this.product, required this.onTap});
+  final String Function(int) formatPrice;
 
   @override
   State<_ProductCard> createState() => _ProductCardState();
@@ -1026,12 +1082,6 @@ class _ProductCard extends StatefulWidget {
 
 class _ProductCardState extends State<_ProductCard> {
   bool _isPressed = false;
-
-  String _formatPrice(int cents) {
-    final whole = cents ~/ 100;
-    final frac = (cents % 100).toString().padLeft(2, '0');
-    return 'CHF $whole.$frac';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1044,14 +1094,17 @@ class _ProductCardState extends State<_ProductCard> {
       onTapCancel: () => setState(() => _isPressed = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        constraints: const BoxConstraints(minHeight: 88),
+        constraints: const BoxConstraints(minHeight: 100),
         decoration: BoxDecoration(
-          color: _isPressed
-              ? AppColors.surfaceBright
-              : AppColors.surfaceContainerLow,
+          color: _isPressed ? AppColors.surfaceBright : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
+          boxShadow: _isPressed ? null : kCardShadow,
+          border: _isPressed
+              ? Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.3))
+              : null,
         ),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1066,13 +1119,13 @@ class _ProductCardState extends State<_ProductCard> {
                 child: const Center(
                   child: Icon(
                     Icons.restaurant_rounded,
-                    size: 28,
-                    color: AppColors.surfaceContainerHighest,
+                    size: 32,
+                    color: AppColors.textDim,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             // Name
             Text(
               widget.product.name,
@@ -1084,9 +1137,8 @@ class _ProductCardState extends State<_ProductCard> {
                 color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 2),
-            // Description
-            if (widget.product.description != null)
+            if (widget.product.description != null) ...[
+              const SizedBox(height: 2),
               Text(
                 widget.product.description!,
                 maxLines: 1,
@@ -1096,15 +1148,35 @@ class _ProductCardState extends State<_ProductCard> {
                   color: AppColors.textDim,
                 ),
               ),
+            ],
             const SizedBox(height: 6),
-            // Price
-            Text(
-              _formatPrice(widget.product.price),
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: AppColors.green,
-              ),
+            // Price + add button
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  widget.formatPrice(widget.product.price),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.add,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

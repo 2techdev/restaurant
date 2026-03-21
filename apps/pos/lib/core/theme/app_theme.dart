@@ -1,7 +1,8 @@
-/// Complete dark theme for GastroCore POS.
+/// Complete light theme for GastroCore POS.
 ///
-/// Optimised for restaurant environments: high contrast on dark surfaces,
-/// large touch targets, and clearly distinguishable semantic colours.
+/// Lightspeed-inspired professional UI optimised for restaurant tablets.
+/// Material 3 light theme — high contrast, generous touch targets,
+/// clean hierarchy through whitespace and shadow (not borders).
 library;
 
 import 'package:flutter/material.dart';
@@ -12,39 +13,79 @@ import 'app_colors.dart';
 // Border radius constants
 // ---------------------------------------------------------------------------
 
-/// Small radius for chips, badges, small buttons.
+/// Small radius — chips, badges, small buttons.
 const double kRadiusSmall = 8.0;
 
-/// Medium radius for cards, inputs, dialogs.
+/// Medium radius — cards, inputs, dialogs.
 const double kRadiusMedium = 12.0;
 
-/// Large radius for sheets, modals, prominent elements.
+/// Large radius — sheets, modals, prominent panels.
 const double kRadiusLarge = 16.0;
+
+// ---------------------------------------------------------------------------
+// Shadow presets
+// ---------------------------------------------------------------------------
+
+/// Subtle card shadow — white cards on light gray background.
+const List<BoxShadow> kCardShadow = [
+  BoxShadow(
+    color: Color(0x0D000000),
+    blurRadius: 8,
+    offset: Offset(0, 2),
+  ),
+  BoxShadow(
+    color: Color(0x07000000),
+    blurRadius: 1,
+    offset: Offset(0, 1),
+  ),
+];
+
+/// Elevated panel shadow — order panel, floating dialogs.
+const List<BoxShadow> kPanelShadow = [
+  BoxShadow(
+    color: Color(0x18000000),
+    blurRadius: 24,
+    offset: Offset(-4, 0),
+  ),
+];
+
+/// Button shadow — for primary action buttons.
+const List<BoxShadow> kButtonShadow = [
+  BoxShadow(
+    color: Color(0x2600897B),
+    blurRadius: 8,
+    offset: Offset(0, 4),
+  ),
+];
 
 // ---------------------------------------------------------------------------
 // Theme
 // ---------------------------------------------------------------------------
 
-/// Builds the application-wide dark [ThemeData].
+/// Builds the application-wide light [ThemeData].
 ThemeData buildAppTheme() {
-  final colorScheme = ColorScheme.dark(
-    primary: AppColors.accent,
+  final colorScheme = ColorScheme.light(
+    primary: AppColors.primary,
     onPrimary: Colors.white,
-    secondary: AppColors.accent,
+    primaryContainer: AppColors.primaryLight,
+    onPrimaryContainer: AppColors.primaryContainer,
+    secondary: AppColors.coral,
     onSecondary: Colors.white,
     error: AppColors.red,
     onError: Colors.white,
-    surface: AppColors.bgSecondary,
+    surface: AppColors.surface,
     onSurface: AppColors.textPrimary,
-    surfaceContainerHighest: AppColors.bgCard,
+    surfaceContainerHighest: AppColors.surfaceContainer,
+    outline: AppColors.border,
+    outlineVariant: AppColors.outlineVariant,
   );
 
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
+    brightness: Brightness.light,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: AppColors.bgPrimary,
-    canvasColor: AppColors.bgSecondary,
+    scaffoldBackgroundColor: AppColors.surfaceDim,
+    canvasColor: AppColors.surface,
     cardColor: AppColors.bgCard,
     dividerColor: AppColors.border,
 
@@ -134,7 +175,6 @@ ThemeData buildAppTheme() {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRadiusMedium),
-        side: const BorderSide(color: AppColors.border, width: 1),
       ),
       margin: EdgeInsets.zero,
     ),
@@ -154,7 +194,7 @@ ThemeData buildAppTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
-        borderSide: const BorderSide(color: AppColors.accent, width: 2),
+        borderSide: const BorderSide(color: AppColors.borderFocused, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
@@ -171,7 +211,7 @@ ThemeData buildAppTheme() {
     // -- Elevated button -----------------------------------------------------
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.accent,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -186,10 +226,10 @@ ThemeData buildAppTheme() {
       ),
     ),
 
-    // -- Text button ----------------------------------------------------------
+    // -- Text button ---------------------------------------------------------
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: AppColors.accent,
+        foregroundColor: AppColors.primary,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kRadiusSmall),
@@ -201,7 +241,7 @@ ThemeData buildAppTheme() {
       ),
     ),
 
-    // -- Outlined button ------------------------------------------------------
+    // -- Outlined button -----------------------------------------------------
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.textPrimary,
@@ -220,44 +260,63 @@ ThemeData buildAppTheme() {
 
     // -- Dialog ---------------------------------------------------------------
     dialogTheme: DialogThemeData(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: AppColors.surface,
       elevation: 8,
+      shadowColor: const Color(0x1A000000),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRadiusLarge),
       ),
     ),
 
-    // -- Bottom sheet ---------------------------------------------------------
+    // -- Bottom sheet --------------------------------------------------------
     bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: AppColors.bgSecondary,
+      backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(kRadiusLarge)),
       ),
     ),
 
-    // -- Divider --------------------------------------------------------------
+    // -- Divider -------------------------------------------------------------
     dividerTheme: const DividerThemeData(
       color: AppColors.border,
       thickness: 1,
       space: 1,
     ),
 
-    // -- Snackbar -------------------------------------------------------------
+    // -- Snackbar ------------------------------------------------------------
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: AppColors.bgCard,
-      contentTextStyle: const TextStyle(color: AppColors.textPrimary),
+      backgroundColor: AppColors.textPrimary,
+      contentTextStyle: const TextStyle(color: Colors.white),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
       ),
       behavior: SnackBarBehavior.floating,
     ),
 
-    // -- AppBar (used sparingly in POS) --------------------------------------
+    // -- AppBar (used sparingly) ---------------------------------------------
     appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.surface,
       foregroundColor: AppColors.textPrimary,
       elevation: 0,
+      shadowColor: Color(0x0D000000),
+      surfaceTintColor: Colors.transparent,
       centerTitle: false,
+    ),
+
+    // -- Chip ----------------------------------------------------------------
+    chipTheme: ChipThemeData(
+      backgroundColor: AppColors.surfaceContainerHigh,
+      selectedColor: AppColors.accentDim,
+      labelStyle: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: AppColors.textPrimary,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      side: BorderSide.none,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     ),
   );
 }
@@ -267,8 +326,7 @@ ThemeData buildAppTheme() {
 // ---------------------------------------------------------------------------
 
 /// Additional colours that don't map to Material's [ColorScheme] but are
-/// essential for POS UI elements such as status indicators, table states,
-/// and order badges.
+/// essential for POS UI elements: status indicators, table states, badges.
 class PosColors extends ThemeExtension<PosColors> {
   const PosColors({
     this.green = AppColors.green,
@@ -276,6 +334,7 @@ class PosColors extends ThemeExtension<PosColors> {
     this.red = AppColors.red,
     this.yellow = AppColors.yellow,
     this.purple = AppColors.purple,
+    this.coral = AppColors.coral,
     this.greenDim = AppColors.greenDim,
     this.orangeDim = AppColors.orangeDim,
     this.redDim = AppColors.redDim,
@@ -287,6 +346,7 @@ class PosColors extends ThemeExtension<PosColors> {
     this.textSecondary = AppColors.textSecondary,
     this.textDim = AppColors.textDim,
     this.border = AppColors.border,
+    this.navSurface = AppColors.navSurface,
   });
 
   final Color green;
@@ -294,6 +354,7 @@ class PosColors extends ThemeExtension<PosColors> {
   final Color red;
   final Color yellow;
   final Color purple;
+  final Color coral;
   final Color greenDim;
   final Color orangeDim;
   final Color redDim;
@@ -305,6 +366,7 @@ class PosColors extends ThemeExtension<PosColors> {
   final Color textSecondary;
   final Color textDim;
   final Color border;
+  final Color navSurface;
 
   @override
   PosColors copyWith({
@@ -313,6 +375,7 @@ class PosColors extends ThemeExtension<PosColors> {
     Color? red,
     Color? yellow,
     Color? purple,
+    Color? coral,
     Color? greenDim,
     Color? orangeDim,
     Color? redDim,
@@ -324,6 +387,7 @@ class PosColors extends ThemeExtension<PosColors> {
     Color? textSecondary,
     Color? textDim,
     Color? border,
+    Color? navSurface,
   }) {
     return PosColors(
       green: green ?? this.green,
@@ -331,6 +395,7 @@ class PosColors extends ThemeExtension<PosColors> {
       red: red ?? this.red,
       yellow: yellow ?? this.yellow,
       purple: purple ?? this.purple,
+      coral: coral ?? this.coral,
       greenDim: greenDim ?? this.greenDim,
       orangeDim: orangeDim ?? this.orangeDim,
       redDim: redDim ?? this.redDim,
@@ -342,6 +407,7 @@ class PosColors extends ThemeExtension<PosColors> {
       textSecondary: textSecondary ?? this.textSecondary,
       textDim: textDim ?? this.textDim,
       border: border ?? this.border,
+      navSurface: navSurface ?? this.navSurface,
     );
   }
 
@@ -354,6 +420,7 @@ class PosColors extends ThemeExtension<PosColors> {
       red: Color.lerp(red, other.red, t)!,
       yellow: Color.lerp(yellow, other.yellow, t)!,
       purple: Color.lerp(purple, other.purple, t)!,
+      coral: Color.lerp(coral, other.coral, t)!,
       greenDim: Color.lerp(greenDim, other.greenDim, t)!,
       orangeDim: Color.lerp(orangeDim, other.orangeDim, t)!,
       redDim: Color.lerp(redDim, other.redDim, t)!,
@@ -365,6 +432,7 @@ class PosColors extends ThemeExtension<PosColors> {
       textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
       textDim: Color.lerp(textDim, other.textDim, t)!,
       border: Color.lerp(border, other.border, t)!,
+      navSurface: Color.lerp(navSurface, other.navSurface, t)!,
     );
   }
 }

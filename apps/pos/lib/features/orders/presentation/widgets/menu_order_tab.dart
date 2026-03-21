@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/router/app_router.dart';
+import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
@@ -24,16 +25,16 @@ import 'package:gastrocore_pos/features/orders/presentation/widgets/menu_setting
 // ---------------------------------------------------------------------------
 
 abstract final class _Tok {
-  static const Color surfaceBase = Color(0xFF111319);
-  static const Color surfaceLow = Color(0xFF1A1D27);
-  static const Color surfaceMedium = Color(0xFF222633);
-  static const Color surfaceHigh = Color(0xFF2A2F3D);
-  static const Color textPrimary = Color(0xFFF0F0F5);
-  static const Color textSecondary = Color(0xFF8E8E9A);
-  static const Color textDim = Color(0xFF5A5A6A);
-  static const Color accentBlue = Color(0xFF528DFF);
-  static const Color accentBlueLight = Color(0xFFAFC6FF);
-  static const Color badgeRed = Color(0xFFEF4444);
+  static const Color surfaceBase = AppColors.surfaceDim;
+  static const Color surfaceLow = AppColors.surface;
+  static const Color surfaceMedium = AppColors.surfaceContainerHigh;
+  static const Color surfaceHigh = AppColors.surfaceContainerHighest;
+  static const Color textPrimary = AppColors.textPrimary;
+  static const Color textSecondary = AppColors.textSecondary;
+  static const Color textDim = AppColors.textDim;
+  static const Color accentBlue = AppColors.primary;
+  static const Color accentBlueLight = AppColors.primaryLight;
+  static const Color badgeRed = AppColors.red;
 }
 
 // ---------------------------------------------------------------------------
