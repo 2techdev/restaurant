@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service — GastroCore POS</title>
+  <style>
+    :root {
+      --orange: #FF6B35;
+      --orange-dark: #E55A25;
+      --orange-light: #FFF0EB;
+      --text: #1A1A2E;
+      --text-light: #555;
+      --border: #E0E0E0;
+      --bg: #FAFAFA;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+    header {
+      background: linear-gradient(135deg, var(--orange) 0%, var(--orange-dark) 100%);
+      color: white;
+      padding: 2rem 0;
+    }
+    .header-inner {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      text-decoration: none;
+      color: white;
+    }
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+    .logo-name { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-name span { font-weight: 300; opacity: 0.85; }
+    header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.4rem; }
+    header p { opacity: 0.85; font-size: 0.95rem; }
+    .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 0.2rem 0.75rem;
+      font-size: 0.8rem;
+      margin-top: 0.75rem;
+      margin-right: 0.4rem;
+    }
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 3rem 2rem;
+    }
+    .toc {
+      background: var(--orange-light);
+      border-left: 4px solid var(--orange);
+      border-radius: 0 8px 8px 0;
+      padding: 1.5rem 2rem;
+      margin-bottom: 3rem;
+    }
+    .toc h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--orange-dark); }
+    .toc ol { padding-left: 1.2rem; }
+    .toc li { margin-bottom: 0.3rem; }
+    .toc a { color: var(--orange-dark); text-decoration: none; font-size: 0.9rem; }
+    .toc a:hover { text-decoration: underline; }
+    section { margin-bottom: 3rem; }
+    h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--orange-light);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    h2 .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: var(--orange);
+      color: white;
+      border-radius: 50%;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+    h3 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--text); }
+    p { margin-bottom: 0.9rem; color: var(--text-light); }
+    ul, ol { margin: 0.5rem 0 1rem 1.5rem; color: var(--text-light); }
+    li { margin-bottom: 0.35rem; }
+    .tier-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    .tier-card {
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      background: white;
+      transition: border-color 0.2s;
+    }
+    .tier-card.featured {
+      border-color: var(--orange);
+      position: relative;
+    }
+    .tier-badge {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--orange);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.6rem;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .tier-card h3 { margin-top: 0; color: var(--text); }
+    .tier-price {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--orange);
+      margin: 0.5rem 0;
+    }
+    .tier-price span { font-size: 0.85rem; font-weight: 400; color: var(--text-light); }
+    .tier-card ul { margin-left: 1rem; font-size: 0.88rem; }
+    .highlight-box {
+      background: var(--orange-light);
+      border: 1px solid #FFD5C2;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+    .warning-box {
+      background: #FFF8E1;
+      border: 1px solid #FFE082;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+    .contact-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+    }
+    .contact-card p { margin: 0.2rem 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th {
+      background: var(--orange);
+      color: white;
+      padding: 0.6rem 1rem;
+      text-align: left;
+      font-weight: 600;
+    }
+    td {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-light);
+    }
+    tr:nth-child(even) td { background: #f8f8f8; }
+    footer {
+      background: var(--text);
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.85rem;
+      margin-top: 2rem;
+    }
+    footer a { color: var(--orange); text-decoration: none; }
+    a { color: var(--orange-dark); }
+    @media (max-width: 600px) {
+      main { padding: 2rem 1rem; }
+      header h1 { font-size: 1.4rem; }
+      .tier-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="logo" href="/">
+      <div class="logo-icon">🍽️</div>
+      <div class="logo-name">Gastro<span>Core</span> POS</div>
+    </a>
+    <h1>Terms of Service</h1>
+    <p>Please read these terms carefully before using GastroCore POS.</p>
+    <span class="badge">Swiss Law — Zürich</span>
+    <span class="badge">Last updated: March 2026</span>
+  </div>
+</header>
+
+<main>
+
+  <div class="toc">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#acceptance">Acceptance of Terms</a></li>
+      <li><a href="#service">Description of Service</a></li>
+      <li><a href="#licensing">Licensing Tiers</a></li>
+      <li><a href="#accounts">Accounts and Access</a></li>
+      <li><a href="#data-ownership">Data Ownership</a></li>
+      <li><a href="#payment-terms">Payment Terms</a></li>
+      <li><a href="#acceptable-use">Acceptable Use</a></li>
+      <li><a href="#ip">Intellectual Property</a></li>
+      <li><a href="#liability">Liability and Warranties</a></li>
+      <li><a href="#termination">Termination</a></li>
+      <li><a href="#governing-law">Governing Law and Jurisdiction</a></li>
+      <li><a href="#changes">Changes to Terms</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ol>
+  </div>
+
+  <section id="acceptance">
+    <h2><span class="num">1</span> Acceptance of Terms</h2>
+    <p>By downloading, installing, or using GastroCore POS ("the Service", "the App"), you ("Customer", "Operator", "you") agree to be bound by these Terms of Service ("Terms"). If you are using the Service on behalf of a business, you represent that you have authority to bind that business to these Terms.</p>
+    <p>If you do not agree to these Terms, do not use the Service.</p>
+    <div class="highlight-box">
+      These Terms constitute a legally binding agreement between you and <strong>2TechHub GmbH</strong>, incorporated under Swiss law. The governing language of these Terms is English; translations are provided for convenience only.
+    </div>
+  </section>
+
+  <section id="service">
+    <h2><span class="num">2</span> Description of Service</h2>
+    <p>GastroCore POS is a Software-as-a-Service (SaaS) restaurant management platform comprising:</p>
+    <ul>
+      <li><strong>POS App</strong> — Point-of-sale application for Android devices</li>
+      <li><strong>Kiosk App</strong> — Self-service ordering kiosk application</li>
+      <li><strong>Kitchen Display System (KDS)</strong> — Kitchen order management display</li>
+      <li><strong>Online Ordering</strong> — Customer-facing web application for pickup/delivery orders</li>
+      <li><strong>Manager Dashboard</strong> — Analytics and reporting web portal</li>
+      <li><strong>Admin Console</strong> — Multi-location configuration and management</li>
+      <li><strong>Cloud Sync</strong> (optional) — Data synchronisation and backup infrastructure</li>
+    </ul>
+    <p>The Service is designed for use by restaurant operators, food service businesses, and hospitality venues. It is not intended for personal, household, or consumer use.</p>
+  </section>
+
+  <section id="licensing">
+    <h2><span class="num">3</span> Licensing Tiers</h2>
+    <p>GastroCore POS is available in three licensing tiers. The features available to you depend on your active subscription.</p>
+
+    <div class="tier-grid">
+      <div class="tier-card">
+        <h3>Starter</h3>
+        <div class="tier-price">Free <span>forever</span></div>
+        <ul>
+          <li>1 POS device</li>
+          <li>1 location</li>
+          <li>Core POS features</li>
+          <li>Basic sales reports</li>
+          <li>Community support</li>
+          <li>Local storage only</li>
+        </ul>
+      </div>
+      <div class="tier-card featured">
+        <div class="tier-badge">Most Popular</div>
+        <h3>Professional</h3>
+        <div class="tier-price">CHF 49 <span>/ month</span></div>
+        <ul>
+          <li>Up to 5 devices</li>
+          <li>1 location</li>
+          <li>All 6 apps included</li>
+          <li>Wallee &amp; MyPOS integration</li>
+          <li>Cloud sync &amp; backup</li>
+          <li>Email support (48h SLA)</li>
+          <li>Advanced analytics</li>
+        </ul>
+      </div>
+      <div class="tier-card">
+        <h3>Enterprise</h3>
+        <div class="tier-price">Custom <span>pricing</span></div>
+        <ul>
+          <li>Unlimited devices</li>
+          <li>Unlimited locations</li>
+          <li>All Professional features</li>
+          <li>Dedicated account manager</li>
+          <li>Custom integrations</li>
+          <li>SLA: 4h response time</li>
+          <li>On-site training available</li>
+          <li>Custom data retention</li>
+        </ul>
+      </div>
+    </div>
+
+    <p>All prices are in Swiss Francs (CHF) and exclude VAT where applicable. Annual prepayment options are available with a 15% discount.</p>
+
+    <h3>3.1 Licence Grant</h3>
+    <p>Subject to your payment of applicable fees and compliance with these Terms, 2TechHub GmbH grants you a limited, non-exclusive, non-transferable, revocable licence to access and use GastroCore POS for your internal business operations during the subscription period.</p>
+
+    <h3>3.2 Licence Restrictions</h3>
+    <p>You may not:</p>
+    <ul>
+      <li>Sublicense, resell, or redistribute the Service without written authorisation</li>
+      <li>Reverse engineer, decompile, or attempt to extract source code</li>
+      <li>Use the Service to build a competing product</li>
+      <li>Exceed the device or location limits of your tier</li>
+      <li>Share login credentials across multiple unaffiliated businesses</li>
+    </ul>
+  </section>
+
+  <section id="accounts">
+    <h2><span class="num">4</span> Accounts and Access</h2>
+    <p>You are responsible for maintaining the security of your account credentials and all activity that occurs under your account. You must:</p>
+    <ul>
+      <li>Provide accurate and complete registration information</li>
+      <li>Notify us immediately of any unauthorised account access at <a href="mailto:security@gastrocore.ch">security@gastrocore.ch</a></li>
+      <li>Ensure that all staff using the Service comply with these Terms</li>
+      <li>Not share owner/admin credentials with staff members (use role-based access instead)</li>
+    </ul>
+    <p>We reserve the right to suspend accounts that show signs of compromise or abuse pending investigation.</p>
+  </section>
+
+  <section id="data-ownership">
+    <h2><span class="num">5</span> Data Ownership</h2>
+    <div class="highlight-box">
+      <strong>Your data is yours.</strong> You retain full ownership of all business data, customer data, and transaction data you input into GastroCore POS.
+    </div>
+
+    <h3>5.1 Your Data</h3>
+    <p>You own all data you create, upload, or generate through the Service ("Customer Data"). We do not claim any intellectual property rights over Customer Data. We process Customer Data only as a data processor acting on your instructions, except where required by law.</p>
+
+    <h3>5.2 Our Use of Your Data</h3>
+    <p>We use Customer Data solely to:</p>
+    <ul>
+      <li>Provide and maintain the Service</li>
+      <li>Generate aggregated, anonymised analytics to improve the Service (no individual identification)</li>
+      <li>Comply with legal obligations</li>
+    </ul>
+
+    <h3>5.3 Data Portability and Export</h3>
+    <p>You may export your data at any time via the Manager Dashboard in CSV or JSON format. Upon account termination, you have 90 days to export your data before it is deleted from cloud storage.</p>
+
+    <h3>5.4 Statutory Retention</h3>
+    <p>Transaction records required for Swiss accounting law (OR Art. 958f) will be retained for 10 years regardless of account status. These records remain accessible to you upon request during this period.</p>
+  </section>
+
+  <section id="payment-terms">
+    <h2><span class="num">6</span> Payment Terms</h2>
+    <h3>6.1 Billing</h3>
+    <p>Subscriptions are billed monthly or annually in advance. Payment is due on the subscription renewal date. We accept major credit cards, SEPA direct debit, and bank transfer (for annual plans).</p>
+
+    <h3>6.2 Price Changes</h3>
+    <p>We will notify you of price changes at least 60 days in advance via email and in-app notification. Continued use of the Service after the effective date constitutes acceptance of new pricing.</p>
+
+    <h3>6.3 Refunds</h3>
+    <p>Monthly subscriptions: no refunds for partial months. Annual subscriptions: pro-rata refund for unused full months if cancelled within 30 days of renewal. The Starter (free) tier has no payment or refund provisions.</p>
+
+    <h3>6.4 Late Payment</h3>
+    <p>Accounts with overdue payments (>14 days) will be downgraded to Starter tier access. Data is preserved for 90 days before deletion. Accounts overdue >90 days may be terminated with data deletion.</p>
+  </section>
+
+  <section id="acceptable-use">
+    <h2><span class="num">7</span> Acceptable Use</h2>
+    <p>You agree not to use GastroCore POS to:</p>
+    <ul>
+      <li>Process fraudulent transactions or engage in money laundering</li>
+      <li>Store or transmit illegal, harmful, or offensive content</li>
+      <li>Violate any applicable laws, including Swiss OR, VAT regulations, or data protection laws</li>
+      <li>Attempt to gain unauthorised access to our systems or other customers' data</li>
+      <li>Overload our systems through excessive automated requests</li>
+      <li>Circumvent any usage limits or security measures</li>
+    </ul>
+    <p>Violation of this acceptable use policy may result in immediate account suspension and potential legal action.</p>
+  </section>
+
+  <section id="ip">
+    <h2><span class="num">8</span> Intellectual Property</h2>
+    <p>All rights in the GastroCore POS software, including source code, design, trademarks, and documentation, are owned by 2TechHub GmbH or its licensors. Nothing in these Terms grants you any ownership rights in the Service.</p>
+    <p>The GastroCore name, logo, and "GastroCore POS" mark are trademarks of 2TechHub GmbH. You may not use our marks without prior written consent.</p>
+    <p>Feedback, suggestions, or ideas you provide about the Service may be used by us without obligation to you.</p>
+  </section>
+
+  <section id="liability">
+    <h2><span class="num">9</span> Liability and Warranties</h2>
+    <h3>9.1 Service Availability</h3>
+    <p>We target 99.5% monthly uptime for cloud services (excluding scheduled maintenance and events outside our reasonable control). GastroCore's offline-first architecture ensures core POS functionality remains available regardless of cloud service status.</p>
+
+    <h3>9.2 Disclaimer of Warranties</h3>
+    <p>THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE". TO THE MAXIMUM EXTENT PERMITTED BY SWISS LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.</p>
+
+    <h3>9.3 Limitation of Liability</h3>
+    <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, 2TECHUB GMBH'S TOTAL LIABILITY TO YOU FOR ANY CLAIMS ARISING UNDER THESE TERMS SHALL NOT EXCEED THE AMOUNT YOU PAID TO US IN THE 12 MONTHS PRECEDING THE CLAIM.</p>
+    <p>We are not liable for: loss of profits, loss of data (where you have not exported your data), indirect or consequential losses, or losses arising from third-party payment processing failures.</p>
+
+    <div class="warning-box">
+      <strong>Tax Compliance Responsibility:</strong> While GastroCore POS is designed for MWST compliance, you remain responsible for ensuring your tax filings are accurate. We recommend consulting a Swiss-qualified tax advisor (Treuhänder) for your specific situation.
+    </div>
+
+    <h3>9.4 Indemnification</h3>
+    <p>You agree to indemnify and hold 2TechHub GmbH harmless from any claims, damages, or expenses arising from your misuse of the Service, violation of these Terms, or infringement of third-party rights.</p>
+  </section>
+
+  <section id="termination">
+    <h2><span class="num">10</span> Termination</h2>
+    <h3>10.1 Termination by You</h3>
+    <p>You may cancel your subscription at any time through the account settings. Your access continues until the end of the current billing period. Data export is available for 90 days after cancellation.</p>
+
+    <h3>10.2 Termination by Us</h3>
+    <p>We may suspend or terminate your account:</p>
+    <ul>
+      <li>Immediately for material breach of these Terms (e.g., fraudulent use, security violations)</li>
+      <li>With 30 days' notice for convenience (Professional/Enterprise plans)</li>
+      <li>After 90 days of non-payment following downgrade to Starter</li>
+    </ul>
+
+    <h3>10.3 Effect of Termination</h3>
+    <p>Upon termination, your licence to use the Service ends. We will retain your data for 90 days to allow export, after which it will be securely deleted, except for data subject to statutory retention obligations.</p>
+  </section>
+
+  <section id="governing-law">
+    <h2><span class="num">11</span> Governing Law and Jurisdiction</h2>
+    <div class="highlight-box">
+      These Terms are governed by <strong>Swiss law</strong>, without regard to conflict of law principles. Any disputes arising from or related to these Terms shall be subject to the exclusive jurisdiction of the courts of <strong>Zürich, Switzerland</strong>.
+    </div>
+    <p>For customers in the European Union: mandatory consumer protection provisions of your home country continue to apply where Swiss law would provide lesser protection.</p>
+    <p>We are committed to resolving disputes amicably. Before initiating formal proceedings, we encourage you to contact us at <a href="mailto:legal@gastrocore.ch">legal@gastrocore.ch</a> to seek resolution.</p>
+  </section>
+
+  <section id="changes">
+    <h2><span class="num">12</span> Changes to Terms</h2>
+    <p>We may update these Terms from time to time. For material changes, we will provide at least 30 days' notice via email and in-app notification before the new terms take effect.</p>
+    <p>For non-material changes (e.g., typographical corrections, clarifications), we may update the Terms without notice.</p>
+    <p>Your continued use of the Service after the effective date constitutes acceptance of the updated Terms.</p>
+    <p><strong>Last modified:</strong> March 2026</p>
+  </section>
+
+  <section id="contact">
+    <h2><span class="num">13</span> Contact</h2>
+    <div class="contact-card">
+      <p><strong>2TechHub GmbH — Legal</strong></p>
+      <p>Switzerland</p>
+      <p>General: <a href="mailto:hello@gastrocore.ch">hello@gastrocore.ch</a></p>
+      <p>Legal: <a href="mailto:legal@gastrocore.ch">legal@gastrocore.ch</a></p>
+      <p>Billing: <a href="mailto:billing@gastrocore.ch">billing@gastrocore.ch</a></p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>&copy; 2026 2TechHub GmbH — GastroCore POS. All rights reserved.</p>
+  <p style="margin-top:0.5rem;">
+    <a href="/privacy-policy.html">Privacy Policy</a> &nbsp;·&nbsp;
+    <a href="/terms.html">Terms of Service</a>
+  </p>
+</footer>
+
+</body>
+</html>

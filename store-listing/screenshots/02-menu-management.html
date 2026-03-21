@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Screenshot 02 — Menu Management</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1A1A2E;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 2rem 1rem;
+    }
+    .caption { color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 1rem; text-align: center; }
+    .phone {
+      width: 375px;
+      height: 812px;
+      background: #111;
+      border-radius: 50px;
+      padding: 12px;
+      box-shadow: 0 0 0 2px #333, 0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 1px #222;
+      position: relative;
+    }
+    .phone-screen {
+      width: 100%;
+      height: 100%;
+      background: #F5F5F7;
+      border-radius: 40px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .status-bar {
+      background: #1A1A2E;
+      padding: 10px 20px 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .app-header {
+      background: #1A1A2E;
+      padding: 8px 16px 16px;
+      color: white;
+    }
+    .app-header .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .app-header h1 { font-size: 1.05rem; font-weight: 700; }
+    .add-btn-header {
+      background: #FF6B35;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 5px 12px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+    .search-bar {
+      background: rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 7px 12px;
+      color: rgba(255,255,255,0.6);
+      font-size: 0.78rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .content { flex: 1; overflow-y: auto; padding: 12px; }
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      margin-top: 4px;
+    }
+    .category-header {
+      background: white;
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .cat-left { display: flex; align-items: center; gap: 10px; }
+    .cat-icon {
+      width: 36px;
+      height: 36px;
+      background: #FFF0EB;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+    .cat-info .name { font-size: 0.78rem; font-weight: 700; color: #222; }
+    .cat-info .count { font-size: 0.65rem; color: #888; }
+    .cat-chevron { color: #ccc; font-size: 1rem; }
+    .menu-list { margin-bottom: 12px; }
+    .menu-row {
+      background: white;
+      border-radius: 10px;
+      padding: 8px 12px;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: 14px;
+    }
+    .menu-row .m-img {
+      width: 42px;
+      height: 42px;
+      background: #FFF0EB;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+    .menu-row .m-info { flex: 1; }
+    .menu-row .m-name { font-size: 0.75rem; font-weight: 600; color: #222; }
+    .menu-row .m-desc { font-size: 0.62rem; color: #888; margin-top: 1px; }
+    .menu-row .m-right { text-align: right; }
+    .menu-row .m-price { font-size: 0.78rem; font-weight: 700; color: #FF6B35; }
+    .m-tags { display: flex; gap: 3px; margin-top: 3px; justify-content: flex-end; }
+    .m-tag {
+      background: #F0F0F0;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.55rem;
+      color: #666;
+    }
+    .m-tag.active-tag { background: #E8F5E9; color: #388E3C; }
+    .toggle {
+      width: 30px;
+      height: 17px;
+      background: #4CAF50;
+      border-radius: 9px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      right: 2px;
+      top: 2px;
+      width: 13px;
+      height: 13px;
+      background: white;
+      border-radius: 50%;
+    }
+    .toggle.off { background: #ddd; }
+    .toggle.off::after { right: auto; left: 2px; }
+    .bottom-nav {
+      background: white;
+      border-top: 1px solid #eee;
+      padding: 6px 0 10px;
+      display: flex;
+      justify-content: space-around;
+    }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.55rem; color: #aaa; }
+    .nav-item .nav-icon { font-size: 1.1rem; }
+    .nav-item.active { color: #FF6B35; }
+    .notch {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 28px;
+      background: #111;
+      border-radius: 0 0 18px 18px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div class="caption">Screenshot 2 of 5 — Menu Management</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="phone-screen">
+      <div class="status-bar">
+        <span>9:41</span>
+        <span>●●●● WiFi 🔋</span>
+      </div>
+      <div class="app-header">
+        <div class="top-row">
+          <h1>📋 Menu Management</h1>
+          <button class="add-btn-header">+ Add Item</button>
+        </div>
+        <div class="search-bar">
+          <span>🔍</span>
+          <span>Search menu items...</span>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="section-title">Categories · 6 active</div>
+
+        <div class="category-header">
+          <div class="cat-left">
+            <div class="cat-icon">🍕</div>
+            <div class="cat-info">
+              <div class="name">Pizza</div>
+              <div class="count">8 items</div>
+            </div>
+          </div>
+          <span class="cat-chevron">›</span>
+        </div>
+        <div class="menu-list">
+          <div class="menu-row">
+            <div class="m-img">🍕</div>
+            <div class="m-info">
+              <div class="m-name">Margherita</div>
+              <div class="m-desc">Tomato, mozzarella, basil</div>
+            </div>
+            <div class="m-right">
+              <div class="m-price">CHF 18.00</div>
+              <div class="m-tags"><span class="m-tag active-tag">Active</span><span class="m-tag">V</span></div>
+            </div>
+          </div>
+          <div class="menu-row">
+            <div class="m-img">🍕</div>
+            <div class="m-info">
+              <div class="m-name">Diavola</div>
+              <div class="m-desc">Spicy salami, chili, mozzarella</div>
+            </div>
+            <div class="m-right">
+              <div class="m-price">CHF 23.00</div>
+              <div class="m-tags"><span class="m-tag active-tag">Active</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="category-header">
+          <div class="cat-left">
+            <div class="cat-icon">🍝</div>
+            <div class="cat-info">
+              <div class="name">Pasta</div>
+              <div class="count">6 items</div>
+            </div>
+          </div>
+          <span class="cat-chevron">›</span>
+        </div>
+        <div class="menu-list">
+          <div class="menu-row">
+            <div class="m-img">🍝</div>
+            <div class="m-info">
+              <div class="m-name">Carbonara</div>
+              <div class="m-desc">Guanciale, egg, pecorino</div>
+            </div>
+            <div class="m-right">
+              <div class="m-price">CHF 19.00</div>
+              <div class="m-tags"><span class="m-tag active-tag">Active</span></div>
+            </div>
+          </div>
+          <div class="menu-row">
+            <div class="m-img">🍝</div>
+            <div class="m-info">
+              <div class="m-name">Pesto Genovese</div>
+              <div class="m-desc">Fresh basil pesto, pine nuts</div>
+            </div>
+            <div class="m-right">
+              <div class="m-price">CHF 17.50</div>
+              <div class="m-tags"><span class="m-tag">86'd</span><span class="m-tag">V</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="category-header">
+          <div class="cat-left">
+            <div class="cat-icon">🥗</div>
+            <div class="cat-info">
+              <div class="name">Salads</div>
+              <div class="count">4 items</div>
+            </div>
+          </div>
+          <span class="cat-chevron">›</span>
+        </div>
+
+        <div class="category-header">
+          <div class="cat-left">
+            <div class="cat-icon">🥤</div>
+            <div class="cat-info">
+              <div class="name">Drinks</div>
+              <div class="count">12 items</div>
+            </div>
+          </div>
+          <span class="cat-chevron">›</span>
+        </div>
+      </div>
+
+      <div class="bottom-nav">
+        <div class="nav-item"><span class="nav-icon">🛒</span>Orders</div>
+        <div class="nav-item"><span class="nav-icon">🪑</span>Tables</div>
+        <div class="nav-item active"><span class="nav-icon">📋</span>Menu</div>
+        <div class="nav-item"><span class="nav-icon">📊</span>Reports</div>
+        <div class="nav-item"><span class="nav-icon">⚙️</span>Settings</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

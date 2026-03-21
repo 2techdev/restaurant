@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Screenshot 04 — Table Layout</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1A1A2E;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 2rem 1rem;
+    }
+    .caption { color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 1rem; text-align: center; }
+    .phone {
+      width: 375px;
+      height: 812px;
+      background: #111;
+      border-radius: 50px;
+      padding: 12px;
+      box-shadow: 0 0 0 2px #333, 0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 1px #222;
+      position: relative;
+    }
+    .phone-screen {
+      width: 100%;
+      height: 100%;
+      background: #F5F5F7;
+      border-radius: 40px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .status-bar {
+      background: #2E7D32;
+      padding: 10px 20px 6px;
+      display: flex;
+      justify-content: space-between;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .app-header {
+      background: #2E7D32;
+      padding: 8px 16px 14px;
+      color: white;
+    }
+    .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .app-header h1 { font-size: 1.05rem; font-weight: 700; }
+    .live-badge {
+      background: rgba(255,255,255,0.2);
+      border-radius: 10px;
+      padding: 3px 8px;
+      font-size: 0.62rem;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .live-dot { width: 6px; height: 6px; background: #76FF03; border-radius: 50%; }
+    .legend {
+      display: flex;
+      gap: 10px;
+    }
+    .leg-item { display: flex; align-items: center; gap: 5px; font-size: 0.62rem; color: rgba(255,255,255,0.8); }
+    .leg-dot { width: 10px; height: 10px; border-radius: 3px; }
+    .leg-dot.free { background: #A5D6A7; }
+    .leg-dot.occupied { background: #EF9A9A; }
+    .leg-dot.reserved { background: #FFF176; }
+    .content { flex: 1; overflow: hidden; padding: 12px; }
+    .floor-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .floor-select {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .floor-btn {
+      background: white;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #888;
+    }
+    .floor-btn.active { background: #2E7D32; color: white; border-color: #2E7D32; }
+    /* Floor map */
+    .floor-map {
+      background: white;
+      border-radius: 14px;
+      padding: 14px;
+      position: relative;
+      height: 420px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    /* Room outline */
+    .room {
+      position: absolute;
+      border: 2px dashed #e0e0e0;
+      border-radius: 8px;
+      background: rgba(245,245,247,0.5);
+    }
+    .room-label {
+      position: absolute;
+      font-size: 0.55rem;
+      color: #bbb;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    /* Table styles */
+    .table {
+      position: absolute;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+    .table.free { background: #E8F5E9; border-color: #A5D6A7; }
+    .table.occupied { background: #FFEBEE; border-color: #EF9A9A; }
+    .table.reserved { background: #FFFDE7; border-color: #FFF176; border-style: dashed; }
+    .table.selected { background: #E3F2FD; border-color: #42A5F5; box-shadow: 0 0 0 3px rgba(66,165,245,0.3); }
+    .table .t-num { font-size: 0.85rem; font-weight: 800; color: #333; }
+    .table .t-info { font-size: 0.52rem; color: #666; text-align: center; line-height: 1.3; }
+    .table .t-time { font-size: 0.52rem; color: #888; }
+    /* Various table shapes */
+    .t-sq { width: 60px; height: 60px; }
+    .t-rect { width: 80px; height: 50px; }
+    .t-lg { width: 70px; height: 70px; border-radius: 50%; }
+    /* Chairs visual hint */
+    .chairs-top, .chairs-bottom { display: flex; gap: 4px; position: absolute; }
+    .chairs-top { top: -8px; left: 50%; transform: translateX(-50%); }
+    .chairs-bottom { bottom: -8px; left: 50%; transform: translateX(-50%); }
+    .chair {
+      width: 12px;
+      height: 8px;
+      background: #ddd;
+      border-radius: 2px;
+    }
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .stat-pill {
+      flex: 1;
+      background: white;
+      border-radius: 8px;
+      padding: 6px 8px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .stat-num { font-size: 1rem; font-weight: 800; color: #222; }
+    .stat-num.green { color: #2E7D32; }
+    .stat-num.red { color: #C62828; }
+    .stat-label { font-size: 0.55rem; color: #888; }
+    .bottom-nav {
+      background: white;
+      border-top: 1px solid #eee;
+      padding: 6px 0 10px;
+      display: flex;
+      justify-content: space-around;
+    }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.55rem; color: #aaa; }
+    .nav-item .nav-icon { font-size: 1.1rem; }
+    .nav-item.active { color: #2E7D32; }
+    .notch {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 28px;
+      background: #111;
+      border-radius: 0 0 18px 18px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div class="caption">Screenshot 4 of 5 — Table Layout</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="phone-screen">
+      <div class="status-bar">
+        <span>9:41</span>
+        <span>●●●● WiFi 🔋</span>
+      </div>
+      <div class="app-header">
+        <div class="header-row">
+          <h1>🪑 Table Layout</h1>
+          <div class="live-badge"><div class="live-dot"></div> Live</div>
+        </div>
+        <div class="legend">
+          <div class="leg-item"><div class="leg-dot free"></div>Free (6)</div>
+          <div class="leg-item"><div class="leg-dot occupied"></div>Occupied (7)</div>
+          <div class="leg-item"><div class="leg-dot reserved"></div>Reserved (2)</div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="floor-select">
+          <div class="floor-btn active">Ground Floor</div>
+          <div class="floor-btn">Terrace</div>
+          <div class="floor-btn">Private Room</div>
+        </div>
+
+        <div class="floor-map">
+          <div class="room" style="left:8px;top:8px;right:8px;bottom:100px;"></div>
+          <div class="room-label" style="left:16px;top:14px;">Main Hall</div>
+
+          <div class="room" style="left:8px;bottom:8px;right:8px;height:92px;"></div>
+          <div class="room-label" style="left:16px;bottom:80px;">Bar Area</div>
+
+          <!-- Table 1 - occupied -->
+          <div class="table t-sq occupied" style="left:28px;top:50px;">
+            <div class="chairs-top"><div class="chair"></div><div class="chair"></div></div>
+            <div class="t-num">1</div>
+            <div class="t-info">4 guests<br>45 min</div>
+            <div class="chairs-bottom"><div class="chair"></div><div class="chair"></div></div>
+          </div>
+
+          <!-- Table 2 - free -->
+          <div class="table t-sq free" style="left:108px;top:50px;">
+            <div class="chairs-top"><div class="chair"></div><div class="chair"></div></div>
+            <div class="t-num">2</div>
+            <div class="t-info">2 pax</div>
+            <div class="chairs-bottom"><div class="chair"></div><div class="chair"></div></div>
+          </div>
+
+          <!-- Table 3 - selected/occupied -->
+          <div class="table t-sq selected" style="left:188px;top:50px;">
+            <div class="chairs-top"><div class="chair"></div><div class="chair"></div></div>
+            <div class="t-num">3</div>
+            <div class="t-info">2 guests<br>CHF 62</div>
+            <div class="chairs-bottom"><div class="chair"></div><div class="chair"></div></div>
+          </div>
+
+          <!-- Table 4 - occupied (large) -->
+          <div class="table t-lg occupied" style="left:260px;top:40px;">
+            <div class="t-num">4</div>
+            <div class="t-info">6 guests<br>1h 12m</div>
+          </div>
+
+          <!-- Table 5 - reserved -->
+          <div class="table t-rect reserved" style="left:28px;top:155px;">
+            <div class="t-num">5</div>
+            <div class="t-info">Reserved 12:30<br>Party of 4</div>
+          </div>
+
+          <!-- Table 6 - free -->
+          <div class="table t-sq free" style="left:138px;top:155px;">
+            <div class="chairs-top"><div class="chair"></div><div class="chair"></div></div>
+            <div class="t-num">6</div>
+            <div class="t-info">4 pax</div>
+            <div class="chairs-bottom"><div class="chair"></div><div class="chair"></div></div>
+          </div>
+
+          <!-- Table 7 - occupied -->
+          <div class="table t-sq occupied" style="left:230px;top:155px;">
+            <div class="chairs-top"><div class="chair"></div><div class="chair"></div></div>
+            <div class="t-num">7</div>
+            <div class="t-info">3 guests<br>28 min</div>
+            <div class="chairs-bottom"><div class="chair"></div><div class="chair"></div></div>
+          </div>
+
+          <!-- Table 8 - free -->
+          <div class="table t-sq free" style="left:28px;top:255px;">
+            <div class="t-num">8</div>
+            <div class="t-info">2 pax</div>
+          </div>
+
+          <!-- Table 9 - occupied -->
+          <div class="table t-sq occupied" style="left:138px;top:255px;">
+            <div class="t-num">9</div>
+            <div class="t-info">2 guests<br>18 min</div>
+          </div>
+
+          <!-- Bar stools -->
+          <div class="table t-sq free" style="left:28px;bottom:18px;width:50px;height:44px;border-radius:6px;">
+            <div class="t-num" style="font-size:0.7rem;">B1</div>
+          </div>
+          <div class="table t-sq occupied" style="left:90px;bottom:18px;width:50px;height:44px;border-radius:6px;">
+            <div class="t-num" style="font-size:0.7rem;">B2</div>
+          </div>
+          <div class="table t-sq free" style="left:152px;bottom:18px;width:50px;height:44px;border-radius:6px;">
+            <div class="t-num" style="font-size:0.7rem;">B3</div>
+          </div>
+        </div>
+
+        <div class="stats-bar">
+          <div class="stat-pill">
+            <div class="stat-num green">6</div>
+            <div class="stat-label">Free</div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-num red">7</div>
+            <div class="stat-label">Occupied</div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-num" style="color:#F9A825;">2</div>
+            <div class="stat-label">Reserved</div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-num">58%</div>
+            <div class="stat-label">Occupancy</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-nav">
+        <div class="nav-item"><span class="nav-icon">🛒</span>Orders</div>
+        <div class="nav-item active"><span class="nav-icon">🪑</span>Tables</div>
+        <div class="nav-item"><span class="nav-icon">📋</span>Menu</div>
+        <div class="nav-item"><span class="nav-icon">📊</span>Reports</div>
+        <div class="nav-item"><span class="nav-icon">⚙️</span>Settings</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
