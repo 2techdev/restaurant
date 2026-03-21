@@ -119,6 +119,7 @@ class _Sidebar extends StatelessWidget {
       _SidebarItem(icon: Icons.grid_view_outlined, label: l10n.navTables, route: AppRoutes.orderCenter),
       _SidebarItem(icon: Icons.restaurant_menu_outlined, label: l10n.navMenu, route: AppRoutes.backOffice),
       _SidebarItem(icon: Icons.tv_outlined, label: l10n.navKitchen, route: AppRoutes.kitchen),
+      _SidebarItem(icon: Icons.bar_chart_rounded, label: 'Raporlar', route: AppRoutes.analytics),
     ];
 
     return Container(
