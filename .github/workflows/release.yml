@@ -3,129 +3,136 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
-
-env:
-  FLUTTER_VERSION: '3.35.0'
-  JAVA_VERSION: '17'
+      - "v*"
 
 jobs:
-  release:
-    name: Build & Publish Release
+  build-apks:
+    name: Build APK — ${{ matrix.flavor }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [pos, waiter, kiosk, kds, ods]
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: temurin
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version: "3.35.4"
           channel: stable
           cache: true
+          cache-key: flutter-${{ hashFiles('apps/pos/pubspec.lock') }}
 
-      - name: Cache pub dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('apps/pos/pubspec.lock') }}
-          restore-keys: ${{ runner.os }}-pub-
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/pos/android/**/*.gradle*', 'apps/pos/android/**/gradle-wrapper.properties') }}
-          restore-keys: ${{ runner.os }}-gradle-
-
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode \
-            > apps/pos/android/app/gastrocore-release.jks
-
-      - name: Write key.properties
-        run: |
-          cat > apps/pos/android/key.properties <<EOF
-          storePassword=${{ secrets.STORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=app/gastrocore-release.jks
-          EOF
-
-      - name: Get dependencies
+      - name: Install dependencies
         working-directory: apps/pos
         run: flutter pub get
 
-      - name: Extract version from tag
-        id: version
+      - name: Create key.properties
+        working-directory: apps/pos/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          VERSION="${TAG#v}"
-          BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "build_number=${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "$KEYSTORE_BASE64" | base64 --decode > app/gastrocore-release.jks
+          cat > key.properties <<EOF
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=gastrocore-release.jks
+          EOF
 
-      - name: Build release AAB
+      - name: Build APK — ${{ matrix.flavor }}
         working-directory: apps/pos
-        run: |
-          flutter build appbundle --release \
-            --build-name=${{ steps.version.outputs.version }} \
-            --build-number=${{ steps.version.outputs.build_number }}
+        run: flutter build apk --flavor ${{ matrix.flavor }} --release
 
-      - name: Build release APK
-        working-directory: apps/pos
-        run: |
-          flutter build apk --release \
-            --build-name=${{ steps.version.outputs.version }} \
-            --build-number=${{ steps.version.outputs.build_number }}
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gastrocore-${{ matrix.flavor }}-release
+          path: apps/pos/build/app/outputs/flutter-apk/app-${{ matrix.flavor }}-release.apk
 
-      - name: Rename artifacts
-        run: |
-          VERSION=${{ steps.version.outputs.tag }}
-          cp apps/pos/build/app/outputs/bundle/release/app-release.aab \
-             gastrocore-${VERSION}.aab
-          cp apps/pos/build/app/outputs/flutter-apk/app-release.apk \
-             gastrocore-${VERSION}.apk
+  build-server:
+    name: Build Go Server (linux/amd64)
+    runs-on: ubuntu-latest
 
-      - name: Generate changelog
-        id: changelog
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Download modules
+        working-directory: server
+        run: go mod download
+
+      - name: Build server binary
+        working-directory: server
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: 0
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]' | sed -n '2p')
-          if [ -n "$PREV_TAG" ]; then
-            CHANGELOG=$(git log "${PREV_TAG}..${TAG}" --pretty=format:"- %s" --no-merges)
-          else
-            CHANGELOG=$(git log --pretty=format:"- %s" --no-merges | head -20)
+          go build \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o gastrocore-server \
+            ./cmd/server
+
+      - name: Upload server binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: gastrocore-server-linux-amd64
+          path: server/gastrocore-server
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-apks, build-server]
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Flatten artifacts for release
+        run: |
+          mkdir -p release-assets
+          find dist/ -type f \( -name "*.apk" -o -name "gastrocore-server" \) \
+            -exec cp {} release-assets/ \;
+          ls -lh release-assets/
+
+      - name: Extract changelog for this version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          NOTES=$(awk "/^## \[${VERSION#v}\]/{found=1; next} found && /^## /{exit} found{print}" CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES="Release $VERSION"
           fi
-          echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$CHANGELOG" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" > release-notes.txt
 
-      - name: Create GitHub release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: GastroCore POS ${{ steps.version.outputs.tag }}
-          body: |
-            ## Changes in ${{ steps.version.outputs.tag }}
-
-            ${{ steps.changelog.outputs.changelog }}
-
-            ---
-            **Build:** ${{ steps.version.outputs.build_number }}
-            **Flutter:** ${{ env.FLUTTER_VERSION }}
-          files: |
-            gastrocore-${{ steps.version.outputs.tag }}.aab
-            gastrocore-${{ steps.version.outputs.tag }}.apk
+          tag_name: ${{ github.ref_name }}
+          name: GastroCore ${{ github.ref_name }}
+          body_path: release-notes.txt
           draft: false
-          prerelease: ${{ contains(steps.version.outputs.tag, '-') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: release-assets/*
