@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
+import 'package:gastrocore_pos/core/providers/connectivity_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Settings providers (persisted in SharedPreferences)
@@ -180,6 +181,7 @@ class OdsNotifier extends StateNotifier<OdsState> {
         super(const OdsState()) {
     _subscribe();
     _startAutoRemoveTimer();
+    _watchConnectivity();
   }
 
   final AppDatabase _db;
@@ -188,6 +190,13 @@ class OdsNotifier extends StateNotifier<OdsState> {
   StreamSubscription<List<Ticket>>? _ticketSub;
   Timer? _autoRemoveTimer;
   Set<String> _previousReadyIds = {};
+
+  void _watchConnectivity() {
+    _ref.listen<ConnectivityState>(connectivityProvider, (_, current) {
+      setConnected(current == ConnectivityState.online ||
+          current == ConnectivityState.syncing);
+    }, fireImmediately: true);
+  }
 
   void _subscribe() {
     final query = _db.select(_db.tickets)

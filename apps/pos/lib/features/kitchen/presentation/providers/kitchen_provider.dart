@@ -26,12 +26,14 @@ final kitchenRepositoryProvider = Provider<KitchenRepositoryImpl>((ref) {
 
 /// Stream of kitchen tickets with status 'pending' or 'preparing'.
 ///
+/// Scoped to the current tenant so multi-terminal setups stay isolated.
 /// The KDS screen watches this provider; the UI rebuilds whenever a new
 /// ticket is created or an existing one is bumped.
 final activeKitchenTicketsProvider =
     StreamProvider<List<KitchenTicketEntity>>((ref) {
   final repo = ref.watch(kitchenRepositoryProvider);
-  return repo.watchActiveTickets();
+  final tenantId = ref.watch(tenantIdProvider);
+  return repo.watchActiveTickets(tenantId);
 });
 
 // ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:gastrocore_pos/core/providers/connectivity_provider.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/kitchen/domain/entities/kitchen_ticket_entity.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_provider.dart';
@@ -132,8 +133,10 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
   }
 
   void _onNewTicket() {
-    // Visual flash — sound integration point for audioplayers package.
     HapticFeedback.vibrate();
+    // System alert sound — audible on Android/iOS/desktop.
+    // Replace with audioplayers for custom WAV/MP3 when needed.
+    SystemSound.play(SystemSoundType.alert);
   }
 
   // -------------------------------------------------------------------------
@@ -676,15 +679,23 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
   // -------------------------------------------------------------------------
 
   Widget _buildFooter() {
+    final connectivity = ref.watch(connectivityProvider);
+    final isOnline = connectivity == ConnectivityState.online ||
+        connectivity == ConnectivityState.syncing;
+
     return Container(
       height: 40,
       color: const Color(0xFF1A1D27),
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
-          _footerDot(AppColors.green, 'Live sync active'),
+          _footerDot(
+            isOnline ? AppColors.green : const Color(0xFF9CA3AF),
+            isOnline ? 'Live sync active' : 'Offline',
+          ),
           const SizedBox(width: 24),
-          _footerDot(AppColors.primary, 'Tap = bump • Long-press = recall • Space/Enter = bump oldest'),
+          _footerDot(AppColors.primary,
+              'Tap = bump • Long-press = recall • Space/Enter = bump oldest'),
           const Spacer(),
           const Text(
             'GASTROCORE KDS',
