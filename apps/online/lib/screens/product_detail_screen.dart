@@ -388,54 +388,82 @@ class _ModifierGroupSection extends StatelessWidget {
         const SizedBox(height: 4),
 
         // Modifiers
-        ...group.modifiers.map((mod) {
-          final isSelected = selectedIds.contains(mod.id);
-          return ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-            leading: group.isSingle
-                ? Radio<String>(
-                    value: mod.id,
-                    groupValue:
-                        selectedIds.isEmpty ? null : selectedIds.first,
-                    activeColor: OnlineColors.primary,
-                    onChanged: (_) => onToggle(mod.id),
-                  )
-                : Checkbox(
-                    value: isSelected,
-                    activeColor: OnlineColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    onChanged: (_) => onToggle(mod.id),
-                  ),
-            title: Text(
-              mod.name,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight:
-                    isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-            trailing: mod.priceDelta == 0
-                ? Text(l10n.free,
-                    style: const TextStyle(
-                        color: OnlineColors.green,
-                        fontWeight: FontWeight.w500))
-                : Text(
-                    '${mod.priceDelta > 0 ? '+' : ''}CHF ${(mod.priceDelta / 100).toStringAsFixed(2)}',
+        if (group.isSingle)
+          RadioGroup<String>(
+            groupValue: selectedIds.isEmpty ? null : selectedIds.first,
+            onChanged: (id) {
+              if (id != null) onToggle(id);
+            },
+            child: Column(
+              children: group.modifiers.map((mod) {
+                final isSelected = selectedIds.contains(mod.id);
+                return ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+                  leading: Radio<String>(value: mod.id),
+                  title: Text(
+                    mod.name,
                     style: TextStyle(
-                      color: mod.priceDelta > 0
-                          ? OnlineColors.textSecondary
-                          : OnlineColors.green,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
-            onTap: () => onToggle(mod.id),
-          );
-        }),
+                  trailing: _modTrailing(mod, l10n),
+                  onTap: () => onToggle(mod.id),
+                );
+              }).toList(),
+            ),
+          )
+        else
+          ...group.modifiers.map((mod) {
+            final isSelected = selectedIds.contains(mod.id);
+            return ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+              leading: Checkbox(
+                value: isSelected,
+                activeColor: OnlineColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                onChanged: (_) => onToggle(mod.id),
+              ),
+              title: Text(
+                mod.name,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+              trailing: _modTrailing(mod, l10n),
+              onTap: () => onToggle(mod.id),
+            );
+          }),
         const SizedBox(height: 8),
       ],
+    );
+  }
+
+  Widget _modTrailing(OnlineModifier mod, AppLocalizations l10n) {
+    if (mod.priceDelta == 0) {
+      return Text(
+        l10n.free,
+        style: const TextStyle(
+          color: OnlineColors.green,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+    }
+    return Text(
+      '${mod.priceDelta > 0 ? '+' : ''}CHF ${(mod.priceDelta / 100).toStringAsFixed(2)}',
+      style: TextStyle(
+        color: mod.priceDelta > 0
+            ? OnlineColors.textSecondary
+            : OnlineColors.green,
+        fontWeight: FontWeight.w500,
+      ),
     );
   }
 }
