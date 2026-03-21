@@ -1,5 +1,20 @@
 name: Deploy Online Ordering
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Builds Flutter web + Go server binary, uploads both as artifacts, and
+# deploys the Flutter web to GitHub Pages.
+#
+# SSH to the VPS (192.168.1.134) is done LOCALLY — port 22 is not reachable
+# from GitHub's runners on the public IP. After this workflow completes:
+#
+#   1. Download the "gastrocore-server-linux" artifact from the Actions run.
+#      OR just run from the repo root:
+#
+#      ./infra/deploy/deploy.sh
+#
+#   The script builds + deploys everything over LAN SSH automatically.
+# ─────────────────────────────────────────────────────────────────────────────
+
 on:
   push:
     branches: [main]
@@ -16,9 +31,9 @@ permissions:
   contents: write
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 1. Build Flutter web app + bundle standalone demo page
-  # ─────────────────────────────────────────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
+  # 1. Build Flutter web app
+  # ───────────────────────────────────────────────────────────────────────────
   build-web:
     name: Build Flutter Web
     runs-on: ubuntu-latest
@@ -48,10 +63,44 @@ jobs:
         with:
           name: online-web
           path: apps/online/build/web/
+          retention-days: 14
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 2. Deploy to GitHub Pages (custom domain: pos.2tech.ch)
-  # ─────────────────────────────────────────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
+  # 2. Cross-compile Go server for linux/amd64
+  #    Artifact can be downloaded and deployed via infra/deploy/deploy.sh
+  # ───────────────────────────────────────────────────────────────────────────
+  build-server:
+    name: Build Go Server (linux/amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Cross-compile for linux/amd64
+        working-directory: server
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p bin
+          go build -ldflags="-s -w" -o bin/gastrocore-server-linux ./cmd/server
+
+      - name: Upload server binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gastrocore-server-linux
+          path: server/bin/gastrocore-server-linux
+          retention-days: 14
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 3. Deploy Flutter web to GitHub Pages (custom domain: pos.2tech.ch)
+  # ───────────────────────────────────────────────────────────────────────────
   deploy-pages:
     name: Deploy to GitHub Pages
     needs: build-web
@@ -71,71 +120,30 @@ jobs:
           publish_branch: gh-pages
           cname: pos.2tech.ch
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 3. Deploy Go server + web files to pos.2tech.ch via SSH
-  #    (non-blocking — continues even if SSH is unavailable)
-  # ─────────────────────────────────────────────────────────────────────────────
-  deploy-server:
-    name: Deploy to pos.2tech.ch Server
-    needs: build-web
+  # ───────────────────────────────────────────────────────────────────────────
+  # 4. Summary — remind how to deploy to VPS
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-instructions:
+    name: VPS Deploy Instructions
+    needs: [build-web, build-server]
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Download web artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: online-web
-          path: ./web
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-          cache: true
-          cache-dependency-path: server/go.sum
-
-      - name: Cross-compile Go server for Linux amd64
-        working-directory: server
-        env:
-          GOOS: linux
-          GOARCH: amd64
-          CGO_ENABLED: '0'
-        run: go build -ldflags="-s -w" -o bin/gastrocore-server-linux ./cmd/server
-
-      - name: Setup SSH
+      - name: Print local deploy instructions
         run: |
-          mkdir -p ~/.ssh
-          printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Deploy web files
-        env:
-          HOST: ${{ secrets.SERVER_HOST }}
-          USER: ${{ secrets.SERVER_USER }}
-          WEB_PATH: /home/tech/gastrocore/web/dist
-        run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              -o ConnectTimeout=15 $USER@$HOST \
-            "mkdir -p $WEB_PATH && rm -rf $WEB_PATH/*"
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-            ./web/* $USER@$HOST:$WEB_PATH/
-
-      - name: Deploy Go binary and restart
-        env:
-          HOST: ${{ secrets.SERVER_HOST }}
-          USER: ${{ secrets.SERVER_USER }}
-        run: |
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            server/bin/gastrocore-server-linux $USER@$HOST:/tmp/gastrocore-server-new
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-              -o ConnectTimeout=15 $USER@$HOST "
-            chmod +x /tmp/gastrocore-server-new
-            sudo mv /tmp/gastrocore-server-new /usr/local/bin/gastrocore-server
-            sudo systemctl restart gastrocore 2>/dev/null || \
-            sudo pkill -f gastrocore-server && sleep 1 && \
-            sudo /usr/local/bin/gastrocore-server &
-            echo 'Deployed successfully'
-          "
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  VPS DEPLOY — run from your local machine (LAN access)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "  # Full deploy (builds + pushes to 192.168.1.134):"
+          echo "  ./infra/deploy/deploy.sh"
+          echo ""
+          echo "  # Build only (no network access needed):"
+          echo "  ./infra/deploy/deploy.sh --build-only"
+          echo ""
+          echo "  # Skip Flutter web rebuild (binary only):"
+          echo "  ./infra/deploy/deploy.sh --no-web"
+          echo ""
+          echo "  Artifacts available for manual download:"
+          echo "    • gastrocore-server-linux  (Go binary, linux/amd64)"
+          echo "    • online-web               (Flutter web build)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
