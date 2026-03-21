@@ -3,6 +3,13 @@ name: Deploy Online Ordering
 on:
   push:
     branches: [main]
+    paths:
+      - "apps/online/**"
+      - "server/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/online/**"
   workflow_dispatch:
 
 permissions:
