@@ -15,6 +15,7 @@ import (
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
 	"github.com/gastrocore/server/internal/kds"
+	"github.com/gastrocore/server/internal/license"
 	"github.com/gastrocore/server/internal/licenses"
 	"github.com/gastrocore/server/internal/menu"
 	"github.com/gastrocore/server/internal/online"
@@ -64,6 +65,7 @@ func main() {
 	reportsModule := reports.NewModule(db)
 	devicesModule := devices.NewModule(db)
 	licensesModule := licenses.NewModule(db, cfg)
+	licenseModule := license.NewModule(db, cfg)
 	storesModule := stores.NewModule(db, cfg)
 	kdsModule := kds.NewModule(db, kdsHub)
 
@@ -115,6 +117,7 @@ func main() {
 	reportsModule.RegisterRoutes(mux)
 	devicesModule.RegisterRoutes(mux)
 	licensesModule.RegisterRoutes(mux)
+	licenseModule.RegisterRoutes(mux)
 	storesModule.RegisterRoutes(mux)
 	kdsModule.RegisterRoutes(mux)
 

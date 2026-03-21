@@ -24,6 +24,16 @@ enum AppFeature {
   basicReports(LicenseTier.free, 'Basic Reports'),
 
   // -------------------------------------------------------------------------
+  // STARTER tier
+  // -------------------------------------------------------------------------
+
+  /// Detailed analytics: revenue breakdown, category performance, trends.
+  advancedReports(LicenseTier.starter, 'Advanced Reports'),
+
+  /// Receipt printing support (thermal / PDF / email).
+  printing(LicenseTier.starter, 'Receipt Printing'),
+
+  // -------------------------------------------------------------------------
   // PROFESSIONAL tier
   // -------------------------------------------------------------------------
 
@@ -33,11 +43,11 @@ enum AppFeature {
   /// Kitchen Display System — real-time ticket view for kitchen staff.
   kds(LicenseTier.professional, 'Kitchen Display System (KDS)'),
 
-  /// Multiple POS registers connected over LAN.
-  multiDevice(LicenseTier.professional, 'Multi-Device (LAN)'),
+  /// Inventory tracking and stock management.
+  inventory(LicenseTier.professional, 'Inventory Management'),
 
-  /// Detailed analytics: revenue breakdown, category performance, trends.
-  advancedReports(LicenseTier.professional, 'Advanced Reports'),
+  /// CRM loyalty program and customer profiles.
+  crm(LicenseTier.professional, 'CRM & Loyalty'),
 
   /// Fully customisable receipt header, footer, and logo.
   customReceipts(LicenseTier.professional, 'Custom Receipts'),
@@ -51,6 +61,9 @@ enum AppFeature {
 
   /// Bidirectional sync with the GastroCore cloud backend.
   cloudSync(LicenseTier.enterprise, 'Cloud Sync'),
+
+  /// Multiple POS registers connected over the network.
+  multiDevice(LicenseTier.enterprise, 'Multi-Device Sync'),
 
   /// REST API access for third-party integrations.
   apiAccess(LicenseTier.enterprise, 'API Access'),

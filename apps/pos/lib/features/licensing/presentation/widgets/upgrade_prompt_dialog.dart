@@ -245,6 +245,7 @@ class _UpgradeDialogState extends ConsumerState<_UpgradeDialog> {
 
   Color _tierColor(LicenseTier tier) => switch (tier) {
         LicenseTier.free => AppColors.textDim,
+        LicenseTier.starter => const Color(0xFF4CAF50),
         LicenseTier.professional => const Color(0xFF4C9EFF),
         LicenseTier.enterprise => const Color(0xFFB06EFF),
       };
