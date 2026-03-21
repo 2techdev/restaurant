@@ -36,6 +36,8 @@ import 'package:gastrocore_pos/features/reservations/presentation/screens/reserv
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_detail_screen.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_form_screen.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_list_screen.dart';
+import 'package:gastrocore_pos/features/customers/presentation/screens/customer_list_screen.dart';
+import 'package:gastrocore_pos/features/customers/presentation/screens/customer_detail_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Route path constants
@@ -70,6 +72,8 @@ abstract final class AppRoutes {
 
   static String reservationDetail(String id) => '/reservations/$id';
   static String reservationEdit(String id) => '/reservations/$id/edit';
+  static const String customers = '/customers';
+  static const String customerDetail = '/customers/:customerId';
 
   // Legacy routes kept for backward compatibility
   static const String pos = '/pos';
@@ -89,6 +93,9 @@ abstract final class AppRoutes {
 
   /// Build a void route for a specific ticket.
   static String voidFor(String ticketId) => '/void/$ticketId';
+  /// Build a customer detail route.
+  static String customerDetailFor(String customerId) =>
+      '/customers/$customerId';
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +257,16 @@ GoRouter createAppRouter() => GoRouter(
       builder: (context, state) => ReservationFormScreen(
         reservationId: state.pathParameters['id'],
       ),
+    ),
+      path: AppRoutes.customers,
+      builder: (context, state) => const CustomerListScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.customerDetail,
+      builder: (context, state) {
+        final customerId = state.pathParameters['customerId'] ?? '';
+        return CustomerDetailScreen(customerId: customerId);
+      },
     ),
   ],
 );

@@ -42,6 +42,9 @@ import 'tables/inventory_transactions.dart';
 import 'tables/license_tokens.dart';
 import 'tables/suppliers.dart';
 import 'tables/reservations.dart';
+import 'tables/customers.dart';
+import 'tables/customer_addresses.dart';
+import 'tables/loyalty_transactions.dart';
 
 part 'app_database.g.dart';
 
@@ -80,6 +83,9 @@ part 'app_database.g.dart';
     InventoryTransactions,
     Suppliers,
     Reservations,
+    Customers,
+    CustomerAddresses,
+    LoyaltyTransactions,
   ],
   daos: [AuditLogDao, InventoryDao, SyncEventDao],
 )
@@ -121,6 +127,10 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(users, users.managerPinHash);
         await m.addColumn(auditLog, auditLog.managerId);
         await m.addColumn(auditLog, auditLog.managerName);
+        // Add CRM tables introduced in v7.
+        await m.createTable(customers);
+        await m.createTable(customerAddresses);
+        await m.createTable(loyaltyTransactions);
       }
     },
     onCreate: (m) async {

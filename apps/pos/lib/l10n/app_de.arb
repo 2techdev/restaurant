@@ -358,129 +358,87 @@
   "quickActionOrderHistory": "Bestellungshistorie",
   "@quickActionOrderHistory": { "description": "Quick action: Order History" },
 
-  "navCrm": "Kunden",
-  "@navCrm": { "description": "Navigation: CRM" },
+  "navCustomers": "Kunden",
+  "@navCustomers": { "description": "Navigation: Customers" },
 
-  "navReservations": "Reservierungen",
-  "@navReservations": { "description": "Navigation: Reservations" },
-
-  "crmCustomers": "Kunden",
-  "@crmCustomers": { "description": "CRM: Customers" },
+  "crmTitle": "Kundenverwaltung",
+  "@crmTitle": { "description": "CRM: Screen title" },
 
   "crmNewCustomer": "Neuer Kunde",
-  "@crmNewCustomer": { "description": "CRM: New customer" },
+  "@crmNewCustomer": { "description": "CRM: New customer button" },
 
-  "crmCustomerName": "Name",
-  "@crmCustomerName": { "description": "CRM: Customer name" },
+  "crmEditCustomer": "Kunde bearbeiten",
+  "@crmEditCustomer": { "description": "CRM: Edit customer" },
+
+  "crmDeleteCustomer": "Kunde löschen",
+  "@crmDeleteCustomer": { "description": "CRM: Delete customer" },
+
+  "crmName": "Name",
+  "@crmName": { "description": "CRM: Name field" },
 
   "crmPhone": "Telefon",
-  "@crmPhone": { "description": "CRM: Phone" },
+  "@crmPhone": { "description": "CRM: Phone field" },
 
   "crmEmail": "E-Mail",
-  "@crmEmail": { "description": "CRM: Email" },
+  "@crmEmail": { "description": "CRM: Email field" },
+
+  "crmAddress": "Adresse",
+  "@crmAddress": { "description": "CRM: Address field" },
 
   "crmBirthday": "Geburtstag",
-  "@crmBirthday": { "description": "CRM: Birthday" },
+  "@crmBirthday": { "description": "CRM: Birthday field" },
 
   "crmNotes": "Notizen",
-  "@crmNotes": { "description": "CRM: Notes" },
+  "@crmNotes": { "description": "CRM: Notes field" },
+
+  "crmTotalOrders": "Bestellungen",
+  "@crmTotalOrders": { "description": "CRM: Total orders" },
+
+  "crmTotalSpent": "Umsatz",
+  "@crmTotalSpent": { "description": "CRM: Total spent" },
 
   "crmLoyaltyPoints": "Treuepunkte",
   "@crmLoyaltyPoints": { "description": "CRM: Loyalty points" },
 
-  "crmLoyaltyBalance": "Punktestand",
-  "@crmLoyaltyBalance": { "description": "CRM: Loyalty balance" },
+  "crmTierBronze": "Bronze",
+  "@crmTierBronze": { "description": "CRM: Bronze tier" },
 
-  "crmAddPoints": "Punkte hinzufügen",
-  "@crmAddPoints": { "description": "CRM: Add points" },
+  "crmTierSilver": "Silber",
+  "@crmTierSilver": { "description": "CRM: Silver tier" },
 
-  "crmRedeemPoints": "Punkte einlösen",
-  "@crmRedeemPoints": { "description": "CRM: Redeem points" },
+  "crmTierGold": "Gold",
+  "@crmTierGold": { "description": "CRM: Gold tier" },
 
-  "crmTotalVisits": "Besuche",
-  "@crmTotalVisits": { "description": "CRM: Total visits" },
+  "crmBirthdayReminder": "{count,plural, one{1 Geburtstag} other{{count} Geburtstage}}",
+  "@crmBirthdayReminder": {
+    "description": "CRM: Birthday reminder",
+    "placeholders": { "count": { "type": "int" } }
+  },
 
-  "crmTotalSpent": "Gesamtumsatz",
-  "@crmTotalSpent": { "description": "CRM: Total spent" },
+  "loyaltyTitle": "Treuepunkte",
+  "@loyaltyTitle": { "description": "Loyalty: Screen title" },
 
-  "crmLastVisit": "Letzter Besuch",
-  "@crmLastVisit": { "description": "CRM: Last visit" },
+  "loyaltyRedeem": "Punkte einlösen",
+  "@loyaltyRedeem": { "description": "Loyalty: Redeem points" },
 
-  "crmSearchCustomers": "Kunden suchen",
-  "@crmSearchCustomers": { "description": "CRM: Search customers" },
+  "loyaltyAdjust": "Punkte anpassen",
+  "@loyaltyAdjust": { "description": "Loyalty: Adjust points" },
 
-  "crmNoCustomers": "Keine Kunden",
-  "@crmNoCustomers": { "description": "CRM: No customers" },
+  "loyaltyEarnRule": "1 CHF ausgeben = 1 Punkt sammeln",
+  "@loyaltyEarnRule": { "description": "Loyalty: Earn rule" },
 
-  "crmLoyaltyEarn": "Punkte verdienen",
-  "@crmLoyaltyEarn": { "description": "CRM: Earn points" },
+  "loyaltyRedeemRule": "100 Punkte = CHF 1.00 Rabatt",
+  "@loyaltyRedeemRule": { "description": "Loyalty: Redeem rule" },
 
-  "crmLoyaltyRedeem": "Punkte einlösen",
-  "@crmLoyaltyRedeem": { "description": "CRM: Redeem action label" },
+  "loyaltyTransactionEarn": "Punkte gesammelt",
+  "@loyaltyTransactionEarn": { "description": "Loyalty: Earn transaction" },
 
-  "crmLoyaltyAdjust": "Punkte anpassen",
-  "@crmLoyaltyAdjust": { "description": "CRM: Adjust points" },
+  "loyaltyTransactionRedeem": "Punkte eingelöst",
+  "@loyaltyTransactionRedeem": { "description": "Loyalty: Redeem transaction" },
 
-  "crmLoyaltyHistory": "Punkteverlauf",
-  "@crmLoyaltyHistory": { "description": "CRM: Loyalty history" },
+  "loyaltyTransactionAdjust": "Manuelle Anpassung",
+  "@loyaltyTransactionAdjust": { "description": "Loyalty: Adjust transaction" },
 
-  "reservationNew": "Neue Reservierung",
-  "@reservationNew": { "description": "Reservation: New" },
-
-  "reservationDate": "Datum",
-  "@reservationDate": { "description": "Reservation: Date" },
-
-  "reservationTime": "Uhrzeit",
-  "@reservationTime": { "description": "Reservation: Time" },
-
-  "reservationGuests": "Gäste",
-  "@reservationGuests": { "description": "Reservation: Guests" },
-
-  "reservationTable": "Tisch",
-  "@reservationTable": { "description": "Reservation: Table" },
-
-  "reservationStatus": "Status",
-  "@reservationStatus": { "description": "Reservation: Status" },
-
-  "reservationStatusConfirmed": "Bestätigt",
-  "@reservationStatusConfirmed": { "description": "Reservation: Confirmed" },
-
-  "reservationStatusPending": "Ausstehend",
-  "@reservationStatusPending": { "description": "Reservation: Pending" },
-
-  "reservationStatusCancelled": "Storniert",
-  "@reservationStatusCancelled": { "description": "Reservation: Cancelled" },
-
-  "reservationStatusSeated": "Platziert",
-  "@reservationStatusSeated": { "description": "Reservation: Seated" },
-
-  "reservationStatusNoShow": "Nicht erschienen",
-  "@reservationStatusNoShow": { "description": "Reservation: No show" },
-
-  "reservationCustomerName": "Gastname",
-  "@reservationCustomerName": { "description": "Reservation: Customer name" },
-
-  "reservationPhone": "Telefon",
-  "@reservationPhone": { "description": "Reservation: Phone" },
-
-  "reservationNotes": "Notizen",
-  "@reservationNotes": { "description": "Reservation: Notes" },
-
-  "reservationConflict": "Tischkonflikt erkannt",
-  "@reservationConflict": { "description": "Reservation: Conflict detected" },
-
-  "reservationNoReservations": "Keine Reservierungen",
-  "@reservationNoReservations": { "description": "Reservation: No reservations" },
-
-  "reservationToday": "Heute",
-  "@reservationToday": { "description": "Reservation: Today" },
-
-  "reservationCalendar": "Kalender",
-  "@reservationCalendar": { "description": "Reservation: Calendar" },
-
-  "reservationDuration": "Dauer (Min.)",
-  "@reservationDuration": { "description": "Reservation: Duration in minutes" },
-
-  "reservationCheckConflict": "Konflikt prüfen",
-  "@reservationCheckConflict": { "description": "Reservation: Check for conflicts" }
+  "loyaltyTransactionExpire": "Punkte abgelaufen",
+  "@loyaltyTransactionExpire": { "description": "Loyalty: Expire transaction" }
 }
