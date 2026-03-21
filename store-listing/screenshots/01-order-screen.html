@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Screenshot 01 — Order Screen</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1A1A2E;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 2rem 1rem;
+    }
+    .caption {
+      color: rgba(255,255,255,0.5);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    /* Phone frame */
+    .phone {
+      width: 375px;
+      height: 812px;
+      background: #111;
+      border-radius: 50px;
+      padding: 12px;
+      box-shadow: 0 0 0 2px #333, 0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 1px #222;
+      position: relative;
+    }
+    .phone-screen {
+      width: 100%;
+      height: 100%;
+      background: #F5F5F7;
+      border-radius: 40px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Status bar */
+    .status-bar {
+      background: #FF6B35;
+      padding: 10px 20px 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    /* App header */
+    .app-header {
+      background: #FF6B35;
+      padding: 8px 16px 16px;
+      color: white;
+    }
+    .app-header .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .app-header h1 { font-size: 1.1rem; font-weight: 700; }
+    .table-badge {
+      background: rgba(255,255,255,0.25);
+      border-radius: 12px;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+    .tabs {
+      display: flex;
+      gap: 6px;
+    }
+    .tab {
+      background: rgba(255,255,255,0.2);
+      border-radius: 16px;
+      padding: 4px 12px;
+      font-size: 0.72rem;
+      font-weight: 500;
+    }
+    .tab.active { background: white; color: #FF6B35; }
+    /* Content area */
+    .content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    /* Categories */
+    .categories {
+      width: 80px;
+      background: white;
+      padding: 8px 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-right: 1px solid #eee;
+    }
+    .cat-item {
+      padding: 8px 4px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 0.6rem;
+      color: #888;
+      cursor: pointer;
+    }
+    .cat-item .icon { font-size: 1.2rem; display: block; margin-bottom: 2px; }
+    .cat-item.active { background: #FFF0EB; color: #FF6B35; font-weight: 600; }
+    /* Menu items grid */
+    .menu-grid {
+      flex: 1;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      overflow-y: auto;
+      align-content: start;
+    }
+    .menu-item {
+      background: white;
+      border-radius: 10px;
+      padding: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .menu-item .item-img {
+      width: 100%;
+      height: 60px;
+      background: linear-gradient(135deg, #FFE0CC 0%, #FFD5B8 100%);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      margin-bottom: 5px;
+    }
+    .menu-item .item-name { font-size: 0.68rem; font-weight: 600; color: #222; }
+    .menu-item .item-price { font-size: 0.65rem; color: #FF6B35; font-weight: 700; margin-top: 2px; }
+    .menu-item .add-btn {
+      width: 22px;
+      height: 22px;
+      background: #FF6B35;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      float: right;
+      margin-top: -24px;
+    }
+    /* Order panel */
+    .order-panel {
+      background: white;
+      width: 140px;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid #eee;
+    }
+    .order-title {
+      padding: 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #222;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .order-items {
+      flex: 1;
+      padding: 6px;
+      overflow-y: auto;
+    }
+    .order-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid #f5f5f5;
+    }
+    .order-item .oi-name { font-size: 0.6rem; color: #333; flex: 1; }
+    .order-item .oi-qty {
+      background: #FF6B35;
+      color: white;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.58rem;
+      font-weight: 700;
+      margin-right: 4px;
+    }
+    .order-item .oi-price { font-size: 0.6rem; color: #555; }
+    .order-footer {
+      padding: 8px;
+      border-top: 1px solid #eee;
+    }
+    .order-total {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #222;
+      margin-bottom: 8px;
+    }
+    .order-btn {
+      display: block;
+      width: 100%;
+      background: #FF6B35;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-align: center;
+      cursor: pointer;
+    }
+    /* Bottom nav */
+    .bottom-nav {
+      background: white;
+      border-top: 1px solid #eee;
+      padding: 6px 0 10px;
+      display: flex;
+      justify-content: space-around;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      font-size: 0.55rem;
+      color: #aaa;
+    }
+    .nav-item .nav-icon { font-size: 1.1rem; }
+    .nav-item.active { color: #FF6B35; }
+    .notch {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 28px;
+      background: #111;
+      border-radius: 0 0 18px 18px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div class="caption">Screenshot 1 of 5 — Order Screen</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="phone-screen">
+      <div class="status-bar">
+        <span>9:41</span>
+        <span>●●●● WiFi 🔋</span>
+      </div>
+      <div class="app-header">
+        <div class="top-row">
+          <h1>🍽️ GastroCore POS</h1>
+          <span class="table-badge">Table 4</span>
+        </div>
+        <div class="tabs">
+          <span class="tab active">Food</span>
+          <span class="tab">Drinks</span>
+          <span class="tab">Desserts</span>
+        </div>
+      </div>
+      <div class="content">
+        <div class="categories">
+          <div class="cat-item active"><span class="icon">🍕</span>Pizza</div>
+          <div class="cat-item"><span class="icon">🍝</span>Pasta</div>
+          <div class="cat-item"><span class="icon">🥗</span>Salads</div>
+          <div class="cat-item"><span class="icon">🥩</span>Meat</div>
+          <div class="cat-item"><span class="icon">🐟</span>Fish</div>
+          <div class="cat-item"><span class="icon">🍰</span>Desserts</div>
+          <div class="cat-item"><span class="icon">🥤</span>Drinks</div>
+        </div>
+        <div class="menu-grid">
+          <div class="menu-item">
+            <div class="item-img">🍕</div>
+            <div class="item-name">Margherita</div>
+            <div class="item-price">CHF 18.00</div>
+            <div class="add-btn">+</div>
+          </div>
+          <div class="menu-item">
+            <div class="item-img">🍕</div>
+            <div class="item-name">Quattro Stagioni</div>
+            <div class="item-price">CHF 22.00</div>
+            <div class="add-btn">+</div>
+          </div>
+          <div class="menu-item">
+            <div class="item-img">🍕</div>
+            <div class="item-name">Prosciutto</div>
+            <div class="item-price">CHF 24.00</div>
+            <div class="add-btn">+</div>
+          </div>
+          <div class="menu-item">
+            <div class="item-img">🍕</div>
+            <div class="item-name">Diavola</div>
+            <div class="item-price">CHF 23.00</div>
+            <div class="add-btn">+</div>
+          </div>
+          <div class="menu-item">
+            <div class="item-img">🍕</div>
+            <div class="item-name">Funghi</div>
+            <div class="item-price">CHF 21.00</div>
+            <div class="add-btn">+</div>
+          </div>
+          <div class="menu-item">
+            <div class="item-img">🍕</div>
+            <div class="item-name">Capricciosa</div>
+            <div class="item-price">CHF 22.50</div>
+            <div class="add-btn">+</div>
+          </div>
+        </div>
+        <div class="order-panel">
+          <div class="order-title">Current Order</div>
+          <div class="order-items">
+            <div class="order-item">
+              <span class="oi-qty">2×</span>
+              <span class="oi-name">Margherita</span>
+              <span class="oi-price">36.00</span>
+            </div>
+            <div class="order-item">
+              <span class="oi-qty">1×</span>
+              <span class="oi-name">Diavola</span>
+              <span class="oi-price">23.00</span>
+            </div>
+            <div class="order-item">
+              <span class="oi-qty">3×</span>
+              <span class="oi-name">Sparkling Water</span>
+              <span class="oi-price">12.00</span>
+            </div>
+            <div class="order-item">
+              <span class="oi-qty">1×</span>
+              <span class="oi-name">House Wine</span>
+              <span class="oi-price">14.00</span>
+            </div>
+          </div>
+          <div class="order-footer">
+            <div class="order-total">
+              <span>Total</span>
+              <span>CHF 85.00</span>
+            </div>
+            <div class="order-btn">Send to Kitchen</div>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active"><span class="nav-icon">🛒</span>Orders</div>
+        <div class="nav-item"><span class="nav-icon">🪑</span>Tables</div>
+        <div class="nav-item"><span class="nav-icon">📊</span>Reports</div>
+        <div class="nav-item"><span class="nav-icon">⚙️</span>Settings</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
