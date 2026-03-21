@@ -38,6 +38,7 @@ import 'package:gastrocore_pos/features/reservations/presentation/screens/reserv
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_list_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_list_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_detail_screen.dart';
+import 'package:gastrocore_pos/features/dashboard/presentation/screens/analytics_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Route path constants
@@ -74,6 +75,7 @@ abstract final class AppRoutes {
   static String reservationEdit(String id) => '/reservations/$id/edit';
   static const String customers = '/customers';
   static const String customerDetail = '/customers/:customerId';
+  static const String analytics = '/analytics';
 
   // Legacy routes kept for backward compatibility
   static const String pos = '/pos';
@@ -267,6 +269,8 @@ GoRouter createAppRouter() => GoRouter(
         final customerId = state.pathParameters['customerId'] ?? '';
         return CustomerDetailScreen(customerId: customerId);
       },
+      path: AppRoutes.analytics,
+      builder: (context, state) => const AnalyticsScreen(),
     ),
   ],
 );
