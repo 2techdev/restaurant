@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gastrocore/server/internal/auth"
+	"github.com/gastrocore/server/internal/demo"
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
 	"github.com/gastrocore/server/internal/kds"
@@ -100,6 +101,10 @@ func main() {
 			},
 		})
 	})
+
+	// Online ordering demo page
+	mux.HandleFunc("GET /demo", demo.Handler())
+	mux.HandleFunc("GET /demo/", demo.Handler())
 
 	// OpenAPI docs
 	mux.HandleFunc("GET /docs/swagger.json", docs.Handler())
