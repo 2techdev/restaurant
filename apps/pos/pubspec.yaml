@@ -22,10 +22,15 @@ dependencies:
   flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.6.1
 
-  # Networking (sync)
+  # Networking (cloud sync)
   connectivity_plus: ^6.1.4
   http: ^1.3.0
   web_socket_channel: ^3.0.2
+
+  # LAN sync — embedded HTTP server + mDNS/UDP-beacon discovery
+  shelf: ^1.4.2
+  shelf_router: ^1.1.4
+  multicast_dns: ^0.3.2+1
 
   # Navigation
   go_router: ^14.8.1
