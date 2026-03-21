@@ -12,7 +12,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get appTitle => 'Online Bestellen';
 
   @override
-  String get viewMenu => 'Speisekarte';
+  String get viewMenu => 'Jetzt bestellen';
 
   @override
   String get search => 'Suchen';

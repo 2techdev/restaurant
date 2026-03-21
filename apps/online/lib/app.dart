@@ -23,8 +23,8 @@ import 'package:gastrocore_online/screens/order_tracking_screen.dart';
 final _router = GoRouter(
   initialLocation: '/',
   redirect: (context, state) {
-    // Root without restaurant ID → show an empty landing
-    if (state.uri.path == '/') return null;
+    // Root without restaurant ID → redirect to demo restaurant
+    if (state.uri.path == '/') return '/demo';
     return null;
   },
   routes: [

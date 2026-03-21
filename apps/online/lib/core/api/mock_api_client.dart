@@ -10,8 +10,8 @@ class MockApiClient extends ApiClient {
 
   static const _restaurant = {
     'id': 'demo',
-    'name': 'Restaurant GastroCore',
-    'description': 'Frische Schweizer Küche · Cuisine suisse fraîche',
+    'name': 'Demo Restaurant Zürich',
+    'description': 'Traditionelle Schweizer Küche · Mitten in Zürich',
     'logo_url': null,
     'cover_image_url': null,
     'is_open': true,
@@ -43,25 +43,35 @@ class MockApiClient extends ApiClient {
   };
 
   List<Map<String, dynamic>> get _products => [
-        // Vorspeisen
+        // Vorspeisen (4)
         {'id': 'p-1', 'category_id': 'cat-1', 'name': 'Gemischter Salat', 'description': 'Frischer Salat mit Saison-Gemüse und Vinaigrette', 'price': 1450, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 1, 'modifier_groups': []},
         {'id': 'p-2', 'category_id': 'cat-1', 'name': 'Suppe des Tages', 'description': 'Täglich frisch zubereitet, mit Brot', 'price': 990, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 2, 'modifier_groups': []},
         {'id': 'p-3', 'category_id': 'cat-1', 'name': 'Bruschetta', 'description': 'Röstbrot mit Tomaten, Basilikum und Knoblauch', 'price': 1190, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 3, 'modifier_groups': []},
-        // Hauptgerichte
+        {'id': 'p-15', 'category_id': 'cat-1', 'name': 'Carpaccio vom Rind', 'description': 'Hauchdünn aufgeschnittenes Rinderfilet, Rucola, Parmesan', 'price': 1890, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 4, 'modifier_groups': []},
+        // Hauptgerichte (6)
         {'id': 'p-4', 'category_id': 'cat-2', 'name': 'Zürcher Geschnetzeltes', 'description': 'Kalbfleisch in Rahmsauce mit Rösti, klassisch zubereitet', 'price': 3490, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 1, 'modifier_groups': []},
         {'id': 'p-5', 'category_id': 'cat-2', 'name': 'Poulet Cordon Bleu', 'description': 'Gefüllt mit Schinken und Käse, mit Pommes und Salat', 'price': 2990, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 2, 'modifier_groups': []},
         {'id': 'p-6', 'category_id': 'cat-2', 'name': 'Veganes Gemüsecurry', 'description': 'Saisonales Gemüse in Kokosmilch, mit Basmati-Reis', 'price': 2290, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 3, 'modifier_groups': []},
-        // Pizza & Pasta
-        {'id': 'p-7', 'category_id': 'cat-3', 'name': 'Pizza Margherita', 'description': 'Tomatensauce, Mozzarella, Basilikum', 'price': 1890, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 1, 'modifier_groups': [_sizeGroup]},
-        {'id': 'p-8', 'category_id': 'cat-3', 'name': 'Spaghetti Carbonara', 'description': 'Pancetta, Ei, Parmesan, Pfeffer — kein Rahm', 'price': 2190, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 2, 'modifier_groups': []},
-        {'id': 'p-9', 'category_id': 'cat-3', 'name': 'Penne al Arrabiata', 'description': 'Tomatensauce mit Chili und Knoblauch, vegan', 'price': 1890, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 3, 'modifier_groups': []},
-        // Desserts
+        {'id': 'p-16', 'category_id': 'cat-2', 'name': 'Rindsfilet mit Gemüse', 'description': '200g Rindsfilet, Saisongemüse, Kräuterbutter, Pommes', 'price': 4890, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 4, 'modifier_groups': []},
+        {'id': 'p-17', 'category_id': 'cat-2', 'name': 'Risotto ai Funghi', 'description': 'Cremiges Risotto mit Steinpilzen und Parmesan', 'price': 2590, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 5, 'modifier_groups': []},
+        {'id': 'p-18', 'category_id': 'cat-2', 'name': 'Fischfilet vom Zürichsee', 'description': 'Felchenfilet, Kapernbutter, Kartoffelpüree, Blattspinat', 'price': 3290, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 6, 'modifier_groups': []},
+        // Pizza & Pasta (5)
+        {'id': 'p-7', 'category_id': 'cat-3', 'name': 'Pizza Margherita', 'description': 'Tomatensauce, Mozzarella, frisches Basilikum', 'price': 1890, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 1, 'modifier_groups': [_sizeGroup]},
+        {'id': 'p-19', 'category_id': 'cat-3', 'name': 'Pizza Prosciutto', 'description': 'Tomatensauce, Mozzarella, Parmaschinken, Rucola', 'price': 2290, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 2, 'modifier_groups': [_sizeGroup]},
+        {'id': 'p-8', 'category_id': 'cat-3', 'name': 'Spaghetti Carbonara', 'description': 'Pancetta, Ei, Parmesan, Pfeffer — kein Rahm', 'price': 2190, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 3, 'modifier_groups': []},
+        {'id': 'p-9', 'category_id': 'cat-3', 'name': 'Penne all\'Arrabiata', 'description': 'Tomatensauce mit Chili und Knoblauch, vegan', 'price': 1890, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 4, 'modifier_groups': []},
+        {'id': 'p-20', 'category_id': 'cat-3', 'name': 'Tagliatelle al Salmone', 'description': 'Geräucherter Lachs, Rahmsauce, Kapern, Dill', 'price': 2490, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 5, 'modifier_groups': []},
+        // Desserts (4)
         {'id': 'p-10', 'category_id': 'cat-4', 'name': 'Crème Brûlée', 'description': 'Klassische Vanillecreme mit Karamellkruste', 'price': 950, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 1, 'modifier_groups': []},
         {'id': 'p-11', 'category_id': 'cat-4', 'name': 'Schokoladenfondue', 'description': 'Dunkle Schweizer Schokolade mit Früchten (für 2)', 'price': 1890, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 2, 'modifier_groups': []},
-        // Getränke
+        {'id': 'p-21', 'category_id': 'cat-4', 'name': 'Tiramisu', 'description': 'Hausgemacht mit Mascarpone, Espresso und Amaretto', 'price': 1050, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 3, 'modifier_groups': []},
+        {'id': 'p-22', 'category_id': 'cat-4', 'name': 'Apfelstrudel', 'description': 'Warm, mit Vanillesauce und Schlagsahne', 'price': 890, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 4, 'modifier_groups': []},
+        // Getränke (5)
         {'id': 'p-12', 'category_id': 'cat-5', 'name': 'Mineralwasser', 'description': 'Still oder prickelnd, 0.5 l', 'price': 490, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 1, 'modifier_groups': []},
         {'id': 'p-13', 'category_id': 'cat-5', 'name': 'Hausgemachte Limonade', 'description': 'Zitrone, Minze und Zucker, 0.4 l', 'price': 690, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 2, 'modifier_groups': []},
         {'id': 'p-14', 'category_id': 'cat-5', 'name': 'Kaffee', 'description': 'Espresso, Cappuccino oder Filterkaffee', 'price': 490, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 3, 'modifier_groups': []},
+        {'id': 'p-23', 'category_id': 'cat-5', 'name': 'Weisswein (Zürich)', 'description': 'Riesling-Silvaner, Zürichsee, 1 dl', 'price': 790, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 4, 'modifier_groups': []},
+        {'id': 'p-24', 'category_id': 'cat-5', 'name': 'Bier vom Fass', 'description': 'Helles oder Dunkel, 0.5 l', 'price': 690, 'tax_group': 'standard', 'image_url': '', 'is_available': true, 'display_order': 5, 'modifier_groups': []},
       ];
 
   @override
