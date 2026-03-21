@@ -22,6 +22,7 @@ import 'package:drift/drift.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/audit_log/domain/entities/audit_action.dart';
+import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 
 class AuditService {
   AuditService({
@@ -60,6 +61,9 @@ class AuditService {
   ///
   /// [userId] / [userName] override the session context when the acting user
   /// differs from the logged-in user (e.g. manager overrides).
+  ///
+  /// [approver] is the manager / admin who authorised the action.  When
+  /// supplied, [managerId] and [managerName] are populated on the log row.
   Future<void> log({
     required AuditAction action,
     required String entityType,
@@ -71,7 +75,14 @@ class AuditService {
     String? userId,
     String? userName,
     String? branchId,
+    // Manager / admin who authorised this action (voids, discounts, etc.)
+    UserEntity? approver,
+    String? managerId,
+    String? managerName,
   }) async {
+    final effectiveManagerId = approver?.id ?? managerId;
+    final effectiveManagerName = approver?.name ?? managerName;
+
     final companion = AuditLogCompanion.insert(
       id: IdGenerator.generateId(),
       tenantId: _tenantId,
@@ -79,6 +90,8 @@ class AuditService {
       deviceId: _deviceId,
       userId: userId ?? _userId,
       userName: userName ?? _userName,
+      managerId: Value(effectiveManagerId),
+      managerName: Value(effectiveManagerName),
       action: action.name,
       entityType: entityType,
       entityId: entityId,
@@ -129,11 +142,32 @@ class AuditService {
         reason: reason,
       );
 
-  Future<void> logOrderVoided(String ticketId, {String? reason}) => log(
+  Future<void> logOrderVoided(
+    String ticketId, {
+    String? reason,
+    UserEntity? approver,
+  }) =>
+      log(
         action: AuditAction.orderVoided,
         entityType: 'ticket',
         entityId: ticketId,
         reason: reason,
+        approver: approver,
+      );
+
+  Future<void> logItemVoided(
+    String orderItemId, {
+    String? ticketId,
+    String? reason,
+    UserEntity? approver,
+  }) =>
+      log(
+        action: AuditAction.itemVoided,
+        entityType: 'order_item',
+        entityId: orderItemId,
+        reason: reason,
+        approver: approver,
+        newValueJson: ticketId != null ? '{"ticketId":"$ticketId"}' : null,
       );
 
   Future<void> logPaymentReceived(String paymentId, {String? newValueJson}) =>
@@ -144,19 +178,45 @@ class AuditService {
         newValueJson: newValueJson,
       );
 
-  Future<void> logPaymentRefunded(String paymentId, {String? reason}) => log(
+  Future<void> logPaymentRefunded(
+    String paymentId, {
+    String? reason,
+    UserEntity? approver,
+  }) =>
+      log(
         action: AuditAction.paymentRefunded,
         entityType: 'payment',
         entityId: paymentId,
         reason: reason,
+        approver: approver,
       );
 
-  Future<void> logDiscountApplied(String ticketId, {String? newValueJson}) =>
+  Future<void> logItemRefunded(
+    String orderItemId, {
+    String? ticketId,
+    String? reason,
+    UserEntity? approver,
+  }) =>
+      log(
+        action: AuditAction.itemRefunded,
+        entityType: 'order_item',
+        entityId: orderItemId,
+        reason: reason,
+        approver: approver,
+        newValueJson: ticketId != null ? '{"ticketId":"$ticketId"}' : null,
+      );
+
+  Future<void> logDiscountApplied(
+    String ticketId, {
+    String? newValueJson,
+    UserEntity? approver,
+  }) =>
       log(
         action: AuditAction.discountApplied,
         entityType: 'ticket',
         entityId: ticketId,
         newValueJson: newValueJson,
+        approver: approver,
       );
 
   Future<void> logShiftOpened(String shiftId, {String? newValueJson}) => log(
@@ -168,6 +228,21 @@ class AuditService {
 
   Future<void> logShiftClosed(String shiftId, {String? newValueJson}) => log(
         action: AuditAction.shiftClosed,
+        entityType: 'shift',
+        entityId: shiftId,
+        newValueJson: newValueJson,
+      );
+
+  Future<void> logDayOpened(String shiftId, {String? cashierName}) => log(
+        action: AuditAction.dayOpened,
+        entityType: 'shift',
+        entityId: shiftId,
+        newValueJson:
+            cashierName != null ? '{"cashier":"$cashierName"}' : null,
+      );
+
+  Future<void> logDayClosed(String shiftId, {String? newValueJson}) => log(
+        action: AuditAction.dayClosed,
         entityType: 'shift',
         entityId: shiftId,
         newValueJson: newValueJson,
@@ -202,11 +277,17 @@ class AuditService {
         userName: name,
       );
 
-  Future<void> logManagerOverride(String entityId, {String? reason}) => log(
+  Future<void> logManagerOverride(
+    String entityId, {
+    String? reason,
+    UserEntity? approver,
+  }) =>
+      log(
         action: AuditAction.managerOverride,
         entityType: 'override',
         entityId: entityId,
         reason: reason,
+        approver: approver,
       );
 
   Future<void> logSettingChanged(
@@ -226,5 +307,17 @@ class AuditService {
         action: AuditAction.cashDrawerOpened,
         entityType: 'shift',
         entityId: shiftId,
+      );
+
+  Future<void> logBackupCreated(String backupName) => log(
+        action: AuditAction.backupCreated,
+        entityType: 'backup',
+        entityId: backupName,
+      );
+
+  Future<void> logBackupRestored(String backupName) => log(
+        action: AuditAction.backupRestored,
+        entityType: 'backup',
+        entityId: backupName,
       );
 }

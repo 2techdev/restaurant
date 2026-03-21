@@ -1,14 +1,21 @@
-/// Discount application dialog with optional manager PIN for large discounts.
+/// Discount application dialog with role-based limits and manager PIN for
+/// discounts that exceed the current user's authorisation level.
+///
+/// Role limits (percentage):
+///   waiter / cashier → 0 %  (always requires manager approval)
+///   manager          → 50 % (anything above requires admin approval)
+///   admin            → 100 % (no limit)
 ///
 /// Supports:
 ///  - Percentage-based discount (e.g. 10%)
-///  - Fixed-amount discount (e.g. ₺5.00)
+///  - Fixed-amount discount (e.g. CHF 5.00)
 ///  - Mandatory reason selection
-///  - Automatic manager override trigger when discount exceeds [kManagerThresholdPercent]
+///  - Automatic manager / admin override trigger when discount exceeds limit
 ///
 /// Usage:
 /// ```dart
-/// final result = await DiscountDialog.show(context: context, ref: ref);
+/// final result = await DiscountDialog.show(
+///   context: context, ref: ref, orderTotal: ticket.total);
 /// if (result != null) {
 ///   ref.read(currentTicketProvider.notifier).applyDiscount(result);
 /// }
@@ -26,11 +33,27 @@ import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dar
 import 'package:gastrocore_pos/features/overrides/presentation/widgets/manager_pin_dialog.dart';
 
 // ---------------------------------------------------------------------------
-// Constants
+// Role-based discount limits
 // ---------------------------------------------------------------------------
 
-/// Discounts above this percentage require manager PIN approval.
-const double kManagerThresholdPercent = 20.0;
+/// Maximum discount percentage a [UserRole.waiter] or [UserRole.cashier] can
+/// apply without any manager override.  Currently 0 — they always need approval.
+const double kWaiterMaxDiscountPct = 0.0;
+
+/// Maximum discount percentage a [UserRole.manager] can approve unilaterally.
+const double kManagerMaxDiscountPct = 50.0;
+
+/// Maximum discount percentage a [UserRole.admin] can approve (effectively 100%).
+const double kAdminMaxDiscountPct = 100.0;
+
+/// Returns the self-authorisation limit for [role].
+double _selfLimit(UserRole role) {
+  return switch (role) {
+    UserRole.admin => kAdminMaxDiscountPct,
+    UserRole.manager => kManagerMaxDiscountPct,
+    _ => kWaiterMaxDiscountPct,
+  };
+}
 
 /// Standard discount reasons.
 const kDiscountReasons = [
@@ -49,7 +72,7 @@ class DiscountResult {
   final DiscountType discountType;
   final int discountValue; // percent (0-100) or cents
   final String reason;
-  final UserEntity? approvedBy; // null = no override required
+  final UserEntity? approvedBy; // null = self-authorised
 
   const DiscountResult({
     required this.discountType,
@@ -104,6 +127,38 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
   }
 
   // -------------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------------
+
+  /// Effective percentage the user has entered (0 if invalid).
+  double _effectivePct() {
+    final raw = _valueController.text.trim();
+    final value = double.tryParse(raw.replaceAll(',', '.')) ?? 0;
+    if (_type == DiscountType.percentage) return value;
+    if (widget.orderTotal == 0) return 0;
+    final cents = (value * 100).round();
+    return cents / widget.orderTotal * 100;
+  }
+
+  /// Whether the current user can self-authorise the entered discount.
+  bool _selfAuthorised(UserEntity? user) {
+    if (user == null) return false;
+    return _effectivePct() <= _selfLimit(user.role);
+  }
+
+  /// Whether the current user needs a manager (not admin) approval.
+  bool _requiresManagerApproval(UserEntity? user) {
+    final pct = _effectivePct();
+    if (user == null) return pct > 0;
+    return pct > _selfLimit(user.role) && pct <= kManagerMaxDiscountPct;
+  }
+
+  /// Whether the entered discount exceeds even the manager limit (admin needed).
+  bool _requiresAdminApproval() {
+    return _effectivePct() > kManagerMaxDiscountPct;
+  }
+
+  // -------------------------------------------------------------------------
   // Validation
   // -------------------------------------------------------------------------
 
@@ -133,21 +188,6 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
     return null;
   }
 
-  /// Whether manager PIN is needed for the current input.
-  bool _requiresOverride() {
-    if (_type == DiscountType.fixed) {
-      final raw = _valueController.text.trim();
-      final value = double.tryParse(raw.replaceAll(',', '.')) ?? 0;
-      final cents = (value * 100).round();
-      if (widget.orderTotal == 0) return false;
-      return (cents / widget.orderTotal * 100) >= kManagerThresholdPercent;
-    } else {
-      final raw = _valueController.text.trim();
-      final pct = double.tryParse(raw.replaceAll(',', '.')) ?? 0;
-      return pct >= kManagerThresholdPercent;
-    }
-  }
-
   // -------------------------------------------------------------------------
   // Apply
   // -------------------------------------------------------------------------
@@ -166,35 +206,37 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
         : (value * 100).round();
 
     final effectiveReason =
-        _selectedReason == 'Diğer' && _customReasonController.text.trim().isNotEmpty
+        _selectedReason == 'Diğer' &&
+                _customReasonController.text.trim().isNotEmpty
             ? _customReasonController.text.trim()
             : _selectedReason;
 
+    final currentUser = ref.read(currentUserProvider);
     UserEntity? approver;
 
-    if (_requiresOverride()) {
+    if (!_selfAuthorised(currentUser)) {
+      // Show manager / admin PIN dialog.
+      final label = _requiresAdminApproval()
+          ? 'Admin Onayı Gerekli — İndirim: %${_effectivePct().toStringAsFixed(0)}'
+          : 'Yönetici Onayı — İndirim: %${_effectivePct().toStringAsFixed(0)} — $effectiveReason';
+
       approver = await ManagerPinDialog.show(
         context: context,
         ref: ref,
-        operationLabel:
-            'İndirim: %${_type == DiscountType.percentage ? value.toInt() : ''} — $effectiveReason',
+        operationLabel: label,
+        requireAdmin: _requiresAdminApproval(),
       );
       if (approver == null || !mounted) return;
-    } else {
-      // Check if current user has permission (manager/admin can apply without PIN).
-      final currentUser = ref.read(currentUserProvider);
-      if (currentUser?.role == UserRole.cashier ||
-          currentUser?.role == UserRole.waiter) {
-        // Even below threshold, non-manager staff require override.
-        approver = await ManagerPinDialog.show(
-          context: context,
-          ref: ref,
-          operationLabel: 'İndirim Onayı — $effectiveReason',
-        );
-        if (approver == null || !mounted) return;
+
+      // Validate that the approver has sufficient authority.
+      if (_requiresAdminApproval() && !approver.canApproveAdminOverride) {
+        setState(() =>
+            _errorMessage = 'Bu indirim için admin onayı gereklidir (>%${kManagerMaxDiscountPct.toInt()})');
+        return;
       }
     }
 
+    if (!mounted) return;
     Navigator.of(context).pop(DiscountResult(
       discountType: _type,
       discountValue: intValue,
@@ -209,6 +251,8 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.watch(currentUserProvider);
+
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -269,7 +313,7 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _typeButton(
-                      label: 'Tutar (₺)',
+                      label: 'Tutar (CHF)',
                       type: DiscountType.fixed,
                     ),
                   ),
@@ -281,7 +325,7 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
               Text(
                 _type == DiscountType.percentage
                     ? 'İndirim Yüzdesi'
-                    : 'İndirim Tutarı (₺)',
+                    : 'İndirim Tutarı (CHF)',
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -333,9 +377,9 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
                     Padding(
                       padding: const EdgeInsets.only(right: 16),
                       child: Text(
-                        _type == DiscountType.percentage ? '%' : '₺',
+                        _type == DiscountType.percentage ? '%' : 'CHF',
                         style: const TextStyle(
-                          fontSize: 24,
+                          fontSize: 20,
                           fontWeight: FontWeight.w300,
                           color: AppColors.textDim,
                         ),
@@ -345,29 +389,10 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
                 ),
               ),
 
-              // Manager override hint
+              // Role-limit / override hint
               AnimatedSize(
                 duration: const Duration(milliseconds: 180),
-                child: _requiresOverride()
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.lock_outline_rounded,
-                                size: 14, color: AppColors.orange),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Bu indirim yönetici onayı gerektirir'
-                              ' (≥%${kManagerThresholdPercent.toInt()})',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.orange,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : const SizedBox.shrink(),
+                child: _buildOverrideHint(currentUser),
               ),
 
               if (_errorMessage != null)
@@ -472,6 +497,43 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildOverrideHint(UserEntity? user) {
+    final pct = _effectivePct();
+    if (pct <= 0) return const SizedBox.shrink();
+
+    final selfLimit = _selfLimit(user?.role ?? UserRole.waiter);
+    final needsOverride = !_selfAuthorised(user);
+    final needsAdmin = _requiresAdminApproval();
+
+    if (!needsOverride) return const SizedBox.shrink();
+
+    final color = needsAdmin ? AppColors.red : AppColors.orange;
+    final icon = needsAdmin
+        ? Icons.admin_panel_settings_rounded
+        : Icons.lock_outline_rounded;
+    final text = needsAdmin
+        ? 'Admin onayı gereklidir (>%${kManagerMaxDiscountPct.toInt()})'
+        : user?.role == UserRole.manager
+            ? 'Bu indirim için admin onayı gereklidir'
+            : 'Yönetici onayı gereklidir (limit: %${selfLimit.toInt()})';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 11, color: color),
+            ),
+          ),
+        ],
       ),
     );
   }

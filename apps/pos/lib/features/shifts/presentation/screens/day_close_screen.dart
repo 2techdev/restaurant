@@ -22,6 +22,7 @@ import 'package:go_router/go_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/printing/models/print_models.dart';
+import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_log_provider.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/shifts/domain/day_close_calculator.dart';
 import 'package:gastrocore_pos/features/shifts/domain/entities/day_close_summary_entity.dart';
@@ -88,6 +89,14 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
 
       // Z-report printing (best-effort).
       await _printZReport(summary);
+
+      // Audit: day closed
+      final audit = ref.read(auditServiceProvider);
+      await audit.logDayClosed(
+        summary.shiftId,
+        newValueJson:
+            '{"cashier":"${summary.cashierName}","revenue":${summary.totalRevenueCents},"orders":${summary.totalOrders}}',
+      );
 
       if (mounted) {
         ref.read(currentUserProvider.notifier).logout();

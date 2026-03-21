@@ -78,7 +78,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -102,6 +102,12 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         // Add day_close_summaries table introduced in v6.
         await m.createTable(dayCloseSummaries);
+      }
+      if (from < 7) {
+        // v7: separate manager override PIN on users; authorizer columns on audit_log.
+        await m.addColumn(users, users.managerPinHash);
+        await m.addColumn(auditLog, auditLog.managerId);
+        await m.addColumn(auditLog, auditLog.managerName);
       }
     },
     onCreate: (m) async {

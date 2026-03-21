@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_log_provider.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/providers/shift_provider.dart';
@@ -98,10 +99,15 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
     final openingCash = (int.tryParse(_amountStr) ?? 0) * 100;
 
     try {
-      await ref.read(currentShiftProvider.notifier).openShift(
+      final shift = await ref.read(currentShiftProvider.notifier).openShift(
             userId: user.id,
             openingCash: openingCash,
           );
+
+      // Audit: day opened
+      final audit = ref.read(auditServiceProvider);
+      audit.setUser(userId: user.id, userName: user.name);
+      await audit.logDayOpened(shift.id, cashierName: user.name);
 
       if (mounted) context.go('/home');
     } catch (e) {

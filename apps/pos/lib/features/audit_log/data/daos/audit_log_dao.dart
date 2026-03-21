@@ -25,7 +25,7 @@ class AuditLogDao extends DatabaseAccessor<AppDatabase>
 
   /// Fetch entries for a tenant with optional filters, newest first.
   ///
-  /// [limit] caps the result set (default 200).
+  /// [limit] caps the result set (default 200, pass 0 for unlimited).
   Future<List<AuditLogEntryEntity>> getEntries({
     required String tenantId,
     DateTime? from,
@@ -36,8 +36,11 @@ class AuditLogDao extends DatabaseAccessor<AppDatabase>
   }) async {
     final query = select(auditLog)
       ..where((t) => t.tenantId.equals(tenantId))
-      ..orderBy([(t) => OrderingTerm.desc(t.timestamp)])
-      ..limit(limit);
+      ..orderBy([(t) => OrderingTerm.desc(t.timestamp)]);
+
+    if (limit > 0) {
+      query.limit(limit);
+    }
 
     if (from != null) {
       query.where((t) => t.timestamp.isBiggerOrEqualValue(from));
@@ -56,6 +59,24 @@ class AuditLogDao extends DatabaseAccessor<AppDatabase>
     return rows.map(_toEntity).toList();
   }
 
+  /// Fetch ALL entries for CSV export (no row limit).
+  Future<List<AuditLogEntryEntity>> getAllEntries({
+    required String tenantId,
+    DateTime? from,
+    DateTime? to,
+    AuditAction? action,
+    String? userId,
+  }) {
+    return getEntries(
+      tenantId: tenantId,
+      from: from,
+      to: to,
+      action: action,
+      userId: userId,
+      limit: 0,
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Mapper
   // ---------------------------------------------------------------------------
@@ -67,6 +88,8 @@ class AuditLogDao extends DatabaseAccessor<AppDatabase>
         deviceId: row.deviceId,
         userId: row.userId,
         userName: row.userName,
+        managerId: row.managerId,
+        managerName: row.managerName,
         action: AuditAction.fromString(row.action),
         entityType: row.entityType,
         entityId: row.entityId,

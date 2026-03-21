@@ -56,12 +56,25 @@ class AuthRepositoryImpl {
     final companion = UsersCompanion(
       name: Value(entity.name),
       pinHash: Value(entity.pinHash),
+      managerPinHash: Value(entity.managerPinHash),
       role: Value(entity.role.name),
       isActive: Value(entity.isActive),
       updatedAt: Value(DateTime.now()),
     );
     await (_db.update(_db.users)..where((u) => u.id.equals(entity.id)))
         .write(companion);
+  }
+
+  /// Set or clear the dedicated manager override PIN for a user.
+  ///
+  /// Pass `null` to remove the override PIN (falls back to [pinHash]).
+  Future<void> updateManagerPin(String userId, String? managerPinHash) async {
+    await (_db.update(_db.users)..where((u) => u.id.equals(userId))).write(
+      UsersCompanion(
+        managerPinHash: Value(managerPinHash),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Soft-delete a user by setting [isDeleted] to true.
@@ -84,6 +97,7 @@ class AuthRepositoryImpl {
       tenantId: row.tenantId,
       name: row.name,
       pinHash: row.pinHash,
+      managerPinHash: row.managerPinHash,
       role: UserRole.values.firstWhere(
         (r) => r.name == row.role,
         orElse: () => UserRole.waiter,
@@ -100,6 +114,7 @@ class AuthRepositoryImpl {
       tenantId: Value(entity.tenantId),
       name: Value(entity.name),
       pinHash: Value(entity.pinHash),
+      managerPinHash: Value(entity.managerPinHash),
       role: Value(entity.role.name),
       isActive: Value(entity.isActive),
       createdAt: Value(entity.createdAt),

@@ -41,9 +41,15 @@ class ManagerPinDialog extends ConsumerStatefulWidget {
   /// Label shown below the title to explain why authorisation is required.
   final String operationLabel;
 
+  /// When true, only an [UserRole.admin] PIN is accepted.
+  ///
+  /// Use this for high-value operations (e.g. discounts >50%, bulk refunds).
+  final bool requireAdmin;
+
   const ManagerPinDialog({
     super.key,
     required this.operationLabel,
+    this.requireAdmin = false,
   });
 
   // -------------------------------------------------------------------------
@@ -52,10 +58,13 @@ class ManagerPinDialog extends ConsumerStatefulWidget {
 
   /// Display the dialog and return the approver [UserEntity], or `null` if
   /// the dialog is dismissed without a successful PIN entry.
+  ///
+  /// Set [requireAdmin] to true to only accept [UserRole.admin] PINs.
   static Future<UserEntity?> show({
     required BuildContext context,
     required WidgetRef ref,
     required String operationLabel,
+    bool requireAdmin = false,
   }) {
     // Reset any stale state before showing.
     ref.read(managerOverrideProvider.notifier).reset();
@@ -66,7 +75,10 @@ class ManagerPinDialog extends ConsumerStatefulWidget {
       barrierDismissible: false,
       builder: (dialogContext) => UncontrolledProviderScope(
         container: ProviderScope.containerOf(context),
-        child: ManagerPinDialog(operationLabel: operationLabel),
+        child: ManagerPinDialog(
+          operationLabel: operationLabel,
+          requireAdmin: requireAdmin,
+        ),
       ),
     );
   }
@@ -112,7 +124,16 @@ class _ManagerPinDialogState extends ConsumerState<ManagerPinDialog> {
 
     if (!mounted) return;
 
+    // If requireAdmin, reject manager-level approvers.
     if (approver != null) {
+      if (widget.requireAdmin && !approver.canApproveAdminOverride) {
+        setState(() {
+          _isVerifying = false;
+          _pin = '';
+          _errorMessage = 'Bu işlem için Admin yetkisi gereklidir.';
+        });
+        return;
+      }
       Navigator.of(context).pop(approver);
     } else {
       setState(() {
@@ -170,9 +191,11 @@ class _ManagerPinDialogState extends ConsumerState<ManagerPinDialog> {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Yönetici veya admin PIN\'i giriniz',
-                style: TextStyle(
+              Text(
+                widget.requireAdmin
+                    ? 'Admin PIN\'i giriniz'
+                    : 'Yönetici veya admin PIN\'i giriniz',
+                style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
                 ),
