@@ -31,6 +31,9 @@ dependencies:
   # Persistent state (language pref, last restaurant)
   shared_preferences: ^2.3.2
 
+  # Fonts
+  google_fonts: ^6.2.1
+
   # Icons
   cupertino_icons: ^1.0.8
 

@@ -29,7 +29,7 @@ class LanguageSelector extends ConsumerWidget {
         decoration: BoxDecoration(
           color: onLight
               ? OnlineColors.bgCard
-              : Colors.white.withOpacity(0.25),
+              : Colors.white.withValues(alpha: 0.25),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(

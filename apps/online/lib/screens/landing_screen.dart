@@ -1,15 +1,15 @@
-/// Landing screen — restaurant branding, language selector, "View Menu" CTA.
+/// Landing screen — restaurant hero, info strip, "View Menu" CTA.
 /// Entry point when customer scans QR code: /{restaurantId}?table={n}
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:gastrocore_online/core/theme/app_theme.dart';
 import 'package:gastrocore_online/domain/models/menu_models.dart';
 import 'package:gastrocore_online/l10n/app_localizations.dart';
 import 'package:gastrocore_online/providers/cart_provider.dart';
-import 'package:gastrocore_online/providers/locale_provider.dart';
 import 'package:gastrocore_online/providers/menu_provider.dart';
 import 'package:gastrocore_online/widgets/language_selector.dart';
 
@@ -31,7 +31,6 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
   @override
   void initState() {
     super.initState();
-    // Pre-fill table number from QR and initialise cart order type
     if (widget.tableFromQr != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(cartProvider.notifier).setTableNumber(widget.tableFromQr);
@@ -41,149 +40,215 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final menu = ref.watch(menuProvider(widget.restaurantId));
 
     return Scaffold(
+      backgroundColor: OnlineColors.bgPage,
       body: menu.when(
-        loading: () => _buildContent(context, l10n, null),
-        error: (e, _) => _buildContent(context, l10n, null),
-        data: (m) => _buildContent(context, l10n, m.restaurant),
+        loading: () => _buildPage(context, null),
+        error: (_, __) => _buildPage(context, null),
+        data: (m) => _buildPage(context, m.restaurant),
       ),
     );
   }
 
-  Widget _buildContent(
-    BuildContext context,
-    AppLocalizations l10n,
-    OnlineRestaurant? restaurant,
-  ) {
-    final screenHeight = MediaQuery.sizeOf(context).height;
+  Widget _buildPage(BuildContext context, OnlineRestaurant? restaurant) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _HeroSection(
+            restaurant: restaurant,
+            restaurantId: widget.restaurantId,
+          ),
+          _InfoSection(
+            restaurant: restaurant,
+            restaurantId: widget.restaurantId,
+            tableFromQr: widget.tableFromQr,
+          ),
+          _FooterSection(restaurantId: widget.restaurantId),
+        ],
+      ),
+    );
+  }
+}
 
+// ---------------------------------------------------------------------------
+// Hero section — cover image with overlay + language selector
+// ---------------------------------------------------------------------------
+
+class _HeroSection extends StatelessWidget {
+  const _HeroSection({required this.restaurant, required this.restaurantId});
+  final OnlineRestaurant? restaurant;
+  final String restaurantId;
+
+  @override
+  Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Background cover image / gradient
-        Positioned.fill(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  OnlineColors.primary.withOpacity(0.85),
-                  OnlineColors.primaryDark,
-                ],
-              ),
+        // Cover image
+        SizedBox(
+          height: 280,
+          width: double.infinity,
+          child: restaurant?.coverImageUrl != null
+              ? Image.network(
+                  restaurant!.coverImageUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _defaultCover(),
+                )
+              : _defaultCover(),
+        ),
+
+        // Gradient overlay
+        Container(
+          height: 280,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0x40000000),
+                Color(0xD0000000),
+              ],
+              stops: [0.0, 1.0],
             ),
-            child: restaurant?.coverImageUrl != null
-                ? Image.network(
-                    restaurant!.coverImageUrl!,
-                    fit: BoxFit.cover,
-                    color: Colors.black38,
-                    colorBlendMode: BlendMode.darken,
-                    errorBuilder: (_, __, ___) => const SizedBox(),
-                  )
-                : null,
           ),
         ),
 
         // Language selector — top right
         Positioned(
-          top: MediaQuery.paddingOf(context).top + 16,
+          top: MediaQuery.paddingOf(context).top + 12,
           right: 16,
           child: const LanguageSelector(),
         ),
 
-        // Main content
+        // Restaurant info overlaid at bottom of hero
         Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: screenHeight * 0.55,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: OnlineColors.bgCard,
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(kRadiusXl),
+          bottom: 20,
+          left: 20,
+          right: 20,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                restaurant?.name ?? 'Demo Restaurant Zürich',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -0.3,
+                  shadows: [
+                    const Shadow(
+                      color: Color(0x80000000),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-            child: _BottomContent(
-              restaurant: restaurant,
-              restaurantId: widget.restaurantId,
-              tableFromQr: widget.tableFromQr,
-            ),
-          ),
-        ),
-
-        // Logo / restaurant icon
-        Positioned(
-          top: screenHeight * 0.45 - 48,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: _RestaurantLogo(restaurant: restaurant),
+              if (restaurant?.description != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  restaurant!.description!,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: Colors.white70,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              const SizedBox(height: 12),
+              // Info strip: rating | delivery time | min order
+              Row(
+                children: [
+                  _InfoChip(
+                    icon: Icons.star_rounded,
+                    iconColor: const Color(0xFFFFC107),
+                    label: '4.8',
+                  ),
+                  const SizedBox(width: 8),
+                  _InfoChip(
+                    icon: Icons.access_time_rounded,
+                    label: restaurant != null
+                        ? '${restaurant!.estimatedWaitMinutes}–${restaurant!.estimatedWaitMinutes + 10} min'
+                        : '20–30 min',
+                  ),
+                  const SizedBox(width: 8),
+                  _InfoChip(
+                    icon: Icons.shopping_bag_outlined,
+                    label: 'Min. CHF 0',
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],
     );
   }
-}
 
-// ---------------------------------------------------------------------------
-// Restaurant logo
-// ---------------------------------------------------------------------------
-
-class _RestaurantLogo extends StatelessWidget {
-  const _RestaurantLogo({this.restaurant});
-  final OnlineRestaurant? restaurant;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 96,
-      height: 96,
-      decoration: BoxDecoration(
-        color: OnlineColors.bgCard,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+  Widget _defaultCover() => Container(
+        color: OnlineColors.charcoal,
+        child: Center(
+          child: Icon(
+            Icons.restaurant,
+            size: 64,
+            color: Colors.white.withValues(alpha: 0.3),
           ),
-        ],
-      ),
-      child: ClipOval(
-        child: restaurant?.logoUrl != null
-            ? Image.network(restaurant!.logoUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _defaultIcon())
-            : _defaultIcon(),
-      ),
-    );
-  }
-
-  Widget _defaultIcon() => const Center(
-        child: Icon(
-          Icons.restaurant,
-          size: 48,
-          color: OnlineColors.primary,
         ),
       );
 }
 
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    this.iconColor = Colors.white70,
+  });
+  final IconData icon;
+  final String label;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black45,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: iconColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Bottom card content
+// Info section — status, table chip, CTA
 // ---------------------------------------------------------------------------
 
-class _BottomContent extends ConsumerWidget {
-  const _BottomContent({
+class _InfoSection extends ConsumerWidget {
+  const _InfoSection({
     required this.restaurant,
     required this.restaurantId,
     this.tableFromQr,
   });
-
   final OnlineRestaurant? restaurant;
   final String restaurantId;
   final int? tableFromQr;
@@ -192,71 +257,20 @@ class _BottomContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Restaurant name
-        Text(
-          restaurant?.name ?? 'Restaurant',
-          style: Theme.of(context).textTheme.headlineLarge,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        if (restaurant?.description != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            restaurant!.description!,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: OnlineColors.textSecondary),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-        const SizedBox(height: 16),
-
-        // Table chip
-        if (tableFromQr != null) ...[
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: OnlineColors.primaryLight,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.table_restaurant,
-                    size: 16, color: OnlineColors.primary),
-                const SizedBox(width: 6),
-                Text(
-                  l10n.tableAutoFilled('$tableFromQr'),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: OnlineColors.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-
-        // Open/closed status
-        if (restaurant != null) ...[
+    return Container(
+      color: OnlineColors.bgCard,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Open / closed status
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: restaurant!.isOpen
+                  color: restaurant?.isOpen != false
                       ? OnlineColors.green
                       : OnlineColors.red,
                   shape: BoxShape.circle,
@@ -264,23 +278,26 @@ class _BottomContent extends ConsumerWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                restaurant!.isOpen ? 'Open' : 'Closed',
-                style: TextStyle(
+                restaurant?.isOpen != false ? 'Jetzt geöffnet' : 'Geschlossen',
+                style: GoogleFonts.inter(
                   fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: restaurant!.isOpen
+                  fontWeight: FontWeight.w600,
+                  color: restaurant?.isOpen != false
                       ? OnlineColors.green
                       : OnlineColors.red,
                 ),
               ),
-              if (restaurant!.isOpen) ...[
-                const SizedBox(width: 12),
-                Icon(Icons.access_time,
-                    size: 14, color: OnlineColors.textSecondary),
+              if (restaurant?.isOpen == true) ...[
+                const SizedBox(width: 16),
+                Icon(
+                  Icons.delivery_dining_rounded,
+                  size: 15,
+                  color: OnlineColors.textSecondary,
+                ),
                 const SizedBox(width: 4),
                 Text(
-                  '~${restaurant!.estimatedWaitMinutes} min',
-                  style: const TextStyle(
+                  'Lieferung & Abholung',
+                  style: GoogleFonts.inter(
                     fontSize: 13,
                     color: OnlineColors.textSecondary,
                   ),
@@ -288,36 +305,181 @@ class _BottomContent extends ConsumerWidget {
               ],
             ],
           ),
+
+          // Table chip from QR
+          if (tableFromQr != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: OnlineColors.pillActiveBg,
+                borderRadius: BorderRadius.circular(kRadiusMedium),
+                border: Border.all(
+                  color: OnlineColors.primary.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.table_restaurant,
+                      size: 16, color: OnlineColors.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.tableAutoFilled('$tableFromQr'),
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: OnlineColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           const SizedBox(height: 24),
-        ] else
+
+          // CTA button
+          ElevatedButton(
+            onPressed: restaurant?.isOpen == false
+                ? null
+                : () {
+                    final tableQuery =
+                        tableFromQr != null ? '?table=$tableFromQr' : '';
+                    context.go('/$restaurantId/menu$tableQuery');
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: OnlineColors.primary,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 54),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(kRadiusLarge),
+              ),
+              elevation: 0,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.restaurant_menu_rounded, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  l10n.viewMenu,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Footer section
+// ---------------------------------------------------------------------------
+
+class _FooterSection extends StatelessWidget {
+  const _FooterSection({required this.restaurantId});
+  final String restaurantId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: OnlineColors.bgPage,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Restaurant details
+          _FooterBlock(
+            icon: Icons.location_on_outlined,
+            text: 'Bahnhofstrasse 1, 8001 Zürich',
+          ),
+          const SizedBox(height: 10),
+          _FooterBlock(
+            icon: Icons.phone_outlined,
+            text: '+41 44 000 00 00',
+          ),
+          const SizedBox(height: 10),
+          _FooterBlock(
+            icon: Icons.access_time_outlined,
+            text: 'Mo–Fr 11:30–14:00, 17:30–22:00',
+          ),
           const SizedBox(height: 24),
+          const Divider(color: OnlineColors.divider),
+          const SizedBox(height: 16),
 
-        const Spacer(),
+          // Legal links
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              _FooterLink(label: 'Impressum'),
+              _FooterLink(label: 'Datenschutz'),
+              _FooterLink(label: 'AGB'),
+            ],
+          ),
+          const SizedBox(height: 20),
 
-        // CTA button
-        ElevatedButton.icon(
-          onPressed: restaurant?.isOpen == false
-              ? null
-              : () {
-                  final tableQuery =
-                      tableFromQr != null ? '?table=$tableFromQr' : '';
-                  context.go('/$restaurantId/menu$tableQuery');
-                },
-          icon: const Icon(Icons.restaurant_menu),
-          label: Text(l10n.viewMenu),
-        ),
+          // Powered by
+          Text(
+            'Powered by GastroCore',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: OnlineColors.textDim,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-        const SizedBox(height: 16),
+class _FooterBlock extends StatelessWidget {
+  const _FooterBlock({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
 
-        // Powered by
-        Text(
-          'Powered by GastroCore',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: OnlineColors.textDim),
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: OnlineColors.textSecondary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: OnlineColors.textSecondary,
+            ),
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _FooterLink extends StatelessWidget {
+  const _FooterLink({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: GoogleFonts.inter(
+        fontSize: 12,
+        color: OnlineColors.textSecondary,
+        decoration: TextDecoration.underline,
+        decorationColor: OnlineColors.textDim,
+      ),
     );
   }
 }
