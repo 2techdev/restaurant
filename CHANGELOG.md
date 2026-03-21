@@ -10,6 +10,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Comprehensive developer documentation suite in `docs/`:
+  - `README.md` — project overview, architecture diagram (Mermaid), setup instructions, build commands for all 5 flavors, deploy instructions, API summary
+  - `docs/ARCHITECTURE.md` — three-layer architecture, sync protocol, module map, fare engine, WebSocket layer, licensing, security model
+  - `docs/API.md` — complete REST API reference with request/response examples for all 40+ endpoints and WebSocket protocols
+  - `docs/DEPLOYMENT.md` — step-by-step VPS deployment guide, nginx config, Certbot SSL, environment variables reference, backup/restore, GitHub Pages deployment
+  - `docs/DEVELOPMENT.md` — developer setup, Drift DAO patterns, Riverpod patterns, coding conventions, PR process, common tasks
+  - `docs/DATABASE.md` — full schema reference for all 31 tables, indexes, materialized views, triggers, migration guide, schema conventions
+  - `docs/TESTING.md` — running tests, writing unit/widget/integration tests, Go test patterns, test database setup, coverage targets
 - ODS (Order Display Screen) feature module scaffolded — customer-facing order status display
 - `apps/online` Flutter Web app scaffolded for online ordering (screens, widgets, providers)
 - Go backend `stores` module (handlers, models, routes)
