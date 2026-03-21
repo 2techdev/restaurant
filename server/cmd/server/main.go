@@ -22,6 +22,7 @@ import (
 	"github.com/gastrocore/server/internal/menu"
 	"github.com/gastrocore/server/internal/online"
 	"github.com/gastrocore/server/internal/orders"
+	"github.com/gastrocore/server/internal/qrbill"
 	"github.com/gastrocore/server/internal/reports"
 	"github.com/gastrocore/server/internal/shared/config"
 	"github.com/gastrocore/server/internal/shared/database"
@@ -66,7 +67,11 @@ func main() {
 	syncModule := gosync.NewModule(db, cfg)
 	menuModule := menu.NewModule(db)
 	ordersModule := orders.NewModule(db)
-	onlineModule := online.NewModule(db, kdsHub, onlineHub)
+	onlineModule := online.NewModuleWithStripe(db, kdsHub, onlineHub, online.StripeConfig{
+		SecretKey:      cfg.StripeSecretKey,
+		WebhookSecret:  cfg.StripeWebhookSecret,
+		SuccessURLBase: cfg.StripeSuccessURLBase,
+	})
 	reportsModule := reports.NewModule(db)
 	dashboardModule := dashboard.NewModule(db)
 	devicesModule := devices.NewModule(db)
@@ -76,6 +81,7 @@ func main() {
 	kdsModule := kds.NewModule(db, kdsHub)
 	// Fiscal compliance (Germany KassenSichV) — enabled when Fiskaly credentials set.
 	fiscalModule := fiscal.NewModule(cfg)
+	qrbillModule := qrbill.NewModule()
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -130,6 +136,7 @@ func main() {
 	storesModule.RegisterRoutes(mux)
 	kdsModule.RegisterRoutes(mux)
 	fiscalModule.RegisterRoutes(mux)
+	qrbillModule.RegisterRoutes(mux) // POST /api/invoices/qrbill — JWT required at call site
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain

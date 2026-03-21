@@ -3,6 +3,7 @@ library;
 
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gastrocore_online/core/api/api_client.dart';
 import 'package:gastrocore_online/domain/cart.dart';
 import 'package:gastrocore_online/domain/models/order_models.dart';
 import 'package:gastrocore_online/providers/menu_provider.dart';
@@ -38,6 +39,67 @@ class PlaceOrderNotifier
       final order = PlacedOrder.fromJson(json);
       state = AsyncData(order);
       return order;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      return null;
+    }
+  }
+
+  void reset() => state = const AsyncData(null);
+}
+
+// ---------------------------------------------------------------------------
+// Payment checkout
+// ---------------------------------------------------------------------------
+
+class PaymentCheckoutResult {
+  final String checkoutUrl;
+  final String sessionId;
+  final String orderId;
+
+  const PaymentCheckoutResult({
+    required this.checkoutUrl,
+    required this.sessionId,
+    required this.orderId,
+  });
+}
+
+final createPaymentCheckoutProvider = StateNotifierProvider<
+    CreatePaymentCheckoutNotifier,
+    AsyncValue<PaymentCheckoutResult?>>((ref) {
+  return CreatePaymentCheckoutNotifier(ref);
+});
+
+class CreatePaymentCheckoutNotifier
+    extends StateNotifier<AsyncValue<PaymentCheckoutResult?>> {
+  CreatePaymentCheckoutNotifier(this.ref) : super(const AsyncData(null));
+
+  final Ref ref;
+
+  Future<PaymentCheckoutResult?> createCheckout({
+    required String orderId,
+    required String restaurantId,
+    required int amountCents,
+    String currency = 'chf',
+    String? description,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      final client = ref.read(apiClientProvider);
+      final json = await client.createPaymentCheckout(
+        orderId: orderId,
+        restaurantId: restaurantId,
+        amountCents: amountCents,
+        currency: currency,
+        description: description,
+      );
+      final result = PaymentCheckoutResult(
+        checkoutUrl: json['checkout_url'] as String,
+        sessionId: json['session_id'] as String,
+        orderId: json['order_id'] as String,
+      );
+      state = AsyncData(result);
+      return result;
     } catch (e, st) {
       state = AsyncError(e, st);
       return null;

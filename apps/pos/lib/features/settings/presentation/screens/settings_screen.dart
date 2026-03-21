@@ -19,6 +19,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gastrocore_pos/core/printing/printer_device.dart';
+import 'package:gastrocore_pos/core/printing/printing_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gastrocore_pos/core/data/seed_data.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
@@ -725,6 +727,11 @@ class _PrinterSectionState extends ConsumerState<_PrinterSection> {
   bool _initialised = false;
   String? _testResult;
 
+  // Bluetooth discovery state
+  List<PrinterDevice> _btDevices = [];
+  bool _btScanning = false;
+  String? _btError;
+
   @override
   void dispose() {
     _receiptIpCtrl.dispose();
@@ -732,6 +739,40 @@ class _PrinterSectionState extends ConsumerState<_PrinterSection> {
     _kitchenIpCtrl.dispose();
     _kitchenPortCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _scanBluetooth() async {
+    setState(() {
+      _btScanning = true;
+      _btError = null;
+    });
+    try {
+      final devices =
+          await ref.read(printerServiceProvider).discoverBluetoothPrinters();
+      setState(() {
+        _btDevices = devices;
+        _btScanning = false;
+        if (devices.isEmpty) {
+          _btError =
+              'No paired Bluetooth printers found. Pair the printer in Android Bluetooth settings first.';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _btScanning = false;
+        _btError = 'Scan failed: $e';
+      });
+    }
+  }
+
+  Future<void> _selectBtDevice(PrinterDevice device) async {
+    await ref.read(printerSettingsProvider.notifier).update(
+          (s) => s.copyWith(
+            bluetoothDeviceAddress: device.address,
+            bluetoothDeviceName: device.name,
+          ),
+        );
+    if (mounted) _showSnack('Bluetooth printer selected: ${device.name}');
   }
 
   void _populate(PrinterSettings s) {
@@ -827,63 +868,228 @@ class _PrinterSectionState extends ConsumerState<_PrinterSection> {
             ),
           ],
         ),
-        _Card(
-          title: 'RECEIPT PRINTER',
-          children: [
-            _Field(
-              label: 'IP Address',
-              controller: _receiptIpCtrl,
-              hint: '192.168.1.100',
-              keyboardType: TextInputType.text,
-            ),
-            _Field(
-              label: 'TCP Port',
-              controller: _receiptPortCtrl,
-              hint: '9100',
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            ),
-            Row(
-              children: [
-                _OutlineBtn(
-                  label: 'Test Print',
-                  icon: Icons.print_rounded,
-                  onPressed: _testPrint,
+        if (settings.connectionType == PrinterConnectionType.bluetooth)
+          _Card(
+            title: 'BLUETOOTH PRINTER',
+            children: [
+              // Currently selected device
+              if (settings.bluetoothDeviceAddress.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentDim,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.bluetooth_connected_rounded,
+                          size: 18, color: AppColors.accent),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              settings.bluetoothDeviceName.isNotEmpty
+                                  ? settings.bluetoothDeviceName
+                                  : 'Unknown device',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.accent),
+                            ),
+                            Text(
+                              settings.bluetoothDeviceAddress,
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => ref
+                            .read(printerSettingsProvider.notifier)
+                            .update((s) => s.copyWith(
+                                  bluetoothDeviceAddress: '',
+                                  bluetoothDeviceName: '',
+                                )),
+                        child: const Icon(Icons.close_rounded,
+                            size: 16, color: AppColors.textDim),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 12),
-                if (_testResult != null)
-                  Expanded(
-                    child: Text(
-                      _testResult!,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: _testResult!.contains('success')
-                            ? AppColors.green
-                            : AppColors.orange,
+                const SizedBox(height: 12),
+              ],
+
+              // Discover button
+              _OutlineBtn(
+                label: _btScanning
+                    ? 'Scanning…'
+                    : 'Discover Paired Devices',
+                icon: Icons.bluetooth_searching_rounded,
+                onPressed: _btScanning ? null : _scanBluetooth,
+              ),
+
+              // Error message
+              if (_btError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _btError!,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.orange),
+                  ),
+                ),
+
+              // Discovered device list
+              if (_btDevices.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'PAIRED DEVICES',
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDim,
+                      letterSpacing: 1),
+                ),
+                const SizedBox(height: 6),
+                ..._btDevices.map(
+                  (device) => GestureDetector(
+                    onTap: () => _selectBtDevice(device),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: device.address ==
+                                settings.bluetoothDeviceAddress
+                            ? AppColors.accentDim
+                            : AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: device.address ==
+                                  settings.bluetoothDeviceAddress
+                              ? AppColors.accent.withValues(alpha: 0.4)
+                              : AppColors.border.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.bluetooth_rounded,
+                            size: 16,
+                            color: device.address ==
+                                    settings.bluetoothDeviceAddress
+                                ? AppColors.accent
+                                : AppColors.textDim,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  device.name,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: device.address ==
+                                            settings.bluetoothDeviceAddress
+                                        ? AppColors.accent
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                                Text(
+                                  device.address,
+                                  style: const TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.textDim),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (device.address ==
+                              settings.bluetoothDeviceAddress)
+                            const Icon(Icons.check_circle_rounded,
+                                size: 16, color: AppColors.accent),
+                        ],
                       ),
                     ),
                   ),
+                ),
               ],
-            ),
-          ],
-        ),
-        _Card(
-          title: 'KITCHEN PRINTER',
-          children: [
-            _Field(
-              label: 'IP Address',
-              controller: _kitchenIpCtrl,
-              hint: '192.168.1.101',
-            ),
-            _Field(
-              label: 'TCP Port',
-              controller: _kitchenPortCtrl,
-              hint: '9100',
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            ),
-          ],
-        ),
+
+              const SizedBox(height: 8),
+              const Text(
+                'Note: Only devices already paired in Android system Bluetooth settings are shown. '
+                'ESC/POS via RFCOMM SPP (UUID 00001101…).',
+                style: TextStyle(fontSize: 11, color: AppColors.textDim),
+              ),
+            ],
+          )
+        else ...[
+          _Card(
+            title: 'RECEIPT PRINTER',
+            children: [
+              _Field(
+                label: 'IP Address',
+                controller: _receiptIpCtrl,
+                hint: '192.168.1.100',
+                keyboardType: TextInputType.text,
+              ),
+              _Field(
+                label: 'TCP Port',
+                controller: _receiptPortCtrl,
+                hint: '9100',
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+              Row(
+                children: [
+                  _OutlineBtn(
+                    label: 'Test Print',
+                    icon: Icons.print_rounded,
+                    onPressed: _testPrint,
+                  ),
+                  const SizedBox(width: 12),
+                  if (_testResult != null)
+                    Expanded(
+                      child: Text(
+                        _testResult!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _testResult!.contains('success')
+                              ? AppColors.green
+                              : AppColors.orange,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          _Card(
+            title: 'KITCHEN PRINTER',
+            children: [
+              _Field(
+                label: 'IP Address',
+                controller: _kitchenIpCtrl,
+                hint: '192.168.1.101',
+              ),
+              _Field(
+                label: 'TCP Port',
+                controller: _kitchenPortCtrl,
+                hint: '9100',
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+            ],
+          ),
+        ],
         _Card(
           title: 'BEHAVIOUR',
           children: [
@@ -2436,7 +2642,7 @@ class _OutlineBtn extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final IconData? icon;
 
   @override

@@ -3,6 +3,26 @@ package online
 import "time"
 
 // ---------------------------------------------------------------------------
+// Payment models
+// ---------------------------------------------------------------------------
+
+// CreateCheckoutRequest is the POST body for POST /api/v1/online/payment/checkout.
+type CreateCheckoutRequest struct {
+	OrderID      string `json:"order_id"`
+	RestaurantID string `json:"restaurant_id"`
+	AmountCents  int64  `json:"amount_cents"` // e.g. 2350 for CHF 23.50
+	Currency     string `json:"currency"`     // "chf" (default) or "eur"
+	Description  string `json:"description,omitempty"`
+}
+
+// CreateCheckoutResponse is returned after creating a Stripe Checkout Session.
+type CreateCheckoutResponse struct {
+	CheckoutURL string `json:"checkout_url"` // Redirect the customer here
+	SessionID   string `json:"session_id"`
+	OrderID     string `json:"order_id"`
+}
+
+// ---------------------------------------------------------------------------
 // Menu response models (public, no auth)
 // ---------------------------------------------------------------------------
 

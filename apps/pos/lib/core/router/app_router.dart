@@ -31,6 +31,7 @@ import 'package:gastrocore_pos/features/license/flag_gate_widget.dart';
 import 'package:gastrocore_pos/features/license/license_models.dart';
 import 'package:gastrocore_pos/features/license/license_screen.dart';
 import 'package:gastrocore_pos/features/orders/presentation/screens/void_screen.dart';
+import 'package:gastrocore_pos/features/orders/presentation/screens/qr_bill_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Route path constants
@@ -56,6 +57,7 @@ abstract final class AppRoutes {
   static const String menuManagement = '/menu-management';
   static const String auditLog = '/audit-log';
   static const String license = '/license';
+  static const String qrBill = '/qr-bill';
 
   // Legacy routes kept for backward compatibility
   static const String pos = '/pos';
@@ -200,6 +202,18 @@ GoRouter createAppRouter() => GoRouter(
     GoRoute(
       path: AppRoutes.auditLog,
       builder: (context, state) => const AuditLogScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.qrBill,
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return QRBillScreen(
+          ticketId: extra?['ticketId'] as String?,
+          amountCents: extra?['amountCents'] as int?,
+          customerName: extra?['customerName'] as String?,
+          invoiceId: extra?['invoiceId'] as String?,
+        );
+      },
     ),
   ],
 );

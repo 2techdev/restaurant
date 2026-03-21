@@ -48,6 +48,9 @@ dependencies:
   # Collection utilities
   collection: ^1.19.1
 
+  # URL launcher — opens Stripe Checkout in browser
+  url_launcher: ^6.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

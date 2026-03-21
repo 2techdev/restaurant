@@ -73,6 +73,9 @@ dependencies:
   # Collection utilities
   collection: ^1.19.1
 
+  # QR code rendering (Swiss QR-Bill)
+  qr_flutter: ^4.1.0
+
   # Equatable for value objects
   equatable: ^2.0.7
 

@@ -1,10 +1,11 @@
-/// Checkout screen — order summary, optional customer name, confirm order.
+/// Checkout screen — order summary, optional customer name, payment method, confirm.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:gastrocore_online/core/theme/app_theme.dart';
 import 'package:gastrocore_online/core/utils/money.dart';
 import 'package:gastrocore_online/domain/cart.dart';
@@ -12,6 +13,16 @@ import 'package:gastrocore_online/domain/models/order_models.dart';
 import 'package:gastrocore_online/l10n/app_localizations.dart';
 import 'package:gastrocore_online/providers/cart_provider.dart';
 import 'package:gastrocore_online/providers/order_provider.dart';
+
+// ---------------------------------------------------------------------------
+// Payment method
+// ---------------------------------------------------------------------------
+
+enum _PaymentMethod { payOnPickup, payOnline }
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key, required this.restaurantId});
@@ -23,6 +34,7 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _nameController = TextEditingController();
+  _PaymentMethod _paymentMethod = _PaymentMethod.payOnPickup;
 
   @override
   void dispose() {
@@ -32,6 +44,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   Future<void> _placeOrder(Cart cart) async {
     final l10n = AppLocalizations.of(context)!;
+
+    // 1) Place the order
     final order = await ref.read(placeOrderProvider.notifier).placeOrder(
           restaurantId: widget.restaurantId,
           cart: cart,
@@ -41,19 +55,75 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         );
 
     if (!mounted) return;
-    if (order != null) {
-      ref.read(cartProvider.notifier).clear();
-      context.go(
-        '/${widget.restaurantId}/confirmation/${order.id}'
-        '?number=${order.orderNumber}',
-      );
-    } else {
+
+    if (order == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(l10n.orderFailed),
           backgroundColor: OnlineColors.red,
         ),
       );
+      return;
+    }
+
+    // 2) If paying online → create Stripe checkout session
+    if (_paymentMethod == _PaymentMethod.payOnline) {
+      await _redirectToStripe(order, cart);
+    } else {
+      // Pay on pickup → go directly to confirmation
+      ref.read(cartProvider.notifier).clear();
+      if (mounted) {
+        context.go(
+          '/${widget.restaurantId}/confirmation/${order.id}'
+          '?number=${order.orderNumber}',
+        );
+      }
+    }
+  }
+
+  Future<void> _redirectToStripe(PlacedOrder order, Cart cart) async {
+    final result =
+        await ref.read(createPaymentCheckoutProvider.notifier).createCheckout(
+              orderId: order.id,
+              restaurantId: widget.restaurantId,
+              amountCents: cart.totalRounded,
+              currency: 'chf',
+              description: 'Order #${order.orderNumber}',
+            );
+
+    if (!mounted) return;
+
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment setup failed. Please try Pay on Pickup.'),
+          backgroundColor: OnlineColors.red,
+        ),
+      );
+      return;
+    }
+
+    // Open Stripe Checkout in browser
+    final uri = Uri.parse(result.checkoutUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // After returning from browser, clear cart and show confirmation
+      ref.read(cartProvider.notifier).clear();
+      if (mounted) {
+        context.go(
+          '/${widget.restaurantId}/confirmation/${order.id}'
+          '?number=${order.orderNumber}&payment=stripe',
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open payment page. Please try again.'),
+            backgroundColor: OnlineColors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -62,7 +132,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final l10n = AppLocalizations.of(context)!;
     final cart = ref.watch(cartProvider);
     final orderState = ref.watch(placeOrderProvider);
-    final isLoading = orderState is AsyncLoading;
+    final checkoutState = ref.watch(createPaymentCheckoutProvider);
+    final isLoading = orderState is AsyncLoading || checkoutState is AsyncLoading;
 
     return Scaffold(
       backgroundColor: OnlineColors.bgPage,
@@ -117,41 +188,55 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             ),
             const SizedBox(height: 16),
 
+            // Payment method
+            _PaymentMethodSelector(
+              selected: _paymentMethod,
+              onChanged: (m) => setState(() => _paymentMethod = m),
+            ),
+            const SizedBox(height: 16),
+
             // Totals
             _CheckoutTotals(cart: cart),
           ],
         ),
       ),
 
-      bottomNavigationBar: Container(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          12,
-          16,
-          16 + MediaQuery.paddingOf(context).bottom,
-        ),
-        decoration: BoxDecoration(
-          color: OnlineColors.bgCard,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: ElevatedButton(
+            onPressed: isLoading ? null : () => _placeOrder(cart),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _paymentMethod == _PaymentMethod.payOnline
+                  ? const Color(0xFF6772E5) // Stripe purple
+                  : OnlineColors.primary,
             ),
-          ],
-        ),
-        child: ElevatedButton(
-          onPressed: isLoading ? null : () => _placeOrder(cart),
-          child: isLoading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2.5,
+            child: isLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_paymentMethod == _PaymentMethod.payOnline)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 8),
+                          child: Icon(Icons.lock_rounded,
+                              size: 16, color: Colors.white),
+                        ),
+                      Text(
+                        _paymentMethod == _PaymentMethod.payOnline
+                            ? 'Pay Securely Online'
+                            : l10n.confirmOrder,
+                      ),
+                    ],
                   ),
-                )
-              : Text(l10n.confirmOrder),
+          ),
         ),
       ),
     );
@@ -190,6 +275,168 @@ class _FormCard extends StatelessWidget {
           const SizedBox(height: 10),
           child,
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Payment method selector
+// ---------------------------------------------------------------------------
+
+class _PaymentMethodSelector extends StatelessWidget {
+  const _PaymentMethodSelector({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final _PaymentMethod selected;
+  final ValueChanged<_PaymentMethod> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: OnlineColors.bgCard,
+        borderRadius: BorderRadius.circular(kRadiusMedium),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Payment Method',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 12),
+          _PaymentOption(
+            icon: Icons.store_rounded,
+            title: 'Pay on Pickup / At Table',
+            subtitle: 'Pay with cash or card when you receive your order',
+            isSelected: selected == _PaymentMethod.payOnPickup,
+            onTap: () => onChanged(_PaymentMethod.payOnPickup),
+          ),
+          const SizedBox(height: 8),
+          _PaymentOption(
+            icon: Icons.credit_card_rounded,
+            title: 'Pay Online (Card)',
+            subtitle: 'Secure payment via Stripe — Visa, Mastercard, AMEX',
+            isSelected: selected == _PaymentMethod.payOnline,
+            onTap: () => onChanged(_PaymentMethod.payOnline),
+            badge: 'Stripe',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentOption extends StatelessWidget {
+  const _PaymentOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.isSelected,
+    required this.onTap,
+    this.badge,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? OnlineColors.primaryLight
+              : OnlineColors.bgPage,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? OnlineColors.primary
+                : OnlineColors.divider,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: isSelected
+                  ? OnlineColors.primary
+                  : OnlineColors.textDim,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected
+                              ? OnlineColors.primary
+                              : OnlineColors.textPrimary,
+                        ),
+                      ),
+                      if (badge != null) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6772E5),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            badge!,
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isSelected
+                          ? OnlineColors.primary.withValues(alpha: 0.7)
+                          : OnlineColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 20,
+              color: isSelected ? OnlineColors.primary : OnlineColors.textDim,
+            ),
+          ],
+        ),
       ),
     );
   }

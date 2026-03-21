@@ -52,6 +52,8 @@ class PrinterSettings {
     this.autoPrintOnPayment = true,
     this.autoPrintKitchenTicket = true,
     this.characterSet = 'UTF-8',
+    this.bluetoothDeviceAddress = '',
+    this.bluetoothDeviceName = '',
   });
 
   final PrinterConnectionType connectionType;
@@ -80,6 +82,12 @@ class PrinterSettings {
   /// ESC/POS character set (e.g. "UTF-8", "CP1252").
   final String characterSet;
 
+  /// MAC address of the paired Bluetooth printer (used when connectionType is bluetooth).
+  final String bluetoothDeviceAddress;
+
+  /// Display name of the paired Bluetooth printer.
+  final String bluetoothDeviceName;
+
   PrinterSettings copyWith({
     PrinterConnectionType? connectionType,
     String? receiptPrinterIp,
@@ -90,6 +98,8 @@ class PrinterSettings {
     bool? autoPrintOnPayment,
     bool? autoPrintKitchenTicket,
     String? characterSet,
+    String? bluetoothDeviceAddress,
+    String? bluetoothDeviceName,
   }) {
     return PrinterSettings(
       connectionType: connectionType ?? this.connectionType,
@@ -102,6 +112,9 @@ class PrinterSettings {
       autoPrintKitchenTicket:
           autoPrintKitchenTicket ?? this.autoPrintKitchenTicket,
       characterSet: characterSet ?? this.characterSet,
+      bluetoothDeviceAddress:
+          bluetoothDeviceAddress ?? this.bluetoothDeviceAddress,
+      bluetoothDeviceName: bluetoothDeviceName ?? this.bluetoothDeviceName,
     );
   }
 
@@ -115,6 +128,8 @@ class PrinterSettings {
         'autoPrintOnPayment': autoPrintOnPayment,
         'autoPrintKitchenTicket': autoPrintKitchenTicket,
         'characterSet': characterSet,
+        'bluetoothDeviceAddress': bluetoothDeviceAddress,
+        'bluetoothDeviceName': bluetoothDeviceName,
       };
 
   factory PrinterSettings.fromJson(Map<String, dynamic> json) =>
@@ -131,6 +146,9 @@ class PrinterSettings {
         autoPrintKitchenTicket:
             (json['autoPrintKitchenTicket'] as bool?) ?? true,
         characterSet: (json['characterSet'] as String?) ?? 'UTF-8',
+        bluetoothDeviceAddress:
+            (json['bluetoothDeviceAddress'] as String?) ?? '',
+        bluetoothDeviceName: (json['bluetoothDeviceName'] as String?) ?? '',
       );
 
   String toJsonString() => jsonEncode(toJson());
@@ -150,7 +168,9 @@ class PrinterSettings {
           paperWidth == other.paperWidth &&
           autoPrintOnPayment == other.autoPrintOnPayment &&
           autoPrintKitchenTicket == other.autoPrintKitchenTicket &&
-          characterSet == other.characterSet;
+          characterSet == other.characterSet &&
+          bluetoothDeviceAddress == other.bluetoothDeviceAddress &&
+          bluetoothDeviceName == other.bluetoothDeviceName;
 
   @override
   int get hashCode => Object.hash(
@@ -163,5 +183,7 @@ class PrinterSettings {
         autoPrintOnPayment,
         autoPrintKitchenTicket,
         characterSet,
+        bluetoothDeviceAddress,
+        bluetoothDeviceName,
       );
 }
