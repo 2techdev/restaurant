@@ -17,6 +17,7 @@ import (
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
 	"github.com/gastrocore/server/internal/fiscal"
+	"github.com/gastrocore/server/internal/inventory"
 	"github.com/gastrocore/server/internal/kds"
 	"github.com/gastrocore/server/internal/license"
 	"github.com/gastrocore/server/internal/licenses"
@@ -86,6 +87,7 @@ func main() {
 	qrbillModule := qrbill.NewModule()
 	crmModule := crm.NewModule(db, syncModule.SyncHub())
 	reservationsModule := reservations.NewModule(db, syncModule.SyncHub())
+	inventoryModule := inventory.NewModule(db)
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -143,6 +145,7 @@ func main() {
 	qrbillModule.RegisterRoutes(mux) // POST /api/invoices/qrbill — JWT required at call site
 	crmModule.RegisterRoutes(mux)
 	reservationsModule.RegisterRoutes(mux)
+	inventoryModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain
