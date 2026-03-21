@@ -49,6 +49,10 @@ dependencies:
   # Persistent key-value storage (used by WalleePaymentProvider for trxSyncNumber)
   shared_preferences: ^2.3.2
 
+  # Encrypted storage for security-sensitive values (JWT tokens, device tokens)
+  # Uses Keystore on Android and Keychain on iOS.
+  flutter_secure_storage: ^9.2.2
+
   # Runtime permission requests (camera, bluetooth, storage)
   permission_handler: ^11.3.1
 

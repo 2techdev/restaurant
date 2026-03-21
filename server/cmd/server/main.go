@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -38,6 +39,12 @@ func main() {
 		Level: cfg.LogLevel(),
 	}))
 	slog.SetDefault(logger)
+
+	// Validate config — abort in production on fatal misconfigurations.
+	if cfg.Validate() {
+		slog.Error("fatal configuration error — aborting startup")
+		os.Exit(1)
+	}
 
 	// Connect database
 	db, err := database.Connect(cfg.DatabaseURL)
@@ -121,17 +128,64 @@ func main() {
 	// ---------------------------------------------------------------------------
 	// Middleware chain
 	// ---------------------------------------------------------------------------
-	// Rate limits (applied globally; adjust per-environment as needed):
-	//   - 200 req/min for most APIs (generous for POS devices on slow networks)
-	//   - Public online-ordering endpoints share this limit
+	// Rate limits:
+	//   - 200 req/min per IP for general API traffic
+	//   - 10 req/min per IP for auth endpoints (brute-force / credential-stuffing protection)
 	rateLimiter := middleware.RateLimit(200, time.Minute)
+	authRateLimiter := middleware.RateLimit(10, time.Minute)
+
+	corsMW := middleware.CORS(middleware.CORSConfig{
+		AllowedOrigins: cfg.CORSOrigins,
+	})
+	securityHeadersMW := middleware.SecurityHeaders(!cfg.IsDevelopment())
+
+	// publicAPIPaths lists auth endpoints that do NOT require a Bearer token.
+	// Online ordering and health/docs paths are excluded by prefix below.
+	publicAPIPaths := map[string]bool{
+		"/api/v1/auth/device/register": true,
+		"/api/v1/auth/device/token":    true,
+		"/api/v1/auth/admin/login":     true,
+		"/api/v1/auth/token/refresh":   true,
+	}
+
+	authMW := middleware.AuthRequired(authModule.ValidateToken)
+
+	// authGate applies JWT authentication to all /api/v1/* routes except
+	// public ones (auth, online ordering, health, docs).
+	authGate := middleware.Middleware(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			path := r.URL.Path
+			if !strings.HasPrefix(path, "/api/v1/") ||
+				strings.HasPrefix(path, "/api/v1/online/") ||
+				publicAPIPaths[path] {
+				next.ServeHTTP(w, r)
+				return
+			}
+			authMW(next).ServeHTTP(w, r)
+		})
+	})
+
+	// authEndpointLimiter applies a tighter per-IP rate limit to auth endpoints.
+	authEndpointLimiter := middleware.Middleware(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if publicAPIPaths[r.URL.Path] {
+				authRateLimiter(next).ServeHTTP(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	handler := middleware.Chain(mux,
 		middleware.RequestID,
 		middleware.Logger,
 		middleware.Recover,
-		middleware.CORS,
+		securityHeadersMW,
+		corsMW,
+		middleware.MaxBodySize,
+		authEndpointLimiter,
 		rateLimiter,
+		authGate,
 	)
 
 	// ---------------------------------------------------------------------------

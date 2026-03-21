@@ -3,6 +3,7 @@ package online
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -160,6 +161,13 @@ func (m *Module) fetchModifiers(r *http.Request, groupID string) []MenuModifier 
 	return mods
 }
 
+const (
+	maxOnlineOrderItems    = 50
+	maxCustomerNameLen     = 100
+	maxOrderNotesLen       = 500
+	maxItemNotesLen        = 200
+)
+
 // handlePlaceOrder creates a new order from the online ordering app.
 // POST /api/v1/online/orders
 // No authentication required.
@@ -177,6 +185,40 @@ func (m *Module) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 	if len(req.Items) == 0 {
 		response.Error(w, http.StatusBadRequest, "NO_ITEMS", "Order must have at least one item")
 		return
+	}
+	if len(req.Items) > maxOnlineOrderItems {
+		response.Error(w, http.StatusBadRequest, "TOO_MANY_ITEMS", "Order exceeds maximum item count")
+		return
+	}
+	if req.OrderType != "" && req.OrderType != "dine_in" && req.OrderType != "takeaway" && req.OrderType != "delivery" {
+		response.Error(w, http.StatusBadRequest, "INVALID_ORDER_TYPE", "order_type must be dine_in, takeaway, or delivery")
+		return
+	}
+	if len(req.CustomerName) > maxCustomerNameLen {
+		response.Error(w, http.StatusBadRequest, "INVALID_CUSTOMER_NAME", "customer_name is too long")
+		return
+	}
+	if len(req.Notes) > maxOrderNotesLen {
+		response.Error(w, http.StatusBadRequest, "INVALID_NOTES", "notes field is too long")
+		return
+	}
+	for i, item := range req.Items {
+		if item.Quantity <= 0 || item.Quantity > 99 {
+			response.Error(w, http.StatusBadRequest, "INVALID_QUANTITY", "item quantity must be between 1 and 99")
+			return
+		}
+		if item.UnitPrice < 0 {
+			response.Error(w, http.StatusBadRequest, "INVALID_PRICE", "item unit_price cannot be negative")
+			return
+		}
+		if len(item.ProductID) > 64 {
+			response.Error(w, http.StatusBadRequest, "INVALID_PRODUCT_ID", "product_id is too long")
+			return
+		}
+		if len(item.Notes) > maxItemNotesLen {
+			response.Error(w, http.StatusBadRequest, "INVALID_ITEM_NOTES", fmt.Sprintf("notes for item %d is too long", i))
+			return
+		}
 	}
 
 	// Generate IDs
