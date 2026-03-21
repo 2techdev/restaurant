@@ -14,6 +14,7 @@ import (
 	"github.com/gastrocore/server/internal/auth"
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
+	"github.com/gastrocore/server/internal/inventory"
 	"github.com/gastrocore/server/internal/kds"
 	"github.com/gastrocore/server/internal/licenses"
 	"github.com/gastrocore/server/internal/menu"
@@ -66,6 +67,7 @@ func main() {
 	licensesModule := licenses.NewModule(db, cfg)
 	storesModule := stores.NewModule(db, cfg)
 	kdsModule := kds.NewModule(db, kdsHub)
+	inventoryModule := inventory.NewModule(db)
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -117,6 +119,7 @@ func main() {
 	licensesModule.RegisterRoutes(mux)
 	storesModule.RegisterRoutes(mux)
 	kdsModule.RegisterRoutes(mux)
+	inventoryModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain
