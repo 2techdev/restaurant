@@ -136,5 +136,36 @@
   "quickActionFloorPlan": "Floor Plan",
   "quickActionOpenShift": "Open Shift",
   "quickActionCloseShift": "Close Shift",
-  "quickActionOrderHistory": "Order History"
+  "quickActionOrderHistory": "Order History",
+
+  "navCustomers": "Customers",
+  "crmTitle": "Customer Management",
+  "crmNewCustomer": "New Customer",
+  "crmEditCustomer": "Edit Customer",
+  "crmDeleteCustomer": "Delete Customer",
+  "crmName": "Name",
+  "crmPhone": "Phone",
+  "crmEmail": "Email",
+  "crmAddress": "Address",
+  "crmBirthday": "Birthday",
+  "crmNotes": "Notes",
+  "crmTotalOrders": "Orders",
+  "crmTotalSpent": "Revenue",
+  "crmLoyaltyPoints": "Loyalty Points",
+  "crmTierBronze": "Bronze",
+  "crmTierSilver": "Silver",
+  "crmTierGold": "Gold",
+  "crmBirthdayReminder": "{count,plural, one{1 Birthday} other{{count} Birthdays}}",
+  "@crmBirthdayReminder": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "loyaltyTitle": "Loyalty Points",
+  "loyaltyRedeem": "Redeem Points",
+  "loyaltyAdjust": "Adjust Points",
+  "loyaltyEarnRule": "Spend CHF 1 = earn 1 point",
+  "loyaltyRedeemRule": "100 points = CHF 1.00 discount",
+  "loyaltyTransactionEarn": "Points earned",
+  "loyaltyTransactionRedeem": "Points redeemed",
+  "loyaltyTransactionAdjust": "Manual adjustment",
+  "loyaltyTransactionExpire": "Points expired"
 }

@@ -37,6 +37,9 @@ import 'tables/tenants.dart';
 import 'tables/tickets.dart';
 import 'tables/users.dart';
 import 'tables/license_tokens.dart';
+import 'tables/customers.dart';
+import 'tables/customer_addresses.dart';
+import 'tables/loyalty_transactions.dart';
 
 part 'app_database.g.dart';
 
@@ -71,6 +74,9 @@ part 'app_database.g.dart';
     ProductSpecifications,
     LicenseTokens,
     DayCloseSummaries,
+    Customers,
+    CustomerAddresses,
+    LoyaltyTransactions,
   ],
   daos: [AuditLogDao, SyncEventDao],
 )
@@ -78,7 +84,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -102,6 +108,12 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         // Add day_close_summaries table introduced in v6.
         await m.createTable(dayCloseSummaries);
+      }
+      if (from < 7) {
+        // Add CRM tables introduced in v7.
+        await m.createTable(customers);
+        await m.createTable(customerAddresses);
+        await m.createTable(loyaltyTransactions);
       }
     },
     onCreate: (m) async {

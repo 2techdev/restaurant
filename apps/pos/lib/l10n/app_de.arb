@@ -356,5 +356,89 @@
   "@quickActionCloseShift": { "description": "Quick action: Close Shift" },
 
   "quickActionOrderHistory": "Bestellungshistorie",
-  "@quickActionOrderHistory": { "description": "Quick action: Order History" }
+  "@quickActionOrderHistory": { "description": "Quick action: Order History" },
+
+  "navCustomers": "Kunden",
+  "@navCustomers": { "description": "Navigation: Customers" },
+
+  "crmTitle": "Kundenverwaltung",
+  "@crmTitle": { "description": "CRM: Screen title" },
+
+  "crmNewCustomer": "Neuer Kunde",
+  "@crmNewCustomer": { "description": "CRM: New customer button" },
+
+  "crmEditCustomer": "Kunde bearbeiten",
+  "@crmEditCustomer": { "description": "CRM: Edit customer" },
+
+  "crmDeleteCustomer": "Kunde löschen",
+  "@crmDeleteCustomer": { "description": "CRM: Delete customer" },
+
+  "crmName": "Name",
+  "@crmName": { "description": "CRM: Name field" },
+
+  "crmPhone": "Telefon",
+  "@crmPhone": { "description": "CRM: Phone field" },
+
+  "crmEmail": "E-Mail",
+  "@crmEmail": { "description": "CRM: Email field" },
+
+  "crmAddress": "Adresse",
+  "@crmAddress": { "description": "CRM: Address field" },
+
+  "crmBirthday": "Geburtstag",
+  "@crmBirthday": { "description": "CRM: Birthday field" },
+
+  "crmNotes": "Notizen",
+  "@crmNotes": { "description": "CRM: Notes field" },
+
+  "crmTotalOrders": "Bestellungen",
+  "@crmTotalOrders": { "description": "CRM: Total orders" },
+
+  "crmTotalSpent": "Umsatz",
+  "@crmTotalSpent": { "description": "CRM: Total spent" },
+
+  "crmLoyaltyPoints": "Treuepunkte",
+  "@crmLoyaltyPoints": { "description": "CRM: Loyalty points" },
+
+  "crmTierBronze": "Bronze",
+  "@crmTierBronze": { "description": "CRM: Bronze tier" },
+
+  "crmTierSilver": "Silber",
+  "@crmTierSilver": { "description": "CRM: Silver tier" },
+
+  "crmTierGold": "Gold",
+  "@crmTierGold": { "description": "CRM: Gold tier" },
+
+  "crmBirthdayReminder": "{count,plural, one{1 Geburtstag} other{{count} Geburtstage}}",
+  "@crmBirthdayReminder": {
+    "description": "CRM: Birthday reminder",
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "loyaltyTitle": "Treuepunkte",
+  "@loyaltyTitle": { "description": "Loyalty: Screen title" },
+
+  "loyaltyRedeem": "Punkte einlösen",
+  "@loyaltyRedeem": { "description": "Loyalty: Redeem points" },
+
+  "loyaltyAdjust": "Punkte anpassen",
+  "@loyaltyAdjust": { "description": "Loyalty: Adjust points" },
+
+  "loyaltyEarnRule": "1 CHF ausgeben = 1 Punkt sammeln",
+  "@loyaltyEarnRule": { "description": "Loyalty: Earn rule" },
+
+  "loyaltyRedeemRule": "100 Punkte = CHF 1.00 Rabatt",
+  "@loyaltyRedeemRule": { "description": "Loyalty: Redeem rule" },
+
+  "loyaltyTransactionEarn": "Punkte gesammelt",
+  "@loyaltyTransactionEarn": { "description": "Loyalty: Earn transaction" },
+
+  "loyaltyTransactionRedeem": "Punkte eingelöst",
+  "@loyaltyTransactionRedeem": { "description": "Loyalty: Redeem transaction" },
+
+  "loyaltyTransactionAdjust": "Manuelle Anpassung",
+  "@loyaltyTransactionAdjust": { "description": "Loyalty: Adjust transaction" },
+
+  "loyaltyTransactionExpire": "Punkte abgelaufen",
+  "@loyaltyTransactionExpire": { "description": "Loyalty: Expire transaction" }
 }

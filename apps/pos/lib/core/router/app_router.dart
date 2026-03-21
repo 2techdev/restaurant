@@ -27,6 +27,8 @@ import 'package:gastrocore_pos/features/backoffice/presentation/screens/back_off
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_history_screen.dart';
 import 'package:gastrocore_pos/features/audit_log/presentation/screens/audit_log_screen.dart';
 import 'package:gastrocore_pos/features/menu/presentation/screens/menu_management_screen.dart';
+import 'package:gastrocore_pos/features/customers/presentation/screens/customer_list_screen.dart';
+import 'package:gastrocore_pos/features/customers/presentation/screens/customer_detail_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Route path constants
@@ -50,6 +52,8 @@ abstract final class AppRoutes {
   static const String shiftHistory = '/shift-history';
   static const String menuManagement = '/menu-management';
   static const String auditLog = '/audit-log';
+  static const String customers = '/customers';
+  static const String customerDetail = '/customers/:customerId';
 
   // Legacy routes kept for backward compatibility
   static const String pos = '/pos';
@@ -66,6 +70,10 @@ abstract final class AppRoutes {
 
   /// Build a refund route for a specific ticket.
   static String refundFor(String ticketId) => '/refund/$ticketId';
+
+  /// Build a customer detail route.
+  static String customerDetailFor(String customerId) =>
+      '/customers/$customerId';
 }
 
 // ---------------------------------------------------------------------------
@@ -176,6 +184,17 @@ GoRouter createAppRouter() => GoRouter(
     GoRoute(
       path: AppRoutes.auditLog,
       builder: (context, state) => const AuditLogScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.customers,
+      builder: (context, state) => const CustomerListScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.customerDetail,
+      builder: (context, state) {
+        final customerId = state.pathParameters['customerId'] ?? '';
+        return CustomerDetailScreen(customerId: customerId);
+      },
     ),
   ],
 );

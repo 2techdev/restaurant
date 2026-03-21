@@ -136,5 +136,36 @@
   "quickActionFloorPlan": "Pianta sala",
   "quickActionOpenShift": "Apri turno",
   "quickActionCloseShift": "Chiudi turno",
-  "quickActionOrderHistory": "Storico ordini"
+  "quickActionOrderHistory": "Storico ordini",
+
+  "navCustomers": "Clienti",
+  "crmTitle": "Gestione clienti",
+  "crmNewCustomer": "Nuovo cliente",
+  "crmEditCustomer": "Modifica cliente",
+  "crmDeleteCustomer": "Elimina cliente",
+  "crmName": "Nome",
+  "crmPhone": "Telefono",
+  "crmEmail": "E-mail",
+  "crmAddress": "Indirizzo",
+  "crmBirthday": "Compleanno",
+  "crmNotes": "Note",
+  "crmTotalOrders": "Ordini",
+  "crmTotalSpent": "Fatturato",
+  "crmLoyaltyPoints": "Punti fedeltà",
+  "crmTierBronze": "Bronzo",
+  "crmTierSilver": "Argento",
+  "crmTierGold": "Oro",
+  "crmBirthdayReminder": "{count,plural, one{1 Compleanno} other{{count} Compleanni}}",
+  "@crmBirthdayReminder": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "loyaltyTitle": "Punti fedeltà",
+  "loyaltyRedeem": "Riscatta punti",
+  "loyaltyAdjust": "Regola punti",
+  "loyaltyEarnRule": "Spendere CHF 1 = guadagnare 1 punto",
+  "loyaltyRedeemRule": "100 punti = CHF 1.00 di sconto",
+  "loyaltyTransactionEarn": "Punti guadagnati",
+  "loyaltyTransactionRedeem": "Punti riscattati",
+  "loyaltyTransactionAdjust": "Rettifica manuale",
+  "loyaltyTransactionExpire": "Punti scaduti"
 }
