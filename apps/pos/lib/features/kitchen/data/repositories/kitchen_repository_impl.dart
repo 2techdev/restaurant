@@ -25,12 +25,14 @@ class KitchenRepositoryImpl {
   /// Stream of active kitchen tickets (status: pending or preparing),
   /// ordered oldest-first so the most urgent ticket is top-left.
   ///
+  /// Filtered to [tenantId] so multi-tenant deployments stay isolated.
   /// The stream re-emits whenever any [KitchenTickets] row changes — e.g.
   /// when a new ticket is created or a ticket is bumped to 'served'.
-  Stream<List<KitchenTicketEntity>> watchActiveTickets() {
+  Stream<List<KitchenTicketEntity>> watchActiveTickets(String tenantId) {
     return (_db.select(_db.kitchenTickets)
           ..where(
             (t) =>
+                t.tenantId.equals(tenantId) &
                 t.status.isIn(['pending', 'preparing']) &
                 t.isDeleted.equals(false),
           )
@@ -84,29 +86,103 @@ class KitchenRepositoryImpl {
 
   /// Mark a kitchen ticket as completed ('served') and set [completedAt].
   ///
+  /// Also updates the parent [Tickets] status so the ODS auto-advances:
+  ///   - All kitchen tickets served → 'fully_served'
+  ///   - Some remaining          → 'partially_served'
+  ///
   /// The active-tickets stream will automatically remove it from the KDS UI.
   Future<void> completeTicket(String kitchenTicketId) async {
-    await (_db.update(_db.kitchenTickets)
-          ..where((t) => t.id.equals(kitchenTicketId)))
-        .write(
-      KitchenTicketsCompanion(
-        status: const Value('served'),
-        completedAt: Value(DateTime.now()),
-      ),
-    );
+    await _db.transaction(() async {
+      final now = DateTime.now();
+
+      // 1. Mark the kitchen ticket as served.
+      await (_db.update(_db.kitchenTickets)
+            ..where((t) => t.id.equals(kitchenTicketId)))
+          .write(
+        KitchenTicketsCompanion(
+          status: const Value('served'),
+          completedAt: Value(now),
+        ),
+      );
+
+      // 2. Fetch the parent ticketId from the kitchen ticket row.
+      final ktRow = await (_db.select(_db.kitchenTickets)
+            ..where((t) => t.id.equals(kitchenTicketId)))
+          .getSingleOrNull();
+      if (ktRow == null) return;
+
+      // 3. Count remaining active kitchen tickets for the same parent ticket.
+      final remaining = await (_db.select(_db.kitchenTickets)
+            ..where(
+              (t) =>
+                  t.ticketId.equals(ktRow.ticketId) &
+                  t.status.isIn(['pending', 'preparing']) &
+                  t.isDeleted.equals(false),
+            ))
+          .get();
+
+      // 4. Update parent ticket status so ODS reflects the change.
+      final newTicketStatus =
+          remaining.isEmpty ? 'fully_served' : 'partially_served';
+
+      await (_db.update(_db.tickets)
+            ..where((t) =>
+                t.id.equals(ktRow.ticketId) &
+                // Only advance — don't downgrade a ticket that's already paid/closed.
+                t.status.isIn([
+                  'open',
+                  'items_added',
+                  'sent_to_kitchen',
+                  'partially_served',
+                ])))
+          .write(
+        TicketsCompanion(
+          status: Value(newTicketStatus),
+          updatedAt: Value(now),
+        ),
+      );
+    });
   }
 
   /// Recall a previously bumped ticket — restores it to 'preparing' so it
   /// reappears on the KDS display. Used by the long-press recall gesture.
+  ///
+  /// Also reverts the parent [Tickets] status to 'sent_to_kitchen' when
+  /// coming back from 'fully_served' or 'partially_served', so the ODS
+  /// moves the order back to the "Preparing" panel.
   Future<void> recallTicket(String kitchenTicketId) async {
-    await (_db.update(_db.kitchenTickets)
-          ..where((t) => t.id.equals(kitchenTicketId)))
-        .write(
-      const KitchenTicketsCompanion(
-        status: Value('preparing'),
-        completedAt: Value(null),
-      ),
-    );
+    await _db.transaction(() async {
+      final now = DateTime.now();
+
+      // 1. Restore kitchen ticket to preparing.
+      await (_db.update(_db.kitchenTickets)
+            ..where((t) => t.id.equals(kitchenTicketId)))
+          .write(
+        const KitchenTicketsCompanion(
+          status: Value('preparing'),
+          completedAt: Value(null),
+        ),
+      );
+
+      // 2. Fetch the parent ticketId.
+      final ktRow = await (_db.select(_db.kitchenTickets)
+            ..where((t) => t.id.equals(kitchenTicketId)))
+          .getSingleOrNull();
+      if (ktRow == null) return;
+
+      // 3. Revert parent ticket status to 'sent_to_kitchen' if it was
+      //    advanced by a previous completeTicket() call.
+      await (_db.update(_db.tickets)
+            ..where((t) =>
+                t.id.equals(ktRow.ticketId) &
+                t.status.isIn(['partially_served', 'fully_served'])))
+          .write(
+        TicketsCompanion(
+          status: const Value('sent_to_kitchen'),
+          updatedAt: Value(now),
+        ),
+      );
+    });
   }
 
   /// Create a kitchen ticket (and its items) from a submitted POS ticket.

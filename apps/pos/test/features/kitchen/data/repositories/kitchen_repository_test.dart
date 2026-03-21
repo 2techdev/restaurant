@@ -10,6 +10,7 @@
 ///   - table name resolution: looks up table name from restaurant_tables
 library;
 
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -74,6 +75,36 @@ OrderItemModifierEntity _modifier(String name) {
     modifierName: name,
     priceDelta: 0,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Inserts a bare [Ticket] row so [completeTicket] / [recallTicket] can
+/// update its status. The status defaults to 'sent_to_kitchen'.
+Future<void> _seedTicketRow(
+  AppDatabase db, {
+  String id = 'ticket-1',
+  String tenantId = 'tenant-1',
+  String status = 'sent_to_kitchen',
+}) async {
+  final now = DateTime.now();
+  // In Drift's insert() constructor: required (non-default) columns are raw
+  // values; columns with defaults take Value<T> (absent = use default).
+  await db.into(db.tickets).insert(
+        TicketsCompanion.insert(
+          id: id,
+          tenantId: tenantId,
+          orderNumber: 1,
+          status: Value(status),
+          channel: const Value('pos'),
+          openedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          deviceId: 'DEV-01',
+        ),
+      );
 }
 
 // ---------------------------------------------------------------------------
@@ -224,13 +255,13 @@ void main() {
       // pending ticket
       await repo.createTicketFromOrder(ticket: ticket, items: [_item()]);
 
-      final result = await repo.watchActiveTickets().first;
+      final result = await repo.watchActiveTickets('tenant-1').first;
       expect(result, hasLength(1));
       expect(result.first.status, KitchenTicketStatus.pending);
     });
 
     test('emits empty list when no active tickets', () async {
-      final result = await repo.watchActiveTickets().first;
+      final result = await repo.watchActiveTickets('tenant-1').first;
       expect(result, isEmpty);
     });
 
@@ -243,7 +274,7 @@ void main() {
 
       await repo.createTicketFromOrder(ticket: ticket, items: items);
 
-      final result = await repo.watchActiveTickets().first;
+      final result = await repo.watchActiveTickets('tenant-1').first;
       expect(result.first.items, hasLength(2));
       final names =
           result.first.items.map((i) => i.productName).toSet();
@@ -258,7 +289,7 @@ void main() {
       final ktRow = await db.select(db.kitchenTickets).getSingle();
       await repo.completeTicket(ktRow.id);
 
-      final result = await repo.watchActiveTickets().first;
+      final result = await repo.watchActiveTickets('tenant-1').first;
       expect(result, isEmpty);
     });
   });
@@ -275,6 +306,134 @@ void main() {
       final updated = await db.select(db.kitchenTickets).getSingle();
       expect(updated.status, 'served');
       expect(updated.completedAt, isNotNull);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  group('completeTicket — parent ticket status', () {
+    test('sets parent ticket to fully_served when all kitchen tickets served',
+        () async {
+      await _seedTicketRow(db);
+      await repo.createTicketFromOrder(
+          ticket: _ticket(), items: [_item()]);
+
+      final ktRow = await db.select(db.kitchenTickets).getSingle();
+      await repo.completeTicket(ktRow.id);
+
+      final ticketRow = await db.select(db.tickets).getSingle();
+      expect(ticketRow.status, 'fully_served');
+    });
+
+    test(
+        'sets parent ticket to partially_served when other kitchen tickets remain',
+        () async {
+      await _seedTicketRow(db);
+      // Create two kitchen tickets for the same parent ticket.
+      await repo.createTicketFromOrder(
+          ticket: _ticket(), items: [_item(id: 'item-1')]);
+      // Simulate a second kitchen ticket (bar station) for the same ticketId.
+      final now = DateTime.now();
+      await db.into(db.kitchenTickets).insert(
+            KitchenTicketsCompanion.insert(
+              id: 'kt-bar-1',
+              tenantId: 'tenant-1',
+              ticketId: 'ticket-1',
+              orderNumber: 1,
+              printerGroup: const Value('bar'),
+              status: const Value('pending'),
+              sentAt: now,
+              createdAt: now,
+            ),
+          );
+
+      // Complete only the first kitchen ticket (kitchen station).
+      final ktRows = await db.select(db.kitchenTickets).get();
+      final kitchenKt =
+          ktRows.firstWhere((r) => r.printerGroup == 'kitchen');
+      await repo.completeTicket(kitchenKt.id);
+
+      final ticketRow = await db.select(db.tickets).getSingle();
+      expect(ticketRow.status, 'partially_served');
+    });
+
+    test('does not downgrade a ticket already past fully_served', () async {
+      await _seedTicketRow(db, status: 'fully_paid');
+      await repo.createTicketFromOrder(
+          ticket: _ticket(), items: [_item()]);
+
+      final ktRow = await db.select(db.kitchenTickets).getSingle();
+      await repo.completeTicket(ktRow.id);
+
+      // Status must stay 'fully_paid' — not regressed by KDS bump.
+      final ticketRow = await db.select(db.tickets).getSingle();
+      expect(ticketRow.status, 'fully_paid');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  group('recallTicket', () {
+    test('sets status back to preparing and clears completedAt', () async {
+      await _seedTicketRow(db);
+      await repo.createTicketFromOrder(
+          ticket: _ticket(), items: [_item()]);
+
+      final ktRow = await db.select(db.kitchenTickets).getSingle();
+      await repo.completeTicket(ktRow.id);
+      await repo.recallTicket(ktRow.id);
+
+      final recalled = await db.select(db.kitchenTickets).getSingle();
+      expect(recalled.status, 'preparing');
+      expect(recalled.completedAt, isNull);
+    });
+
+    test('reverts parent ticket from fully_served to sent_to_kitchen',
+        () async {
+      await _seedTicketRow(db);
+      await repo.createTicketFromOrder(
+          ticket: _ticket(), items: [_item()]);
+
+      final ktRow = await db.select(db.kitchenTickets).getSingle();
+      await repo.completeTicket(ktRow.id); // → fully_served
+      await repo.recallTicket(ktRow.id); // → sent_to_kitchen
+
+      final ticketRow = await db.select(db.tickets).getSingle();
+      expect(ticketRow.status, 'sent_to_kitchen');
+    });
+
+    test('reverts parent ticket from partially_served to sent_to_kitchen',
+        () async {
+      await _seedTicketRow(db, status: 'partially_served');
+      await repo.createTicketFromOrder(
+          ticket: _ticket(), items: [_item()]);
+
+      final ktRow = await db.select(db.kitchenTickets).getSingle();
+      await repo.recallTicket(ktRow.id);
+
+      final ticketRow = await db.select(db.tickets).getSingle();
+      expect(ticketRow.status, 'sent_to_kitchen');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  group('watchActiveTickets — tenantId scoping', () {
+    test('does not return tickets from a different tenant', () async {
+      // Create a kitchen ticket for tenant-2.
+      final now = DateTime.now();
+      await db.into(db.kitchenTickets).insert(
+            KitchenTicketsCompanion.insert(
+              id: 'kt-other',
+              tenantId: 'tenant-2',
+              ticketId: 'ticket-x',
+              orderNumber: 99,
+              status: const Value('pending'),
+              sentAt: now,
+              createdAt: now,
+            ),
+          );
+
+      // Watch as tenant-1 — should see nothing.
+      final result = await repo.watchActiveTickets('tenant-1').first;
+      expect(result, isEmpty);
     });
   });
 
