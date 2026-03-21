@@ -41,6 +41,7 @@ import 'tables/inventory_items.dart';
 import 'tables/inventory_transactions.dart';
 import 'tables/license_tokens.dart';
 import 'tables/suppliers.dart';
+import 'tables/reservations.dart';
 
 part 'app_database.g.dart';
 
@@ -78,6 +79,7 @@ part 'app_database.g.dart';
     InventoryItems,
     InventoryTransactions,
     Suppliers,
+    Reservations,
   ],
   daos: [AuditLogDao, InventoryDao, SyncEventDao],
 )
@@ -111,10 +113,11 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(dayCloseSummaries);
       }
       if (from < 7) {
-        // v7: inventory tables + manager PIN columns + audit log authorizer.
+        // v7: inventory tables + manager PIN + audit authorizer + reservations.
         await m.createTable(inventoryItems);
         await m.createTable(inventoryTransactions);
         await m.createTable(suppliers);
+        await m.createTable(reservations);
         await m.addColumn(users, users.managerPinHash);
         await m.addColumn(auditLog, auditLog.managerId);
         await m.addColumn(auditLog, auditLog.managerName);

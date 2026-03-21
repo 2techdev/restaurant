@@ -370,4 +370,131 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quickActionOrderHistory => 'Order History';
+
+  @override
+  String get navReservations => 'Reservations';
+
+  @override
+  String get reservationList => 'Reservations';
+
+  @override
+  String get reservationCalendar => 'Calendar';
+
+  @override
+  String get reservationNew => 'New Reservation';
+
+  @override
+  String get reservationEdit => 'Edit Reservation';
+
+  @override
+  String get reservationToday => 'Today';
+
+  @override
+  String get reservationNoUpcoming => 'No upcoming reservations';
+
+  @override
+  String get reservationNoReservations => 'No reservations for this day';
+
+  @override
+  String get reservationCustomerInfo => 'Guest information';
+
+  @override
+  String get reservationCustomerName => 'Guest name';
+
+  @override
+  String get reservationCustomerPhone => 'Phone';
+
+  @override
+  String get reservationCustomerEmail => 'Email';
+
+  @override
+  String get reservationDateTime => 'Date & time';
+
+  @override
+  String get reservationDate => 'Date';
+
+  @override
+  String get reservationTime => 'Time';
+
+  @override
+  String get reservationPartySize => 'Party size';
+
+  @override
+  String get reservationTable => 'Table';
+
+  @override
+  String get reservationTableOptional => 'Table (optional)';
+
+  @override
+  String get reservationNoTable => 'No table assigned';
+
+  @override
+  String get reservationNotes => 'Notes';
+
+  @override
+  String get reservationMeta => 'Booking info';
+
+  @override
+  String get reservationChannel => 'Source';
+
+  @override
+  String get reservationStatus => 'Status';
+
+  @override
+  String get reservationChangeStatus => 'Change status';
+
+  @override
+  String get reservationChangeEndTime => 'Change end time';
+
+  @override
+  String get reservationChannelWalkIn => 'Walk-in';
+
+  @override
+  String get reservationChannelOnline => 'Online';
+
+  @override
+  String get reservationChannelPhone => 'Phone';
+
+  @override
+  String get reservationStatusPending => 'Pending';
+
+  @override
+  String get reservationStatusConfirmed => 'Confirmed';
+
+  @override
+  String get reservationStatusSeated => 'Seated';
+
+  @override
+  String get reservationStatusCancelled => 'Cancelled';
+
+  @override
+  String get reservationStatusNoShow => 'No-show';
+
+  @override
+  String get reservationConfirm => 'Confirm';
+
+  @override
+  String get reservationSeat => 'Seat guests';
+
+  @override
+  String get reservationNoShow => 'No-show';
+
+  @override
+  String get reservationCancel => 'Cancel reservation';
+
+  @override
+  String get reservationViewDay => 'Day';
+
+  @override
+  String get reservationViewWeek => 'Week';
+
+  @override
+  String get reservationNameRequired => 'Guest name is required';
+
+  @override
+  String get reservationErrorTimeRange => 'End time must be after start time';
+
+  @override
+  String get reservationErrorConflict =>
+      'This table is already reserved at that time';
 }

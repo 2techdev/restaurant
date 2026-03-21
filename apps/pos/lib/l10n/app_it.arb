@@ -136,5 +136,55 @@
   "quickActionFloorPlan": "Pianta sala",
   "quickActionOpenShift": "Apri turno",
   "quickActionCloseShift": "Chiudi turno",
-  "quickActionOrderHistory": "Storico ordini"
+  "quickActionOrderHistory": "Storico ordini",
+
+  "navReservations": "Prenotazioni",
+
+  "reservationList": "Prenotazioni",
+  "reservationCalendar": "Calendario",
+  "reservationNew": "Nuova prenotazione",
+  "reservationEdit": "Modifica prenotazione",
+  "reservationToday": "Oggi",
+  "reservationNoUpcoming": "Nessuna prenotazione in arrivo",
+  "reservationNoReservations": "Nessuna prenotazione per questo giorno",
+
+  "reservationCustomerInfo": "Informazioni ospite",
+  "reservationCustomerName": "Nome ospite",
+  "reservationCustomerPhone": "Telefono",
+  "reservationCustomerEmail": "E-mail",
+  "reservationDateTime": "Data e ora",
+  "reservationDate": "Data",
+  "reservationTime": "Ora",
+  "reservationPartySize": "Numero di persone",
+  "reservationTable": "Tavolo",
+  "reservationTableOptional": "Tavolo (facoltativo)",
+  "reservationNoTable": "Nessun tavolo assegnato",
+  "reservationNotes": "Note",
+  "reservationMeta": "Info prenotazione",
+  "reservationChannel": "Fonte",
+  "reservationStatus": "Stato",
+  "reservationChangeStatus": "Cambia stato",
+  "reservationChangeEndTime": "Modifica ora di fine",
+
+  "reservationChannelWalkIn": "Senza prenotazione",
+  "reservationChannelOnline": "Online",
+  "reservationChannelPhone": "Telefono",
+
+  "reservationStatusPending": "In attesa",
+  "reservationStatusConfirmed": "Confermato",
+  "reservationStatusSeated": "Seduto",
+  "reservationStatusCancelled": "Annullato",
+  "reservationStatusNoShow": "No-show",
+
+  "reservationConfirm": "Conferma",
+  "reservationSeat": "Accomodare ospiti",
+  "reservationNoShow": "No-show",
+  "reservationCancel": "Annulla prenotazione",
+
+  "reservationViewDay": "Giorno",
+  "reservationViewWeek": "Settimana",
+
+  "reservationNameRequired": "Il nome dell'ospite è obbligatorio",
+  "reservationErrorTimeRange": "L'ora di fine deve essere dopo l'ora di inizio",
+  "reservationErrorConflict": "Questo tavolo è già prenotato in questo orario"
 }

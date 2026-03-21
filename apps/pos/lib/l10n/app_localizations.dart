@@ -809,6 +809,258 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Bestellungshistorie'**
   String get quickActionOrderHistory;
+
+  /// Navigation: Reservations
+  ///
+  /// In de, this message translates to:
+  /// **'Reservierungen'**
+  String get navReservations;
+
+  /// Reservations list title
+  ///
+  /// In de, this message translates to:
+  /// **'Reservierungen'**
+  String get reservationList;
+
+  /// Reservations calendar title
+  ///
+  /// In de, this message translates to:
+  /// **'Kalender'**
+  String get reservationCalendar;
+
+  /// New reservation
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Reservierung'**
+  String get reservationNew;
+
+  /// Edit reservation
+  ///
+  /// In de, this message translates to:
+  /// **'Reservierung bearbeiten'**
+  String get reservationEdit;
+
+  /// Today label
+  ///
+  /// In de, this message translates to:
+  /// **'Heute'**
+  String get reservationToday;
+
+  /// No upcoming reservations
+  ///
+  /// In de, this message translates to:
+  /// **'Keine bevorstehenden Reservierungen'**
+  String get reservationNoUpcoming;
+
+  /// No reservations for day
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Reservierungen für diesen Tag'**
+  String get reservationNoReservations;
+
+  /// Guest info section
+  ///
+  /// In de, this message translates to:
+  /// **'Gastinformationen'**
+  String get reservationCustomerInfo;
+
+  /// Guest name
+  ///
+  /// In de, this message translates to:
+  /// **'Gastname'**
+  String get reservationCustomerName;
+
+  /// Phone
+  ///
+  /// In de, this message translates to:
+  /// **'Telefon'**
+  String get reservationCustomerPhone;
+
+  /// Email
+  ///
+  /// In de, this message translates to:
+  /// **'E-Mail'**
+  String get reservationCustomerEmail;
+
+  /// Date and time section
+  ///
+  /// In de, this message translates to:
+  /// **'Datum & Uhrzeit'**
+  String get reservationDateTime;
+
+  /// Date
+  ///
+  /// In de, this message translates to:
+  /// **'Datum'**
+  String get reservationDate;
+
+  /// Time
+  ///
+  /// In de, this message translates to:
+  /// **'Uhrzeit'**
+  String get reservationTime;
+
+  /// Party size
+  ///
+  /// In de, this message translates to:
+  /// **'Personenanzahl'**
+  String get reservationPartySize;
+
+  /// Table
+  ///
+  /// In de, this message translates to:
+  /// **'Tisch'**
+  String get reservationTable;
+
+  /// Table optional
+  ///
+  /// In de, this message translates to:
+  /// **'Tisch (optional)'**
+  String get reservationTableOptional;
+
+  /// No table assigned
+  ///
+  /// In de, this message translates to:
+  /// **'Kein Tisch zugewiesen'**
+  String get reservationNoTable;
+
+  /// Notes
+  ///
+  /// In de, this message translates to:
+  /// **'Bemerkungen'**
+  String get reservationNotes;
+
+  /// Booking meta section
+  ///
+  /// In de, this message translates to:
+  /// **'Buchungsinfo'**
+  String get reservationMeta;
+
+  /// Reservation channel
+  ///
+  /// In de, this message translates to:
+  /// **'Quelle'**
+  String get reservationChannel;
+
+  /// Reservation status
+  ///
+  /// In de, this message translates to:
+  /// **'Status'**
+  String get reservationStatus;
+
+  /// Change status
+  ///
+  /// In de, this message translates to:
+  /// **'Status ändern'**
+  String get reservationChangeStatus;
+
+  /// Change end time
+  ///
+  /// In de, this message translates to:
+  /// **'Endzeit ändern'**
+  String get reservationChangeEndTime;
+
+  /// Channel: walk-in
+  ///
+  /// In de, this message translates to:
+  /// **'Walk-in'**
+  String get reservationChannelWalkIn;
+
+  /// Channel: online
+  ///
+  /// In de, this message translates to:
+  /// **'Online'**
+  String get reservationChannelOnline;
+
+  /// Channel: phone
+  ///
+  /// In de, this message translates to:
+  /// **'Telefon'**
+  String get reservationChannelPhone;
+
+  /// Status: pending
+  ///
+  /// In de, this message translates to:
+  /// **'Ausstehend'**
+  String get reservationStatusPending;
+
+  /// Status: confirmed
+  ///
+  /// In de, this message translates to:
+  /// **'Bestätigt'**
+  String get reservationStatusConfirmed;
+
+  /// Status: seated
+  ///
+  /// In de, this message translates to:
+  /// **'Platziert'**
+  String get reservationStatusSeated;
+
+  /// Status: cancelled
+  ///
+  /// In de, this message translates to:
+  /// **'Storniert'**
+  String get reservationStatusCancelled;
+
+  /// Status: no-show
+  ///
+  /// In de, this message translates to:
+  /// **'No-show'**
+  String get reservationStatusNoShow;
+
+  /// Action: confirm reservation
+  ///
+  /// In de, this message translates to:
+  /// **'Bestätigen'**
+  String get reservationConfirm;
+
+  /// Action: seat guests
+  ///
+  /// In de, this message translates to:
+  /// **'Platzieren'**
+  String get reservationSeat;
+
+  /// Action: mark no-show
+  ///
+  /// In de, this message translates to:
+  /// **'No-show'**
+  String get reservationNoShow;
+
+  /// Action: cancel reservation
+  ///
+  /// In de, this message translates to:
+  /// **'Reservierung stornieren'**
+  String get reservationCancel;
+
+  /// Calendar: day view
+  ///
+  /// In de, this message translates to:
+  /// **'Tag'**
+  String get reservationViewDay;
+
+  /// Calendar: week view
+  ///
+  /// In de, this message translates to:
+  /// **'Woche'**
+  String get reservationViewWeek;
+
+  /// Validation: name required
+  ///
+  /// In de, this message translates to:
+  /// **'Gastname ist erforderlich'**
+  String get reservationNameRequired;
+
+  /// Validation: time range
+  ///
+  /// In de, this message translates to:
+  /// **'Endzeit muss nach der Startzeit liegen'**
+  String get reservationErrorTimeRange;
+
+  /// Validation: table conflict
+  ///
+  /// In de, this message translates to:
+  /// **'Dieser Tisch ist zu diesem Zeitpunkt bereits reserviert'**
+  String get reservationErrorConflict;
 }
 
 class _AppLocalizationsDelegate
