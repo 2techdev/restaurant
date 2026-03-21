@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gastrocore/server/internal/auth"
+	"github.com/gastrocore/server/internal/dashboard"
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
 	"github.com/gastrocore/server/internal/fiscal"
@@ -67,6 +68,7 @@ func main() {
 	ordersModule := orders.NewModule(db)
 	onlineModule := online.NewModule(db, kdsHub, onlineHub)
 	reportsModule := reports.NewModule(db)
+	dashboardModule := dashboard.NewModule(db)
 	devicesModule := devices.NewModule(db)
 	licensesModule := licenses.NewModule(db, cfg)
 	licenseModule := license.NewModule(db, cfg)
@@ -121,6 +123,7 @@ func main() {
 	ordersModule.RegisterRoutes(mux)
 	onlineModule.RegisterRoutes(mux)  // public — no auth
 	reportsModule.RegisterRoutes(mux)
+	dashboardModule.RegisterRoutes(mux)
 	devicesModule.RegisterRoutes(mux)
 	licensesModule.RegisterRoutes(mux)
 	licenseModule.RegisterRoutes(mux)

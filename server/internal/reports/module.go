@@ -6,7 +6,7 @@ import (
 )
 
 // Module is the reports module handling sales reports, product performance,
-// staff performance, and shift summaries.
+// staff performance, shift summaries, and MWST breakdowns.
 type Module struct {
 	db *sql.DB
 }
@@ -22,4 +22,6 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/reports/products", m.handleProductReport)
 	mux.HandleFunc("GET /api/v1/reports/staff", m.handleStaffReport)
 	mux.HandleFunc("GET /api/v1/reports/shifts", m.handleShiftReport)
+	mux.HandleFunc("GET /api/v1/reports/sales", m.handleSalesReport)
+	mux.HandleFunc("GET /api/v1/reports/mwst", m.handleMWSTReport)
 }
