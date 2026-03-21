@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gastrocore/server/internal/auth"
+	"github.com/gastrocore/server/internal/crm"
 	"github.com/gastrocore/server/internal/dashboard"
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
@@ -24,6 +25,7 @@ import (
 	"github.com/gastrocore/server/internal/orders"
 	"github.com/gastrocore/server/internal/qrbill"
 	"github.com/gastrocore/server/internal/reports"
+	"github.com/gastrocore/server/internal/reservations"
 	"github.com/gastrocore/server/internal/shared/config"
 	"github.com/gastrocore/server/internal/shared/database"
 	"github.com/gastrocore/server/internal/shared/middleware"
@@ -82,6 +84,8 @@ func main() {
 	// Fiscal compliance (Germany KassenSichV) — enabled when Fiskaly credentials set.
 	fiscalModule := fiscal.NewModule(cfg)
 	qrbillModule := qrbill.NewModule()
+	crmModule := crm.NewModule(db, syncModule.SyncHub())
+	reservationsModule := reservations.NewModule(db, syncModule.SyncHub())
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -137,6 +141,8 @@ func main() {
 	kdsModule.RegisterRoutes(mux)
 	fiscalModule.RegisterRoutes(mux)
 	qrbillModule.RegisterRoutes(mux) // POST /api/invoices/qrbill — JWT required at call site
+	crmModule.RegisterRoutes(mux)
+	reservationsModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain

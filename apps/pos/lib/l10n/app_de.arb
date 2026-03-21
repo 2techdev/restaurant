@@ -358,95 +358,129 @@
   "quickActionOrderHistory": "Bestellungshistorie",
   "@quickActionOrderHistory": { "description": "Quick action: Order History" },
 
+  "navCrm": "Kunden",
+  "@navCrm": { "description": "Navigation: CRM" },
+
   "navReservations": "Reservierungen",
   "@navReservations": { "description": "Navigation: Reservations" },
 
-  "reservationList": "Reservierungen",
-  "@reservationList": { "description": "Reservations list title" },
-  "reservationCalendar": "Kalender",
-  "@reservationCalendar": { "description": "Reservations calendar title" },
+  "crmCustomers": "Kunden",
+  "@crmCustomers": { "description": "CRM: Customers" },
+
+  "crmNewCustomer": "Neuer Kunde",
+  "@crmNewCustomer": { "description": "CRM: New customer" },
+
+  "crmCustomerName": "Name",
+  "@crmCustomerName": { "description": "CRM: Customer name" },
+
+  "crmPhone": "Telefon",
+  "@crmPhone": { "description": "CRM: Phone" },
+
+  "crmEmail": "E-Mail",
+  "@crmEmail": { "description": "CRM: Email" },
+
+  "crmBirthday": "Geburtstag",
+  "@crmBirthday": { "description": "CRM: Birthday" },
+
+  "crmNotes": "Notizen",
+  "@crmNotes": { "description": "CRM: Notes" },
+
+  "crmLoyaltyPoints": "Treuepunkte",
+  "@crmLoyaltyPoints": { "description": "CRM: Loyalty points" },
+
+  "crmLoyaltyBalance": "Punktestand",
+  "@crmLoyaltyBalance": { "description": "CRM: Loyalty balance" },
+
+  "crmAddPoints": "Punkte hinzufügen",
+  "@crmAddPoints": { "description": "CRM: Add points" },
+
+  "crmRedeemPoints": "Punkte einlösen",
+  "@crmRedeemPoints": { "description": "CRM: Redeem points" },
+
+  "crmTotalVisits": "Besuche",
+  "@crmTotalVisits": { "description": "CRM: Total visits" },
+
+  "crmTotalSpent": "Gesamtumsatz",
+  "@crmTotalSpent": { "description": "CRM: Total spent" },
+
+  "crmLastVisit": "Letzter Besuch",
+  "@crmLastVisit": { "description": "CRM: Last visit" },
+
+  "crmSearchCustomers": "Kunden suchen",
+  "@crmSearchCustomers": { "description": "CRM: Search customers" },
+
+  "crmNoCustomers": "Keine Kunden",
+  "@crmNoCustomers": { "description": "CRM: No customers" },
+
+  "crmLoyaltyEarn": "Punkte verdienen",
+  "@crmLoyaltyEarn": { "description": "CRM: Earn points" },
+
+  "crmLoyaltyRedeem": "Punkte einlösen",
+  "@crmLoyaltyRedeem": { "description": "CRM: Redeem action label" },
+
+  "crmLoyaltyAdjust": "Punkte anpassen",
+  "@crmLoyaltyAdjust": { "description": "CRM: Adjust points" },
+
+  "crmLoyaltyHistory": "Punkteverlauf",
+  "@crmLoyaltyHistory": { "description": "CRM: Loyalty history" },
+
   "reservationNew": "Neue Reservierung",
-  "@reservationNew": { "description": "New reservation" },
-  "reservationEdit": "Reservierung bearbeiten",
-  "@reservationEdit": { "description": "Edit reservation" },
-  "reservationToday": "Heute",
-  "@reservationToday": { "description": "Today label" },
-  "reservationNoUpcoming": "Keine bevorstehenden Reservierungen",
-  "@reservationNoUpcoming": { "description": "No upcoming reservations" },
-  "reservationNoReservations": "Keine Reservierungen für diesen Tag",
-  "@reservationNoReservations": { "description": "No reservations for day" },
+  "@reservationNew": { "description": "Reservation: New" },
 
-  "reservationCustomerInfo": "Gastinformationen",
-  "@reservationCustomerInfo": { "description": "Guest info section" },
-  "reservationCustomerName": "Gastname",
-  "@reservationCustomerName": { "description": "Guest name" },
-  "reservationCustomerPhone": "Telefon",
-  "@reservationCustomerPhone": { "description": "Phone" },
-  "reservationCustomerEmail": "E-Mail",
-  "@reservationCustomerEmail": { "description": "Email" },
-  "reservationDateTime": "Datum & Uhrzeit",
-  "@reservationDateTime": { "description": "Date and time section" },
   "reservationDate": "Datum",
-  "@reservationDate": { "description": "Date" },
-  "reservationTime": "Uhrzeit",
-  "@reservationTime": { "description": "Time" },
-  "reservationPartySize": "Personenanzahl",
-  "@reservationPartySize": { "description": "Party size" },
-  "reservationTable": "Tisch",
-  "@reservationTable": { "description": "Table" },
-  "reservationTableOptional": "Tisch (optional)",
-  "@reservationTableOptional": { "description": "Table optional" },
-  "reservationNoTable": "Kein Tisch zugewiesen",
-  "@reservationNoTable": { "description": "No table assigned" },
-  "reservationNotes": "Bemerkungen",
-  "@reservationNotes": { "description": "Notes" },
-  "reservationMeta": "Buchungsinfo",
-  "@reservationMeta": { "description": "Booking meta section" },
-  "reservationChannel": "Quelle",
-  "@reservationChannel": { "description": "Reservation channel" },
-  "reservationStatus": "Status",
-  "@reservationStatus": { "description": "Reservation status" },
-  "reservationChangeStatus": "Status ändern",
-  "@reservationChangeStatus": { "description": "Change status" },
-  "reservationChangeEndTime": "Endzeit ändern",
-  "@reservationChangeEndTime": { "description": "Change end time" },
+  "@reservationDate": { "description": "Reservation: Date" },
 
-  "reservationChannelWalkIn": "Walk-in",
-  "@reservationChannelWalkIn": { "description": "Channel: walk-in" },
-  "reservationChannelOnline": "Online",
-  "@reservationChannelOnline": { "description": "Channel: online" },
-  "reservationChannelPhone": "Telefon",
-  "@reservationChannelPhone": { "description": "Channel: phone" },
+  "reservationTime": "Uhrzeit",
+  "@reservationTime": { "description": "Reservation: Time" },
+
+  "reservationGuests": "Gäste",
+  "@reservationGuests": { "description": "Reservation: Guests" },
+
+  "reservationTable": "Tisch",
+  "@reservationTable": { "description": "Reservation: Table" },
+
+  "reservationStatus": "Status",
+  "@reservationStatus": { "description": "Reservation: Status" },
+
+  "reservationStatusConfirmed": "Bestätigt",
+  "@reservationStatusConfirmed": { "description": "Reservation: Confirmed" },
 
   "reservationStatusPending": "Ausstehend",
-  "@reservationStatusPending": { "description": "Status: pending" },
-  "reservationStatusConfirmed": "Bestätigt",
-  "@reservationStatusConfirmed": { "description": "Status: confirmed" },
-  "reservationStatusSeated": "Platziert",
-  "@reservationStatusSeated": { "description": "Status: seated" },
+  "@reservationStatusPending": { "description": "Reservation: Pending" },
+
   "reservationStatusCancelled": "Storniert",
-  "@reservationStatusCancelled": { "description": "Status: cancelled" },
-  "reservationStatusNoShow": "No-show",
-  "@reservationStatusNoShow": { "description": "Status: no-show" },
+  "@reservationStatusCancelled": { "description": "Reservation: Cancelled" },
 
-  "reservationConfirm": "Bestätigen",
-  "@reservationConfirm": { "description": "Action: confirm reservation" },
-  "reservationSeat": "Platzieren",
-  "@reservationSeat": { "description": "Action: seat guests" },
-  "reservationNoShow": "No-show",
-  "@reservationNoShow": { "description": "Action: mark no-show" },
-  "reservationCancel": "Reservierung stornieren",
-  "@reservationCancel": { "description": "Action: cancel reservation" },
+  "reservationStatusSeated": "Platziert",
+  "@reservationStatusSeated": { "description": "Reservation: Seated" },
 
-  "reservationViewDay": "Tag",
-  "@reservationViewDay": { "description": "Calendar: day view" },
-  "reservationViewWeek": "Woche",
-  "@reservationViewWeek": { "description": "Calendar: week view" },
+  "reservationStatusNoShow": "Nicht erschienen",
+  "@reservationStatusNoShow": { "description": "Reservation: No show" },
 
-  "reservationNameRequired": "Gastname ist erforderlich",
-  "@reservationNameRequired": { "description": "Validation: name required" },
-  "reservationErrorTimeRange": "Endzeit muss nach der Startzeit liegen",
-  "@reservationErrorTimeRange": { "description": "Validation: time range" },
-  "reservationErrorConflict": "Dieser Tisch ist zu diesem Zeitpunkt bereits reserviert",
-  "@reservationErrorConflict": { "description": "Validation: table conflict" }
+  "reservationCustomerName": "Gastname",
+  "@reservationCustomerName": { "description": "Reservation: Customer name" },
+
+  "reservationPhone": "Telefon",
+  "@reservationPhone": { "description": "Reservation: Phone" },
+
+  "reservationNotes": "Notizen",
+  "@reservationNotes": { "description": "Reservation: Notes" },
+
+  "reservationConflict": "Tischkonflikt erkannt",
+  "@reservationConflict": { "description": "Reservation: Conflict detected" },
+
+  "reservationNoReservations": "Keine Reservierungen",
+  "@reservationNoReservations": { "description": "Reservation: No reservations" },
+
+  "reservationToday": "Heute",
+  "@reservationToday": { "description": "Reservation: Today" },
+
+  "reservationCalendar": "Kalender",
+  "@reservationCalendar": { "description": "Reservation: Calendar" },
+
+  "reservationDuration": "Dauer (Min.)",
+  "@reservationDuration": { "description": "Reservation: Duration in minutes" },
+
+  "reservationCheckConflict": "Konflikt prüfen",
+  "@reservationCheckConflict": { "description": "Reservation: Check for conflicts" }
 }

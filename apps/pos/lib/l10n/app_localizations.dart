@@ -64,8 +64,7 @@ import 'app_localizations_it.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -73,8 +72,7 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate =
-      _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -86,20 +84,19 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
-      <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('de'),
     Locale('en'),
     Locale('fr'),
-    Locale('it'),
+    Locale('it')
   ];
 
   /// App title
@@ -810,261 +807,260 @@ abstract class AppLocalizations {
   /// **'Bestellungshistorie'**
   String get quickActionOrderHistory;
 
+  /// Navigation: CRM
+  ///
+  /// In de, this message translates to:
+  /// **'Kunden'**
+  String get navCrm;
+
   /// Navigation: Reservations
   ///
   /// In de, this message translates to:
   /// **'Reservierungen'**
   String get navReservations;
 
-  /// Reservations list title
+  /// CRM: Customers
   ///
   /// In de, this message translates to:
-  /// **'Reservierungen'**
-  String get reservationList;
+  /// **'Kunden'**
+  String get crmCustomers;
 
-  /// Reservations calendar title
+  /// CRM: New customer
   ///
   /// In de, this message translates to:
-  /// **'Kalender'**
-  String get reservationCalendar;
+  /// **'Neuer Kunde'**
+  String get crmNewCustomer;
 
-  /// New reservation
+  /// CRM: Customer name
+  ///
+  /// In de, this message translates to:
+  /// **'Name'**
+  String get crmCustomerName;
+
+  /// CRM: Phone
+  ///
+  /// In de, this message translates to:
+  /// **'Telefon'**
+  String get crmPhone;
+
+  /// CRM: Email
+  ///
+  /// In de, this message translates to:
+  /// **'E-Mail'**
+  String get crmEmail;
+
+  /// CRM: Birthday
+  ///
+  /// In de, this message translates to:
+  /// **'Geburtstag'**
+  String get crmBirthday;
+
+  /// CRM: Notes
+  ///
+  /// In de, this message translates to:
+  /// **'Notizen'**
+  String get crmNotes;
+
+  /// CRM: Loyalty points
+  ///
+  /// In de, this message translates to:
+  /// **'Treuepunkte'**
+  String get crmLoyaltyPoints;
+
+  /// CRM: Loyalty balance
+  ///
+  /// In de, this message translates to:
+  /// **'Punktestand'**
+  String get crmLoyaltyBalance;
+
+  /// CRM: Add points
+  ///
+  /// In de, this message translates to:
+  /// **'Punkte hinzufügen'**
+  String get crmAddPoints;
+
+  /// CRM: Redeem points
+  ///
+  /// In de, this message translates to:
+  /// **'Punkte einlösen'**
+  String get crmRedeemPoints;
+
+  /// CRM: Total visits
+  ///
+  /// In de, this message translates to:
+  /// **'Besuche'**
+  String get crmTotalVisits;
+
+  /// CRM: Total spent
+  ///
+  /// In de, this message translates to:
+  /// **'Gesamtumsatz'**
+  String get crmTotalSpent;
+
+  /// CRM: Last visit
+  ///
+  /// In de, this message translates to:
+  /// **'Letzter Besuch'**
+  String get crmLastVisit;
+
+  /// CRM: Search customers
+  ///
+  /// In de, this message translates to:
+  /// **'Kunden suchen'**
+  String get crmSearchCustomers;
+
+  /// CRM: No customers
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Kunden'**
+  String get crmNoCustomers;
+
+  /// CRM: Earn points
+  ///
+  /// In de, this message translates to:
+  /// **'Punkte verdienen'**
+  String get crmLoyaltyEarn;
+
+  /// CRM: Redeem action label
+  ///
+  /// In de, this message translates to:
+  /// **'Punkte einlösen'**
+  String get crmLoyaltyRedeem;
+
+  /// CRM: Adjust points
+  ///
+  /// In de, this message translates to:
+  /// **'Punkte anpassen'**
+  String get crmLoyaltyAdjust;
+
+  /// CRM: Loyalty history
+  ///
+  /// In de, this message translates to:
+  /// **'Punkteverlauf'**
+  String get crmLoyaltyHistory;
+
+  /// Reservation: New
   ///
   /// In de, this message translates to:
   /// **'Neue Reservierung'**
   String get reservationNew;
 
-  /// Edit reservation
-  ///
-  /// In de, this message translates to:
-  /// **'Reservierung bearbeiten'**
-  String get reservationEdit;
-
-  /// Today label
-  ///
-  /// In de, this message translates to:
-  /// **'Heute'**
-  String get reservationToday;
-
-  /// No upcoming reservations
-  ///
-  /// In de, this message translates to:
-  /// **'Keine bevorstehenden Reservierungen'**
-  String get reservationNoUpcoming;
-
-  /// No reservations for day
-  ///
-  /// In de, this message translates to:
-  /// **'Keine Reservierungen für diesen Tag'**
-  String get reservationNoReservations;
-
-  /// Guest info section
-  ///
-  /// In de, this message translates to:
-  /// **'Gastinformationen'**
-  String get reservationCustomerInfo;
-
-  /// Guest name
-  ///
-  /// In de, this message translates to:
-  /// **'Gastname'**
-  String get reservationCustomerName;
-
-  /// Phone
-  ///
-  /// In de, this message translates to:
-  /// **'Telefon'**
-  String get reservationCustomerPhone;
-
-  /// Email
-  ///
-  /// In de, this message translates to:
-  /// **'E-Mail'**
-  String get reservationCustomerEmail;
-
-  /// Date and time section
-  ///
-  /// In de, this message translates to:
-  /// **'Datum & Uhrzeit'**
-  String get reservationDateTime;
-
-  /// Date
+  /// Reservation: Date
   ///
   /// In de, this message translates to:
   /// **'Datum'**
   String get reservationDate;
 
-  /// Time
+  /// Reservation: Time
   ///
   /// In de, this message translates to:
   /// **'Uhrzeit'**
   String get reservationTime;
 
-  /// Party size
+  /// Reservation: Guests
   ///
   /// In de, this message translates to:
-  /// **'Personenanzahl'**
-  String get reservationPartySize;
+  /// **'Gäste'**
+  String get reservationGuests;
 
-  /// Table
+  /// Reservation: Table
   ///
   /// In de, this message translates to:
   /// **'Tisch'**
   String get reservationTable;
 
-  /// Table optional
-  ///
-  /// In de, this message translates to:
-  /// **'Tisch (optional)'**
-  String get reservationTableOptional;
-
-  /// No table assigned
-  ///
-  /// In de, this message translates to:
-  /// **'Kein Tisch zugewiesen'**
-  String get reservationNoTable;
-
-  /// Notes
-  ///
-  /// In de, this message translates to:
-  /// **'Bemerkungen'**
-  String get reservationNotes;
-
-  /// Booking meta section
-  ///
-  /// In de, this message translates to:
-  /// **'Buchungsinfo'**
-  String get reservationMeta;
-
-  /// Reservation channel
-  ///
-  /// In de, this message translates to:
-  /// **'Quelle'**
-  String get reservationChannel;
-
-  /// Reservation status
+  /// Reservation: Status
   ///
   /// In de, this message translates to:
   /// **'Status'**
   String get reservationStatus;
 
-  /// Change status
-  ///
-  /// In de, this message translates to:
-  /// **'Status ändern'**
-  String get reservationChangeStatus;
-
-  /// Change end time
-  ///
-  /// In de, this message translates to:
-  /// **'Endzeit ändern'**
-  String get reservationChangeEndTime;
-
-  /// Channel: walk-in
-  ///
-  /// In de, this message translates to:
-  /// **'Walk-in'**
-  String get reservationChannelWalkIn;
-
-  /// Channel: online
-  ///
-  /// In de, this message translates to:
-  /// **'Online'**
-  String get reservationChannelOnline;
-
-  /// Channel: phone
-  ///
-  /// In de, this message translates to:
-  /// **'Telefon'**
-  String get reservationChannelPhone;
-
-  /// Status: pending
-  ///
-  /// In de, this message translates to:
-  /// **'Ausstehend'**
-  String get reservationStatusPending;
-
-  /// Status: confirmed
+  /// Reservation: Confirmed
   ///
   /// In de, this message translates to:
   /// **'Bestätigt'**
   String get reservationStatusConfirmed;
 
-  /// Status: seated
+  /// Reservation: Pending
   ///
   /// In de, this message translates to:
-  /// **'Platziert'**
-  String get reservationStatusSeated;
+  /// **'Ausstehend'**
+  String get reservationStatusPending;
 
-  /// Status: cancelled
+  /// Reservation: Cancelled
   ///
   /// In de, this message translates to:
   /// **'Storniert'**
   String get reservationStatusCancelled;
 
-  /// Status: no-show
+  /// Reservation: Seated
   ///
   /// In de, this message translates to:
-  /// **'No-show'**
+  /// **'Platziert'**
+  String get reservationStatusSeated;
+
+  /// Reservation: No show
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht erschienen'**
   String get reservationStatusNoShow;
 
-  /// Action: confirm reservation
+  /// Reservation: Customer name
   ///
   /// In de, this message translates to:
-  /// **'Bestätigen'**
-  String get reservationConfirm;
+  /// **'Gastname'**
+  String get reservationCustomerName;
 
-  /// Action: seat guests
+  /// Reservation: Phone
   ///
   /// In de, this message translates to:
-  /// **'Platzieren'**
-  String get reservationSeat;
+  /// **'Telefon'**
+  String get reservationPhone;
 
-  /// Action: mark no-show
+  /// Reservation: Notes
   ///
   /// In de, this message translates to:
-  /// **'No-show'**
-  String get reservationNoShow;
+  /// **'Notizen'**
+  String get reservationNotes;
 
-  /// Action: cancel reservation
+  /// Reservation: Conflict detected
   ///
   /// In de, this message translates to:
-  /// **'Reservierung stornieren'**
-  String get reservationCancel;
+  /// **'Tischkonflikt erkannt'**
+  String get reservationConflict;
 
-  /// Calendar: day view
+  /// Reservation: No reservations
   ///
   /// In de, this message translates to:
-  /// **'Tag'**
-  String get reservationViewDay;
+  /// **'Keine Reservierungen'**
+  String get reservationNoReservations;
 
-  /// Calendar: week view
+  /// Reservation: Today
   ///
   /// In de, this message translates to:
-  /// **'Woche'**
-  String get reservationViewWeek;
+  /// **'Heute'**
+  String get reservationToday;
 
-  /// Validation: name required
+  /// Reservation: Calendar
   ///
   /// In de, this message translates to:
-  /// **'Gastname ist erforderlich'**
-  String get reservationNameRequired;
+  /// **'Kalender'**
+  String get reservationCalendar;
 
-  /// Validation: time range
+  /// Reservation: Duration in minutes
   ///
   /// In de, this message translates to:
-  /// **'Endzeit muss nach der Startzeit liegen'**
-  String get reservationErrorTimeRange;
+  /// **'Dauer (Min.)'**
+  String get reservationDuration;
 
-  /// Validation: table conflict
+  /// Reservation: Check for conflicts
   ///
   /// In de, this message translates to:
-  /// **'Dieser Tisch ist zu diesem Zeitpunkt bereits reserviert'**
-  String get reservationErrorConflict;
+  /// **'Konflikt prüfen'**
+  String get reservationCheckConflict;
 }
 
-class _AppLocalizationsDelegate
-    extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -1073,30 +1069,27 @@ class _AppLocalizationsDelegate
   }
 
   @override
-  bool isSupported(Locale locale) =>
-      <String>['de', 'en', 'fr', 'it'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>['de', 'en', 'fr', 'it'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
+
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'de':
-      return AppLocalizationsDe();
-    case 'en':
-      return AppLocalizationsEn();
-    case 'fr':
-      return AppLocalizationsFr();
-    case 'it':
-      return AppLocalizationsIt();
+    case 'de': return AppLocalizationsDe();
+    case 'en': return AppLocalizationsEn();
+    case 'fr': return AppLocalizationsFr();
+    case 'it': return AppLocalizationsIt();
   }
 
   throw FlutterError(
     'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
     'an issue with the localizations generation tool. Please file an issue '
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
+    'that was used.'
   );
 }

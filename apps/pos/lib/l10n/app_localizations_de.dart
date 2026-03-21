@@ -341,8 +341,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get confirmDelete => 'Löschen bestätigen';
 
   @override
-  String get confirmDeleteMessage =>
-      'Möchten Sie diesen Eintrag wirklich löschen?';
+  String get confirmDeleteMessage => 'Möchten Sie diesen Eintrag wirklich löschen?';
 
   @override
   String get pinLogin => 'PIN eingeben';
@@ -372,43 +371,73 @@ class AppLocalizationsDe extends AppLocalizations {
   String get quickActionOrderHistory => 'Bestellungshistorie';
 
   @override
+  String get navCrm => 'Kunden';
+
+  @override
   String get navReservations => 'Reservierungen';
 
   @override
-  String get reservationList => 'Reservierungen';
+  String get crmCustomers => 'Kunden';
 
   @override
-  String get reservationCalendar => 'Kalender';
+  String get crmNewCustomer => 'Neuer Kunde';
+
+  @override
+  String get crmCustomerName => 'Name';
+
+  @override
+  String get crmPhone => 'Telefon';
+
+  @override
+  String get crmEmail => 'E-Mail';
+
+  @override
+  String get crmBirthday => 'Geburtstag';
+
+  @override
+  String get crmNotes => 'Notizen';
+
+  @override
+  String get crmLoyaltyPoints => 'Treuepunkte';
+
+  @override
+  String get crmLoyaltyBalance => 'Punktestand';
+
+  @override
+  String get crmAddPoints => 'Punkte hinzufügen';
+
+  @override
+  String get crmRedeemPoints => 'Punkte einlösen';
+
+  @override
+  String get crmTotalVisits => 'Besuche';
+
+  @override
+  String get crmTotalSpent => 'Gesamtumsatz';
+
+  @override
+  String get crmLastVisit => 'Letzter Besuch';
+
+  @override
+  String get crmSearchCustomers => 'Kunden suchen';
+
+  @override
+  String get crmNoCustomers => 'Keine Kunden';
+
+  @override
+  String get crmLoyaltyEarn => 'Punkte verdienen';
+
+  @override
+  String get crmLoyaltyRedeem => 'Punkte einlösen';
+
+  @override
+  String get crmLoyaltyAdjust => 'Punkte anpassen';
+
+  @override
+  String get crmLoyaltyHistory => 'Punkteverlauf';
 
   @override
   String get reservationNew => 'Neue Reservierung';
-
-  @override
-  String get reservationEdit => 'Reservierung bearbeiten';
-
-  @override
-  String get reservationToday => 'Heute';
-
-  @override
-  String get reservationNoUpcoming => 'Keine bevorstehenden Reservierungen';
-
-  @override
-  String get reservationNoReservations => 'Keine Reservierungen für diesen Tag';
-
-  @override
-  String get reservationCustomerInfo => 'Gastinformationen';
-
-  @override
-  String get reservationCustomerName => 'Gastname';
-
-  @override
-  String get reservationCustomerPhone => 'Telefon';
-
-  @override
-  String get reservationCustomerEmail => 'E-Mail';
-
-  @override
-  String get reservationDateTime => 'Datum & Uhrzeit';
 
   @override
   String get reservationDate => 'Datum';
@@ -417,85 +446,53 @@ class AppLocalizationsDe extends AppLocalizations {
   String get reservationTime => 'Uhrzeit';
 
   @override
-  String get reservationPartySize => 'Personenanzahl';
+  String get reservationGuests => 'Gäste';
 
   @override
   String get reservationTable => 'Tisch';
 
   @override
-  String get reservationTableOptional => 'Tisch (optional)';
-
-  @override
-  String get reservationNoTable => 'Kein Tisch zugewiesen';
-
-  @override
-  String get reservationNotes => 'Bemerkungen';
-
-  @override
-  String get reservationMeta => 'Buchungsinfo';
-
-  @override
-  String get reservationChannel => 'Quelle';
-
-  @override
   String get reservationStatus => 'Status';
-
-  @override
-  String get reservationChangeStatus => 'Status ändern';
-
-  @override
-  String get reservationChangeEndTime => 'Endzeit ändern';
-
-  @override
-  String get reservationChannelWalkIn => 'Walk-in';
-
-  @override
-  String get reservationChannelOnline => 'Online';
-
-  @override
-  String get reservationChannelPhone => 'Telefon';
-
-  @override
-  String get reservationStatusPending => 'Ausstehend';
 
   @override
   String get reservationStatusConfirmed => 'Bestätigt';
 
   @override
-  String get reservationStatusSeated => 'Platziert';
+  String get reservationStatusPending => 'Ausstehend';
 
   @override
   String get reservationStatusCancelled => 'Storniert';
 
   @override
-  String get reservationStatusNoShow => 'No-show';
+  String get reservationStatusSeated => 'Platziert';
 
   @override
-  String get reservationConfirm => 'Bestätigen';
+  String get reservationStatusNoShow => 'Nicht erschienen';
 
   @override
-  String get reservationSeat => 'Platzieren';
+  String get reservationCustomerName => 'Gastname';
 
   @override
-  String get reservationNoShow => 'No-show';
+  String get reservationPhone => 'Telefon';
 
   @override
-  String get reservationCancel => 'Reservierung stornieren';
+  String get reservationNotes => 'Notizen';
 
   @override
-  String get reservationViewDay => 'Tag';
+  String get reservationConflict => 'Tischkonflikt erkannt';
 
   @override
-  String get reservationViewWeek => 'Woche';
+  String get reservationNoReservations => 'Keine Reservierungen';
 
   @override
-  String get reservationNameRequired => 'Gastname ist erforderlich';
+  String get reservationToday => 'Heute';
 
   @override
-  String get reservationErrorTimeRange =>
-      'Endzeit muss nach der Startzeit liegen';
+  String get reservationCalendar => 'Kalender';
 
   @override
-  String get reservationErrorConflict =>
-      'Dieser Tisch ist zu diesem Zeitpunkt bereits reserviert';
+  String get reservationDuration => 'Dauer (Min.)';
+
+  @override
+  String get reservationCheckConflict => 'Konflikt prüfen';
 }

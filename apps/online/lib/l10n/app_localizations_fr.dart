@@ -181,8 +181,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get itemAdded => 'Ajouté au panier';
 
   @override
-  String get errorLoadingMenu =>
-      'Impossible de charger le menu. Veuillez réessayer.';
+  String get errorLoadingMenu => 'Impossible de charger le menu. Veuillez réessayer.';
 
   @override
   String get retry => 'Réessayer';
