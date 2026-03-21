@@ -17,6 +17,23 @@ env:
 jobs:
   analyze-and-test:
     name: Analyze & Test
+  go-test:
+    name: Go Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: server/go.sum
+
+      - name: Run Go tests
+        working-directory: server
+        run: go test -race -count=1 ./...
+
+  analyze:
+    name: Analyze
     runs-on: ubuntu-latest
 
     steps:
