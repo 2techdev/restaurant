@@ -1,21 +1,18 @@
-/// Top navigation bar — Lightspeed-inspired professional POS UI.
+/// Klein Professional POS — Dark Top Navigation Bar.
 ///
-/// A 56px-tall white bar with:
-/// - GastroCore logo (teal accent) or back button
-/// - Online/offline status badge
-/// - Shift and terminal information
-/// - User avatar with initials
-/// - Custom action icon buttons
+/// A 64px-tall dark bar with:
+/// - Left: "GASTROCORE" wordmark (font-black, tight tracking)
+/// - Center: Navigation tabs — ONGOING | TABLES | MENU | STAFF
+///   Active tab: primary (#90ABFF) text + 2px bottom border primaryDim
+///   Inactive: onSurfaceVariant, hover: surfaceContainerHighest bg
+/// - Right: notification icon + settings icon + user avatar + name
 ///
 /// Implements [PreferredSizeWidget] for use with [Scaffold.appBar].
 ///
 /// ```dart
 /// PosTopBar(
-///   showLogo: true,
-///   showOnlineStatus: true,
-///   isOnline: true,
-///   shiftInfo: 'Shift #402',
-///   terminalInfo: 'Terminal 01 • Main Floor',
+///   activeTab: PosTab.ongoing,
+///   onTabChanged: (tab) => context.go(tab.route),
 ///   userName: 'Mehmet',
 ///   userInitials: 'MK',
 /// )
@@ -25,6 +22,34 @@ library;
 import 'package:flutter/material.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+
+// ---------------------------------------------------------------------------
+// PosTab — navigation tab descriptor
+// ---------------------------------------------------------------------------
+
+enum PosTab {
+  ongoing(label: 'ONGOING', route: '/order-center', icon: Icons.receipt_long_rounded),
+  tables(label: 'TABLES', route: '/tables', icon: Icons.table_restaurant_rounded),
+  menu(label: 'MENU', route: '/back-office', icon: Icons.restaurant_menu_rounded),
+  staff(label: 'STAFF', route: '/settings', icon: Icons.people_rounded);
+
+  const PosTab({
+    required this.label,
+    required this.route,
+    required this.icon,
+  });
+
+  final String label;
+  final String route;
+  final IconData icon;
+
+  static PosTab? fromRoute(String route) {
+    for (final tab in values) {
+      if (route.startsWith(tab.route)) return tab;
+    }
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // TopBarAction
@@ -51,15 +76,16 @@ class TopBarAction {
 // PosTopBar
 // ---------------------------------------------------------------------------
 
-/// Top navigation bar used across POS screens.
+/// Dark top navigation bar — 64px tall, surface (#0B0E14) background.
 ///
-/// White background with a bottom border. No sidebar — use [GcSidebar] for
-/// the main navigation rail.
+/// Center-aligned tabs replace the sidebar for main navigation.
 class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
   const PosTopBar({
     super.key,
+    this.activeTab,
+    this.onTabChanged,
     this.title,
-    this.showLogo = false,
+    this.showLogo = true,
     this.showOnlineStatus = false,
     this.isOnline = true,
     this.shiftInfo,
@@ -70,7 +96,14 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
     this.actions,
     this.onBack,
     this.bottom,
+    this.showTabs = true,
   });
+
+  /// Currently active tab for highlighting.
+  final PosTab? activeTab;
+
+  /// Called when a tab is tapped.
+  final ValueChanged<PosTab>? onTabChanged;
 
   final String? title;
   final bool showLogo;
@@ -83,77 +116,85 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
   final Color? userColor;
   final List<TopBarAction>? actions;
   final VoidCallback? onBack;
+  final bool showTabs;
 
   /// Optional bottom widget (e.g. TabBar). Adds height if provided.
   final PreferredSizeWidget? bottom;
 
   @override
   Size get preferredSize => Size.fromHeight(
-        56 + (bottom?.preferredSize.height ?? 0),
+        64 + (bottom?.preferredSize.height ?? 0),
       );
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.surface,
+      color: AppColors.surfaceDim,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: AppColors.border, width: 1),
-              ),
-            ),
+          SizedBox(
+            height: 64,
             child: Row(
               children: [
-                // -- Left section --
-                if (onBack != null) _buildBackButton(),
-                if (showLogo) ...[
-                  _buildLogo(),
-                  const SizedBox(width: 16),
-                ],
-                if (title != null) ...[
-                  Text(
-                    title!,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                // ── Left: Logo / back ──────────────────────────────────────
+                SizedBox(
+                  width: 180,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 20),
+                    child: onBack != null
+                        ? _buildBackButton()
+                        : _buildWordmark(),
+                  ),
+                ),
+
+                // ── Center: Navigation tabs ────────────────────────────────
+                if (showTabs)
+                  Expanded(child: _buildTabs())
+                else if (title != null)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        title!.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  const Expanded(child: SizedBox()),
+
+                // ── Right: Actions + user ──────────────────────────────────
+                SizedBox(
+                  width: 180,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (showOnlineStatus) ...[
+                          _buildOnlineStatus(),
+                          const SizedBox(width: 10),
+                        ],
+                        if (shiftInfo != null) ...[
+                          _buildShiftBadge(shiftInfo!),
+                          const SizedBox(width: 10),
+                        ],
+                        if (actions != null)
+                          for (final action in actions!) ...[
+                            _buildActionButton(action),
+                            const SizedBox(width: 6),
+                          ],
+                        if (userName != null || userInitials != null)
+                          _buildUserAvatar(),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 16),
-                ],
-                if (showOnlineStatus) ...[
-                  _buildOnlineStatus(),
-                  const SizedBox(width: 12),
-                ],
-                if (terminalInfo != null) ...[
-                  Text(
-                    terminalInfo!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textDim,
-                    ),
-                  ),
-                ],
-
-                const Spacer(),
-
-                // -- Right section --
-                if (shiftInfo != null) ...[
-                  _buildShiftBadge(shiftInfo!),
-                  const SizedBox(width: 12),
-                ],
-                if (actions != null)
-                  for (final action in actions!) ...[
-                    _buildActionButton(action),
-                    const SizedBox(width: 6),
-                  ],
-                if (userName != null || userInitials != null)
-                  _buildUserAvatar(),
+                ),
               ],
             ),
           ),
@@ -163,109 +204,108 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
+  // ── Wordmark ──────────────────────────────────────────────────────────────
+
+  Widget _buildWordmark() {
+    return const Text(
+      'GASTROCORE',
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w900,
+        color: AppColors.textPrimary,
+        letterSpacing: -0.5,
+      ),
+    );
+  }
+
+  // ── Back button ───────────────────────────────────────────────────────────
+
   Widget _buildBackButton() {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onBack,
-          child: const SizedBox(
-            width: 44,
-            height: 44,
-            child: Icon(
-              Icons.arrow_back_rounded,
-              size: 22,
-              color: AppColors.textPrimary,
-            ),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(4),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onBack,
+        child: const SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(
+            Icons.arrow_back_rounded,
+            size: 20,
+            color: AppColors.textPrimary,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildLogo() {
+  // ── Navigation tabs ───────────────────────────────────────────────────────
+
+  Widget _buildTabs() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: PosTab.values.map((tab) {
+        final isActive = tab == activeTab;
+        return _PosNavTab(
+          tab: tab,
+          isActive: isActive,
+          onTap: () => onTabChanged?.call(tab),
+        );
+      }).toList(),
+    );
+  }
+
+  // ── Online status badge ───────────────────────────────────────────────────
+
+  Widget _buildOnlineStatus() {
+    final color = isOnline ? AppColors.green : AppColors.orange;
+    final label = isOnline ? 'ONLINE' : 'OFFLINE';
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          'Gastro',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-            letterSpacing: -0.3,
-          ),
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        const Text(
-          'Core',
+        const SizedBox(width: 5),
+        Text(
+          label,
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 9,
             fontWeight: FontWeight.w700,
-            color: AppColors.primary,
-            letterSpacing: -0.3,
+            color: color,
+            letterSpacing: 0.8,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildOnlineStatus() {
-    final color = isOnline ? AppColors.green : AppColors.orange;
-    final label = isOnline ? 'ONLINE' : 'OFFLINE';
-    final bg = isOnline ? AppColors.greenDim : AppColors.orangeDim;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: color,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // ── Shift badge ───────────────────────────────────────────────────────────
 
   Widget _buildShiftBadge(String info) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(6),
+        color: AppColors.primaryContainer.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        info,
+        info.toUpperCase(),
         style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textSecondary,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: AppColors.primary,
+          letterSpacing: 0.8,
         ),
       ),
     );
   }
+
+  // ── Action button ─────────────────────────────────────────────────────────
 
   Widget _buildActionButton(TopBarAction action) {
     return Tooltip(
@@ -273,18 +313,18 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
       child: Stack(
         children: [
           Material(
-            color: AppColors.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(8),
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: action.onTap,
-              splashColor: AppColors.primary.withValues(alpha: 0.08),
+              hoverColor: AppColors.surfaceContainerHighest,
               child: SizedBox(
-                width: 40,
-                height: 40,
+                width: 36,
+                height: 36,
                 child: Icon(
                   action.icon,
-                  size: 20,
+                  size: 18,
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -292,20 +332,20 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           if (action.badge != null && action.badge! > 0)
             Positioned(
-              top: 4,
-              right: 4,
+              top: 5,
+              right: 5,
               child: Container(
-                width: 16,
-                height: 16,
+                width: 14,
+                height: 14,
                 decoration: const BoxDecoration(
-                  color: AppColors.red,
+                  color: AppColors.error,
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
                     '${action.badge}',
                     style: const TextStyle(
-                      fontSize: 9,
+                      fontSize: 8,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
@@ -317,6 +357,8 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
       ),
     );
   }
+
+  // ── User avatar ───────────────────────────────────────────────────────────
 
   Widget _buildUserAvatar() {
     final color = userColor ?? AppColors.primary;
@@ -330,7 +372,7 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
           Text(
             userName!,
             style: const TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w500,
               color: AppColors.textSecondary,
             ),
@@ -338,17 +380,17 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
           const SizedBox(width: 8),
         ],
         Container(
-          width: 36,
-          height: 36,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: color.withValues(alpha: 0.12),
+            color: color.withValues(alpha: 0.15),
           ),
           child: Center(
             child: Text(
               initials,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: color,
               ),
@@ -356,6 +398,83 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _PosNavTab — individual tab widget with hover + active state
+// ---------------------------------------------------------------------------
+
+class _PosNavTab extends StatefulWidget {
+  const _PosNavTab({
+    required this.tab,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  final PosTab tab;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  State<_PosNavTab> createState() => _PosNavTabState();
+}
+
+class _PosNavTabState extends State<_PosNavTab> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeInOut,
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: _hovered && !widget.isActive
+                ? AppColors.surfaceContainerHighest
+                : Colors.transparent,
+            border: Border(
+              bottom: widget.isActive
+                  ? const BorderSide(
+                      color: AppColors.primaryDim,
+                      width: 2,
+                    )
+                  : BorderSide.none,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                widget.tab.icon,
+                size: 14,
+                color: widget.isActive
+                    ? AppColors.primary
+                    : AppColors.textSecondary,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                widget.tab.label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: widget.isActive
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
