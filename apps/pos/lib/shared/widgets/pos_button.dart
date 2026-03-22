@@ -1,27 +1,26 @@
-/// POS Button variants — Lightspeed-inspired professional UI.
+/// POS Button variants — Klein Professional POS dark theme.
 ///
 /// Four button types covering all POS interaction contexts:
 ///
 /// - [PosGradientButton] — Primary CTA (Pay, Confirm, Submit).
-///   Teal gradient, white text. Full-width by default.
+///   primaryDim solid color, white text, tight 4px radius. Full-width by default.
 ///
-/// - [PosSolidButton] — Semantic action (Send to Kitchen = coral,
-///   Void = red, Accept = green). Single solid color background.
+/// - [PosSolidButton] — Semantic action (Send = secondary green,
+///   Void = error red, Accept = green). Single solid color background.
 ///
 /// - [PosGhostButton] — Tertiary actions (Cancel, Dismiss).
-///   Transparent background, teal-colored text.
+///   Transparent background, primary-colored text.
 ///
 /// - [PosSurfaceButton] — Secondary actions (Category tabs, toggles).
-///   Light gray background with teal active state.
+///   surfaceContainerHighest bg with primaryDim active state.
 ///
 /// All buttons enforce 48px minimum touch targets, scale-down press
-/// feedback (0.97), and 200ms transitions.
+/// feedback (0.97), and 150ms transitions.
 library;
 
 import 'package:flutter/material.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
-import 'package:gastrocore_pos/core/theme/app_theme.dart';
 
 // ---------------------------------------------------------------------------
 // Gradient Primary Button
@@ -37,7 +36,7 @@ class PosGradientButton extends StatefulWidget {
     this.onPressed,
     this.height = 52,
     this.isLoading = false,
-    this.borderRadius = 12,
+    this.borderRadius = 4,
     this.expand = true,
   });
 
@@ -98,16 +97,11 @@ class _PosGradientButtonState extends State<PosGradientButton>
         onTapCancel: _onTapCancel,
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 200),
-          opacity: _enabled ? 1.0 : 0.45,
+          opacity: _enabled ? 1.0 : 0.35,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.primary, AppColors.primaryContainer],
-              ),
+              color: AppColors.primaryDim,
               borderRadius: BorderRadius.circular(widget.borderRadius),
-              boxShadow: _enabled ? kButtonShadow : null,
             ),
             child: Material(
               color: Colors.transparent,
@@ -183,7 +177,7 @@ class PosSolidButton extends StatefulWidget {
     required this.color,
     this.onPressed,
     this.height = 52,
-    this.borderRadius = 12,
+    this.borderRadius = 4,
     this.expand = true,
     this.isLoading = false,
   });
@@ -482,8 +476,9 @@ class _PosSurfaceButtonState extends State<PosSurfaceButton>
   @override
   Widget build(BuildContext context) {
     final effectiveHeight = widget.height.clamp(48.0, double.infinity);
-    final bgColor =
-        widget.isActive ? AppColors.primary : AppColors.surfaceContainerHigh;
+    final bgColor = widget.isActive
+        ? AppColors.primaryDim
+        : AppColors.surfaceContainerHighest;
     final textColor =
         widget.isActive ? Colors.white : AppColors.textSecondary;
 

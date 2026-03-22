@@ -69,7 +69,7 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
     final editMode = ref.watch(tableEditModeProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDim,
+      backgroundColor: AppColors.surfaceDim, // base void
       floatingActionButton: _buildFab(editMode),
       body: floorsAsync.when(
         loading: () => const Center(
@@ -145,7 +145,7 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
     return Container(
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      color: AppColors.surface,
+      color: AppColors.surfaceContainerLow,
       child: Row(
         children: [
           ...navItems.asMap().entries.map((entry) {
@@ -307,7 +307,7 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
       List<FloorEntity> floors, String? selectedFloorId, bool editMode) {
     return Container(
       width: 180,
-      color: AppColors.surface,
+      color: AppColors.surfaceContainerLow,
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -617,12 +617,13 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
       onLongPress: () => showTableDetailSheet(context, table),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
+          color: AppColors.surfaceContainerHigh,
           borderRadius: isRound
               ? BorderRadius.circular(100)
-              : BorderRadius.circular(12),
-          border:
-              Border.all(color: borderColor.withValues(alpha: 0.6), width: 2),
+              : BorderRadius.circular(4),
+          border: Border(
+            left: BorderSide(color: borderColor, width: 3),
+          ),
         ),
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -678,10 +679,9 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(10),
-              border:
-                  Border(left: BorderSide(color: borderColor, width: 3)),
+              color: AppColors.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(4),
+              border: Border(left: BorderSide(color: borderColor, width: 3)),
             ),
             child: Row(
               children: [
@@ -849,7 +849,7 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
     return Container(
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      color: AppColors.surface,
+      color: AppColors.surfaceContainerLow,
       child: Row(
         children: [
           _BottomStat(Icons.event_seat_rounded, 'Seats: $totalSeats'),
@@ -939,21 +939,13 @@ class _DraggableTableTile extends StatelessWidget {
         width: table.width,
         height: table.height,
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
+          color: AppColors.surfaceContainerHigh,
           borderRadius: isRound
               ? BorderRadius.circular(200)
-              : table.shape == TableShape.square
-                  ? BorderRadius.circular(8)
-                  : BorderRadius.circular(10),
-          border: Border.all(
-              color: statusColor.withValues(alpha: 0.8), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: statusColor.withValues(alpha: 0.15),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
+              : BorderRadius.circular(4),
+          border: Border(
+            left: BorderSide(color: statusColor, width: 3),
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -999,7 +991,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.border.withValues(alpha: 0.4)
+      ..color = AppColors.border.withValues(alpha: 0.25)
       ..strokeWidth = 0.5;
 
     const step = 40.0;

@@ -1,8 +1,8 @@
-/// Complete light theme for GastroCore POS.
+/// Complete dark theme for GastroCore POS.
 ///
-/// Lightspeed-inspired professional UI optimised for restaurant tablets.
-/// Material 3 light theme — high contrast, generous touch targets,
-/// clean hierarchy through whitespace and shadow (not borders).
+/// Klein Professional POS — Organic Brutalism dark theme.
+/// Material 3 dark theme — no shadows, tonal layering, tight border radius,
+/// ultra-dense spacing, Inter font with extreme weight contrasts.
 library;
 
 import 'package:flutter/material.dart';
@@ -10,50 +10,33 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 // ---------------------------------------------------------------------------
-// Border radius constants
+// Border radius constants — tight/dense professional feel
 // ---------------------------------------------------------------------------
 
-/// Small radius — chips, badges, small buttons.
-const double kRadiusSmall = 8.0;
+/// Small radius — chips, badges, small buttons, cards (4px → dense pro feel).
+const double kRadiusSmall = 4.0;
 
-/// Medium radius — cards, inputs, dialogs.
-const double kRadiusMedium = 12.0;
+/// Medium radius — dialogs, inputs (8px).
+const double kRadiusMedium = 8.0;
 
-/// Large radius — sheets, modals, prominent panels.
-const double kRadiusLarge = 16.0;
+/// Large radius — sheets, modals (12px).
+const double kRadiusLarge = 12.0;
 
 // ---------------------------------------------------------------------------
-// Shadow presets
+// Shadow presets — MINIMAL, dark theme uses tonal layering not shadows
 // ---------------------------------------------------------------------------
 
-/// Subtle card shadow — white cards on light gray background.
-const List<BoxShadow> kCardShadow = [
-  BoxShadow(
-    color: Color(0x0D000000),
-    blurRadius: 8,
-    offset: Offset(0, 2),
-  ),
-  BoxShadow(
-    color: Color(0x07000000),
-    blurRadius: 1,
-    offset: Offset(0, 1),
-  ),
-];
+/// No shadow for cards — tonal layering expresses depth instead.
+const List<BoxShadow> kCardShadow = [];
 
-/// Elevated panel shadow — order panel, floating dialogs.
-const List<BoxShadow> kPanelShadow = [
-  BoxShadow(
-    color: Color(0x18000000),
-    blurRadius: 24,
-    offset: Offset(-4, 0),
-  ),
-];
+/// No panel shadow — background color difference defines separation.
+const List<BoxShadow> kPanelShadow = [];
 
-/// Button shadow — for primary action buttons.
+/// Subtle glow for primary action buttons only.
 const List<BoxShadow> kButtonShadow = [
   BoxShadow(
-    color: Color(0x2600897B),
-    blurRadius: 8,
+    color: Color(0x3090ABFF),
+    blurRadius: 12,
     offset: Offset(0, 4),
   ),
 ];
@@ -62,31 +45,40 @@ const List<BoxShadow> kButtonShadow = [
 // Theme
 // ---------------------------------------------------------------------------
 
-/// Builds the application-wide light [ThemeData].
+/// Builds the application-wide dark [ThemeData].
 ThemeData buildAppTheme() {
-  final colorScheme = ColorScheme.light(
+  final colorScheme = ColorScheme.dark(
+    brightness: Brightness.dark,
     primary: AppColors.primary,
-    onPrimary: Colors.white,
-    primaryContainer: AppColors.primaryLight,
-    onPrimaryContainer: AppColors.primaryContainer,
-    secondary: AppColors.coral,
-    onSecondary: Colors.white,
-    error: AppColors.red,
+    onPrimary: AppColors.onPrimary,
+    primaryContainer: AppColors.primaryContainer,
+    onPrimaryContainer: AppColors.onPrimary,
+    secondary: AppColors.secondary,
+    onSecondary: AppColors.onGreen,
+    secondaryContainer: AppColors.secondaryContainer,
+    tertiary: AppColors.tertiary,
+    onTertiary: Colors.white,
+    error: AppColors.error,
     onError: Colors.white,
     surface: AppColors.surface,
     onSurface: AppColors.textPrimary,
-    surfaceContainerHighest: AppColors.surfaceContainer,
-    outline: AppColors.border,
+    surfaceContainerLowest: AppColors.surfaceDim,
+    surfaceContainerLow: AppColors.surfaceContainerLow,
+    surfaceContainer: AppColors.surfaceContainer,
+    surfaceContainerHigh: AppColors.surfaceContainerHigh,
+    surfaceContainerHighest: AppColors.surfaceContainerHighest,
+    onSurfaceVariant: AppColors.textSecondary,
+    outline: AppColors.outline,
     outlineVariant: AppColors.outlineVariant,
   );
 
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.light,
+    brightness: Brightness.dark,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppColors.surfaceDim,
     canvasColor: AppColors.surface,
-    cardColor: AppColors.bgCard,
+    cardColor: AppColors.surfaceContainerHigh,
     dividerColor: AppColors.border,
 
     // -- Extensions ----------------------------------------------------------
@@ -94,36 +86,43 @@ ThemeData buildAppTheme() {
       PosColors(),
     ],
 
-    // -- Typography ----------------------------------------------------------
+    // -- Typography — Inter, extreme weight contrasts -------------------------
     textTheme: const TextTheme(
+      // Display — totals, large numbers (Inter 800)
       displayLarge: TextStyle(
-        fontSize: 32,
-        fontWeight: FontWeight.w700,
+        fontSize: 36,
+        fontWeight: FontWeight.w800,
         color: AppColors.textPrimary,
         letterSpacing: -0.5,
       ),
       displayMedium: TextStyle(
         fontSize: 28,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w800,
         color: AppColors.textPrimary,
+        letterSpacing: -0.4,
       ),
       displaySmall: TextStyle(
         fontSize: 24,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w800,
         color: AppColors.textPrimary,
+        letterSpacing: -0.3,
       ),
+      // Headline — section headers (Inter 700, tight tracking)
       headlineMedium: TextStyle(
         fontSize: 20,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
+        letterSpacing: -0.02 * 20,
       ),
       headlineSmall: TextStyle(
         fontSize: 18,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
+        letterSpacing: -0.02 * 18,
       ),
+      // Title — product names (Inter 600)
       titleLarge: TextStyle(
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: FontWeight.w600,
         color: AppColors.textPrimary,
       ),
@@ -137,6 +136,7 @@ ThemeData buildAppTheme() {
         fontWeight: FontWeight.w600,
         color: AppColors.textSecondary,
       ),
+      // Body — descriptions (Inter 400)
       bodyLarge: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w400,
@@ -152,29 +152,33 @@ ThemeData buildAppTheme() {
         fontWeight: FontWeight.w400,
         color: AppColors.textSecondary,
       ),
+      // Label — ALL-CAPS status tags (Inter 700)
       labelLarge: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
+        letterSpacing: 0.8,
       ),
       labelMedium: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
+        fontSize: 10,
+        fontWeight: FontWeight.w700,
         color: AppColors.textSecondary,
+        letterSpacing: 0.8,
       ),
       labelSmall: TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.w500,
+        fontSize: 9,
+        fontWeight: FontWeight.w700,
         color: AppColors.textDim,
+        letterSpacing: 1.0,
       ),
     ),
 
-    // -- Card ----------------------------------------------------------------
+    // -- Card — tight radius, no shadow, tonal bg ----------------------------
     cardTheme: CardThemeData(
-      color: AppColors.bgCard,
+      color: AppColors.surfaceContainerHigh,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(kRadiusMedium),
+        borderRadius: BorderRadius.circular(kRadiusSmall),
       ),
       margin: EdgeInsets.zero,
     ),
@@ -183,45 +187,46 @@ ThemeData buildAppTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.bgInput,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
-        borderSide: const BorderSide(color: AppColors.borderFocused, width: 2),
+        borderSide: const BorderSide(color: AppColors.borderFocused, width: 1),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
-        borderSide: const BorderSide(color: AppColors.red),
+        borderSide: const BorderSide(color: AppColors.error),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
-        borderSide: const BorderSide(color: AppColors.red, width: 2),
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
       ),
-      hintStyle: const TextStyle(color: AppColors.textDim),
+      hintStyle: const TextStyle(color: AppColors.textDim, fontSize: 13),
       labelStyle: const TextStyle(color: AppColors.textSecondary),
     ),
 
-    // -- Elevated button -----------------------------------------------------
+    // -- Elevated button — primaryDim bg, tight radius -----------------------
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.primaryDim,
         foregroundColor: Colors.white,
         elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         minimumSize: const Size(0, 48),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kRadiusSmall),
         ),
         textStyle: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
         ),
       ),
     ),
@@ -230,12 +235,12 @@ ThemeData buildAppTheme() {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: AppColors.primary,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kRadiusSmall),
         ),
         textStyle: const TextStyle(
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -245,38 +250,37 @@ ThemeData buildAppTheme() {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.textPrimary,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         minimumSize: const Size(0, 48),
         side: const BorderSide(color: AppColors.border),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kRadiusSmall),
         ),
         textStyle: const TextStyle(
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       ),
     ),
 
-    // -- Dialog ---------------------------------------------------------------
+    // -- Dialog — surfaceBright bg, tight radius ----------------------------
     dialogTheme: DialogThemeData(
-      backgroundColor: AppColors.surface,
-      elevation: 8,
-      shadowColor: const Color(0x1A000000),
+      backgroundColor: AppColors.surfaceBright,
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(kRadiusLarge),
+        borderRadius: BorderRadius.circular(kRadiusMedium),
       ),
     ),
 
     // -- Bottom sheet --------------------------------------------------------
     bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.surfaceBright,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(kRadiusLarge)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(kRadiusMedium)),
       ),
     ),
 
-    // -- Divider -------------------------------------------------------------
+    // -- Divider — very subtle -----------------------------------------------
     dividerTheme: const DividerThemeData(
       color: AppColors.border,
       thickness: 1,
@@ -285,20 +289,20 @@ ThemeData buildAppTheme() {
 
     // -- Snackbar ------------------------------------------------------------
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: AppColors.textPrimary,
-      contentTextStyle: const TextStyle(color: Colors.white),
+      backgroundColor: AppColors.surfaceBright,
+      contentTextStyle: const TextStyle(color: AppColors.textPrimary),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
       ),
       behavior: SnackBarBehavior.floating,
     ),
 
-    // -- AppBar (used sparingly) ---------------------------------------------
+    // -- AppBar --------------------------------------------------------------
     appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.surface,
       foregroundColor: AppColors.textPrimary,
       elevation: 0,
-      shadowColor: Color(0x0D000000),
+      shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
     ),
@@ -306,17 +310,25 @@ ThemeData buildAppTheme() {
     // -- Chip ----------------------------------------------------------------
     chipTheme: ChipThemeData(
       backgroundColor: AppColors.surfaceContainerHigh,
-      selectedColor: AppColors.accentDim,
+      selectedColor: AppColors.primaryDim,
       labelStyle: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w500,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
+        letterSpacing: 0.5,
       ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(kRadiusSmall),
       ),
       side: BorderSide.none,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    ),
+
+    // -- FloatingActionButton ------------------------------------------------
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: AppColors.primaryDim,
+      foregroundColor: Colors.white,
+      elevation: 0,
     ),
   );
 }

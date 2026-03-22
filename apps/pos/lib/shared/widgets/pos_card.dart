@@ -1,7 +1,7 @@
-/// Card variants — Lightspeed-inspired professional UI.
+/// Card variants — Klein Professional POS dark theme.
 ///
-/// White cards with subtle shadow on a light gray background.
-/// Depth is expressed through elevation (shadow), not borders.
+/// Dark surface cards with tonal layering (no shadows, no borders).
+/// Depth expressed through surface color shifts: surfaceContainerHigh → Highest.
 ///
 /// - [PosCard] — General-purpose container with ripple and scale feedback.
 /// - [PosStatCard] — Compact KPI display for dashboard and shift summaries.
@@ -10,7 +10,6 @@ library;
 import 'package:flutter/material.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
-import 'package:gastrocore_pos/core/theme/app_theme.dart';
 
 // ---------------------------------------------------------------------------
 // PosCard
@@ -34,7 +33,7 @@ class PosCard extends StatefulWidget {
     required this.child,
     this.padding,
     this.color,
-    this.borderRadius = 12,
+    this.borderRadius = 4,
     this.onTap,
     this.isActive = false,
     this.elevation = true,
@@ -42,14 +41,14 @@ class PosCard extends StatefulWidget {
 
   final Widget child;
 
-  /// Inner padding. Defaults to `EdgeInsets.all(16)` when null.
+  /// Inner padding. Defaults to `EdgeInsets.all(12)` when null.
   final EdgeInsets? padding;
 
-  /// Background color. Defaults to [AppColors.surface] (white).
-  /// When [isActive] is true, overridden to [AppColors.accentDim].
+  /// Background color. Defaults to [AppColors.surfaceContainerHigh].
+  /// When [isActive] is true, overridden to [AppColors.surfaceContainerHighest].
   final Color? color;
 
-  /// Corner radius. Defaults to 12.
+  /// Corner radius. Defaults to 4 (tight/dense professional feel).
   final double borderRadius;
 
   /// Tap callback — card becomes tappable with ripple + scale feedback.
@@ -91,19 +90,21 @@ class _PosCardState extends State<PosCard> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final bgColor = widget.isActive
-        ? AppColors.accentDim
-        : (widget.color ?? AppColors.surface);
+        ? AppColors.surfaceContainerHighest
+        : (widget.color ?? AppColors.surfaceContainerHigh);
 
     final card = AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 150),
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(widget.borderRadius),
+        // Active state: left 4px border in primaryDim (Klein POS spec)
         border: widget.isActive
-            ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
+            ? const Border(
+                left: BorderSide(color: AppColors.primaryDim, width: 4),
+              )
             : null,
-        boxShadow: widget.elevation ? kCardShadow : null,
       ),
       child: widget.onTap != null
           ? Material(
@@ -164,7 +165,7 @@ class PosStatCard extends StatelessWidget {
     this.valueColor,
     this.icon,
     this.iconColor,
-    this.borderRadius = 12,
+    this.borderRadius = 4,
   });
 
   final String value;
@@ -180,11 +181,10 @@ class PosStatCard extends StatelessWidget {
     final iColor = iconColor ?? vColor;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: kCardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
