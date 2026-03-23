@@ -538,6 +538,7 @@ class MenuRepositoryImpl {
       icon: row.icon ?? 'restaurant',
       parentId: row.parentId,
       isActive: row.isActive,
+      defaultGangId: row.defaultGangId,
     );
   }
 
@@ -550,6 +551,7 @@ class MenuRepositoryImpl {
       color: Value(entity.color),
       icon: Value(entity.icon),
       parentId: Value(entity.parentId),
+      defaultGangId: Value(entity.defaultGangId),
       isActive: Value(entity.isActive),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
@@ -582,6 +584,7 @@ class MenuRepositoryImpl {
       prepTimeMinutes: row.prepTimeMinutes,
       printerGroup: row.printerGroup,
       modifierGroups: modifierGroups,
+      defaultGangId: row.defaultGangId,
     );
   }
 
@@ -601,6 +604,7 @@ class MenuRepositoryImpl {
       displayOrder: Value(entity.displayOrder),
       prepTimeMinutes: Value(entity.prepTimeMinutes),
       printerGroup: Value(entity.printerGroup),
+      defaultGangId: Value(entity.defaultGangId),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
       isDeleted: const Value(false),

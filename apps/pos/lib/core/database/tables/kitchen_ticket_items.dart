@@ -10,6 +10,7 @@ class KitchenTicketItems extends Table {
   TextColumn get modifiersText => text().nullable()();
   TextColumn get notes => text().nullable()();
   TextColumn get status => text().withDefault(const Constant('pending'))(); // pending, preparing, ready, served, void
+  TextColumn get gangId => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
   @override

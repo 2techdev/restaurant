@@ -20,12 +20,16 @@ type contextKey string
 const (
 	// ContextKeyRequestID is the context key for the request ID.
 	ContextKeyRequestID contextKey = "request_id"
-	// ContextKeyTenantID is the context key for the tenant ID from JWT.
+	// ContextKeyTenantID is the context key for the tenant / organization / brand ID from JWT.
 	ContextKeyTenantID contextKey = "tenant_id"
 	// ContextKeyDeviceID is the context key for the device ID from JWT.
 	ContextKeyDeviceID contextKey = "device_id"
 	// ContextKeyUserID is the context key for the user ID from JWT.
 	ContextKeyUserID contextKey = "user_id"
+	// ContextKeyStoreID is the context key for the store scope from JWT.
+	ContextKeyStoreID contextKey = "store_id"
+	// ContextKeyDeviceType is the context key for the device type from JWT (kds, kiosk, pos).
+	ContextKeyDeviceType contextKey = "device_type"
 	// ContextKeyRole is the context key for the role from JWT.
 	ContextKeyRole contextKey = "role"
 )
@@ -186,6 +190,12 @@ func AuthRequired(validateToken func(token string) (claims map[string]string, er
 			if v, ok := claims["user_id"]; ok {
 				ctx = context.WithValue(ctx, ContextKeyUserID, v)
 			}
+			if v, ok := claims["store_id"]; ok {
+				ctx = context.WithValue(ctx, ContextKeyStoreID, v)
+			}
+			if v, ok := claims["device_type"]; ok {
+				ctx = context.WithValue(ctx, ContextKeyDeviceType, v)
+			}
 			if v, ok := claims["role"]; ok {
 				ctx = context.WithValue(ctx, ContextKeyRole, v)
 			}
@@ -246,4 +256,38 @@ func GetRole(ctx context.Context) string {
 		return v
 	}
 	return ""
+}
+
+// GetStoreID extracts the store ID from context.
+func GetStoreID(ctx context.Context) string {
+	if v, ok := ctx.Value(ContextKeyStoreID).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// GetDeviceType extracts the device type from context.
+func GetDeviceType(ctx context.Context) string {
+	if v, ok := ctx.Value(ContextKeyDeviceType).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// RoleRequired returns a middleware that checks the caller has one of the allowed roles.
+func RoleRequired(allowed ...string) Middleware {
+	set := make(map[string]bool, len(allowed))
+	for _, r := range allowed {
+		set[r] = true
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			role := GetRole(r.Context())
+			if !set[role] {
+				response.Error(w, http.StatusForbidden, "FORBIDDEN", "Insufficient permissions")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }

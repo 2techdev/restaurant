@@ -5,6 +5,7 @@ package online
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 )
 
@@ -22,23 +23,31 @@ type StripeConfig struct {
 	SuccessURLBase string
 }
 
+// POSNotifier is a narrow interface so that the online module can push full
+// order data to all connected POS terminals without importing the pos package.
+type POSNotifier interface {
+	// NotifyNewOrder pushes the full JSON order payload to POS terminals.
+	NotifyNewOrder(tenantID string, payload json.RawMessage)
+}
+
 // Module is the online-ordering module.
 type Module struct {
-	db        *sql.DB
-	kdsNotify KDSNotifier // optional; nil means no KDS notification
-	wsHub     *OnlineHub  // optional; nil means no real-time WS push
-	stripeCfg StripeConfig
+	db         *sql.DB
+	kdsNotify  KDSNotifier // optional; nil means no KDS notification
+	posNotify  POSNotifier // optional; nil means no POS push
+	wsHub      *OnlineHub  // optional; nil means no real-time WS push
+	stripeCfg  StripeConfig
 }
 
 // NewModule creates a new online ordering module.
-// kdsNotify and wsHub may be nil if those integrations are not needed.
-func NewModule(db *sql.DB, kdsNotify KDSNotifier, wsHub *OnlineHub) *Module {
-	return &Module{db: db, kdsNotify: kdsNotify, wsHub: wsHub}
+// kdsNotify, posNotify and wsHub may be nil if those integrations are not needed.
+func NewModule(db *sql.DB, kdsNotify KDSNotifier, wsHub *OnlineHub, posNotify POSNotifier) *Module {
+	return &Module{db: db, kdsNotify: kdsNotify, wsHub: wsHub, posNotify: posNotify}
 }
 
 // NewModuleWithStripe creates a new online ordering module with Stripe support.
-func NewModuleWithStripe(db *sql.DB, kdsNotify KDSNotifier, wsHub *OnlineHub, stripe StripeConfig) *Module {
-	return &Module{db: db, kdsNotify: kdsNotify, wsHub: wsHub, stripeCfg: stripe}
+func NewModuleWithStripe(db *sql.DB, kdsNotify KDSNotifier, wsHub *OnlineHub, posNotify POSNotifier, stripe StripeConfig) *Module {
+	return &Module{db: db, kdsNotify: kdsNotify, wsHub: wsHub, posNotify: posNotify, stripeCfg: stripe}
 }
 
 // RegisterRoutes registers all public online ordering routes.

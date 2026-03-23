@@ -341,6 +341,13 @@ func (m *Module) handlePlaceOrder(w http.ResponseWriter, r *http.Request) {
 		m.kdsNotify.NotifyNewOrder(req.RestaurantID, orderID, orderNumber)
 	}
 
+	// Notify POS terminals with the full order payload (if hub is wired).
+	if m.posNotify != nil {
+		m.posNotify.NotifyNewOrder(req.RestaurantID, buildPOSPayload(
+			orderID, orderNumber, req, subtotal, taxAmount, now,
+		))
+	}
+
 	resp := PlaceOnlineOrderResponse{
 		ID:                   orderID,
 		OrderNumber:          orderNumber,
@@ -445,5 +452,92 @@ func nullString(s string) interface{} {
 		return nil
 	}
 	return s
+}
+
+// buildPOSPayload serialises a newly placed order into the JSON payload that
+// is pushed to connected POS terminals via the POS WebSocket hub.
+func buildPOSPayload(
+	orderID string,
+	orderNumber int,
+	req PlaceOnlineOrderRequest,
+	subtotal, taxAmount int64,
+	_ interface{},
+) json.RawMessage {
+	type modItem struct {
+		ModifierID   string `json:"modifier_id"`
+		ModifierName string `json:"modifier_name"`
+		PriceDelta   int64  `json:"price_delta"`
+	}
+	type lineItem struct {
+		ProductID   string    `json:"product_id"`
+		ProductName string    `json:"product_name"`
+		Quantity    int       `json:"quantity"`
+		UnitPrice   int64     `json:"unit_price"`
+		Subtotal    int64     `json:"subtotal"`
+		Notes       string    `json:"notes,omitempty"`
+		Modifiers   []modItem `json:"modifiers,omitempty"`
+	}
+	type payload struct {
+		ID                   string     `json:"id"`
+		OrderNumber          int        `json:"order_number"`
+		OrderType            string     `json:"order_type"`
+		Channel              string     `json:"channel"`
+		CustomerName         string     `json:"customer_name,omitempty"`
+		TableNumber          *int       `json:"table_number,omitempty"`
+		Notes                string     `json:"notes,omitempty"`
+		Subtotal             int64      `json:"subtotal"`
+		TaxAmount            int64      `json:"tax_amount"`
+		Total                int64      `json:"total"`
+		Items                []lineItem `json:"items"`
+		Status               string     `json:"status"`
+		EstimatedWaitMinutes int        `json:"estimated_wait_minutes"`
+	}
+
+	items := make([]lineItem, 0, len(req.Items))
+	for _, item := range req.Items {
+		lineSubtotal := item.UnitPrice * int64(item.Quantity)
+		mods := make([]modItem, 0, len(item.Modifiers))
+		for _, m := range item.Modifiers {
+			lineSubtotal += m.PriceDelta * int64(item.Quantity)
+			mods = append(mods, modItem{
+				ModifierID:   m.ModifierID,
+				ModifierName: m.ModifierName,
+				PriceDelta:   m.PriceDelta,
+			})
+		}
+		items = append(items, lineItem{
+			ProductID:   item.ProductID,
+			ProductName: item.ProductName,
+			Quantity:    item.Quantity,
+			UnitPrice:   item.UnitPrice,
+			Subtotal:    lineSubtotal,
+			Notes:       item.Notes,
+			Modifiers:   mods,
+		})
+	}
+
+	channel := req.Channel
+	if channel == "" {
+		channel = "qr"
+	}
+
+	p := payload{
+		ID:                   orderID,
+		OrderNumber:          orderNumber,
+		OrderType:            req.OrderType,
+		Channel:              channel,
+		CustomerName:         req.CustomerName,
+		TableNumber:          req.TableNumber,
+		Notes:                req.Notes,
+		Subtotal:             subtotal,
+		TaxAmount:            taxAmount,
+		Total:                subtotal + taxAmount,
+		Items:                items,
+		Status:               "open",
+		EstimatedWaitMinutes: 20,
+	}
+
+	raw, _ := json.Marshal(p)
+	return raw
 }
 

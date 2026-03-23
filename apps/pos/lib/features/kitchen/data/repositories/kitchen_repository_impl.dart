@@ -242,6 +242,7 @@ class KitchenRepositoryImpl {
                 modifiersText: Value(modText),
                 notes: Value(item.notes),
                 status: const Value('pending'),
+                gangId: Value(item.gangId),
                 createdAt: Value(now),
               ),
             );
@@ -267,6 +268,7 @@ class KitchenRepositoryImpl {
         modifiersText: i.modifiersText,
         notes: i.notes,
         status: _parseItemStatus(i.status),
+        gangId: i.gangId,
       );
     }).toList();
 

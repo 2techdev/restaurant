@@ -26,10 +26,19 @@ func NewModule(db *sql.DB, cfg *config.Config) *Module {
 
 // RegisterRoutes registers all auth routes on the given mux.
 func (m *Module) RegisterRoutes(mux *http.ServeMux) {
+	// Legacy device auth (kept for backward compatibility)
 	mux.HandleFunc("POST /api/v1/auth/device/register", m.handleDeviceRegister)
 	mux.HandleFunc("POST /api/v1/auth/device/token", m.handleDeviceToken)
 	mux.HandleFunc("POST /api/v1/auth/admin/login", m.handleAdminLogin)
 	mux.HandleFunc("POST /api/v1/auth/token/refresh", m.handleTokenRefresh)
+
+	// Multi-tenant auth endpoints
+	mux.HandleFunc("POST /api/v1/auth/register", m.handleRegister)
+	mux.HandleFunc("POST /api/v1/auth/login", m.handleLogin)
+	mux.HandleFunc("POST /api/v1/auth/pin-login", m.handlePINLogin)
+	mux.HandleFunc("POST /api/v1/auth/pair-device", m.handlePairDevice)
+	mux.HandleFunc("POST /api/v1/auth/pairing-code", m.handleGeneratePairingCode)
+	mux.HandleFunc("POST /api/v1/auth/refresh", m.handleRefreshPersisted)
 }
 
 // ValidateToken exposes the JWT validation for use by middleware.

@@ -11,6 +11,8 @@ import 'package:gastrocore_pos/features/sync/data/daos/sync_event_dao.dart';
 
 import 'tables/audit_log.dart';
 import 'tables/bills.dart';
+import 'tables/gang_templates.dart';
+import 'tables/order_gang_states.dart';
 import 'tables/cash_movements.dart';
 import 'tables/categories.dart';
 import 'tables/combo_items.dart';
@@ -92,6 +94,8 @@ part 'app_database.g.dart';
     FiscalSignatures,
     LanSyncPeers,
     ManagerPins,
+    GangTemplates,
+    OrderGangStates,
   ],
   daos: [AuditLogDao, InventoryDao, SyncEventDao],
 )
@@ -99,7 +103,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -184,6 +188,15 @@ class AppDatabase extends _$AppDatabase {
           'CREATE INDEX IF NOT EXISTS idx_fiscal_signatures_receipt_id '
           'ON fiscal_signatures (receipt_id)',
         );
+      }
+      if (from < 8) {
+        // v8: gang/wave ordering system — allows grouping items into service waves.
+        await m.createTable(gangTemplates);
+        await m.createTable(orderGangStates);
+        await m.addColumn(products, products.defaultGangId);
+        await m.addColumn(categories, categories.defaultGangId);
+        await m.addColumn(orderItems, orderItems.gangId);
+        await m.addColumn(kitchenTicketItems, kitchenTicketItems.gangId);
       }
     },
     onCreate: (m) async {

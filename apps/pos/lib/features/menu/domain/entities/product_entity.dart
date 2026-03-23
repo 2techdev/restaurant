@@ -58,6 +58,10 @@ class ProductEntity {
   /// Unit of weight measurement ('kg', 'g').
   final String? weightUnit;
 
+  /// Default Gang (course group) for this product.
+  /// References GangTemplate.id. Null = fall back to category default.
+  final String? defaultGangId;
+
   const ProductEntity({
     required this.id,
     required this.tenantId,
@@ -78,6 +82,7 @@ class ProductEntity {
     this.isOpenPrice = false,
     this.isWeightBased = false,
     this.weightUnit,
+    this.defaultGangId,
   });
 
   /// Whether this product has configurable modifiers.
@@ -104,6 +109,7 @@ class ProductEntity {
     bool? isOpenPrice,
     bool? isWeightBased,
     String? Function()? weightUnit,
+    String? Function()? defaultGangId,
   }) {
     return ProductEntity(
       id: id ?? this.id,
@@ -126,6 +132,8 @@ class ProductEntity {
       isOpenPrice: isOpenPrice ?? this.isOpenPrice,
       isWeightBased: isWeightBased ?? this.isWeightBased,
       weightUnit: weightUnit != null ? weightUnit() : this.weightUnit,
+      defaultGangId:
+          defaultGangId != null ? defaultGangId() : this.defaultGangId,
     );
   }
 

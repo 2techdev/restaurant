@@ -26,6 +26,7 @@ import (
 	"github.com/gastrocore/server/internal/menu"
 	"github.com/gastrocore/server/internal/online"
 	"github.com/gastrocore/server/internal/orders"
+	"github.com/gastrocore/server/internal/pos"
 	"github.com/gastrocore/server/internal/qrbill"
 	"github.com/gastrocore/server/internal/reports"
 	"github.com/gastrocore/server/internal/reservations"
@@ -72,13 +73,19 @@ func main() {
 	go onlineHub.Run()
 
 	// ---------------------------------------------------------------------------
+	// POS hub — real-time push for online orders to POS terminals.
+	// ---------------------------------------------------------------------------
+	posHub := pos.NewHub()
+	go posHub.Run()
+
+	// ---------------------------------------------------------------------------
 	// Initialize modules
 	// ---------------------------------------------------------------------------
 	authModule := auth.NewModule(db, cfg)
 	syncModule := gosync.NewModule(db, cfg)
 	menuModule := menu.NewModule(db)
 	ordersModule := orders.NewModule(db)
-	onlineModule := online.NewModuleWithStripe(db, kdsHub, onlineHub, online.StripeConfig{
+	onlineModule := online.NewModuleWithStripe(db, kdsHub, onlineHub, posHub, online.StripeConfig{
 		SecretKey:      cfg.StripeSecretKey,
 		WebhookSecret:  cfg.StripeWebhookSecret,
 		SuccessURLBase: cfg.StripeSuccessURLBase,
@@ -96,6 +103,7 @@ func main() {
 	crmModule := crm.NewModule(db, syncModule.SyncHub())
 	reservationsModule := reservations.NewModule(db, syncModule.SyncHub())
 	inventoryModule := inventory.NewModule(db)
+	posModule := pos.NewModule(db, posHub)
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -158,6 +166,7 @@ func main() {
 	crmModule.RegisterRoutes(mux)
 	reservationsModule.RegisterRoutes(mux)
 	inventoryModule.RegisterRoutes(mux)
+	posModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain

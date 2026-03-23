@@ -19,6 +19,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/features/gang/domain/entities/gang_template_entity.dart';
+import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
 import 'package:gastrocore_pos/features/kitchen/domain/entities/kitchen_ticket_entity.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_provider.dart';
 import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_providers.dart';
@@ -230,6 +232,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     final stationFilter = ref.watch(kdsStationFilterProvider);
     final largeFont = ref.watch(kdsLargeFontProvider);
     final lateThreshold = ref.watch(kdsLateThresholdProvider);
+    final gangMap = ref.watch(gangTemplateMapProvider);
 
     return KeyboardListener(
       focusNode: _keyFocus,
@@ -258,13 +261,16 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             completed,
             largeFont: largeFont,
             lateThreshold: lateThreshold,
+            gangMap: gangMap,
           );
         },
-        loading: () =>
-            _buildScaffold(const [], 0, largeFont: false, lateThreshold: 10,
-                loading: true),
+        loading: () => _buildScaffold(const [], 0,
+            largeFont: false, lateThreshold: 10, gangMap: const {}),
         error: (e, _) => _buildScaffold(const [], 0,
-            largeFont: false, lateThreshold: 10, error: e.toString()),
+            largeFont: false,
+            lateThreshold: 10,
+            gangMap: const {},
+            error: e.toString()),
       ),
     );
   }
@@ -274,6 +280,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     int completed, {
     required bool largeFont,
     required int lateThreshold,
+    required Map<String, GangTemplateEntity> gangMap,
     bool loading = false,
     String? error,
   }) {
@@ -289,7 +296,8 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                     ? _buildError(error)
                     : _buildGrid(tickets,
                         largeFont: largeFont,
-                        lateThreshold: lateThreshold),
+                        lateThreshold: lateThreshold,
+                        gangMap: gangMap),
           ),
           _buildFooter(),
         ],
@@ -430,6 +438,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     List<KitchenTicketEntity> tickets, {
     required bool largeFont,
     required int lateThreshold,
+    required Map<String, GangTemplateEntity> gangMap,
   }) {
     if (tickets.isEmpty) {
       return const Center(
@@ -474,6 +483,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
               tickets[i],
               largeFont: largeFont,
               lateThreshold: lateThreshold,
+              gangMap: gangMap,
             ),
           );
         },
@@ -489,6 +499,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     KitchenTicketEntity ticket, {
     required bool largeFont,
     required int lateThreshold,
+    required Map<String, GangTemplateEntity> gangMap,
   }) {
     final urgency = _getUrgency(ticket, lateThreshold);
     final borderColor = _urgencyBorderColor(urgency);
@@ -602,93 +613,14 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
               ),
             ),
 
-            // Items list
+            // Items list — grouped by Gang when Gang data is present
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-                itemCount: ticket.items.length,
-                itemBuilder: (context, i) {
-                  final item = ticket.items[i];
-                  final mods = item.modifiersText
-                          ?.split(',')
-                          .map((s) => s.trim())
-                          .where((s) => s.isNotEmpty)
-                          .toList() ??
-                      const [];
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Quantity badge — active blue (#90ABFF dim)
-                        Container(
-                          width: largeFont ? 30 : 24,
-                          height: largeFont ? 30 : 24,
-                          decoration: BoxDecoration(
-                            color: AppColors.accentDim,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Center(
-                            child: Text(
-                              item.quantity == item.quantity.roundToDouble()
-                                  ? item.quantity.toInt().toString()
-                                  : item.quantity.toString(),
-                              style: TextStyle(
-                                fontSize: largeFont ? 16 : 13,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary, // #90ABFF
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.productName,
-                                style: TextStyle(
-                                  fontSize: itemSize,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                  height: 1.3,
-                                ),
-                              ),
-                              // Modifiers
-                              ...mods.map(
-                                (mod) => Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    '\u2022 $mod',
-                                    style: TextStyle(
-                                      fontSize: modSize,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Special instructions — highlighted in yellow
-                              if (item.notes != null && item.notes!.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(
-                                    '\u26A0 ${item.notes}',
-                                    style: TextStyle(
-                                      fontSize: modSize,
-                                      color: AppColors.orange,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+              child: _buildGangGroupedItems(
+                ticket,
+                gangMap: gangMap,
+                largeFont: largeFont,
+                itemSize: itemSize,
+                modSize: modSize,
               ),
             ),
 
@@ -725,6 +657,196 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Gang-grouped items list
+  // -------------------------------------------------------------------------
+
+  /// Builds the items list for a ticket card, grouped by Gang when available.
+  ///
+  /// Items without a gangId are placed in an "Ungrouped" section.
+  /// Each Gang group shows a colored header row with the Gang name.
+  Widget _buildGangGroupedItems(
+    KitchenTicketEntity ticket, {
+    required Map<String, GangTemplateEntity> gangMap,
+    required bool largeFont,
+    required double itemSize,
+    required double modSize,
+  }) {
+    final items = ticket.items;
+    final hasGangs = gangMap.isNotEmpty &&
+        items.any((i) => i.gangId != null && gangMap.containsKey(i.gangId));
+
+    // Build a list of widgets: gang header + items per group
+    final widgets = <Widget>[];
+
+    if (!hasGangs) {
+      // No gang data — flat list (legacy / simple mode)
+      for (final item in items) {
+        widgets.add(_buildItemRow(item,
+            largeFont: largeFont, itemSize: itemSize, modSize: modSize));
+      }
+    } else {
+      // Group items by gangId (preserving sort order via LinkedHashMap)
+      final grouped = <String?, List<KitchenTicketItemEntity>>{};
+      for (final item in items) {
+        final key = (item.gangId != null && gangMap.containsKey(item.gangId))
+            ? item.gangId
+            : null;
+        grouped.putIfAbsent(key, () => []).add(item);
+      }
+
+      // Sort groups: known gangs by sortOrder, then null (ungrouped)
+      final sortedKeys = grouped.keys.toList()
+        ..sort((a, b) {
+          if (a == null && b == null) return 0;
+          if (a == null) return 1;
+          if (b == null) return -1;
+          final orderA = gangMap[a]?.sortOrder ?? 99;
+          final orderB = gangMap[b]?.sortOrder ?? 99;
+          return orderA.compareTo(orderB);
+        });
+
+      for (final key in sortedKeys) {
+        final groupItems = grouped[key]!;
+        final gang = key != null ? gangMap[key] : null;
+
+        // Gang header row
+        widgets.add(_buildGangHeader(gang, largeFont: largeFont));
+
+        // Items in this group
+        for (final item in groupItems) {
+          widgets.add(_buildItemRow(item,
+              largeFont: largeFont, itemSize: itemSize, modSize: modSize));
+        }
+
+        widgets.add(const SizedBox(height: 4));
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+      children: widgets,
+    );
+  }
+
+  Widget _buildGangHeader(GangTemplateEntity? gang, {required bool largeFont}) {
+    final color = gang?.flutterColor ?? AppColors.textSecondary;
+    final name = gang?.name ?? 'Andere';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, top: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            name.toUpperCase(),
+            style: TextStyle(
+              fontSize: largeFont ? 11 : 9,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(height: 1, color: color.withValues(alpha: 0.25)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemRow(
+    KitchenTicketItemEntity item, {
+    required bool largeFont,
+    required double itemSize,
+    required double modSize,
+  }) {
+    final mods = item.modifiersText
+            ?.split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList() ??
+        const [];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Quantity badge
+          Container(
+            width: largeFont ? 30 : 24,
+            height: largeFont ? 30 : 24,
+            decoration: BoxDecoration(
+              color: AppColors.accentDim,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Center(
+              child: Text(
+                item.quantity == item.quantity.roundToDouble()
+                    ? item.quantity.toInt().toString()
+                    : item.quantity.toString(),
+                style: TextStyle(
+                  fontSize: largeFont ? 16 : 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.productName,
+                  style: TextStyle(
+                    fontSize: itemSize,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    height: 1.3,
+                  ),
+                ),
+                ...mods.map(
+                  (mod) => Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      '\u2022 $mod',
+                      style: TextStyle(
+                          fontSize: modSize, color: AppColors.textSecondary),
+                    ),
+                  ),
+                ),
+                if (item.notes != null && item.notes!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '\u26A0 ${item.notes}',
+                      style: TextStyle(
+                        fontSize: modSize,
+                        color: AppColors.orange,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

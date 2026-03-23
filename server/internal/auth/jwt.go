@@ -13,10 +13,12 @@ import (
 
 // Claims holds the JWT payload fields used by GastroCore.
 type Claims struct {
-	TenantID string `json:"tenant_id,omitempty"`
-	DeviceID string `json:"device_id,omitempty"`
-	UserID   string `json:"user_id,omitempty"`
-	Role     string `json:"role,omitempty"` // device, admin, manager, waiter, cashier
+	TenantID   string `json:"tenant_id,omitempty"`   // organization / brand ID
+	DeviceID   string `json:"device_id,omitempty"`   // legacy device auth
+	UserID     string `json:"user_id,omitempty"`     // app_user or admin_user ID
+	StoreID    string `json:"store_id,omitempty"`    // store scope (empty = org-level)
+	DeviceType string `json:"device_type,omitempty"` // kds, kiosk, pos, waiter
+	Role       string `json:"role,omitempty"`        // brand_manager, store_manager, waiter, kiosk, kds, device, admin
 
 	// Standard JWT fields
 	Subject   string `json:"sub,omitempty"`
@@ -114,6 +116,12 @@ func (s *JWTService) ValidateToken(token string) (map[string]string, error) {
 	}
 	if claims.UserID != "" {
 		result["user_id"] = claims.UserID
+	}
+	if claims.StoreID != "" {
+		result["store_id"] = claims.StoreID
+	}
+	if claims.DeviceType != "" {
+		result["device_type"] = claims.DeviceType
 	}
 	if claims.Role != "" {
 		result["role"] = claims.Role
