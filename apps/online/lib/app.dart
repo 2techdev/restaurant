@@ -23,7 +23,7 @@ import 'package:gastrocore_online/screens/order_tracking_screen.dart';
 final _router = GoRouter(
   initialLocation: '/',
   redirect: (context, state) {
-    // Root without restaurant ID → redirect to demo restaurant
+    // Root without restaurant ID → demo restaurant
     if (state.uri.path == '/') return '/demo';
     return null;
   },
@@ -161,7 +161,7 @@ class _NoRestaurantPage extends StatelessWidget {
             Icon(Icons.qr_code_2, size: 80, color: OnlineColors.primary),
             SizedBox(height: 16),
             Text(
-              'Scan the QR code at your table\nto view the menu.',
+              'QR-Code am Tisch scannen,\num die Speisekarte zu öffnen.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 18,

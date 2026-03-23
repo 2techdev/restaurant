@@ -18,8 +18,13 @@ void main() {
 
 /// Builds the appropriate API client based on the current hostname.
 /// - localhost / 127.*  → real ApiClient → http://localhost:8080 (mock_server.py)
+/// - pos.2tech.ch       → MockApiClient  → embedded Swiss demo data
 /// - gastrocore.ch      → real ApiClient → https://api.gastrocore.ch
 /// - everything else    → MockApiClient  → embedded demo data, no backend needed
+///
+/// To connect pos.2tech.ch to the real backend once it's configured:
+/// change the 2tech.ch branch to:
+///   return ApiClient(baseUrl: 'https://pos.2tech.ch');
 ApiClient _buildApiClient() {
   try {
     // ignore: undefined_prefixed_name
@@ -31,7 +36,6 @@ ApiClient _buildApiClient() {
       return ApiClient(baseUrl: 'https://api.gastrocore.ch');
     }
   } catch (_) {}
-  // GitHub Pages, pos.2tech.ch (before backend is live), or any other host:
-  // use embedded demo data so the app works without a backend.
+  // pos.2tech.ch and all other hosts → demo mode with embedded Swiss data
   return MockApiClient();
 }
