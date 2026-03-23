@@ -49,18 +49,19 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
   // Shows a brief "Saved" indicator after a position is persisted to SQLite.
   String? _savedLabel;
 
+  // Stitch status colors
   Color _statusColor(TableStatus status) => switch (status) {
-        TableStatus.available => AppColors.green,
-        TableStatus.occupied => AppColors.primary,
-        TableStatus.reserved => AppColors.orange,
-        TableStatus.dirty => AppColors.red,
+        TableStatus.available => AppColors.green,     // #69F6B8
+        TableStatus.occupied => AppColors.coral,      // #FF6F7E (BUSY)
+        TableStatus.reserved => AppColors.orange,     // #FFAB4E
+        TableStatus.dirty => AppColors.yellow,        // #FFD166
       };
 
   String _statusLabel(TableStatus status) => switch (status) {
-        TableStatus.available => 'Free',
-        TableStatus.occupied => 'Occupied',
-        TableStatus.reserved => 'Reserved',
-        TableStatus.dirty => 'Dirty',
+        TableStatus.available => 'AVAILABLE',
+        TableStatus.occupied => 'BUSY',
+        TableStatus.reserved => 'RESERVED',
+        TableStatus.dirty => 'CHECK',
       };
 
   @override
@@ -145,7 +146,7 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
     return Container(
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      color: AppColors.surface,
+      color: AppColors.surfaceContainerLow,
       child: Row(
         children: [
           ...navItems.asMap().entries.map((entry) {
@@ -307,7 +308,7 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
       List<FloorEntity> floors, String? selectedFloorId, bool editMode) {
     return Container(
       width: 180,
-      color: AppColors.surface,
+      color: AppColors.surfaceContainerLow,
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -594,13 +595,14 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
 
   Widget _buildFloorGrid(List<RestaurantTableEntity> tables) {
     return LayoutBuilder(builder: (context, constraints) {
-      final cols = (constraints.maxWidth / 160).floor().clamp(2, 6);
+      // Stitch: 3-4 columns for table map
+      final cols = (constraints.maxWidth / 200).floor().clamp(3, 4);
       return GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.4,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 1.3,
         ),
         itemCount: tables.length,
         itemBuilder: (_, i) => _buildTableTile(tables[i]),
@@ -609,50 +611,67 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
   }
 
   Widget _buildTableTile(RestaurantTableEntity table) {
-    final borderColor = _statusColor(table.status);
+    final statusColor = _statusColor(table.status);
     final isRound = table.shape == TableShape.circle;
 
     return GestureDetector(
       onTap: () => _onTableTap(table),
       onLongPress: () => showTableDetailSheet(context, table),
       child: Container(
+        // Stitch: bg surfaceContainerHigh (#1C2028), no border
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
+          color: AppColors.surfaceContainerHigh,
           borderRadius: isRound
               ? BorderRadius.circular(100)
-              : BorderRadius.circular(12),
-          border:
-              Border.all(color: borderColor.withValues(alpha: 0.6), width: 2),
+              : BorderRadius.circular(4),
         ),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Table number — huge, font-black
             Text(
               table.name,
               style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary),
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
+              ),
             ),
             const SizedBox(height: 4),
-            Text(
-              _statusLabel(table.status),
-              style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: borderColor),
+            // Status badge
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                _statusLabel(table.status),
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  color: statusColor,
+                  letterSpacing: 0.6,
+                ),
+              ),
             ),
             const SizedBox(height: 4),
+            // Guest / seat count
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.person_rounded,
-                    size: 12, color: AppColors.textDim),
+                    size: 11, color: AppColors.textDim),
                 const SizedBox(width: 2),
-                Text('${table.capacity}',
-                    style: const TextStyle(
-                        fontSize: 10, color: AppColors.textDim)),
+                Text(
+                  '${table.capacity}',
+                  style: const TextStyle(
+                      fontSize: 10, color: AppColors.textDim),
+                ),
               ],
             ),
           ],
@@ -849,7 +868,7 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
     return Container(
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      color: AppColors.surface,
+      color: AppColors.surfaceContainerLow,
       child: Row(
         children: [
           _BottomStat(Icons.event_seat_rounded, 'Seats: $totalSeats'),

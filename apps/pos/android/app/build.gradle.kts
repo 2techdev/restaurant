@@ -85,10 +85,10 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = keyProperties["keyAlias"] as String
-            keyPassword = keyProperties["keyPassword"] as String
-            storeFile = keyProperties["storeFile"]?.let { rootProject.file(it) }
-            storePassword = keyProperties["storePassword"] as String
+            keyAlias = keyProperties["keyAlias"] as? String ?: ""
+            keyPassword = keyProperties["keyPassword"] as? String ?: ""
+            storeFile = (keyProperties["storeFile"] as? String)?.let { rootProject.file(it) }
+            storePassword = keyProperties["storePassword"] as? String ?: ""
         }
     }
 
