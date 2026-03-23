@@ -37,6 +37,9 @@ import 'tables/tenants.dart';
 import 'tables/tickets.dart';
 import 'tables/users.dart';
 import 'tables/license_tokens.dart';
+import 'tables/fiscal_signatures.dart';
+import 'tables/lan_sync_peers.dart';
+import 'tables/manager_pins.dart';
 
 part 'app_database.g.dart';
 
@@ -71,6 +74,9 @@ part 'app_database.g.dart';
     ProductSpecifications,
     LicenseTokens,
     DayCloseSummaries,
+    FiscalSignatures,
+    LanSyncPeers,
+    ManagerPins,
   ],
   daos: [AuditLogDao, SyncEventDao],
 )
@@ -78,7 +84,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -102,6 +108,63 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         // Add day_close_summaries table introduced in v6.
         await m.createTable(dayCloseSummaries);
+      }
+      if (from < 7) {
+        // v7: new tables for fiscal signing (Germany TSE), LAN peer sync,
+        // and manager PIN audit trail.
+        await m.createTable(fiscalSignatures);
+        await m.createTable(lanSyncPeers);
+        await m.createTable(managerPins);
+
+        // Performance indexes on high-frequency query columns.
+        // tickets: status filter + date range queries.
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_tickets_tenant_status '
+          'ON tickets (tenant_id, status) '
+          'WHERE is_deleted = 0',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_tickets_tenant_opened_at '
+          'ON tickets (tenant_id, opened_at DESC) '
+          'WHERE is_deleted = 0',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_tickets_table_id '
+          'ON tickets (table_id) '
+          'WHERE table_id IS NOT NULL AND is_deleted = 0',
+        );
+        // order_items: look up items by ticket.
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_order_items_ticket_id '
+          'ON order_items (ticket_id) '
+          'WHERE is_deleted = 0',
+        );
+        // payments: join from ticket or bill.
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_payments_ticket_id '
+          'ON payments (ticket_id) '
+          'WHERE is_deleted = 0',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_payments_bill_id '
+          'ON payments (bill_id) '
+          'WHERE is_deleted = 0',
+        );
+        // audit_log: tenant + timestamp for chronological queries.
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_audit_log_tenant_timestamp '
+          'ON audit_log (tenant_id, timestamp DESC)',
+        );
+        // license_tokens: quick look-up of active token per tenant.
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_license_tokens_tenant_active '
+          'ON license_tokens (tenant_id, is_active)',
+        );
+        // fiscal_signatures: look up by receipt.
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_fiscal_signatures_receipt_id '
+          'ON fiscal_signatures (receipt_id)',
+        );
       }
     },
     onCreate: (m) async {
