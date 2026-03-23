@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — GastroCore POS</title>
+  <style>
+    :root {
+      --orange: #FF6B35;
+      --orange-dark: #E55A25;
+      --orange-light: #FFF0EB;
+      --text: #1A1A2E;
+      --text-light: #555;
+      --border: #E0E0E0;
+      --bg: #FAFAFA;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+    header {
+      background: linear-gradient(135deg, var(--orange) 0%, var(--orange-dark) 100%);
+      color: white;
+      padding: 2rem 0;
+    }
+    .header-inner {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      text-decoration: none;
+      color: white;
+    }
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+    .logo-name { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-name span { font-weight: 300; opacity: 0.85; }
+    header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.4rem; }
+    header p { opacity: 0.85; font-size: 0.95rem; }
+    .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 0.2rem 0.75rem;
+      font-size: 0.8rem;
+      margin-top: 0.75rem;
+      margin-right: 0.4rem;
+    }
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 3rem 2rem;
+    }
+    .toc {
+      background: var(--orange-light);
+      border-left: 4px solid var(--orange);
+      border-radius: 0 8px 8px 0;
+      padding: 1.5rem 2rem;
+      margin-bottom: 3rem;
+    }
+    .toc h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--orange-dark); }
+    .toc ol { padding-left: 1.2rem; }
+    .toc li { margin-bottom: 0.3rem; }
+    .toc a { color: var(--orange-dark); text-decoration: none; font-size: 0.9rem; }
+    .toc a:hover { text-decoration: underline; }
+    section { margin-bottom: 3rem; }
+    h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--orange-light);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    h2 .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: var(--orange);
+      color: white;
+      border-radius: 50%;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+    }
+    h3 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--text); }
+    p { margin-bottom: 0.9rem; color: var(--text-light); }
+    ul, ol { margin: 0.5rem 0 1rem 1.5rem; color: var(--text-light); }
+    li { margin-bottom: 0.35rem; }
+    .highlight-box {
+      background: var(--orange-light);
+      border: 1px solid #FFD5C2;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+    .highlight-box strong { color: var(--orange-dark); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th {
+      background: var(--orange);
+      color: white;
+      padding: 0.6rem 1rem;
+      text-align: left;
+      font-weight: 600;
+    }
+    td {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-light);
+    }
+    tr:nth-child(even) td { background: #f8f8f8; }
+    .contact-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+    }
+    .contact-card p { margin: 0.2rem 0; }
+    footer {
+      background: var(--text);
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.85rem;
+      margin-top: 2rem;
+    }
+    footer a { color: var(--orange); text-decoration: none; }
+    @media (max-width: 600px) {
+      main { padding: 2rem 1rem; }
+      header h1 { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="logo" href="/">
+      <div class="logo-icon">🍽️</div>
+      <div class="logo-name">Gastro<span>Core</span> POS</div>
+    </a>
+    <h1>Privacy Policy</h1>
+    <p>Your data, your rights — transparent and compliant.</p>
+    <span class="badge">GDPR</span>
+    <span class="badge">Swiss nDSG</span>
+    <span class="badge">Last updated: March 2026</span>
+  </div>
+</header>
+
+<main>
+
+  <div class="toc">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#controller">Data Controller</a></li>
+      <li><a href="#collection">Data We Collect</a></li>
+      <li><a href="#offline">Offline Storage</a></li>
+      <li><a href="#cloud">Cloud Synchronisation</a></li>
+      <li><a href="#third-party">Third-Party Services</a></li>
+      <li><a href="#analytics">Analytics</a></li>
+      <li><a href="#retention">Data Retention</a></li>
+      <li><a href="#rights">Your Rights</a></li>
+      <li><a href="#security">Security</a></li>
+      <li><a href="#children">Children's Privacy</a></li>
+      <li><a href="#changes">Changes to This Policy</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ol>
+  </div>
+
+  <section id="controller">
+    <h2><span class="num">1</span> Data Controller</h2>
+    <p>GastroCore POS is operated by <strong>2TechHub GmbH</strong> ("we", "us", "our"), a company registered in Switzerland. We are the data controller for all personal data processed through the GastroCore POS application and associated services.</p>
+    <div class="contact-card">
+      <p><strong>2TechHub GmbH</strong></p>
+      <p>Switzerland</p>
+      <p>Email: <a href="mailto:privacy@gastrocore.ch">privacy@gastrocore.ch</a></p>
+      <p>Data Protection Officer: <a href="mailto:dpo@gastrocore.ch">dpo@gastrocore.ch</a></p>
+    </div>
+  </section>
+
+  <section id="collection">
+    <h2><span class="num">2</span> Data We Collect</h2>
+    <p>We collect only the data necessary to provide the GastroCore POS service. The categories of data we process are:</p>
+
+    <h3>2.1 Business & Operator Data</h3>
+    <ul>
+      <li>Restaurant name, address, and contact information</li>
+      <li>VAT/UID number for MWST compliance</li>
+      <li>Subscription and billing information</li>
+      <li>Staff accounts: name, email, role, PIN hash</li>
+    </ul>
+
+    <h3>2.2 Transaction Data</h3>
+    <ul>
+      <li>Order details: items, quantities, prices, modifiers</li>
+      <li>Payment records: amount, method, timestamp (no full card numbers stored)</li>
+      <li>Table assignments and session data</li>
+      <li>Receipt copies for statutory retention</li>
+    </ul>
+
+    <h3>2.3 Customer Data (Online Ordering)</h3>
+    <ul>
+      <li>Name and email address (for order confirmation)</li>
+      <li>Delivery address (if delivery is enabled)</li>
+      <li>Phone number (optional, for order updates)</li>
+      <li>Order history (retained per customer request or statutory requirement)</li>
+    </ul>
+
+    <h3>2.4 Device & Technical Data</h3>
+    <ul>
+      <li>Device identifier and OS version (for app diagnostics)</li>
+      <li>App version and crash logs (anonymised)</li>
+      <li>IP address (for cloud sync connections, not stored long-term)</li>
+    </ul>
+
+    <div class="highlight-box">
+      <strong>We do not sell your data.</strong> We do not sell, rent, or trade any personal data to third parties for marketing purposes.
+    </div>
+  </section>
+
+  <section id="offline">
+    <h2><span class="num">3</span> Offline Storage</h2>
+    <p>GastroCore POS is designed with an <strong>offline-first architecture</strong>. All operational data — orders, menu, staff sessions — is stored locally on your device using an encrypted local database (SQLite with SQLCipher).</p>
+    <ul>
+      <li>Local data is encrypted at rest using AES-256</li>
+      <li>No internet connection is required for core POS operations</li>
+      <li>Local data is never shared with third parties without your explicit action (e.g., cloud sync)</li>
+      <li>Data remains on your device until you explicitly delete it or uninstall the app</li>
+    </ul>
+    <p>The operator (restaurant owner/manager) is responsible for securing access to the physical device on which GastroCore POS is installed.</p>
+  </section>
+
+  <section id="cloud">
+    <h2><span class="num">4</span> Cloud Synchronisation</h2>
+    <p>Cloud sync is <strong>optional</strong>. When enabled, your data is synchronised to our secure cloud infrastructure hosted in Switzerland (ISO 27001 certified data centres).</p>
+
+    <h3>What is synced (when cloud sync is enabled)</h3>
+    <ul>
+      <li>Transaction records and sales data</li>
+      <li>Menu configuration</li>
+      <li>Staff accounts and permissions</li>
+      <li>Device configuration</li>
+    </ul>
+
+    <h3>Data transfer safeguards</h3>
+    <ul>
+      <li>All data in transit is encrypted using TLS 1.3</li>
+      <li>Data at rest in the cloud is encrypted using AES-256</li>
+      <li>Data is processed within Switzerland or the EU/EEA</li>
+      <li>Any transfers outside Switzerland comply with Swiss nDSG Chapter 5 requirements</li>
+    </ul>
+
+    <p>You can disable cloud sync at any time in the app settings. Existing cloud data can be deleted upon request (see Section 8 — Your Rights).</p>
+  </section>
+
+  <section id="third-party">
+    <h2><span class="num">5</span> Third-Party Services</h2>
+    <p>GastroCore POS integrates with the following third-party services. Each has its own privacy policy.</p>
+
+    <table>
+      <tr>
+        <th>Service</th>
+        <th>Purpose</th>
+        <th>Data Shared</th>
+        <th>Location</th>
+      </tr>
+      <tr>
+        <td><strong>Wallee AG</strong></td>
+        <td>Payment processing</td>
+        <td>Transaction amount, currency, order reference</td>
+        <td>Switzerland</td>
+      </tr>
+      <tr>
+        <td><strong>MyPOS</strong></td>
+        <td>Card terminal integration</td>
+        <td>Transaction amount, terminal ID</td>
+        <td>EU</td>
+      </tr>
+      <tr>
+        <td><strong>Firebase (Google)</strong></td>
+        <td>Crash reporting &amp; app diagnostics</td>
+        <td>Anonymised crash logs, device type</td>
+        <td>EU</td>
+      </tr>
+      <tr>
+        <td><strong>Google Play</strong></td>
+        <td>App distribution</td>
+        <td>App install/update events</td>
+        <td>Global (Google)</td>
+      </tr>
+    </table>
+
+    <p>Wallee AG and MyPOS act as independent data controllers for payment data under PCI-DSS standards. GastroCore does not store full card numbers, CVV codes, or complete PAN data.</p>
+  </section>
+
+  <section id="analytics">
+    <h2><span class="num">6</span> Analytics</h2>
+    <p>We collect limited, anonymised analytics to improve the app's stability and performance:</p>
+    <ul>
+      <li><strong>Crash reporting</strong> via Firebase Crashlytics — anonymised stack traces, no personal data</li>
+      <li><strong>Performance metrics</strong> — app load times, sync durations (aggregated, not per-user)</li>
+      <li><strong>Feature usage</strong> — which screens are used (aggregated counters only)</li>
+    </ul>
+    <p>We do not use behavioural advertising or cross-app tracking. Analytics data cannot be used to identify individual end customers of the restaurant.</p>
+    <p>You can opt out of analytics in the app settings under <em>Settings → Privacy → Analytics</em>.</p>
+  </section>
+
+  <section id="retention">
+    <h2><span class="num">7</span> Data Retention</h2>
+    <table>
+      <tr>
+        <th>Data Category</th>
+        <th>Retention Period</th>
+        <th>Basis</th>
+      </tr>
+      <tr>
+        <td>Transaction records</td>
+        <td>10 years</td>
+        <td>Swiss OR Art. 958f (accounting obligation)</td>
+      </tr>
+      <tr>
+        <td>Customer order data</td>
+        <td>3 years (or on deletion request)</td>
+        <td>Contractual / statutory</td>
+      </tr>
+      <tr>
+        <td>Staff accounts</td>
+        <td>Until account deletion</td>
+        <td>Contractual</td>
+      </tr>
+      <tr>
+        <td>Crash logs</td>
+        <td>90 days</td>
+        <td>Legitimate interest (app stability)</td>
+      </tr>
+      <tr>
+        <td>Marketing emails</td>
+        <td>Until unsubscribe</td>
+        <td>Consent</td>
+      </tr>
+    </table>
+    <p>Data required for statutory accounting obligations (Swiss OR) may be retained for the legally required period even after account closure.</p>
+  </section>
+
+  <section id="rights">
+    <h2><span class="num">8</span> Your Rights</h2>
+    <p>Under GDPR (for EU/EEA residents) and the Swiss Federal Act on Data Protection (nDSG), you have the following rights:</p>
+    <ul>
+      <li><strong>Right of access</strong> — Obtain a copy of the personal data we hold about you</li>
+      <li><strong>Right to rectification</strong> — Correct inaccurate or incomplete data</li>
+      <li><strong>Right to erasure</strong> — Request deletion of your personal data ("right to be forgotten"), subject to statutory retention obligations</li>
+      <li><strong>Right to restriction</strong> — Restrict processing while a dispute is resolved</li>
+      <li><strong>Right to data portability</strong> — Receive your data in a structured, machine-readable format</li>
+      <li><strong>Right to object</strong> — Object to processing based on legitimate interests</li>
+      <li><strong>Right to withdraw consent</strong> — Withdraw consent at any time where processing is consent-based</li>
+    </ul>
+    <p>To exercise any of these rights, contact us at <a href="mailto:privacy@gastrocore.ch">privacy@gastrocore.ch</a>. We will respond within 30 days.</p>
+    <p>You also have the right to lodge a complaint with the <strong>Federal Data Protection and Information Commissioner (FDPIC)</strong> in Switzerland, or your local supervisory authority within the EU/EEA.</p>
+  </section>
+
+  <section id="security">
+    <h2><span class="num">9</span> Security</h2>
+    <p>We implement technical and organisational measures to protect your data:</p>
+    <ul>
+      <li>AES-256 encryption for data at rest (local device and cloud)</li>
+      <li>TLS 1.3 for all data in transit</li>
+      <li>Role-based access controls and least-privilege principles</li>
+      <li>Regular security audits and penetration testing</li>
+      <li>Incident response plan with 72-hour breach notification (per GDPR Art. 33)</li>
+      <li>Staff trained in data protection annually</li>
+    </ul>
+    <p>No system is completely secure. If you discover a security vulnerability, please report it responsibly to <a href="mailto:security@gastrocore.ch">security@gastrocore.ch</a>.</p>
+  </section>
+
+  <section id="children">
+    <h2><span class="num">10</span> Children's Privacy</h2>
+    <p>GastroCore POS is a business application intended for use by restaurant operators and staff. It is not directed at children under the age of 16. We do not knowingly collect personal data from children. If you believe a child has provided us with personal data, please contact us immediately at <a href="mailto:privacy@gastrocore.ch">privacy@gastrocore.ch</a>.</p>
+  </section>
+
+  <section id="changes">
+    <h2><span class="num">11</span> Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. When we make material changes, we will notify you via:</p>
+    <ul>
+      <li>An in-app notification</li>
+      <li>Email to the registered account holder</li>
+      <li>A notice on this page with an updated "Last modified" date</li>
+    </ul>
+    <p>Your continued use of GastroCore POS after the effective date of changes constitutes your acceptance of the updated policy.</p>
+    <p><strong>Last modified:</strong> March 2026 | <strong>Effective date:</strong> March 2026</p>
+  </section>
+
+  <section id="contact">
+    <h2><span class="num">12</span> Contact</h2>
+    <p>For any questions about this Privacy Policy or to exercise your data rights:</p>
+    <div class="contact-card">
+      <p><strong>2TechHub GmbH — Data Protection</strong></p>
+      <p>Email: <a href="mailto:privacy@gastrocore.ch">privacy@gastrocore.ch</a></p>
+      <p>DPO: <a href="mailto:dpo@gastrocore.ch">dpo@gastrocore.ch</a></p>
+      <p>Security: <a href="mailto:security@gastrocore.ch">security@gastrocore.ch</a></p>
+      <p>Response time: within 30 days</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>&copy; 2026 2TechHub GmbH — GastroCore POS. All rights reserved.</p>
+  <p style="margin-top:0.5rem;">
+    <a href="/privacy-policy.html">Privacy Policy</a> &nbsp;·&nbsp;
+    <a href="/terms.html">Terms of Service</a>
+  </p>
+</footer>
+
+</body>
+</html>
