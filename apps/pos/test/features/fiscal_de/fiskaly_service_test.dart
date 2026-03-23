@@ -11,6 +11,7 @@ import 'package:gastrocore_pos/features/fiscal_de/fiskaly_service.dart';
 // Helpers
 // ---------------------------------------------------------------------------
 
+// ignore: unused_element
 http.Client _mockClient(Map<String, Map<String, dynamic>> responses) {
   return MockClient((request) async {
     final path = request.url.path;

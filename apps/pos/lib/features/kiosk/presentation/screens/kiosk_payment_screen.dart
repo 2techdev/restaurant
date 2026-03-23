@@ -60,7 +60,7 @@ class _KioskPaymentScreenState extends ConsumerState<KioskPaymentScreen> {
     });
 
     try {
-      final orderNumber = await _submitOrder();
+      await _submitOrder();
       if (mounted) context.go(KioskRoutes.confirmation);
     } catch (e) {
       if (mounted) {

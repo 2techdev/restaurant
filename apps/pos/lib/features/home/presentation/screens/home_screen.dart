@@ -113,6 +113,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 // Sidebar (96 px, icon-based navigation)
 // ---------------------------------------------------------------------------
 
+// ignore: unused_element
 class _Sidebar extends StatelessWidget {
   final ShiftEntity? shift;
   const _Sidebar({required this.shift});

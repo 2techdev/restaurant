@@ -147,6 +147,7 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
   }
 
   /// Whether the current user needs a manager (not admin) approval.
+  // ignore: unused_element
   bool _requiresManagerApproval(UserEntity? user) {
     final pct = _effectivePct();
     if (user == null) return pct > 0;

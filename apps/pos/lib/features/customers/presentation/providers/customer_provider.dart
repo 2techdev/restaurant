@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/customers/data/repositories/customer_repository_impl.dart';
