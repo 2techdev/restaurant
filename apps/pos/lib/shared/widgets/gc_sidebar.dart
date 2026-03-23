@@ -32,12 +32,14 @@ class GcNavItem {
     required this.activeIcon,
     required this.label,
     required this.route,
+    this.itemKey,
   });
 
   final IconData icon;
   final IconData activeIcon;
   final String label;
   final String route;
+  final Key? itemKey;
 }
 
 const List<GcNavItem> _kNavItems = [
@@ -46,6 +48,7 @@ const List<GcNavItem> _kNavItems = [
     activeIcon: Icons.receipt_long,
     label: 'Orders',
     route: '/order-center',
+    itemKey: Key('module_order'),
   ),
   GcNavItem(
     icon: Icons.table_restaurant_outlined,
@@ -148,6 +151,7 @@ class GcSidebar extends StatelessWidget {
                 final item = _kNavItems[index];
                 final isActive = activeRoute.startsWith(item.route);
                 return _GcNavTile(
+                  key: item.itemKey,
                   item: item,
                   isActive: isActive,
                   onTap: () => context.go(item.route),
@@ -206,6 +210,7 @@ class GcSidebar extends StatelessWidget {
 
 class _GcNavTile extends StatefulWidget {
   const _GcNavTile({
+    super.key,
     required this.item,
     required this.isActive,
     required this.onTap,

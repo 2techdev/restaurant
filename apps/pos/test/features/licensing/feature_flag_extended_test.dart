@@ -192,8 +192,8 @@ void main() {
       }
     });
 
-    test('14 total features defined', () {
-      expect(AppFeature.values.length, equals(14));
+    test('17 total features defined', () {
+      expect(AppFeature.values.length, equals(17));
     });
   });
 

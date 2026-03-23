@@ -58,8 +58,8 @@ void main() {
       }
     });
 
-    test('covers 15 distinct actions', () {
-      expect(AuditAction.values.length, equals(15));
+    test('covers 21 distinct actions', () {
+      expect(AuditAction.values.length, equals(21));
     });
   });
 

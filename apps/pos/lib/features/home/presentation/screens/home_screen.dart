@@ -262,22 +262,25 @@ class _TopBar extends StatelessWidget {
         children: [
           const Flexible(
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'Gastro',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary, letterSpacing: -0.5,
+                Flexible(
+                  child: Text(
+                    'Gastro',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary, letterSpacing: -0.5,
+                    ),
                   ),
                 ),
-                Text(
-                  'Core POS',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w900,
-                    color: AppColors.primary, letterSpacing: -0.5,
+                Flexible(
+                  child: Text(
+                    'Core POS',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.w900,
+                      color: AppColors.primary, letterSpacing: -0.5,
+                    ),
                   ),
                 ),
               ],
