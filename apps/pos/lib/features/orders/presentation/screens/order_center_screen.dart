@@ -96,9 +96,9 @@ class _OrderCenterScreenState extends ConsumerState<OrderCenterScreen> {
   Widget _buildTopBar(String userName) {
     return Container(
       height: 56,
-      color: AppColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: const BoxDecoration(
+        color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(

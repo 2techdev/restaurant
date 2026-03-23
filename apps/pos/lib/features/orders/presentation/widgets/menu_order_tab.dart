@@ -344,7 +344,7 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
                     crossAxisCount: crossAxisCount,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childAspectRatio: _showPictures ? 0.82 : 1.0,
+                    childAspectRatio: 0.82,
                   ),
                   itemCount: sorted.length,
                   itemBuilder: (context, index) {
@@ -1004,7 +1004,8 @@ class _ProductCardState extends State<_ProductCard> {
   }
 
   Widget _buildImageCard(ProductEntity p) {
-    final hasImage = p.imagePath != null && p.imagePath!.isNotEmpty;
+    final path = p.imagePath;
+    final isNetworkImage = path != null && path.isNotEmpty && path.startsWith('http');
 
     return Container(
       decoration: BoxDecoration(
@@ -1019,10 +1020,25 @@ class _ProductCardState extends State<_ProductCard> {
           Expanded(
             child: SizedBox(
               width: double.infinity,
-              child: hasImage
+              child: isNetworkImage
                   ? Image.network(
-                      p.imagePath!,
+                      path,
                       fit: BoxFit.cover,
+                      cacheWidth: 200,
+                      cacheHeight: 250,
+                      loadingBuilder: (_, child, progress) {
+                        if (progress == null) return child;
+                        return Container(
+                          color: _Tok.surfaceHigh,
+                          child: const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        );
+                      },
                       errorBuilder: (_, __, ___) => _buildPlaceholder(p),
                     )
                   : _buildPlaceholder(p),
@@ -1070,29 +1086,40 @@ class _ProductCardState extends State<_ProductCard> {
         color: _Tok.surfaceMedium,
         borderRadius: BorderRadius.circular(12),
       ),
-      padding: const EdgeInsets.all(12),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            p.name,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: _Tok.textPrimary,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              p.name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _Tok.textPrimary,
+                height: 1.3,
+              ),
             ),
           ),
           if (widget.showPrice) ...[
-            const SizedBox(height: 6),
-            Text(
-              _formatPrice(p.price),
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: _Tok.accentBlueLight,
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _Tok.accentBlue.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _formatPrice(p.price),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: _Tok.accentBlueLight,
+                ),
               ),
             ),
           ],

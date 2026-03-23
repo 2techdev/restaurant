@@ -67,6 +67,9 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
   Widget build(BuildContext context) {
     final floorsAsync = ref.watch(floorsProvider);
     final editMode = ref.watch(tableEditModeProvider);
+    // Must be watched unconditionally (not inside when()) to avoid
+    // _dependents.isEmpty assertion when async state transitions.
+    final selectedFloorId = ref.watch(selectedFloorProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDim, // base void
@@ -80,7 +83,6 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
         ),
         data: (floors) {
           // Auto-select the first floor.
-          final selectedFloorId = ref.watch(selectedFloorProvider);
           if (selectedFloorId == null && floors.isNotEmpty) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               ref.read(selectedFloorProvider.notifier).state = floors.first.id;
