@@ -1,146 +1,213 @@
+// Package fiscal provides German KassenSichV (§146a AO) fiscal compliance
+// via the Fiskaly SIGN DE middleware API v2.
 package fiscal
 
 import "time"
 
 // ---------------------------------------------------------------------------
-// Auth
+// Fiskaly API request/response types
 // ---------------------------------------------------------------------------
 
-// AuthRequest is the payload for the Fiskaly /auth endpoint.
+// AuthRequest is the body sent to POST /api/v2/auth.
 type AuthRequest struct {
 	APIKey    string `json:"api_key"`
 	APISecret string `json:"api_secret"`
 }
 
-// AuthResponse is the Fiskaly /auth response.
+// AuthResponse is returned by POST /api/v2/auth.
 type AuthResponse struct {
-	AccessToken                string `json:"access_token"`
-	AccessTokenExpiresInSeconds int64  `json:"access_token_expires_in_seconds"`
+	AccessToken                  string `json:"access_token"`
+	AccessTokenExpiresInSeconds  int    `json:"access_token_expires_in_seconds"`
+	RefreshToken                 string `json:"refresh_token"`
 }
 
-// ---------------------------------------------------------------------------
-// TSS
-// ---------------------------------------------------------------------------
-
-// TSSState represents the lifecycle state of a TSS.
+// TSSState represents the lifecycle state of a TSS (Technical Security System).
 type TSSState string
 
 const (
-	TSSStateCreated      TSSState = "CREATED"
-	TSSStateInitialized  TSSState = "INITIALIZED"
-	TSSStateActive       TSSState = "ACTIVE"
-	TSSStateDeactivated  TSSState = "DEACTIVATED"
-	TSSStateDisabled     TSSState = "DISABLED"
+	TSSStateCreated     TSSState = "CREATED"
+	TSSStateInitialized TSSState = "INITIALIZED"
+	TSSStateActive      TSSState = "ACTIVE"
+	TSSStateDisabled    TSSState = "DISABLED"
 )
 
-// TSSInfo represents the state of a Technical Security System (TSS) from Fiskaly.
+// TSSInfo is the response from GET /api/v2/tss/{tss_id}.
 type TSSInfo struct {
-	TSSID        string   `json:"_id"`
-	State        TSSState `json:"state"`
-	Description  string   `json:"description"`
-	SerialNumber string   `json:"serial_number,omitempty"`
-	PublicKey    string   `json:"public_key,omitempty"`
+	ID                 string    `json:"_id"`
+	State              TSSState  `json:"state"`
+	Description        string    `json:"description"`
+	SerialNumber       string    `json:"serial_number"`
+	SignatureAlgorithm string    `json:"signature_algorithm"`
+	SignatureCounter   int64     `json:"signature_counter"`
+	TimeCreation       time.Time `json:"time_creation"`
 }
 
-// CreateTSSRequest is the payload for creating/updating a TSS.
+// CreateTSSRequest is the body for PUT /api/v2/tss/{tss_id}.
 type CreateTSSRequest struct {
-	Description string `json:"description"`
+	Description string `json:"description,omitempty"`
 }
 
-// UpdateTSSRequest is the payload for transitioning a TSS state.
+// UpdateTSSRequest is the body for PATCH /api/v2/tss/{tss_id}.
 type UpdateTSSRequest struct {
 	State    TSSState `json:"state"`
-	AdminPin string   `json:"admin_puk,omitempty"`
+	AdminPin string   `json:"admin_pin,omitempty"`
 }
 
-// ClientRegistrationRequest is the payload for registering a POS client.
+// ClientRegistrationRequest is the body for PUT /api/v2/tss/{tss_id}/client/{client_id}.
 type ClientRegistrationRequest struct {
 	SerialNumber string `json:"serial_number"`
 }
 
-// ---------------------------------------------------------------------------
-// Transactions
-// ---------------------------------------------------------------------------
-
-// TransactionState represents the lifecycle state of a transaction.
+// TransactionState represents the state of a Fiskaly transaction.
 type TransactionState string
 
 const (
 	TransactionStateActive   TransactionState = "ACTIVE"
 	TransactionStateFinished TransactionState = "FINISHED"
-	TransactionStateFailed   TransactionState = "FAILED"
 )
 
-// AmountPerVatRate represents an amount broken down by VAT rate.
-type AmountPerVatRate struct {
-	VATRate string  `json:"vat_rate"`
-	Amount  string  `json:"amount"`
-}
-
-// AmountPerPaymentType represents an amount broken down by payment type.
-type AmountPerPaymentType struct {
-	PaymentType string `json:"payment_type"`
-	Amount      string `json:"amount"`
-}
-
-// ReceiptSchema is the DSFinV-K receipt process data.
-type ReceiptSchema struct {
-	ReceiptType           string                 `json:"receipt_type"`
-	AmountsPerVatRate     []AmountPerVatRate     `json:"amounts_per_vat_rate"`
-	AmountsPerPaymentType []AmountPerPaymentType `json:"amounts_per_payment_type"`
-}
-
-// StandardV1Schema wraps the receipt for the standard_v1 schema.
-type StandardV1Schema struct {
-	Receipt ReceiptSchema `json:"receipt"`
-}
-
-// TransactionSchema is the schema field in a finish-transaction request.
-type TransactionSchema struct {
-	StandardV1 StandardV1Schema `json:"standard_v1"`
-}
-
-// StartTransactionRequest is the payload to open a transaction (revision 1).
+// StartTransactionRequest is the body for PUT /api/v2/tss/{tss_id}/tx/{tx_id}?tx_revision=1.
 type StartTransactionRequest struct {
 	State    TransactionState `json:"state"`
 	ClientID string           `json:"client_id"`
 }
 
-// FinishTransactionRequest is the payload to close and sign a transaction.
+// AmountPerVatRate holds the VAT breakdown for one tax rate.
+type AmountPerVatRate struct {
+	VatRate string `json:"vat_rate"` // e.g. "19.00", "7.00", "NULL"
+	Amount  string `json:"amount"`   // EUR amount as string e.g. "12.50"
+}
+
+// AmountPerPaymentType holds the payment breakdown.
+type AmountPerPaymentType struct {
+	PaymentType string `json:"payment_type"` // e.g. "Bar", "Unbar"
+	Amount      string `json:"amount"`
+}
+
+// ReceiptSchema is the DSFinV-K receipt schema embedded in finish transaction.
+type ReceiptSchema struct {
+	ReceiptType           string                 `json:"receipt_type"` // "RECEIPT"
+	AmountsPerVatRate     []AmountPerVatRate     `json:"amounts_per_vat_rate"`
+	AmountsPerPaymentType []AmountPerPaymentType `json:"amounts_per_payment_type"`
+}
+
+// StandardV1Schema is the Fiskaly standard_v1 schema.
+type StandardV1Schema struct {
+	Receipt ReceiptSchema `json:"receipt"`
+}
+
+// TransactionSchema is the schema field in FinishTransactionRequest.
+type TransactionSchema struct {
+	StandardV1 StandardV1Schema `json:"standard_v1"`
+}
+
+// FinishTransactionRequest is the body for PUT /api/v2/tss/{tss_id}/tx/{tx_id}?tx_revision=N.
 type FinishTransactionRequest struct {
 	State    TransactionState  `json:"state"`
 	ClientID string            `json:"client_id"`
 	Schema   TransactionSchema `json:"schema"`
 }
 
-// TransactionResponse is the Fiskaly API response for a transaction operation.
-type TransactionResponse struct {
-	TransactionID      string           `json:"_id"`
-	State              TransactionState `json:"state"`
-	LatestRevision     int              `json:"latest_revision"`
-	StartDate          int64            `json:"time_start,omitempty"`
-	EndDate            int64            `json:"time_end,omitempty"`
-	SignatureAlgorithm string           `json:"signature_algorithm,omitempty"`
-	Signature          string           `json:"signature,omitempty"`
-	LogTimeFormat      string           `json:"log_time_format,omitempty"`
-	TransactionNumber  int64            `json:"transaction_number,omitempty"`
+// TransactionSignature holds the signature block in a finished transaction.
+type TransactionSignature struct {
+	Value            string `json:"value"`            // Base64 signature
+	SignatureCounter int64  `json:"signature_counter"` // cumulative counter
+	Algorithm        string `json:"algorithm"`
 }
 
-// ---------------------------------------------------------------------------
-// Export
-// ---------------------------------------------------------------------------
+// TransactionTSE holds TSE metadata in a finished transaction.
+type TransactionTSE struct {
+	SerialNumber       string `json:"serial_number"`
+	SignatureAlgorithm string `json:"signature_algorithm"`
+	PublicKey          string `json:"public_key"`
+}
 
-// ExportTriggerRequest is the payload for triggering a DSFinV-K export.
+// TransactionResponse is returned after starting or finishing a transaction.
+type TransactionResponse struct {
+	ID                string               `json:"_id"`
+	TransactionNumber int64                `json:"transaction_number"`
+	State             TransactionState     `json:"state"`
+	TimeStart         time.Time            `json:"time_start"`
+	TimeEnd           *time.Time           `json:"time_end,omitempty"`
+	ProcessType       string               `json:"process_type"`
+	ProcessData       string               `json:"process_data"`
+	Signature         TransactionSignature `json:"signature"`
+	TSE               TransactionTSE       `json:"tse"`
+}
+
+// ExportState is the state of a TAR/DSFinV-K export job.
+type ExportState string
+
+const (
+	ExportStatePending   ExportState = "PENDING"
+	ExportStateWorking   ExportState = "WORKING"
+	ExportStateCompleted ExportState = "COMPLETED"
+	ExportStateFailed    ExportState = "FAILED"
+)
+
+// ExportTriggerRequest is the body for POST /api/v2/tss/{tss_id}/export.
 type ExportTriggerRequest struct {
 	StartDate *time.Time `json:"start_date,omitempty"`
 	EndDate   *time.Time `json:"end_date,omitempty"`
 }
 
-// ExportResponse is the Fiskaly API response for a DSFinV-K export operation.
+// ExportResponse is returned by POST or GET /api/v2/tss/{tss_id}/export[/{id}].
 type ExportResponse struct {
-	ExportID  string `json:"_id"`
-	State     string `json:"state"`
-	StartDate int64  `json:"time_start,omitempty"`
-	EndDate   int64  `json:"time_end,omitempty"`
-	URL       string `json:"url,omitempty"`
+	ID          string      `json:"_id"`
+	State       ExportState `json:"state"`
+	Href        string      `json:"href,omitempty"`
+	TimeStart   *time.Time  `json:"time_start,omitempty"`
+	TimeEnd     *time.Time  `json:"time_end,omitempty"`
+	Error       string      `json:"error,omitempty"`
+}
+
+// ---------------------------------------------------------------------------
+// REST API request/response types (GastroCore server endpoints)
+// ---------------------------------------------------------------------------
+
+// InitTSERequest is the body for POST /api/fiscal/tse/init.
+type InitTSERequest struct {
+	TSEID       string `json:"tse_id"`        // UUID for the TSE
+	ClientID    string `json:"client_id"`     // UUID for this terminal
+	Description string `json:"description"`
+	AdminPin    string `json:"admin_pin"`
+}
+
+// InitTSEResponse is returned after TSE initialization.
+type InitTSEResponse struct {
+	TSEID      string   `json:"tse_id"`
+	ClientID   string   `json:"client_id"`
+	State      TSSState `json:"state"`
+	SerialNumber string `json:"serial_number"`
+}
+
+// SignTransactionRequest is the body for POST /api/fiscal/transaction/sign.
+type SignTransactionRequest struct {
+	TransactionID    string             `json:"transaction_id"`
+	TSEID            string             `json:"tse_id"`
+	ClientID         string             `json:"client_id"`
+	AmountsPerVatRate []AmountPerVatRate `json:"amounts_per_vat_rate"`
+	PaymentType      string             `json:"payment_type"`
+	PaymentAmount    string             `json:"payment_amount"`
+}
+
+// SignTransactionResponse is returned after signing a transaction.
+type SignTransactionResponse struct {
+	TransactionNumber int64                `json:"transaction_number"`
+	SignatureCounter  int64                `json:"signature_counter"`
+	StartTime         time.Time            `json:"start_time"`
+	EndTime           time.Time            `json:"end_time"`
+	SignatureValue    string               `json:"signature_value"`
+	TSESerialNumber   string               `json:"tse_serial_number"`
+	Algorithm         string               `json:"algorithm"`
+	PublicKey         string               `json:"public_key"`
+	ProcessType       string               `json:"process_type"`
+	ProcessData       string               `json:"process_data"`
+}
+
+// DSFinVKExportRequest is the query params for GET /api/fiscal/export/dsfinvk.
+type DSFinVKExportRequest struct {
+	TSEID     string     `json:"tse_id"`
+	StartDate *time.Time `json:"start_date,omitempty"`
+	EndDate   *time.Time `json:"end_date,omitempty"`
 }
