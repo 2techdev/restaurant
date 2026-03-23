@@ -119,7 +119,7 @@ class GcSidebar extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: AppColors.coral,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Center(
@@ -178,7 +178,7 @@ class GcSidebar extends StatelessWidget {
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.primary.withValues(alpha: 0.25),
+                    color: AppColors.navSurfaceHover,
                   ),
                   child: Center(
                     child: Text(
@@ -238,7 +238,7 @@ class _GcNavTileState extends State<_GcNavTile> {
             height: 52,
             decoration: BoxDecoration(
               color: widget.isActive
-                  ? AppColors.primary
+                  ? const Color(0xFF2C3E55)
                   : _hovered
                       ? AppColors.navSurfaceHover
                       : Colors.transparent,

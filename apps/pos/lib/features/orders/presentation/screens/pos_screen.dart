@@ -160,7 +160,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: AppColors.primary,
+              color: AppColors.coral,
               letterSpacing: -0.3,
             ),
           ),
@@ -225,7 +225,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             height: 36,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primary.withValues(alpha: 0.12),
+              color: AppColors.surfaceContainerHigh,
             ),
             child: Center(
               child: Text(
@@ -233,7 +233,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ),
@@ -425,7 +425,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primary : AppColors.surfaceContainerHigh,
+          color: isActive ? AppColors.navSurface : AppColors.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Center(
@@ -481,7 +481,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: AppColors.accentDim,
+                    color: AppColors.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -491,7 +491,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -767,8 +767,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                               gradient: hasItems
                                   ? const LinearGradient(
                                       colors: [
-                                        AppColors.primary,
-                                        AppColors.primaryContainer,
+                                        AppColors.navSurface,
+                                        AppColors.navSurfaceHover,
                                       ],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
@@ -996,12 +996,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           duration: const Duration(milliseconds: 150),
           margin: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.primary : Colors.transparent,
+            color: isActive ? AppColors.coral : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.2),
+                      color: AppColors.coral.withValues(alpha: 0.2),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -1101,7 +1101,7 @@ class _ProductCardState extends State<_ProductCard> {
           boxShadow: _isPressed ? null : kCardShadow,
           border: _isPressed
               ? Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.3))
+                  color: AppColors.coral.withValues(alpha: 0.3))
               : null,
         ),
         padding: const EdgeInsets.all(12),
@@ -1159,7 +1159,7 @@ class _ProductCardState extends State<_ProductCard> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
+                    color: AppColors.textPrimary,
                     fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 ),
@@ -1167,7 +1167,7 @@ class _ProductCardState extends State<_ProductCard> {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
+                    color: AppColors.coral,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
