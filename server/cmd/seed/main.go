@@ -138,11 +138,12 @@ func main() {
 		}
 	}
 
-	// Check if already seeded
+	// Check if already seeded (any of the three known tenant IDs)
 	if !force {
 		var exists bool
 		if err := db.QueryRow(
-			"SELECT EXISTS(SELECT 1 FROM tenants WHERE id=$1)", demoTenantID,
+			"SELECT EXISTS(SELECT 1 FROM tenants WHERE id IN ($1,$2,$3))",
+			demoTenantID, clubDemoTenantID, frohsinnTenantID,
 		).Scan(&exists); err != nil {
 			log.Fatalf("check: %v", err)
 		}
@@ -167,34 +168,36 @@ func wipeDemoData(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	// Delete in FK-safe order; use demoTenantID to scope deletes
-	for _, stmt := range []string{
-		`DELETE FROM order_item_modifiers USING order_items WHERE order_item_modifiers.order_item_id = order_items.id AND order_items.tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM order_items            WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM kitchen_ticket_items   USING kitchen_tickets WHERE kitchen_ticket_items.kitchen_ticket_id = kitchen_tickets.id AND kitchen_tickets.tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM kitchen_tickets        WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM payments               WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM bills                  WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM tickets                WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM receipts               WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM cash_movements         WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM shifts                 WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM restaurant_tables      WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM floors                 WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM product_modifier_groups USING products WHERE product_modifier_groups.product_id = products.id AND products.tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM modifiers              WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM modifier_groups        WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM products               WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM categories             WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM audit_log              WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM users                  WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM tenant_subscriptions   WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM device_registrations   WHERE tenant_id = '` + demoTenantID + `'`,
-		`DELETE FROM tenants                WHERE id        = '` + demoTenantID + `'`,
-	} {
-		if _, err := tx.Exec(stmt); err != nil {
-			tx.Rollback()
-			return fmt.Errorf("wipe stmt failed: %w\n  SQL: %s", err, stmt)
+	// Delete all known demo tenants in FK-safe order.
+	for _, tid := range []string{demoTenantID, clubDemoTenantID, frohsinnTenantID} {
+		for _, stmt := range []string{
+			`DELETE FROM order_item_modifiers USING order_items WHERE order_item_modifiers.order_item_id = order_items.id AND order_items.tenant_id = '` + tid + `'`,
+			`DELETE FROM order_items            WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM kitchen_ticket_items   USING kitchen_tickets WHERE kitchen_ticket_items.kitchen_ticket_id = kitchen_tickets.id AND kitchen_tickets.tenant_id = '` + tid + `'`,
+			`DELETE FROM kitchen_tickets        WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM payments               WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM bills                  WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM tickets                WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM receipts               WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM cash_movements         WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM shifts                 WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM restaurant_tables      WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM floors                 WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM product_modifier_groups USING products WHERE product_modifier_groups.product_id = products.id AND products.tenant_id = '` + tid + `'`,
+			`DELETE FROM modifiers              WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM modifier_groups        WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM products               WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM categories             WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM audit_log              WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM users                  WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM tenant_subscriptions   WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM device_registrations   WHERE tenant_id = '` + tid + `'`,
+			`DELETE FROM tenants                WHERE id        = '` + tid + `'`,
+		} {
+			if _, err := tx.Exec(stmt); err != nil {
+				tx.Rollback()
+				return fmt.Errorf("wipe stmt failed (tenant %s): %w\n  SQL: %s", tid, err, stmt)
+			}
 		}
 	}
 	return tx.Commit()
@@ -231,6 +234,17 @@ func seedAll(db *sql.DB) error {
 			return err
 		}
 	}
+
+	// Additional tenants
+	if err := seedClubDemoAll(tx, now); err != nil {
+		tx.Rollback()
+		return err
+	}
+	if err := seedFrohsinnAll(tx, now); err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	return tx.Commit()
 }
 

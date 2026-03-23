@@ -1,11 +1,18 @@
 package stores
 
 import (
+	"crypto/rand"
+	"database/sql"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/gastrocore/server/internal/shared/crypto"
+	"github.com/gastrocore/server/internal/shared/middleware"
 	"github.com/gastrocore/server/internal/shared/response"
+	pqlib "github.com/lib/pq"
 )
 
 // ============================================================
@@ -15,25 +22,44 @@ import (
 // handleGetOrganization returns the current organization.
 // GET /api/v1/admin/organization
 func (m *Module) handleGetOrganization(w http.ResponseWriter, r *http.Request) {
-	// TODO: Extract org_id from JWT claims via middleware context
-	// TODO: Query organization from database
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 
-	trialEnd := time.Date(2026, 6, 30, 23, 59, 59, 0, time.UTC)
-	org := Organization{
-		ID:          "org_01JQXYZ123456789ABCDEF",
-		Name:        "2TECH Technology AG",
-		LegalName:   "2TECH Technology AG",
-		TaxID:       "CHE-123.456.789",
-		Country:     "CH",
-		Address:     "Bahnhofstrasse 10, 8001 Zurich",
-		Phone:       "+41 44 123 45 67",
-		Email:       "info@2tech.ch",
-		Logo:        "",
-		Plan:        "professional",
-		Status:      "active",
-		TrialEndsAt: &trialEnd,
-		CreatedAt:   time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-		UpdatedAt:   time.Now().UTC(),
+	var org Organization
+	var logo, taxID, address, phone, email sql.NullString
+	var trialEndsAt sql.NullTime
+
+	err := m.db.QueryRowContext(r.Context(), `
+		SELECT id, name, COALESCE(legal_name,''), COALESCE(tax_id,''),
+		       country, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''),
+		       COALESCE(logo,''), plan, status, trial_ends_at, created_at, updated_at
+		FROM organizations
+		WHERE id = $1
+	`, orgID).Scan(
+		&org.ID, &org.Name, &org.LegalName, &taxID,
+		&org.Country, &address, &phone, &email,
+		&logo, &org.Plan, &org.Status, &trialEndsAt, &org.CreatedAt, &org.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		response.Error(w, http.StatusNotFound, "NOT_FOUND", "Organization not found")
+		return
+	}
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to fetch organization")
+		return
+	}
+
+	org.TaxID = taxID.String
+	org.Address = address.String
+	org.Phone = phone.String
+	org.Email = email.String
+	org.Logo = logo.String
+	if trialEndsAt.Valid {
+		t := trialEndsAt.Time
+		org.TrialEndsAt = &t
 	}
 
 	response.JSON(w, http.StatusOK, org)
@@ -42,6 +68,12 @@ func (m *Module) handleGetOrganization(w http.ResponseWriter, r *http.Request) {
 // handleUpdateOrganization updates the current organization.
 // PUT /api/v1/admin/organization
 func (m *Module) handleUpdateOrganization(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
+
 	var req struct {
 		Name      string `json:"name"`
 		LegalName string `json:"legal_name"`
@@ -56,27 +88,20 @@ func (m *Module) handleUpdateOrganization(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// TODO: Validate and update organization in database
-
-	trialEnd := time.Date(2026, 6, 30, 23, 59, 59, 0, time.UTC)
-	org := Organization{
-		ID:          "org_01JQXYZ123456789ABCDEF",
-		Name:        req.Name,
-		LegalName:   req.LegalName,
-		TaxID:       req.TaxID,
-		Country:     "CH",
-		Address:     req.Address,
-		Phone:       req.Phone,
-		Email:       req.Email,
-		Logo:        req.Logo,
-		Plan:        "professional",
-		Status:      "active",
-		TrialEndsAt: &trialEnd,
-		CreatedAt:   time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-		UpdatedAt:   time.Now().UTC(),
+	_, err := m.db.ExecContext(r.Context(), `
+		UPDATE organizations
+		SET name=$2, legal_name=$3, tax_id=$4, address=$5,
+		    phone=$6, email=$7, logo=$8, updated_at=NOW()
+		WHERE id=$1
+	`, orgID, req.Name, req.LegalName, req.TaxID,
+		req.Address, req.Phone, req.Email, req.Logo)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to update organization")
+		return
 	}
 
-	response.JSON(w, http.StatusOK, org)
+	// Return updated org
+	m.handleGetOrganization(w, r)
 }
 
 // ============================================================
@@ -86,29 +111,34 @@ func (m *Module) handleUpdateOrganization(w http.ResponseWriter, r *http.Request
 // handleListBrands returns all brands for the current organization.
 // GET /api/v1/admin/brands
 func (m *Module) handleListBrands(w http.ResponseWriter, r *http.Request) {
-	// TODO: Extract org_id from JWT claims, query brands from database
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 
-	brands := []Brand{
-		{
-			ID:             "brand_01JR0001",
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			Name:           "Schore Pintli Restaurant",
-			Logo:           "",
-			Description:    "Traditional Swiss cuisine",
-			Status:         "active",
-			CreatedAt:      time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
-		{
-			ID:             "brand_01JR0002",
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			Name:           "Quick Bites Express",
-			Logo:           "",
-			Description:    "Fast casual dining",
-			Status:         "active",
-			CreatedAt:      time.Date(2024, 3, 1, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
+	rows, err := m.db.QueryContext(r.Context(), `
+		SELECT id, organization_id, name, COALESCE(logo,''), COALESCE(description,''),
+		       status, created_at, updated_at
+		FROM brands
+		WHERE organization_id = $1
+		ORDER BY name
+	`, orgID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to list brands")
+		return
+	}
+	defer rows.Close()
+
+	brands := make([]Brand, 0)
+	for rows.Next() {
+		var b Brand
+		if err := rows.Scan(
+			&b.ID, &b.OrganizationID, &b.Name, &b.Logo, &b.Description,
+			&b.Status, &b.CreatedAt, &b.UpdatedAt,
+		); err == nil {
+			brands = append(brands, b)
+		}
 	}
 
 	response.JSON(w, http.StatusOK, brands)
@@ -117,6 +147,12 @@ func (m *Module) handleListBrands(w http.ResponseWriter, r *http.Request) {
 // handleCreateBrand creates a new brand.
 // POST /api/v1/admin/brands
 func (m *Module) handleCreateBrand(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
+
 	var req struct {
 		Name        string `json:"name"`
 		Logo        string `json:"logo"`
@@ -126,23 +162,25 @@ func (m *Module) handleCreateBrand(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
 		return
 	}
-
 	if req.Name == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "name is required")
 		return
 	}
 
-	// TODO: Insert brand into database
-
-	brand := Brand{
-		ID:             "brand_01JR0003",
-		OrganizationID: "org_01JQXYZ123456789ABCDEF",
-		Name:           req.Name,
-		Logo:           req.Logo,
-		Description:    req.Description,
-		Status:         "active",
-		CreatedAt:      time.Now().UTC(),
-		UpdatedAt:      time.Now().UTC(),
+	var brand Brand
+	err := m.db.QueryRowContext(r.Context(), `
+		INSERT INTO brands (organization_id, name, logo, description, status)
+		VALUES ($1, $2, $3, $4, 'active')
+		RETURNING id, organization_id, name, COALESCE(logo,''), COALESCE(description,''),
+		          status, created_at, updated_at
+	`, orgID, req.Name, req.Logo, req.Description,
+	).Scan(
+		&brand.ID, &brand.OrganizationID, &brand.Name, &brand.Logo, &brand.Description,
+		&brand.Status, &brand.CreatedAt, &brand.UpdatedAt,
+	)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to create brand")
+		return
 	}
 
 	response.Created(w, brand)
@@ -151,6 +189,11 @@ func (m *Module) handleCreateBrand(w http.ResponseWriter, r *http.Request) {
 // handleUpdateBrand updates an existing brand.
 // PUT /api/v1/admin/brands/{id}
 func (m *Module) handleUpdateBrand(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	brandID := r.PathValue("id")
 	if brandID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "brand id is required")
@@ -167,17 +210,25 @@ func (m *Module) handleUpdateBrand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Update brand in database
-
-	brand := Brand{
-		ID:             brandID,
-		OrganizationID: "org_01JQXYZ123456789ABCDEF",
-		Name:           req.Name,
-		Logo:           req.Logo,
-		Description:    req.Description,
-		Status:         "active",
-		CreatedAt:      time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-		UpdatedAt:      time.Now().UTC(),
+	var brand Brand
+	err := m.db.QueryRowContext(r.Context(), `
+		UPDATE brands
+		SET name=$3, logo=$4, description=$5, updated_at=NOW()
+		WHERE id=$1 AND organization_id=$2
+		RETURNING id, organization_id, name, COALESCE(logo,''), COALESCE(description,''),
+		          status, created_at, updated_at
+	`, brandID, orgID, req.Name, req.Logo, req.Description,
+	).Scan(
+		&brand.ID, &brand.OrganizationID, &brand.Name, &brand.Logo, &brand.Description,
+		&brand.Status, &brand.CreatedAt, &brand.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		response.Error(w, http.StatusNotFound, "NOT_FOUND", "Brand not found")
+		return
+	}
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to update brand")
+		return
 	}
 
 	response.JSON(w, http.StatusOK, brand)
@@ -186,14 +237,37 @@ func (m *Module) handleUpdateBrand(w http.ResponseWriter, r *http.Request) {
 // handleDeleteBrand deactivates a brand (soft delete).
 // DELETE /api/v1/admin/brands/{id}
 func (m *Module) handleDeleteBrand(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	brandID := r.PathValue("id")
 	if brandID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "brand id is required")
 		return
 	}
 
-	// TODO: Set brand status to "inactive" in database
-	// TODO: Check for active stores under this brand
+	// Check for active stores under this brand
+	var activeStoreCount int
+	_ = m.db.QueryRowContext(r.Context(), `
+		SELECT COUNT(*) FROM stores WHERE brand_id=$1 AND status='active'
+	`, brandID).Scan(&activeStoreCount)
+
+	if activeStoreCount > 0 {
+		response.Error(w, http.StatusConflict, "BRAND_HAS_STORES",
+			fmt.Sprintf("Cannot deactivate brand with %d active store(s)", activeStoreCount))
+		return
+	}
+
+	_, err := m.db.ExecContext(r.Context(), `
+		UPDATE brands SET status='inactive', updated_at=NOW()
+		WHERE id=$1 AND organization_id=$2
+	`, brandID, orgID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to deactivate brand")
+		return
+	}
 
 	response.NoContent(w)
 }
@@ -205,94 +279,86 @@ func (m *Module) handleDeleteBrand(w http.ResponseWriter, r *http.Request) {
 // handleListStores returns all stores with optional filtering.
 // GET /api/v1/admin/stores?name=&code=&status=&brand_id=
 func (m *Module) handleListStores(w http.ResponseWriter, r *http.Request) {
-	// Parse query parameters for filtering
-	_ = r.URL.Query().Get("name")
-	_ = r.URL.Query().Get("code")
-	_ = r.URL.Query().Get("status")
-	_ = r.URL.Query().Get("brand_id")
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 
-	// TODO: Build dynamic query with filters, extract org_id from JWT
+	q := r.URL.Query()
+	nameFilter := q.Get("name")
+	codeFilter := q.Get("code")
+	statusFilter := q.Get("status")
+	brandFilter := q.Get("brand_id")
 
-	exp1 := time.Date(2026, 12, 31, 23, 59, 59, 0, time.UTC)
-	exp2 := time.Date(2026, 12, 31, 23, 59, 59, 0, time.UTC)
-	exp3 := time.Date(2027, 6, 30, 23, 59, 59, 0, time.UTC)
+	where := "s.organization_id = $1"
+	args := []any{orgID}
+	idx := 2
 
-	stores := []Store{
-		{
-			ID:             "store_01JS0001",
-			BrandID:        "brand_01JR0001",
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			StoreCode:      "CH00000060",
-			Name:           "Zurich Main",
-			LegalName:      "Schore Pintli AG - Zurich",
-			Country:        "CH",
-			Address:        "Bahnhofstrasse 42",
-			City:           "Zurich",
-			PostalCode:     "8001",
-			Phone:          "+41 44 210 00 01",
-			Email:          "zurich@schorepintli.ch",
-			Timezone:       "Europe/Zurich",
-			Currency:       "CHF",
-			TaxRate:        8.1,
-			ProductCount:   85,
-			TableCount:     24,
-			DeviceCount:    3,
-			ManagerName:    "Hans Mueller",
-			Status:         "active",
-			ExpiresAt:      &exp1,
-			CreatedAt:      time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
-		{
-			ID:             "store_01JS0002",
-			BrandID:        "brand_01JR0001",
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			StoreCode:      "CH00000061",
-			Name:           "Bern Branch",
-			LegalName:      "Schore Pintli AG - Bern",
-			Country:        "CH",
-			Address:        "Marktgasse 15",
-			City:           "Bern",
-			PostalCode:     "3011",
-			Phone:          "+41 31 310 00 02",
-			Email:          "bern@schorepintli.ch",
-			Timezone:       "Europe/Zurich",
-			Currency:       "CHF",
-			TaxRate:        8.1,
-			ProductCount:   72,
-			TableCount:     18,
-			DeviceCount:    2,
-			ManagerName:    "Anna Fischer",
-			Status:         "active",
-			ExpiresAt:      &exp2,
-			CreatedAt:      time.Date(2024, 6, 1, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
-		{
-			ID:             "store_01JS0003",
-			BrandID:        "brand_01JR0002",
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			StoreCode:      "CH00000062",
-			Name:           "Basel Express",
-			LegalName:      "Quick Bites GmbH - Basel",
-			Country:        "CH",
-			Address:        "Freie Strasse 28",
-			City:           "Basel",
-			PostalCode:     "4001",
-			Phone:          "+41 61 260 00 03",
-			Email:          "basel@quickbites.ch",
-			Timezone:       "Europe/Zurich",
-			Currency:       "CHF",
-			TaxRate:        8.1,
-			ProductCount:   45,
-			TableCount:     12,
-			DeviceCount:    2,
-			ManagerName:    "Peter Weber",
-			Status:         "active",
-			ExpiresAt:      &exp3,
-			CreatedAt:      time.Date(2025, 1, 10, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
+	if nameFilter != "" {
+		where += fmt.Sprintf(" AND s.name ILIKE $%d", idx)
+		args = append(args, "%"+nameFilter+"%")
+		idx++
+	}
+	if codeFilter != "" {
+		where += fmt.Sprintf(" AND s.store_code = $%d", idx)
+		args = append(args, codeFilter)
+		idx++
+	}
+	if statusFilter != "" {
+		where += fmt.Sprintf(" AND s.status = $%d", idx)
+		args = append(args, statusFilter)
+		idx++
+	}
+	if brandFilter != "" {
+		where += fmt.Sprintf(" AND s.brand_id = $%d", idx)
+		args = append(args, brandFilter)
+		idx++
+	}
+	_ = idx
+
+	rows, err := m.db.QueryContext(r.Context(), `
+		SELECT
+			s.id, s.brand_id, s.organization_id, s.store_code,
+			s.name, COALESCE(s.legal_name,''), s.country,
+			COALESCE(s.address,''), COALESCE(s.city,''), COALESCE(s.postal_code,''),
+			COALESCE(s.phone,''), COALESCE(s.email,''),
+			s.timezone, s.currency, COALESCE(s.tax_rate, 8.1),
+			COALESCE(s.manager_name,''), s.status, s.expires_at,
+			(SELECT COUNT(*) FROM products p WHERE p.tenant_id = s.id::TEXT AND p.is_deleted=FALSE AND p.is_active=TRUE),
+			(SELECT COUNT(*) FROM restaurant_tables rt WHERE rt.tenant_id = s.id::TEXT AND rt.is_deleted=FALSE),
+			0,
+			s.created_at, s.updated_at
+		FROM stores s
+		WHERE `+where+`
+		ORDER BY s.name
+	`, args...)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to list stores")
+		return
+	}
+	defer rows.Close()
+
+	stores := make([]Store, 0)
+	for rows.Next() {
+		var s Store
+		var expiresAt sql.NullTime
+		if err := rows.Scan(
+			&s.ID, &s.BrandID, &s.OrganizationID, &s.StoreCode,
+			&s.Name, &s.LegalName, &s.Country,
+			&s.Address, &s.City, &s.PostalCode,
+			&s.Phone, &s.Email,
+			&s.Timezone, &s.Currency, &s.TaxRate,
+			&s.ManagerName, &s.Status, &expiresAt,
+			&s.ProductCount, &s.TableCount, &s.DeviceCount,
+			&s.CreatedAt, &s.UpdatedAt,
+		); err == nil {
+			if expiresAt.Valid {
+				t := expiresAt.Time
+				s.ExpiresAt = &t
+			}
+			stores = append(stores, s)
+		}
 	}
 
 	response.JSON(w, http.StatusOK, stores)
@@ -301,6 +367,12 @@ func (m *Module) handleListStores(w http.ResponseWriter, r *http.Request) {
 // handleCreateStore creates a new store.
 // POST /api/v1/admin/stores
 func (m *Module) handleCreateStore(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
+
 	var req struct {
 		BrandID     string  `json:"brand_id"`
 		Name        string  `json:"name"`
@@ -320,51 +392,70 @@ func (m *Module) handleCreateStore(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
 		return
 	}
-
 	if req.BrandID == "" || req.Name == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "brand_id and name are required")
 		return
 	}
 
-	// TODO: Generate store_code, insert into database
-
-	// Default timezone and currency for Swiss stores
-	tz := req.Timezone
-	if tz == "" {
-		tz = "Europe/Zurich"
+	// Defaults for Swiss stores
+	if req.Timezone == "" {
+		req.Timezone = "Europe/Zurich"
 	}
-	cur := req.Currency
-	if cur == "" {
-		cur = "CHF"
+	if req.Currency == "" {
+		req.Currency = "CHF"
 	}
-	taxRate := req.TaxRate
-	if taxRate == 0 {
-		taxRate = 8.1
+	if req.Country == "" {
+		req.Country = "CH"
+	}
+	if req.TaxRate == 0 {
+		req.TaxRate = 8.1
 	}
 
-	store := Store{
-		ID:             "store_01JS0004",
-		BrandID:        req.BrandID,
-		OrganizationID: "org_01JQXYZ123456789ABCDEF",
-		StoreCode:      "CH00000063",
-		Name:           req.Name,
-		LegalName:      req.LegalName,
-		Country:        req.Country,
-		Address:        req.Address,
-		City:           req.City,
-		PostalCode:     req.PostalCode,
-		Phone:          req.Phone,
-		Email:          req.Email,
-		Timezone:       tz,
-		Currency:       cur,
-		TaxRate:        taxRate,
-		ProductCount:   0,
-		TableCount:     0,
-		DeviceCount:    0,
-		ManagerName:    req.ManagerName,
-		Status:         "active",
-		CreatedAt:      time.Now().UTC(),
-		UpdatedAt:      time.Now().UTC(),
+	// Generate unique store code
+	storeCode, err := generateStoreCode(m.db, req.Country)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to generate store code")
+		return
+	}
+
+	var store Store
+	var expiresAt sql.NullTime
+	err = m.db.QueryRowContext(r.Context(), `
+		INSERT INTO stores (
+			brand_id, organization_id, store_code, name, legal_name,
+			country, address, city, postal_code, phone, email,
+			timezone, currency, tax_rate, manager_name, status
+		) VALUES (
+			$1, $2, $3, $4, $5,
+			$6, $7, $8, $9, $10, $11,
+			$12, $13, $14, $15, 'active'
+		)
+		RETURNING id, brand_id, organization_id, store_code,
+		          name, COALESCE(legal_name,''), country,
+		          COALESCE(address,''), COALESCE(city,''), COALESCE(postal_code,''),
+		          COALESCE(phone,''), COALESCE(email,''),
+		          timezone, currency, COALESCE(tax_rate, 8.1),
+		          COALESCE(manager_name,''), status, expires_at,
+		          created_at, updated_at
+	`, req.BrandID, orgID, storeCode, req.Name, req.LegalName,
+		req.Country, req.Address, req.City, req.PostalCode, req.Phone, req.Email,
+		req.Timezone, req.Currency, req.TaxRate, req.ManagerName,
+	).Scan(
+		&store.ID, &store.BrandID, &store.OrganizationID, &store.StoreCode,
+		&store.Name, &store.LegalName, &store.Country,
+		&store.Address, &store.City, &store.PostalCode,
+		&store.Phone, &store.Email,
+		&store.Timezone, &store.Currency, &store.TaxRate,
+		&store.ManagerName, &store.Status, &expiresAt,
+		&store.CreatedAt, &store.UpdatedAt,
+	)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to create store")
+		return
+	}
+	if expiresAt.Valid {
+		t := expiresAt.Time
+		store.ExpiresAt = &t
 	}
 
 	response.Created(w, store)
@@ -373,47 +464,67 @@ func (m *Module) handleCreateStore(w http.ResponseWriter, r *http.Request) {
 // handleGetStore returns a single store with counts.
 // GET /api/v1/admin/stores/{id}
 func (m *Module) handleGetStore(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	storeID := r.PathValue("id")
 	if storeID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "store id is required")
 		return
 	}
 
-	// TODO: Query store from database with product/table/device counts
-
-	exp := time.Date(2026, 12, 31, 23, 59, 59, 0, time.UTC)
-	store := Store{
-		ID:             storeID,
-		BrandID:        "brand_01JR0001",
-		OrganizationID: "org_01JQXYZ123456789ABCDEF",
-		StoreCode:      "CH00000060",
-		Name:           "Zurich Main",
-		LegalName:      "Schore Pintli AG - Zurich",
-		Country:        "CH",
-		Address:        "Bahnhofstrasse 42",
-		City:           "Zurich",
-		PostalCode:     "8001",
-		Phone:          "+41 44 210 00 01",
-		Email:          "zurich@schorepintli.ch",
-		Timezone:       "Europe/Zurich",
-		Currency:       "CHF",
-		TaxRate:        8.1,
-		ProductCount:   85,
-		TableCount:     24,
-		DeviceCount:    3,
-		ManagerName:    "Hans Mueller",
-		Status:         "active",
-		ExpiresAt:      &exp,
-		CreatedAt:      time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-		UpdatedAt:      time.Now().UTC(),
+	var s Store
+	var expiresAt sql.NullTime
+	err := m.db.QueryRowContext(r.Context(), `
+		SELECT
+			s.id, s.brand_id, s.organization_id, s.store_code,
+			s.name, COALESCE(s.legal_name,''), s.country,
+			COALESCE(s.address,''), COALESCE(s.city,''), COALESCE(s.postal_code,''),
+			COALESCE(s.phone,''), COALESCE(s.email,''),
+			s.timezone, s.currency, COALESCE(s.tax_rate, 8.1),
+			COALESCE(s.manager_name,''), s.status, s.expires_at,
+			(SELECT COUNT(*) FROM products p WHERE p.tenant_id = s.id::TEXT AND p.is_deleted=FALSE AND p.is_active=TRUE),
+			(SELECT COUNT(*) FROM restaurant_tables rt WHERE rt.tenant_id = s.id::TEXT AND rt.is_deleted=FALSE),
+			0,
+			s.created_at, s.updated_at
+		FROM stores s
+		WHERE s.id = $1 AND s.organization_id = $2
+	`, storeID, orgID).Scan(
+		&s.ID, &s.BrandID, &s.OrganizationID, &s.StoreCode,
+		&s.Name, &s.LegalName, &s.Country,
+		&s.Address, &s.City, &s.PostalCode,
+		&s.Phone, &s.Email,
+		&s.Timezone, &s.Currency, &s.TaxRate,
+		&s.ManagerName, &s.Status, &expiresAt,
+		&s.ProductCount, &s.TableCount, &s.DeviceCount,
+		&s.CreatedAt, &s.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		response.Error(w, http.StatusNotFound, "NOT_FOUND", "Store not found")
+		return
+	}
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to fetch store")
+		return
+	}
+	if expiresAt.Valid {
+		t := expiresAt.Time
+		s.ExpiresAt = &t
 	}
 
-	response.JSON(w, http.StatusOK, store)
+	response.JSON(w, http.StatusOK, s)
 }
 
 // handleUpdateStore updates an existing store.
 // PUT /api/v1/admin/stores/{id}
 func (m *Module) handleUpdateStore(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	storeID := r.PathValue("id")
 	if storeID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "store id is required")
@@ -439,49 +550,47 @@ func (m *Module) handleUpdateStore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Update store in database
-
-	exp := time.Date(2026, 12, 31, 23, 59, 59, 0, time.UTC)
-	store := Store{
-		ID:             storeID,
-		BrandID:        "brand_01JR0001",
-		OrganizationID: "org_01JQXYZ123456789ABCDEF",
-		StoreCode:      "CH00000060",
-		Name:           req.Name,
-		LegalName:      req.LegalName,
-		Country:        "CH",
-		Address:        req.Address,
-		City:           req.City,
-		PostalCode:     req.PostalCode,
-		Phone:          req.Phone,
-		Email:          req.Email,
-		Timezone:       req.Timezone,
-		Currency:       req.Currency,
-		TaxRate:        req.TaxRate,
-		ProductCount:   85,
-		TableCount:     24,
-		DeviceCount:    3,
-		ManagerName:    req.ManagerName,
-		Status:         req.Status,
-		ExpiresAt:      &exp,
-		CreatedAt:      time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-		UpdatedAt:      time.Now().UTC(),
+	_, err := m.db.ExecContext(r.Context(), `
+		UPDATE stores
+		SET name=$3, legal_name=$4, address=$5, city=$6, postal_code=$7,
+		    phone=$8, email=$9, timezone=$10, currency=$11,
+		    tax_rate=$12, manager_name=$13, status=$14, updated_at=NOW()
+		WHERE id=$1 AND organization_id=$2
+	`, storeID, orgID,
+		req.Name, req.LegalName, req.Address, req.City, req.PostalCode,
+		req.Phone, req.Email, req.Timezone, req.Currency,
+		req.TaxRate, req.ManagerName, req.Status)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to update store")
+		return
 	}
 
-	response.JSON(w, http.StatusOK, store)
+	// Return updated store
+	m.handleGetStore(w, r)
 }
 
 // handleDeleteStore deactivates a store (soft delete).
 // DELETE /api/v1/admin/stores/{id}
 func (m *Module) handleDeleteStore(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	storeID := r.PathValue("id")
 	if storeID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "store id is required")
 		return
 	}
 
-	// TODO: Set store status to "inactive" in database
-	// TODO: Deactivate all devices and employees under this store
+	_, err := m.db.ExecContext(r.Context(), `
+		UPDATE stores SET status='inactive', updated_at=NOW()
+		WHERE id=$1 AND organization_id=$2
+	`, storeID, orgID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to deactivate store")
+		return
+	}
 
 	response.NoContent(w)
 }
@@ -489,25 +598,83 @@ func (m *Module) handleDeleteStore(w http.ResponseWriter, r *http.Request) {
 // handleGetStoreStats returns statistics for a specific store.
 // GET /api/v1/admin/stores/{id}/stats
 func (m *Module) handleGetStoreStats(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	storeID := r.PathValue("id")
 	if storeID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "store id is required")
 		return
 	}
 
-	// TODO: Query aggregated stats from tickets, payments, devices tables
+	// Verify store belongs to this org
+	var storeName string
+	err := m.db.QueryRowContext(r.Context(), `
+		SELECT name FROM stores WHERE id=$1 AND organization_id=$2
+	`, storeID, orgID).Scan(&storeName)
+	if err == sql.ErrNoRows {
+		response.Error(w, http.StatusNotFound, "NOT_FOUND", "Store not found")
+		return
+	}
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to verify store")
+		return
+	}
+
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	weekStart := todayStart.AddDate(0, 0, -6)
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+
+	// The tenant_id in tickets matches the store ID from the multi-store schema.
+	// We query using the store ID as the tenant_id.
+	var todaySales, weekSales, monthSales int64
+	var todayOrders, weekOrders, monthOrders int
+
+	_ = m.db.QueryRowContext(r.Context(), `
+		SELECT
+			COALESCE(SUM(total) FILTER (WHERE created_at >= $2), 0),
+			COUNT(*) FILTER (WHERE created_at >= $2 AND status NOT IN ('void','open')),
+			COALESCE(SUM(total) FILTER (WHERE created_at >= $3), 0),
+			COUNT(*) FILTER (WHERE created_at >= $3 AND status NOT IN ('void','open')),
+			COALESCE(SUM(total) FILTER (WHERE created_at >= $4), 0),
+			COUNT(*) FILTER (WHERE created_at >= $4 AND status NOT IN ('void','open'))
+		FROM tickets
+		WHERE tenant_id = $1 AND is_deleted = FALSE AND status NOT IN ('void','open')
+	`, storeID, todayStart, weekStart, monthStart).Scan(
+		&todaySales, &todayOrders,
+		&weekSales, &weekOrders,
+		&monthSales, &monthOrders,
+	)
+
+	// Active devices (last seen within 24h)
+	var activeDevices int
+	_ = m.db.QueryRowContext(r.Context(), `
+		SELECT COUNT(*) FROM devices
+		WHERE tenant_id = $1 AND status='active'
+		  AND last_seen_at >= NOW() - INTERVAL '24 hours'
+	`, storeID).Scan(&activeDevices)
+
+	// Active staff (users with is_active=true)
+	var activeStaff int
+	_ = m.db.QueryRowContext(r.Context(), `
+		SELECT COUNT(*) FROM users
+		WHERE tenant_id = $1 AND is_active=TRUE AND is_deleted=FALSE
+	`, storeID).Scan(&activeStaff)
 
 	stats := StoreStats{
 		StoreID:       storeID,
-		StoreName:     "Zurich Main",
-		TodaySales:    222500,
-		TodayOrders:   222,
-		WeekSales:     1485000,
-		WeekOrders:    1540,
-		MonthSales:    5920000,
-		MonthOrders:   6120,
-		ActiveDevices: 3,
-		ActiveStaff:   8,
+		StoreName:     storeName,
+		TodaySales:    todaySales,
+		TodayOrders:   todayOrders,
+		WeekSales:     weekSales,
+		WeekOrders:    weekOrders,
+		MonthSales:    monthSales,
+		MonthOrders:   monthOrders,
+		ActiveDevices: activeDevices,
+		ActiveStaff:   activeStaff,
 	}
 
 	response.JSON(w, http.StatusOK, stats)
@@ -520,46 +687,41 @@ func (m *Module) handleGetStoreStats(w http.ResponseWriter, r *http.Request) {
 // handleListAdminUsers returns all admin users for the organization.
 // GET /api/v1/admin/users
 func (m *Module) handleListAdminUsers(w http.ResponseWriter, r *http.Request) {
-	// TODO: Extract org_id from JWT, query admin_users
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 
-	lastLogin := time.Now().Add(-2 * time.Hour)
-	users := []AdminUser{
-		{
-			ID:             "adm_01JU0001",
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			Email:          "admin@2tech.ch",
-			Name:           "System Admin",
-			Role:           "org_admin",
-			StoreIDs:       nil,
-			Status:         "active",
-			LastLoginAt:    &lastLogin,
-			CreatedAt:      time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
-		{
-			ID:             "adm_01JU0002",
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			Email:          "hans@schorepintli.ch",
-			Name:           "Hans Mueller",
-			Role:           "store_manager",
-			StoreIDs:       []string{"store_01JS0001"},
-			Status:         "active",
-			LastLoginAt:    &lastLogin,
-			CreatedAt:      time.Date(2024, 2, 1, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
-		{
-			ID:             "adm_01JU0003",
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			Email:          "anna@schorepintli.ch",
-			Name:           "Anna Fischer",
-			Role:           "store_manager",
-			StoreIDs:       []string{"store_01JS0002"},
-			Status:         "active",
-			LastLoginAt:    nil,
-			CreatedAt:      time.Date(2024, 6, 1, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
+	rows, err := m.db.QueryContext(r.Context(), `
+		SELECT id, organization_id, email, name, role,
+		       COALESCE(store_ids, '{}'), status, last_login_at, created_at, updated_at
+		FROM admin_users
+		WHERE organization_id = $1
+		ORDER BY name
+	`, orgID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to list admin users")
+		return
+	}
+	defer rows.Close()
+
+	users := make([]AdminUser, 0)
+	for rows.Next() {
+		var u AdminUser
+		var storeIDs pqlib.StringArray
+		var lastLoginAt sql.NullTime
+		if err := rows.Scan(
+			&u.ID, &u.OrganizationID, &u.Email, &u.Name, &u.Role,
+			&storeIDs, &u.Status, &lastLoginAt, &u.CreatedAt, &u.UpdatedAt,
+		); err == nil {
+			u.StoreIDs = []string(storeIDs)
+			if lastLoginAt.Valid {
+				t := lastLoginAt.Time
+				u.LastLoginAt = &t
+			}
+			users = append(users, u)
+		}
 	}
 
 	response.JSON(w, http.StatusOK, users)
@@ -568,6 +730,12 @@ func (m *Module) handleListAdminUsers(w http.ResponseWriter, r *http.Request) {
 // handleCreateAdminUser creates a new admin user.
 // POST /api/v1/admin/users
 func (m *Module) handleCreateAdminUser(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
+
 	var req struct {
 		Email    string   `json:"email"`
 		Name     string   `json:"name"`
@@ -579,31 +747,49 @@ func (m *Module) handleCreateAdminUser(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
 		return
 	}
-
 	if req.Email == "" || req.Name == "" || req.Password == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "email, name, and password are required")
 		return
 	}
-
-	// TODO: Hash password with bcrypt, insert into admin_users table
-	// TODO: Check for duplicate email
 
 	role := req.Role
 	if role == "" {
 		role = "viewer"
 	}
 
-	user := AdminUser{
-		ID:             "adm_01JU0004",
-		OrganizationID: "org_01JQXYZ123456789ABCDEF",
-		Email:          req.Email,
-		Name:           req.Name,
-		Role:           role,
-		StoreIDs:       req.StoreIDs,
-		Status:         "active",
-		CreatedAt:      time.Now().UTC(),
-		UpdatedAt:      time.Now().UTC(),
+	passwordHash, err := crypto.HashPassword(req.Password)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "HASH_ERROR", "Failed to hash password")
+		return
 	}
+
+	storeIDs := req.StoreIDs
+	if storeIDs == nil {
+		storeIDs = []string{}
+	}
+
+	var user AdminUser
+	var lastLoginAt sql.NullTime
+	err = m.db.QueryRowContext(r.Context(), `
+		INSERT INTO admin_users (organization_id, email, password_hash, name, role, store_ids, status)
+		VALUES ($1, $2, $3, $4, $5, $6, 'active')
+		RETURNING id, organization_id, email, name, role,
+		          COALESCE(store_ids,'{}'), status, last_login_at, created_at, updated_at
+	`, orgID, req.Email, passwordHash, req.Name, role, pqlib.Array(storeIDs),
+	).Scan(
+		&user.ID, &user.OrganizationID, &user.Email, &user.Name, &user.Role,
+		pqlib.Array(&storeIDs), &user.Status, &lastLoginAt, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if err != nil {
+		// Check for duplicate email
+		if isUniqueViolation(err) {
+			response.Error(w, http.StatusConflict, "DUPLICATE_EMAIL", "A user with this email already exists")
+			return
+		}
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to create admin user")
+		return
+	}
+	user.StoreIDs = storeIDs
 
 	response.Created(w, user)
 }
@@ -611,6 +797,11 @@ func (m *Module) handleCreateAdminUser(w http.ResponseWriter, r *http.Request) {
 // handleUpdateAdminUser updates an existing admin user.
 // PUT /api/v1/admin/users/{id}
 func (m *Module) handleUpdateAdminUser(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	userID := r.PathValue("id")
 	if userID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "user id is required")
@@ -628,18 +819,36 @@ func (m *Module) handleUpdateAdminUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Update admin user in database
+	storeIDs := req.StoreIDs
+	if storeIDs == nil {
+		storeIDs = []string{}
+	}
 
-	user := AdminUser{
-		ID:             userID,
-		OrganizationID: "org_01JQXYZ123456789ABCDEF",
-		Email:          "updated@2tech.ch",
-		Name:           req.Name,
-		Role:           req.Role,
-		StoreIDs:       req.StoreIDs,
-		Status:         req.Status,
-		CreatedAt:      time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
-		UpdatedAt:      time.Now().UTC(),
+	var user AdminUser
+	var lastLoginAt sql.NullTime
+	err := m.db.QueryRowContext(r.Context(), `
+		UPDATE admin_users
+		SET name=$3, role=$4, store_ids=$5, status=$6, updated_at=NOW()
+		WHERE id=$1 AND organization_id=$2
+		RETURNING id, organization_id, email, name, role,
+		          COALESCE(store_ids,'{}'), status, last_login_at, created_at, updated_at
+	`, userID, orgID, req.Name, req.Role, pqlib.Array(storeIDs), req.Status,
+	).Scan(
+		&user.ID, &user.OrganizationID, &user.Email, &user.Name, &user.Role,
+		pqlib.Array(&storeIDs), &user.Status, &lastLoginAt, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		response.Error(w, http.StatusNotFound, "NOT_FOUND", "Admin user not found")
+		return
+	}
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to update admin user")
+		return
+	}
+	user.StoreIDs = storeIDs
+	if lastLoginAt.Valid {
+		t := lastLoginAt.Time
+		user.LastLoginAt = &t
 	}
 
 	response.JSON(w, http.StatusOK, user)
@@ -648,13 +857,25 @@ func (m *Module) handleUpdateAdminUser(w http.ResponseWriter, r *http.Request) {
 // handleDeleteAdminUser deactivates an admin user (soft delete).
 // DELETE /api/v1/admin/users/{id}
 func (m *Module) handleDeleteAdminUser(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	userID := r.PathValue("id")
 	if userID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "user id is required")
 		return
 	}
 
-	// TODO: Set admin user status to "inactive" in database
+	_, err := m.db.ExecContext(r.Context(), `
+		UPDATE admin_users SET status='inactive', updated_at=NOW()
+		WHERE id=$1 AND organization_id=$2
+	`, userID, orgID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to deactivate admin user")
+		return
+	}
 
 	response.NoContent(w)
 }
@@ -666,60 +887,41 @@ func (m *Module) handleDeleteAdminUser(w http.ResponseWriter, r *http.Request) {
 // handleListEmployees returns all employees for a specific store.
 // GET /api/v1/admin/stores/{id}/employees
 func (m *Module) handleListEmployees(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	storeID := r.PathValue("id")
 	if storeID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "store id is required")
 		return
 	}
 
-	// TODO: Query employees for the given store_id and org_id
+	// Employees are stored in the users table with the store's tenant_id
+	rows, err := m.db.QueryContext(r.Context(), `
+		SELECT id, tenant_id, name, role, is_active,
+		       COALESCE(email,''), COALESCE(phone,''), created_at, updated_at
+		FROM users
+		WHERE tenant_id = $1 AND is_deleted = FALSE
+		ORDER BY name
+	`, storeID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to list employees")
+		return
+	}
+	defer rows.Close()
 
-	employees := []Employee{
-		{
-			ID:             "emp_01JV0001",
-			StoreID:        storeID,
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			Name:           "Marco Rossi",
-			Role:           "manager",
-			IsActive:       true,
-			Phone:          "+41 79 100 00 01",
-			Email:          "marco@schorepintli.ch",
-			CreatedAt:      time.Date(2024, 1, 20, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
-		{
-			ID:             "emp_01JV0002",
-			StoreID:        storeID,
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			Name:           "Lisa Schmidt",
-			Role:           "waiter",
-			IsActive:       true,
-			Phone:          "+41 79 100 00 02",
-			CreatedAt:      time.Date(2024, 2, 1, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
-		{
-			ID:             "emp_01JV0003",
-			StoreID:        storeID,
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			Name:           "Thomas Keller",
-			Role:           "kitchen",
-			IsActive:       true,
-			Phone:          "+41 79 100 00 03",
-			CreatedAt:      time.Date(2024, 2, 15, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
-		{
-			ID:             "emp_01JV0004",
-			StoreID:        storeID,
-			OrganizationID: "org_01JQXYZ123456789ABCDEF",
-			Name:           "Sarah Brunner",
-			Role:           "cashier",
-			IsActive:       true,
-			Phone:          "+41 79 100 00 04",
-			CreatedAt:      time.Date(2024, 3, 1, 10, 0, 0, 0, time.UTC),
-			UpdatedAt:      time.Now().UTC(),
-		},
+	employees := make([]Employee, 0)
+	for rows.Next() {
+		var e Employee
+		if err := rows.Scan(
+			&e.ID, &e.StoreID, &e.Name, &e.Role, &e.IsActive,
+			&e.Email, &e.Phone, &e.CreatedAt, &e.UpdatedAt,
+		); err == nil {
+			e.OrganizationID = orgID
+			employees = append(employees, e)
+		}
 	}
 
 	response.JSON(w, http.StatusOK, employees)
@@ -728,6 +930,11 @@ func (m *Module) handleListEmployees(w http.ResponseWriter, r *http.Request) {
 // handleCreateEmployee creates a new employee for a store.
 // POST /api/v1/admin/stores/{id}/employees
 func (m *Module) handleCreateEmployee(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	storeID := r.PathValue("id")
 	if storeID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "store id is required")
@@ -746,32 +953,43 @@ func (m *Module) handleCreateEmployee(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
 		return
 	}
-
 	if req.Name == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "name is required")
 		return
 	}
-
-	// TODO: Hash PIN, insert into employees table
+	if req.PIN == "" {
+		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "pin is required")
+		return
+	}
 
 	role := req.Role
 	if role == "" {
 		role = "waiter"
 	}
 
-	employee := Employee{
-		ID:             "emp_01JV0005",
-		StoreID:        storeID,
-		OrganizationID: "org_01JQXYZ123456789ABCDEF",
-		Name:           req.Name,
-		Role:           role,
-		IsActive:       true,
-		Phone:          req.Phone,
-		Email:          req.Email,
-		Permissions:    req.Permissions,
-		CreatedAt:      time.Now().UTC(),
-		UpdatedAt:      time.Now().UTC(),
+	// Hash the PIN using the same crypto module as the Flutter app
+	pinHash, err := crypto.HashPIN(req.PIN)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "HASH_ERROR", "Failed to hash PIN")
+		return
 	}
+
+	var employee Employee
+	err = m.db.QueryRowContext(r.Context(), `
+		INSERT INTO users (tenant_id, name, pin_hash, role, is_active, email, phone)
+		VALUES ($1, $2, $3, $4, TRUE, $5, $6)
+		RETURNING id, tenant_id, name, role, is_active,
+		          COALESCE(email,''), COALESCE(phone,''), created_at, updated_at
+	`, storeID, req.Name, pinHash, role, req.Email, req.Phone,
+	).Scan(
+		&employee.ID, &employee.StoreID, &employee.Name, &employee.Role, &employee.IsActive,
+		&employee.Email, &employee.Phone, &employee.CreatedAt, &employee.UpdatedAt,
+	)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to create employee")
+		return
+	}
+	employee.OrganizationID = orgID
 
 	response.Created(w, employee)
 }
@@ -798,25 +1016,30 @@ func (m *Module) handleUpdateEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Update employee in database
-
 	isActive := true
 	if req.IsActive != nil {
 		isActive = *req.IsActive
 	}
 
-	employee := Employee{
-		ID:             employeeID,
-		StoreID:        "store_01JS0001",
-		OrganizationID: "org_01JQXYZ123456789ABCDEF",
-		Name:           req.Name,
-		Role:           req.Role,
-		IsActive:       isActive,
-		Phone:          req.Phone,
-		Email:          req.Email,
-		Permissions:    req.Permissions,
-		CreatedAt:      time.Date(2024, 1, 20, 10, 0, 0, 0, time.UTC),
-		UpdatedAt:      time.Now().UTC(),
+	var employee Employee
+	err := m.db.QueryRowContext(r.Context(), `
+		UPDATE users
+		SET name=$2, role=$3, phone=$4, email=$5, is_active=$6, updated_at=NOW()
+		WHERE id=$1 AND is_deleted=FALSE
+		RETURNING id, tenant_id, name, role, is_active,
+		          COALESCE(email,''), COALESCE(phone,''), created_at, updated_at
+	`, employeeID, req.Name, req.Role, req.Phone, req.Email, isActive,
+	).Scan(
+		&employee.ID, &employee.StoreID, &employee.Name, &employee.Role, &employee.IsActive,
+		&employee.Email, &employee.Phone, &employee.CreatedAt, &employee.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		response.Error(w, http.StatusNotFound, "NOT_FOUND", "Employee not found")
+		return
+	}
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to update employee")
+		return
 	}
 
 	response.JSON(w, http.StatusOK, employee)
@@ -831,7 +1054,14 @@ func (m *Module) handleDeleteEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Set employee is_active to false in database
+	_, err := m.db.ExecContext(r.Context(), `
+		UPDATE users SET is_active=FALSE, updated_at=NOW()
+		WHERE id=$1 AND is_deleted=FALSE
+	`, employeeID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to deactivate employee")
+		return
+	}
 
 	response.NoContent(w)
 }
@@ -843,35 +1073,199 @@ func (m *Module) handleDeleteEmployee(w http.ResponseWriter, r *http.Request) {
 // handleDashboard returns organization-wide dashboard statistics.
 // GET /api/v1/admin/dashboard
 func (m *Module) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	// TODO: Extract org_id from JWT, aggregate across all stores
-	// TODO: Query tickets, payments for today vs yesterday comparison
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
+
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	yesterdayStart := todayStart.AddDate(0, 0, -1)
+	todayEnd := todayStart.Add(24*time.Hour - time.Nanosecond)
+	yesterdayEnd := yesterdayStart.Add(24*time.Hour - time.Nanosecond)
+
+	// Get all store IDs for this org
+	storeRows, err := m.db.QueryContext(r.Context(), `
+		SELECT id::TEXT FROM stores WHERE organization_id=$1 AND status='active'
+	`, orgID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to query stores")
+		return
+	}
+	defer storeRows.Close()
+
+	storeIDs := []string{}
+	for storeRows.Next() {
+		var sid string
+		if storeRows.Scan(&sid) == nil {
+			storeIDs = append(storeIDs, sid)
+		}
+	}
+
+	if len(storeIDs) == 0 {
+		// No stores, return zeros
+		response.JSON(w, http.StatusOK, DashboardResponse{
+			HourlySales: make([]int64, 24),
+		})
+		return
+	}
+
+	// Build IN clause for tenant_ids
+	inClause, args := buildInClause(storeIDs, 1)
+
+	// Today's stats
+	var todaySales, todayNetSales, todayTax, todayDiscounts int64
+	var todayOrders int
+	queryArgs := append(args, todayStart, todayEnd)
+	_ = m.db.QueryRowContext(r.Context(), `
+		SELECT
+			COALESCE(SUM(total),0),
+			COALESCE(SUM(total - discount_amount),0),
+			COALESCE(SUM(tax_amount),0),
+			COALESCE(SUM(discount_amount),0),
+			COUNT(*)
+		FROM tickets
+		WHERE tenant_id IN (`+inClause+`)
+		  AND is_deleted=FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $`+fmt.Sprintf("%d", len(args)+1)+`
+		  AND created_at <= $`+fmt.Sprintf("%d", len(args)+2),
+		queryArgs...,
+	).Scan(&todaySales, &todayNetSales, &todayTax, &todayDiscounts, &todayOrders)
+
+	// Yesterday's stats for comparison
+	var yesterdaySales, yesterdayNetSales int64
+	var yesterdayOrders int
+	yesterdayArgs := append(args, yesterdayStart, yesterdayEnd)
+	_ = m.db.QueryRowContext(r.Context(), `
+		SELECT COALESCE(SUM(total),0), COALESCE(SUM(total - discount_amount),0), COUNT(*)
+		FROM tickets
+		WHERE tenant_id IN (`+inClause+`)
+		  AND is_deleted=FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $`+fmt.Sprintf("%d", len(args)+1)+`
+		  AND created_at <= $`+fmt.Sprintf("%d", len(args)+2),
+		yesterdayArgs...,
+	).Scan(&yesterdaySales, &yesterdayNetSales, &yesterdayOrders)
+
+	// Sales vs yesterday percentages
+	salesVsYesterday := percentChange(yesterdaySales, todaySales)
+	netSalesVsYesterday := percentChange(yesterdayNetSales, todayNetSales)
+	ordersVsYesterday := percentChange(int64(yesterdayOrders), int64(todayOrders))
+
+	// Payment method breakdown
+	payArgs := append(args, todayStart, todayEnd)
+	payRows, _ := m.db.QueryContext(r.Context(), `
+		SELECT payment_method, COALESCE(SUM(amount),0)
+		FROM payments
+		WHERE tenant_id IN (`+inClause+`)
+		  AND is_deleted=FALSE
+		  AND paid_at >= $`+fmt.Sprintf("%d", len(args)+1)+`
+		  AND paid_at <= $`+fmt.Sprintf("%d", len(args)+2)+`
+		GROUP BY payment_method
+	`, payArgs...)
+
+	paymentTotals := map[string]int64{}
+	var totalPayments int64
+	if payRows != nil {
+		defer payRows.Close()
+		for payRows.Next() {
+			var method string
+			var amount int64
+			if payRows.Scan(&method, &amount) == nil {
+				paymentTotals[method] = amount
+				totalPayments += amount
+			}
+		}
+	}
+
+	salesByPayment := make([]PaymentMethodSales, 0)
+	for method, amount := range paymentTotals {
+		pct := 0
+		if totalPayments > 0 {
+			pct = int(amount * 100 / totalPayments)
+		}
+		salesByPayment = append(salesByPayment, PaymentMethodSales{
+			Method:     method,
+			Amount:     amount,
+			Percentage: pct,
+		})
+	}
+
+	// Order type breakdown
+	typeArgs := append(args, todayStart, todayEnd)
+	typeRows, _ := m.db.QueryContext(r.Context(), `
+		SELECT order_type, COALESCE(SUM(total),0)
+		FROM tickets
+		WHERE tenant_id IN (`+inClause+`)
+		  AND is_deleted=FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $`+fmt.Sprintf("%d", len(args)+1)+`
+		  AND created_at <= $`+fmt.Sprintf("%d", len(args)+2)+`
+		GROUP BY order_type
+	`, typeArgs...)
+
+	salesByType := make([]OrderTypeSales, 0)
+	if typeRows != nil {
+		defer typeRows.Close()
+		for typeRows.Next() {
+			var ot string
+			var amount int64
+			if typeRows.Scan(&ot, &amount) == nil {
+				pct := 0
+				if todaySales > 0 {
+					pct = int(amount * 100 / todaySales)
+				}
+				salesByType = append(salesByType, OrderTypeSales{
+					Type:       ot,
+					Amount:     amount,
+					Percentage: pct,
+				})
+			}
+		}
+	}
+
+	// Hourly breakdown
+	hourlyArgs := append(args, todayStart, todayEnd)
+	hourlyRows, _ := m.db.QueryContext(r.Context(), `
+		SELECT EXTRACT(HOUR FROM created_at)::INT, COALESCE(SUM(total),0)
+		FROM tickets
+		WHERE tenant_id IN (`+inClause+`)
+		  AND is_deleted=FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $`+fmt.Sprintf("%d", len(args)+1)+`
+		  AND created_at <= $`+fmt.Sprintf("%d", len(args)+2)+`
+		GROUP BY EXTRACT(HOUR FROM created_at)
+	`, hourlyArgs...)
+
+	hourlySales := make([]int64, 24)
+	if hourlyRows != nil {
+		defer hourlyRows.Close()
+		for hourlyRows.Next() {
+			var hour int
+			var amount int64
+			if hourlyRows.Scan(&hour, &amount) == nil && hour >= 0 && hour < 24 {
+				hourlySales[hour] = amount
+			}
+		}
+	}
 
 	dashboard := DashboardResponse{
-		Sales:               222500,
-		NetSales:            210107,
-		Orders:              222,
-		SalesVsYesterday:    0,
-		NetSalesVsYesterday: -21,
-		OrdersVsYesterday:   -21,
+		Sales:               todaySales,
+		NetSales:            todayNetSales,
+		Orders:              todayOrders,
+		SalesVsYesterday:    salesVsYesterday,
+		NetSalesVsYesterday: netSalesVsYesterday,
+		OrdersVsYesterday:   ordersVsYesterday,
 		SalesBreakdown: SalesBreakdown{
-			DiscountAmount: -250,
-			Tax:            10346,
-			TotalSales:     222500,
+			DiscountAmount: todayDiscounts,
+			Tax:            todayTax,
+			TotalSales:     todaySales,
 		},
-		SalesByPayment: []PaymentMethodSales{
-			{Method: "cash", Amount: 116970, Percentage: 53},
-			{Method: "card", Amount: 105530, Percentage: 47},
-		},
-		SalesByOrderType: []OrderTypeSales{
-			{Type: "dine_in", Amount: 150000, Percentage: 67},
-			{Type: "takeaway", Amount: 72500, Percentage: 33},
-		},
-		HourlySales: []int64{
-			0, 0, 0, 0, 0, 0, 0, 0,
-			5000, 15000, 35000, 80000,
-			45000, 20000, 10000, 0,
-			0, 0, 0, 0, 0, 0, 0, 0,
-		},
+		SalesByPayment:   salesByPayment,
+		SalesByOrderType: salesByType,
+		HourlySales:      hourlySales,
 	}
 
 	response.JSON(w, http.StatusOK, dashboard)
@@ -880,44 +1274,237 @@ func (m *Module) handleDashboard(w http.ResponseWriter, r *http.Request) {
 // handleStoreDashboard returns dashboard statistics for a specific store.
 // GET /api/v1/admin/dashboard/store/{id}
 func (m *Module) handleStoreDashboard(w http.ResponseWriter, r *http.Request) {
+	orgID := middleware.GetTenantID(r.Context())
+	if orgID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+		return
+	}
 	storeID := r.PathValue("id")
 	if storeID == "" {
 		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "store id is required")
 		return
 	}
 
-	// TODO: Extract org_id from JWT, verify store belongs to org
-	// TODO: Query tickets, payments for this specific store
+	// Verify store belongs to this org
+	var exists bool
+	err := m.db.QueryRowContext(r.Context(), `
+		SELECT EXISTS(SELECT 1 FROM stores WHERE id=$1 AND organization_id=$2)
+	`, storeID, orgID).Scan(&exists)
+	if err != nil || !exists {
+		response.Error(w, http.StatusNotFound, "NOT_FOUND", "Store not found")
+		return
+	}
+
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	yesterdayStart := todayStart.AddDate(0, 0, -1)
+	todayEnd := todayStart.Add(24*time.Hour - time.Nanosecond)
+	yesterdayEnd := yesterdayStart.Add(24*time.Hour - time.Nanosecond)
+
+	var todaySales, todayNetSales, todayTax, todayDiscounts int64
+	var todayOrders int
+	_ = m.db.QueryRowContext(r.Context(), `
+		SELECT
+			COALESCE(SUM(total),0),
+			COALESCE(SUM(total - discount_amount),0),
+			COALESCE(SUM(tax_amount),0),
+			COALESCE(SUM(discount_amount),0),
+			COUNT(*)
+		FROM tickets
+		WHERE tenant_id=$1 AND is_deleted=FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $2 AND created_at <= $3
+	`, storeID, todayStart, todayEnd).Scan(
+		&todaySales, &todayNetSales, &todayTax, &todayDiscounts, &todayOrders)
+
+	var yesterdaySales, yesterdayNetSales int64
+	var yesterdayOrders int
+	_ = m.db.QueryRowContext(r.Context(), `
+		SELECT COALESCE(SUM(total),0), COALESCE(SUM(total - discount_amount),0), COUNT(*)
+		FROM tickets
+		WHERE tenant_id=$1 AND is_deleted=FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $2 AND created_at <= $3
+	`, storeID, yesterdayStart, yesterdayEnd).Scan(
+		&yesterdaySales, &yesterdayNetSales, &yesterdayOrders)
+
+	salesVsYesterday := percentChange(yesterdaySales, todaySales)
+	netSalesVsYesterday := percentChange(yesterdayNetSales, todayNetSales)
+	ordersVsYesterday := percentChange(int64(yesterdayOrders), int64(todayOrders))
+
+	// Payment breakdown
+	payRows, _ := m.db.QueryContext(r.Context(), `
+		SELECT payment_method, COALESCE(SUM(amount),0)
+		FROM payments
+		WHERE tenant_id=$1 AND is_deleted=FALSE
+		  AND paid_at >= $2 AND paid_at <= $3
+		GROUP BY payment_method
+	`, storeID, todayStart, todayEnd)
+
+	paymentTotals := map[string]int64{}
+	var totalPayments int64
+	if payRows != nil {
+		defer payRows.Close()
+		for payRows.Next() {
+			var method string
+			var amount int64
+			if payRows.Scan(&method, &amount) == nil {
+				paymentTotals[method] = amount
+				totalPayments += amount
+			}
+		}
+	}
+
+	salesByPayment := make([]PaymentMethodSales, 0)
+	for method, amount := range paymentTotals {
+		pct := 0
+		if totalPayments > 0 {
+			pct = int(amount * 100 / totalPayments)
+		}
+		salesByPayment = append(salesByPayment, PaymentMethodSales{
+			Method:     method,
+			Amount:     amount,
+			Percentage: pct,
+		})
+	}
+
+	// Order type breakdown
+	typeRows, _ := m.db.QueryContext(r.Context(), `
+		SELECT order_type, COALESCE(SUM(total),0)
+		FROM tickets
+		WHERE tenant_id=$1 AND is_deleted=FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $2 AND created_at <= $3
+		GROUP BY order_type
+	`, storeID, todayStart, todayEnd)
+
+	salesByType := make([]OrderTypeSales, 0)
+	if typeRows != nil {
+		defer typeRows.Close()
+		for typeRows.Next() {
+			var ot string
+			var amount int64
+			if typeRows.Scan(&ot, &amount) == nil {
+				pct := 0
+				if todaySales > 0 {
+					pct = int(amount * 100 / todaySales)
+				}
+				salesByType = append(salesByType, OrderTypeSales{
+					Type:       ot,
+					Amount:     amount,
+					Percentage: pct,
+				})
+			}
+		}
+	}
+
+	// Hourly breakdown
+	hourlyRows, _ := m.db.QueryContext(r.Context(), `
+		SELECT EXTRACT(HOUR FROM created_at)::INT, COALESCE(SUM(total),0)
+		FROM tickets
+		WHERE tenant_id=$1 AND is_deleted=FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $2 AND created_at <= $3
+		GROUP BY EXTRACT(HOUR FROM created_at)
+	`, storeID, todayStart, todayEnd)
+
+	hourlySales := make([]int64, 24)
+	if hourlyRows != nil {
+		defer hourlyRows.Close()
+		for hourlyRows.Next() {
+			var hour int
+			var amount int64
+			if hourlyRows.Scan(&hour, &amount) == nil && hour >= 0 && hour < 24 {
+				hourlySales[hour] = amount
+			}
+		}
+	}
 
 	dashboard := DashboardResponse{
-		Sales:               145200,
-		NetSales:            137100,
-		Orders:              148,
-		SalesVsYesterday:    5,
-		NetSalesVsYesterday: 3,
-		OrdersVsYesterday:   -8,
+		Sales:               todaySales,
+		NetSales:            todayNetSales,
+		Orders:              todayOrders,
+		SalesVsYesterday:    salesVsYesterday,
+		NetSalesVsYesterday: netSalesVsYesterday,
+		OrdersVsYesterday:   ordersVsYesterday,
 		SalesBreakdown: SalesBreakdown{
-			DiscountAmount: -150,
-			Tax:            6700,
-			TotalSales:     145200,
+			DiscountAmount: todayDiscounts,
+			Tax:            todayTax,
+			TotalSales:     todaySales,
 		},
-		SalesByPayment: []PaymentMethodSales{
-			{Method: "cash", Amount: 72600, Percentage: 50},
-			{Method: "card", Amount: 65340, Percentage: 45},
-			{Method: "twint", Amount: 7260, Percentage: 5},
-		},
-		SalesByOrderType: []OrderTypeSales{
-			{Type: "dine_in", Amount: 101640, Percentage: 70},
-			{Type: "takeaway", Amount: 36300, Percentage: 25},
-			{Type: "delivery", Amount: 7260, Percentage: 5},
-		},
-		HourlySales: []int64{
-			0, 0, 0, 0, 0, 0, 0, 0,
-			3200, 9800, 22000, 52000,
-			30000, 14000, 7200, 0,
-			0, 0, 5000, 2000, 0, 0, 0, 0,
-		},
+		SalesByPayment:   salesByPayment,
+		SalesByOrderType: salesByType,
+		HourlySales:      hourlySales,
 	}
 
 	response.JSON(w, http.StatusOK, dashboard)
 }
+
+// ============================================================
+// Helpers
+// ============================================================
+
+// generateStoreCode creates a unique store code like "CH00000064".
+func generateStoreCode(db *sql.DB, country string) (string, error) {
+	// Get the current max code for this country prefix
+	var maxCode sql.NullString
+	prefix := country
+	if len(prefix) != 2 {
+		prefix = "CH"
+	}
+
+	_ = db.QueryRow(`
+		SELECT MAX(store_code)
+		FROM stores
+		WHERE store_code LIKE $1
+	`, prefix+"%").Scan(&maxCode)
+
+	nextNum := 60 // Start from CH00000060
+	if maxCode.Valid && len(maxCode.String) > 2 {
+		var n int
+		fmt.Sscanf(maxCode.String[2:], "%d", &n)
+		nextNum = n + 1
+	}
+
+	// Add randomness to avoid race conditions
+	b := make([]byte, 2)
+	rand.Read(b)
+	_ = hex.EncodeToString(b)
+
+	return fmt.Sprintf("%s%08d", prefix, nextNum), nil
+}
+
+// buildInClause builds a PostgreSQL IN clause placeholder string for a slice of string IDs.
+// startIdx is the starting $N index.
+func buildInClause(ids []string, startIdx int) (string, []any) {
+	clause := ""
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		if i > 0 {
+			clause += ", "
+		}
+		clause += fmt.Sprintf("$%d", startIdx+i)
+		args[i] = id
+	}
+	return clause, args
+}
+
+// percentChange returns the percentage change from oldVal to newVal.
+func percentChange(oldVal, newVal int64) int {
+	if oldVal == 0 {
+		if newVal > 0 {
+			return 100
+		}
+		return 0
+	}
+	return int((newVal - oldVal) * 100 / oldVal)
+}
+
+// isUniqueViolation checks if a PostgreSQL error is a unique constraint violation.
+func isUniqueViolation(err error) bool {
+	if pqErr, ok := err.(*pqlib.Error); ok {
+		return pqErr.Code == "23505"
+	}
+	return false
+}
+

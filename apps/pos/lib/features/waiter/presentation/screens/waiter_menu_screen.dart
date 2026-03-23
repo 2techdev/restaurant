@@ -12,8 +12,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
+import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/modifier_dialog.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/providers/waiter_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -291,12 +294,16 @@ class _ProductTile extends ConsumerWidget {
               ref.read(waiterActiveTicketProvider.notifier).addProduct(product);
               _showAddedFeedback(context);
             },
-      // Long press = modifier sheet (future: show modifier dialog).
+      // Long press = modifier dialog (if modifiers exist) or quantity sheet.
       onLongPress: isOutOfStock
           ? null
           : () {
               HapticFeedback.mediumImpact();
-              _showQuantitySheet(context, ref);
+              if (product.hasModifiers) {
+                _showModifierDialog(context, ref);
+              } else {
+                _showQuantitySheet(context, ref);
+              }
             },
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 200),
@@ -372,6 +379,40 @@ class _ProductTile extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _showModifierDialog(BuildContext context, WidgetRef ref) async {
+    final modifierGroups = ModifierGroupData.fromProductEntity(product);
+    final result = await showModifierDialog(
+      context: context,
+      productName: product.name,
+      productPrice: product.price,
+      modifierGroups: modifierGroups,
+    );
+    if (result != null) {
+      final orderModifiers = <OrderItemModifierEntity>[];
+      for (final entry in result.selectedModifiers.entries) {
+        for (final opt in entry.value) {
+          orderModifiers.add(OrderItemModifierEntity(
+            id: IdGenerator.generateId(),
+            orderItemId: '',
+            modifierId: opt.id,
+            modifierName: opt.name,
+            priceDelta: opt.priceDelta,
+          ));
+        }
+      }
+      if (context.mounted) {
+        HapticFeedback.lightImpact();
+        ref.read(waiterActiveTicketProvider.notifier).addProduct(
+              product,
+              quantity: result.quantity.toDouble(),
+              modifiers: orderModifiers,
+              notes: result.notes.isNotEmpty ? result.notes : null,
+            );
+        _showAddedFeedback(context);
+      }
+    }
   }
 
   void _showAddedFeedback(BuildContext context) {

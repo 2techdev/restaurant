@@ -103,7 +103,7 @@ class _TableManagementTabState extends ConsumerState<TableManagementTab> {
                 borderRadius: BorderRadius.circular(10),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
-                  onTap: () => _showFloorDialog(),
+                  onTap: _showFloorDialog,
                   splashColor: AppColors.textPrimary.withValues(alpha: 0.06),
                   child: const SizedBox(
                     width: 44,
@@ -198,7 +198,7 @@ class _TableManagementTabState extends ConsumerState<TableManagementTab> {
       children: [
         Expanded(
           child: tablesAsync.when(
-            data: (tables) => _buildTableGrid(tables),
+            data: _buildTableGrid,
             loading: () => const Center(
               child: CircularProgressIndicator(
                 color: AppColors.primary,
@@ -221,7 +221,7 @@ class _TableManagementTabState extends ConsumerState<TableManagementTab> {
             label: 'Masa Ekle',
             icon: Icons.add_rounded,
             height: 44,
-            onPressed: () => _showTableDialog(),
+            onPressed: _showTableDialog,
           ),
         ),
       ],

@@ -10,6 +10,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `ROADMAP.md` — living roadmap with Phase 1–4, per-item status (✅/🔄/🔲/❌), licensing tiers, test targets, frozen architecture decisions
+- `RELEASE_NOTES.md` — v1.0.0-beta release notes covering all apps (POS, KDS, Waiter, Kiosk, ODS, Online), Swiss-specific features, known issues, technical specs
+- `PROJECT_STATUS.md` — comprehensive codebase status report: implemented features, stubs/TODOs, missing items, test coverage, build artifacts, error inventory
+
+## [Unreleased — Swiss VAT Phase 1]
+
+### Added
 - ODS (Order Display Screen) feature module scaffolded — customer-facing order status display
 - `apps/online` Flutter Web app scaffolded for online ordering (screens, widgets, providers)
 - Go backend `stores` module (handlers, models, routes)

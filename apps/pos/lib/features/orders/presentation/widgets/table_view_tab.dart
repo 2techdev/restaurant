@@ -49,7 +49,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
   Widget build(BuildContext context) {
     final floorsAsync = ref.watch(floorsProvider);
 
-    return Container(
+    return ColoredBox(
       color: AppColors.surfaceDim,
       child: floorsAsync.when(
         loading: () => const Center(
@@ -263,11 +263,11 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
             ),
             const SizedBox(height: 12),
             // Stats
-            _buildStatCard('$freeCount', 'Free', const Color(0xFF22C55E)),
+            _buildStatCard(freeCount.toString(), 'Free', const Color(0xFF22C55E)),
             const SizedBox(height: 12),
-            _buildStatCard('${busyCount.toString().padLeft(2, '0')}', 'Busy', const Color(0xFF528DFF)),
+            _buildStatCard(busyCount.toString().padLeft(2, '0'), 'Busy', const Color(0xFF528DFF)),
             const SizedBox(height: 12),
-            _buildStatCard('${checkCount.toString().padLeft(2, '0')}', 'Check', const Color(0xFFFB923C)),
+            _buildStatCard(checkCount.toString().padLeft(2, '0'), 'Check', const Color(0xFFFB923C)),
             const SizedBox(height: 12),
             // Add table button
             Container(

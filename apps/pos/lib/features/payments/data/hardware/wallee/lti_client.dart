@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -83,7 +84,7 @@ class LtiClient {
     final startTime = DateTime.now();
     int frameCount = 0;
 
-    String _elapsed() {
+    String elapsedLabel() {
       return '[${DateTime.now().difference(startTime).inSeconds}s]';
     }
 
@@ -106,7 +107,7 @@ class LtiClient {
         t.cancel();
       } else {
         final elapsed = DateTime.now().difference(startTime).inSeconds;
-        print('[LtiClient] ${_elapsed()} Still waiting ($elapsed/${transactionTimeoutSeconds}s) '
+        debugPrint('[LtiClient] ${elapsedLabel()} Still waiting ($elapsed/${transactionTimeoutSeconds}s) '
             '— frames: ${receivedTypes.join(", ")}');
       }
     });
@@ -122,7 +123,7 @@ class LtiClient {
           sub,
           timeoutTimer,
           warningTimer,
-          _elapsed,
+          elapsedLabel,
           (count) => frameCount = count,
         );
       },
@@ -139,7 +140,7 @@ class LtiClient {
           completer,
           timeoutTimer,
           warningTimer,
-          _elapsed,
+          elapsedLabel,
         );
       },
       cancelOnError: true,
@@ -178,7 +179,7 @@ class LtiClient {
 
       final msgType = _messageType(body);
       receivedTypes.add(msgType);
-      print('[LtiClient] ${elapsed()} Frame $frameCount: $msgType (${body.length} chars)');
+      debugPrint('[LtiClient] ${elapsed()} Frame $frameCount: $msgType (${body.length} chars)');
 
       if (_isFinal(body)) {
         timeoutTimer.cancel();
@@ -199,7 +200,7 @@ class LtiClient {
     Timer warningTimer,
     String Function() elapsed,
   ) {
-    print('[LtiClient] ${elapsed()} Socket closed (frames: ${receivedTypes.join(", ")})');
+    debugPrint('[LtiClient] ${elapsed()} Socket closed (frames: ${receivedTypes.join(", ")})');
 
     // Try to parse any remaining bytes as a complete frame
     if (buffer.length > 0) {

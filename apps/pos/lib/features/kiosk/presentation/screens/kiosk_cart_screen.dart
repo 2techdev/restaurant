@@ -502,7 +502,7 @@ class _TypeButton extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.12) : KioskColors.bgCardAlt,
+          color: isSelected ? color.withValues(alpha: 0.12) : KioskColors.bgCardAlt,
           borderRadius: BorderRadius.circular(kKioskRadiusMedium),
           border: Border.all(
             color: isSelected ? color : KioskColors.border,

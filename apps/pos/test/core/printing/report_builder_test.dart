@@ -7,7 +7,7 @@ void main() {
   // Test verileri
   // ---------------------------------------------------------------------------
 
-  ShiftReportData _data({
+  ShiftReportData makeData({
     String title = 'Z-RAPPORT',
     int reportNo = 1,
     String? cashierName,
@@ -51,7 +51,7 @@ void main() {
     );
   }
 
-  String _text(List<int> bytes) => String.fromCharCodes(
+  String extractText(List<int> bytes) => String.fromCharCodes(
         bytes.where((b) => b >= 0x20 || b == 0x0A),
       );
 
@@ -61,18 +61,18 @@ void main() {
 
   group('Temel çıktı', () {
     test('build() boş olmayan byte dizisi döndürür', () {
-      final bytes = ReportBuilder(data: _data()).build();
+      final bytes = ReportBuilder(data: makeData()).build();
       expect(bytes, isNotEmpty);
     });
 
     test('ESC @ (initialize) ile başlar', () {
-      final bytes = ReportBuilder(data: _data()).build();
+      final bytes = ReportBuilder(data: makeData()).build();
       expect(bytes[0], 0x1B);
       expect(bytes[1], 0x40);
     });
 
     test('GS V 1 (partial cut) ile biter', () {
-      final bytes = ReportBuilder(data: _data()).build();
+      final bytes = ReportBuilder(data: makeData()).build();
       bool hasCut = false;
       for (int i = 0; i < bytes.length - 2; i++) {
         if (bytes[i] == 0x1D && bytes[i + 1] == 0x56 && bytes[i + 2] == 0x01) {
@@ -90,47 +90,47 @@ void main() {
 
   group('Başlık bölümü', () {
     test('Z-RAPPORT başlığı yazdırılır', () {
-      final text = _text(ReportBuilder(data: _data(title: 'Z-RAPPORT')).build());
+      final text = extractText(ReportBuilder(data: makeData(title: 'Z-RAPPORT')).build());
       expect(text, contains('Z-RAPPORT'));
     });
 
     test('X-RAPPORT başlığı yazdırılır', () {
-      final text = _text(ReportBuilder(data: _data(title: 'X-RAPPORT')).build());
+      final text = extractText(ReportBuilder(data: makeData(title: 'X-RAPPORT')).build());
       expect(text, contains('X-RAPPORT'));
     });
 
     test('Rapor numarası yazdırılır', () {
-      final text = _text(ReportBuilder(data: _data(reportNo: 42)).build());
+      final text = extractText(ReportBuilder(data: makeData(reportNo: 42)).build());
       expect(text, contains('42'));
     });
 
     test('Kasiyer adı yazdırılır', () {
-      final text = _text(
-        ReportBuilder(data: _data(cashierName: 'Anna Mueller')).build(),
+      final text = extractText(
+        ReportBuilder(data: makeData(cashierName: 'Anna Mueller')).build(),
       );
       expect(text, contains('Anna Mueller'));
     });
 
     test('Terminal numarası yazdırılır', () {
-      final text = _text(
-        ReportBuilder(data: _data(terminalNo: 'POS-01')).build(),
+      final text = extractText(
+        ReportBuilder(data: makeData(terminalNo: 'POS-01')).build(),
       );
       expect(text, contains('POS-01'));
     });
 
     test('Şift başlangıcı yazdırılır', () {
-      final text = _text(
+      final text = extractText(
         ReportBuilder(
-          data: _data(shiftStart: DateTime(2026, 3, 20, 8, 0, 0)),
+          data: makeData(shiftStart: DateTime(2026, 3, 20, 8, 0, 0)),
         ).build(),
       );
       expect(text, contains('08:00:00'));
     });
 
     test('Şift bitişi varsa yazdırılır', () {
-      final text = _text(
+      final text = extractText(
         ReportBuilder(
-          data: _data(shiftEnd: DateTime(2026, 3, 20, 19, 45, 0)),
+          data: makeData(shiftEnd: DateTime(2026, 3, 20, 19, 45, 0)),
         ).build(),
       );
       expect(text, contains('19:45:00'));
@@ -143,43 +143,43 @@ void main() {
 
   group('Satış (UMSATZ) bölümü', () {
     test('UMSATZ başlığı yazdırılır', () {
-      final text = _text(ReportBuilder(data: _data()).build());
+      final text = extractText(ReportBuilder(data: makeData()).build());
       expect(text, contains('UMSATZ'));
     });
 
     test('Brüt satış tutarı yazdırılır', () {
-      final text = _text(
-        ReportBuilder(data: _data(grossSales: 425000)).build(),
+      final text = extractText(
+        ReportBuilder(data: makeData(grossSales: 425000)).build(),
       );
       expect(text, contains('4250.00'));
     });
 
     test('İndirim tutarı varsa yazdırılır', () {
-      final text = _text(
-        ReportBuilder(data: _data(grossSales: 425000, totalDiscount: 12500)).build(),
+      final text = extractText(
+        ReportBuilder(data: makeData(grossSales: 425000, totalDiscount: 12500)).build(),
       );
       expect(text, contains('Rabatte'));
       expect(text, contains('125.00'));
     });
 
     test('İndirim yoksa "Rabatte" yazdırılmaz', () {
-      final text = _text(
-        ReportBuilder(data: _data(totalDiscount: 0)).build(),
+      final text = extractText(
+        ReportBuilder(data: makeData(totalDiscount: 0)).build(),
       );
       expect(text, isNot(contains('Rabatte')));
     });
 
     test('İade tutarı varsa yazdırılır', () {
-      final text = _text(
-        ReportBuilder(data: _data(totalReturns: 5000)).build(),
+      final text = extractText(
+        ReportBuilder(data: makeData(totalReturns: 5000)).build(),
       );
       expect(text, contains('Retouren'));
       expect(text, contains('50.00'));
     });
 
     test('Net gelir (Nettoumsatz gesamt) yazdırılır', () {
-      final text = _text(
-        ReportBuilder(data: _data(netRevenue: 407500)).build(),
+      final text = extractText(
+        ReportBuilder(data: makeData(netRevenue: 407500)).build(),
       );
       expect(text, contains('Nettoumsatz gesamt'));
       expect(text, contains('4075.00'));
@@ -192,14 +192,14 @@ void main() {
 
   group('Ödeme (ZAHLUNGEN) bölümü', () {
     test('ZAHLUNGEN başlığı yazdırılır', () {
-      final text = _text(ReportBuilder(data: _data()).build());
+      final text = extractText(ReportBuilder(data: makeData()).build());
       expect(text, contains('ZAHLUNGEN'));
     });
 
     test('Ödeme yöntemleri ve tutarları yazdırılır', () {
-      final text = _text(
+      final text = extractText(
         ReportBuilder(
-          data: _data(paymentBreakdown: {
+          data: makeData(paymentBreakdown: {
             'Bar': 125000,
             'Karte': 250000,
             'TWINT': 32500,
@@ -215,9 +215,9 @@ void main() {
     });
 
     test('Ödeme toplamı yazdırılır', () {
-      final text = _text(
+      final text = extractText(
         ReportBuilder(
-          data: _data(paymentBreakdown: {'Bar': 125000, 'Karte': 250000}),
+          data: makeData(paymentBreakdown: {'Bar': 125000, 'Karte': 250000}),
         ).build(),
       );
       // Toplam: 125000 + 250000 = 375000 = CHF 3750.00
@@ -231,14 +231,14 @@ void main() {
 
   group('MWST-ABRECHNUNG bölümü', () {
     test('mwstEntries boşsa MWST-ABRECHNUNG başlığı yazdırılmaz', () {
-      final text = _text(ReportBuilder(data: _data(mwstEntries: [])).build());
+      final text = extractText(ReportBuilder(data: makeData(mwstEntries: [])).build());
       expect(text, isNot(contains('MWST-ABRECHNUNG')));
     });
 
     test('MWST-ABRECHNUNG başlığı yazdırılır', () {
-      final text = _text(
+      final text = extractText(
         ReportBuilder(
-          data: _data(mwstEntries: [
+          data: makeData(mwstEntries: [
             MwStReportEntry(code: MwStCode.a, grossAmount: 10000),
           ]),
         ).build(),
@@ -247,9 +247,9 @@ void main() {
     });
 
     test('MwSt kodu, oranı ve tutarı yazdırılır', () {
-      final text = _text(
+      final text = extractText(
         ReportBuilder(
-          data: _data(mwstEntries: [
+          data: makeData(mwstEntries: [
             MwStReportEntry(code: MwStCode.a, grossAmount: 10000),
             MwStReportEntry(code: MwStCode.b, grossAmount: 5000),
           ]),
@@ -260,9 +260,9 @@ void main() {
     });
 
     test('Toplam satırı yazdırılır', () {
-      final text = _text(
+      final text = extractText(
         ReportBuilder(
-          data: _data(mwstEntries: [
+          data: makeData(mwstEntries: [
             MwStReportEntry(code: MwStCode.a, grossAmount: 10000),
           ]),
         ).build(),
@@ -271,9 +271,9 @@ void main() {
     });
 
     test('Kodlar alfabetik sırada yazdırılır (A → B → C)', () {
-      final text = _text(
+      final text = extractText(
         ReportBuilder(
-          data: _data(mwstEntries: [
+          data: makeData(mwstEntries: [
             MwStReportEntry(code: MwStCode.c, grossAmount: 1000),
             MwStReportEntry(code: MwStCode.a, grossAmount: 5000),
             MwStReportEntry(code: MwStCode.b, grossAmount: 2000),
@@ -294,25 +294,25 @@ void main() {
 
   group('İstatistik (STATISTIK) bölümü', () {
     test('STATISTIK başlığı yazdırılır', () {
-      final text = _text(ReportBuilder(data: _data()).build());
+      final text = extractText(ReportBuilder(data: makeData()).build());
       expect(text, contains('STATISTIK'));
     });
 
     test('Bon sayısı yazdırılır', () {
       final text =
-          _text(ReportBuilder(data: _data(orderCount: 45)).build());
+          extractText(ReportBuilder(data: makeData(orderCount: 45)).build());
       expect(text, contains('45'));
     });
 
     test('Storno sayısı yazdırılır', () {
       final text =
-          _text(ReportBuilder(data: _data(voidCount: 3)).build());
+          extractText(ReportBuilder(data: makeData(voidCount: 3)).build());
       expect(text, contains('Stornierungen'));
     });
 
     test('İade sayısı yazdırılır', () {
       final text =
-          _text(ReportBuilder(data: _data(returnCount: 1)).build());
+          extractText(ReportBuilder(data: makeData(returnCount: 1)).build());
       expect(text, contains('Retouren'));
     });
   });
@@ -323,22 +323,22 @@ void main() {
 
   group('Kasa (KASSENSTAND) bölümü', () {
     test('openingFloat yoksa KASSENSTAND bölümü yazdırılmaz', () {
-      final text = _text(ReportBuilder(data: _data()).build());
+      final text = extractText(ReportBuilder(data: makeData()).build());
       expect(text, isNot(contains('KASSENSTAND')));
     });
 
     test('Kasa açılış tutarı yazdırılır', () {
-      final text = _text(
-        ReportBuilder(data: _data(openingFloat: 50000)).build(),
+      final text = extractText(
+        ReportBuilder(data: makeData(openingFloat: 50000)).build(),
       );
       expect(text, contains('KASSENSTAND'));
       expect(text, contains('500.00'));
     });
 
     test('Kasa kapanış tutarı yazdırılır', () {
-      final text = _text(
+      final text = extractText(
         ReportBuilder(
-          data: _data(openingFloat: 50000, closingFloat: 175000),
+          data: makeData(openingFloat: 50000, closingFloat: 175000),
         ).build(),
       );
       expect(text, contains('Kassenendstand'));
@@ -348,7 +348,7 @@ void main() {
     test('cashDifference hesabı doğru: nakit ödeme + açılış - kapanış', () {
       // Açılış: CHF 500, Nakit ödeme: CHF 1250, Beklenen kapanış: CHF 1750
       // Gerçek kapanış: CHF 1750, Fark: 0
-      final reportData = _data(
+      final reportData = makeData(
         openingFloat: 50000,
         closingFloat: 175000,
         paymentBreakdown: {'Bar': 125000, 'Karte': 100000},
@@ -359,7 +359,7 @@ void main() {
     test('cashDifference negatif ise fazla ödeme yapılmış', () {
       // Açılış: CHF 500, Nakit ödeme: CHF 1250, Beklenen: CHF 1750
       // Gerçek kapanış: CHF 1740, Fark: -10 CHF (1000 cent)
-      final reportData = _data(
+      final reportData = makeData(
         openingFloat: 50000,
         closingFloat: 174000,
         paymentBreakdown: {'Bar': 125000},
@@ -375,13 +375,13 @@ void main() {
   group('Kapanış mesajı', () {
     test('Z raporu "KASSE GESCHLOSSEN" ile biter', () {
       final text =
-          _text(ReportBuilder(data: _data(title: 'Z-RAPPORT')).build());
+          extractText(ReportBuilder(data: makeData(title: 'Z-RAPPORT')).build());
       expect(text, contains('KASSE GESCHLOSSEN'));
     });
 
     test('X raporu "ZWISCHENBERICHT" ile biter', () {
       final text =
-          _text(ReportBuilder(data: _data(title: 'X-RAPPORT')).build());
+          extractText(ReportBuilder(data: makeData(title: 'X-RAPPORT')).build());
       expect(text, contains('ZWISCHENBERICHT'));
     });
   });

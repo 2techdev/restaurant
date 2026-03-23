@@ -10,6 +10,7 @@ library;
 
 import 'package:go_router/go_router.dart';
 
+import 'package:gastrocore_pos/features/payments/presentation/screens/split_bill_screen.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/screens/waiter_login_screen.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/screens/table_select_screen.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/screens/waiter_order_screen.dart';
@@ -25,8 +26,10 @@ abstract final class WaiterRoutes {
   static const String tables = '/waiter/tables';
   static const String order = '/waiter/order/:tableId';
   static const String myOrders = '/waiter/my-orders';
+  static const String splitBill = '/waiter/split-bill/:ticketId';
 
   static String orderFor(String tableId) => '/waiter/order/$tableId';
+  static String splitBillFor(String ticketId) => '/waiter/split-bill/$ticketId';
 }
 
 // ---------------------------------------------------------------------------
@@ -45,6 +48,13 @@ final GoRouter waiterRouter = GoRouter(
     GoRoute(
       path: WaiterRoutes.login,
       builder: (context, state) => const WaiterLoginScreen(),
+    ),
+    GoRoute(
+      path: WaiterRoutes.splitBill,
+      builder: (context, state) {
+        final ticketId = state.pathParameters['ticketId'] ?? '';
+        return SplitBillScreen(ticketId: ticketId);
+      },
     ),
     // Shell route provides persistent bottom navigation bar.
     ShellRoute(

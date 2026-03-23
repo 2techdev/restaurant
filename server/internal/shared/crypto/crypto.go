@@ -64,6 +64,17 @@ func VerifyPassword(password, stored string) bool {
 	return hmac.Equal(got, want)
 }
 
+// HashPIN creates a PBKDF2-SHA256 hash for a short numeric PIN.
+// Uses the same format as HashPassword so VerifyPassword works for PINs too.
+func HashPIN(pin string) (string, error) {
+	return HashPassword(pin)
+}
+
+// VerifyPIN checks a plaintext PIN against a stored hash.
+func VerifyPIN(pin, stored string) bool {
+	return VerifyPassword(pin, stored)
+}
+
 // ErrInvalidHash is returned when a stored hash has an unrecognised format.
 var ErrInvalidHash = errors.New("crypto: unrecognised hash format")
 

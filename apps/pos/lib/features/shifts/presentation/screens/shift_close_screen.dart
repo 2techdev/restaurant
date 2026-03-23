@@ -699,7 +699,7 @@ class _ShiftCloseScreenState extends ConsumerState<ShiftCloseScreen> {
     required int expectedCashCents,
     required int varianceCents,
   }) {
-    return Container(
+    return ColoredBox(
       color: AppColors.surface,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

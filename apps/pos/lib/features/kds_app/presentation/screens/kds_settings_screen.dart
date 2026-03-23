@@ -362,7 +362,7 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
           ),
         ],
       ),

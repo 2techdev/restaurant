@@ -106,7 +106,7 @@ class _MenuManagementTabState extends ConsumerState<MenuManagementTab> {
           // Category list
           Expanded(
             child: categoriesAsync.when(
-              data: (categories) => _buildCategoryList(categories),
+              data: _buildCategoryList,
               loading: () => const Center(
                 child: CircularProgressIndicator(
                   color: AppColors.primary,
@@ -129,7 +129,7 @@ class _MenuManagementTabState extends ConsumerState<MenuManagementTab> {
               label: 'Kategori Ekle',
               icon: Icons.add_rounded,
               height: 44,
-              onPressed: () => _showCategoryDialog(),
+              onPressed: _showCategoryDialog,
             ),
           ),
         ],
@@ -354,7 +354,7 @@ class _MenuManagementTabState extends ConsumerState<MenuManagementTab> {
               icon: Icons.add_rounded,
               height: 44,
               onPressed: _selectedCategoryId != null
-                  ? () => _showProductDialog()
+                  ? _showProductDialog
                   : null,
             ),
           ),

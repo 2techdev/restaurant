@@ -84,16 +84,21 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = keyProperties["keyAlias"] as String
-            keyPassword = keyProperties["keyPassword"] as String
-            storeFile = keyProperties["storeFile"]?.let { rootProject.file(it) }
-            storePassword = keyProperties["storePassword"] as String
+            keyAlias = keyProperties["keyAlias"]?.toString() ?: ""
+            keyPassword = keyProperties["keyPassword"]?.toString() ?: ""
+            storeFile = keyProperties["storeFile"]?.let { rootProject.file(it.toString()) }
+            storePassword = keyProperties["storePassword"]?.toString() ?: ""
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Use release signing when key.properties is present, debug signing otherwise.
+            signingConfig = if (keyPropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

@@ -11,7 +11,6 @@
 /// All tests run against an in-memory SQLite database — no real network.
 library;
 
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/native.dart';
@@ -97,7 +96,7 @@ class _FakeRepo implements SyncRepository {
   int pullCalls = 0;
   String cursor = '';
 
-  _FakeRepo({this.pendingCount = 0, this.failPush = false, this.failPull = false});
+  _FakeRepo({this.pendingCount = 0}) : failPush = false, failPull = false;
 
   @override
   Future<int> pushPendingEvents() async {

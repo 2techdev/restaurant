@@ -123,7 +123,7 @@ class _OdsSettingsScreenState extends ConsumerState<OdsSettingsScreen> {
                   label: 'Sound Chime',
                   subtitle: 'Play a chime when orders are ready',
                   value: soundEnabled,
-                  onChanged: (v) => persistence.saveSoundEnabled(v),
+                  onChanged: persistence.saveSoundEnabled,
                 ),
                 const _Divider(),
                 // Auto-remove slider
@@ -329,7 +329,7 @@ class _SwitchRow extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: OdsColors.ready,
+            activeThumbColor: OdsColors.ready,
           ),
         ],
       ),

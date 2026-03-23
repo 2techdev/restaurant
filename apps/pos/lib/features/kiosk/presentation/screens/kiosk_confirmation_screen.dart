@@ -128,7 +128,7 @@ class _KioskConfirmationScreenState
                           color: KioskColors.success,
                           boxShadow: [
                             BoxShadow(
-                              color: KioskColors.success.withOpacity(0.4),
+                              color: KioskColors.success.withValues(alpha: 0.4),
                               blurRadius: 40,
                               spreadRadius: 8,
                             ),

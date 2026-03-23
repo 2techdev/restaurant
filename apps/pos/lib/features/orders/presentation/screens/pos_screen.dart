@@ -18,6 +18,7 @@ import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/discount_dialog.dart';
 
 // ---------------------------------------------------------------------------
 // POS Screen
@@ -386,7 +387,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   Widget _buildProductArea() {
     final productsAsync = ref.watch(filteredProductsProvider);
 
-    return Container(
+    return ColoredBox(
       color: AppColors.surfaceDim,
       child: Column(
         children: [
@@ -819,9 +820,36 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                     // Discount
                     Expanded(
                       child: GestureDetector(
-                        onTap: () {
-                          // TODO: Open discount dialog
-                        },
+                        onTap: hasItems
+                            ? () async {
+                                final ticket =
+                                    ref.read(currentTicketProvider);
+                                if (ticket == null) return;
+                                final result =
+                                    await DiscountDialog.show(
+                                  context: context,
+                                  ref: ref,
+                                  orderTotal: ticket.total,
+                                );
+                                if (result != null && mounted) {
+                                  final currentUser =
+                                      ref.read(currentUserProvider);
+                                  if (currentUser == null) return;
+                                  await ref
+                                      .read(currentTicketProvider
+                                          .notifier)
+                                      .applyDiscount(
+                                        discountType:
+                                            result.discountType,
+                                        discountValue:
+                                            result.discountValue,
+                                        reason: result.reason,
+                                        requestedBy: currentUser,
+                                        approvedBy: result.approvedBy,
+                                      );
+                                }
+                              }
+                            : null,
                         child: Container(
                           height: 48,
                           decoration: BoxDecoration(

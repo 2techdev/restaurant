@@ -289,7 +289,7 @@ class _VoidScreenState extends ConsumerState<VoidScreen> {
   // -------------------------------------------------------------------------
 
   Widget _buildItemList(List<OrderItemEntity> active) {
-    return Container(
+    return ColoredBox(
       color: AppColors.surfaceDim,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,7 +334,7 @@ class _VoidScreenState extends ConsumerState<VoidScreen> {
                 if (_selectedItemIds.isNotEmpty)
                   _actionChip(
                     label: 'Temizle',
-                    onTap: () => setState(() => _selectedItemIds.clear()),
+                    onTap: () => setState(_selectedItemIds.clear),
                   ),
               ],
             ),
@@ -487,7 +487,7 @@ class _VoidScreenState extends ConsumerState<VoidScreen> {
     final canConfirm =
         _voidWholeTicket || _selectedItemIds.isNotEmpty;
 
-    return Container(
+    return ColoredBox(
       color: AppColors.surface,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -621,7 +621,7 @@ class _VoidScreenState extends ConsumerState<VoidScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            Container(
+            DecoratedBox(
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(8),

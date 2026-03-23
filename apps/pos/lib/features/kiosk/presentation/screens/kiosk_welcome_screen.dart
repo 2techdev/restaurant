@@ -107,7 +107,7 @@ class _KioskWelcomeScreenState extends ConsumerState<KioskWelcomeScreen>
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      KioskColors.primary.withOpacity(0.25),
+                      KioskColors.primary.withValues(alpha: 0.25),
                       Colors.transparent,
                     ],
                   ),
@@ -151,7 +151,7 @@ class _KioskWelcomeScreenState extends ConsumerState<KioskWelcomeScreen>
                           BorderRadius.circular(kKioskRadiusXL),
                       boxShadow: [
                         BoxShadow(
-                          color: KioskColors.primary.withOpacity(0.5),
+                          color: KioskColors.primary.withValues(alpha: 0.5),
                           blurRadius: 40,
                           spreadRadius: 4,
                         ),
@@ -198,7 +198,7 @@ class _KioskWelcomeScreenState extends ConsumerState<KioskWelcomeScreen>
                 Text(
                   'Tap to start your order',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     fontSize: 18,
                   ),
                 ),
@@ -250,7 +250,7 @@ class _LanguagePillRow extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: isActive
                     ? KioskColors.primary
-                    : Colors.white.withOpacity(0.15),
+                    : Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(kKioskRadiusSmall),
               ),
               child: Text(
@@ -295,7 +295,7 @@ class _StepIndicator extends StatelessWidget {
                 height: 2,
                 color: done
                     ? KioskColors.primary
-                    : Colors.white.withOpacity(0.3),
+                    : Colors.white.withValues(alpha: 0.3),
               ),
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
@@ -307,7 +307,7 @@ class _StepIndicator extends StatelessWidget {
                     ? KioskColors.primary
                     : done
                         ? KioskColors.primaryLight
-                        : Colors.white.withOpacity(0.2),
+                        : Colors.white.withValues(alpha: 0.2),
               ),
               child: Center(
                 child: Text(

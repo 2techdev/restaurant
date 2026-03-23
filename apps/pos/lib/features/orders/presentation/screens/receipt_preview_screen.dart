@@ -8,90 +8,14 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
+import 'package:gastrocore_pos/core/di/providers.dart';
+import 'package:gastrocore_pos/core/printing/models/print_models.dart';
+import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
-
-// ---------------------------------------------------------------------------
-// Demo data (MVP)
-// ---------------------------------------------------------------------------
-
-class _ReceiptItem {
-  final int qty;
-  final String name;
-  final int unitPrice; // cents
-
-  const _ReceiptItem({
-    required this.qty,
-    required this.name,
-    required this.unitPrice,
-  });
-
-  int get subtotal => qty * unitPrice;
-}
-
-class _ReceiptData {
-  final String restaurantName;
-  final String address;
-  final String phone;
-  final String receiptNumber;
-  final String dateTime;
-  final String waiter;
-  final String tableName;
-  final List<_ReceiptItem> items;
-  final int subtotal;
-  final int taxAmount;
-  final int grandTotal;
-  final int paidAmount;
-  final int changeAmount;
-  final String paymentMethod;
-
-  const _ReceiptData({
-    required this.restaurantName,
-    required this.address,
-    required this.phone,
-    required this.receiptNumber,
-    required this.dateTime,
-    required this.waiter,
-    required this.tableName,
-    required this.items,
-    required this.subtotal,
-    required this.taxAmount,
-    required this.grandTotal,
-    required this.paidAmount,
-    required this.changeAmount,
-    required this.paymentMethod,
-  });
-}
-
-_ReceiptData _buildDemoReceipt() {
-  const items = [
-    _ReceiptItem(qty: 2, name: 'Izgara Tavuk', unitPrice: 18500),
-    _ReceiptItem(qty: 1, name: 'Adana Kebap', unitPrice: 21000),
-    _ReceiptItem(qty: 1, name: 'Sezar Salata', unitPrice: 12000),
-    _ReceiptItem(qty: 2, name: 'Ayran', unitPrice: 3500),
-    _ReceiptItem(qty: 1, name: 'Kunefe', unitPrice: 11000),
-  ];
-  final subtotal = items.fold<int>(0, (s, i) => s + i.subtotal);
-  final tax = (subtotal * 0.10).round();
-  final total = subtotal + tax;
-
-  return _ReceiptData(
-    restaurantName: 'GASTROCORE RESTAURANT',
-    address: 'Bahnhofstrasse 42, Zurich',
-    phone: 'Tel: +41 (044) 123 45 67',
-    receiptNumber: '#0412',
-    dateTime: '20.03.2026  14:32',
-    waiter: 'Ahmet K.',
-    tableName: 'Masa 12',
-    items: items,
-    subtotal: subtotal,
-    taxAmount: tax,
-    grandTotal: total,
-    paidAmount: 100000,
-    changeAmount: 100000 - total,
-    paymentMethod: 'Nakit',
-  );
-}
+import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Receipt Preview Screen
@@ -108,14 +32,8 @@ class ReceiptPreviewScreen extends ConsumerStatefulWidget {
 }
 
 class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
-  // TODO: Replace with real receipt data from provider using widget.ticketId
-  late final _ReceiptData _receipt;
-
-  @override
-  void initState() {
-    super.initState();
-    _receipt = _buildDemoReceipt();
-  }
+  /// Cached ticket — updated whenever the async provider emits a new value.
+  TicketEntity? _ticket;
 
   String _formatCents(int cents) {
     final isNeg = cents < 0;
@@ -131,14 +49,159 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
     return '${isNeg ? '-' : ''}${parts.join(',')}.$frac';
   }
 
+  String _formatDateTime(DateTime dt) {
+    final d = '${dt.day.toString().padLeft(2, '0')}.'
+        '${dt.month.toString().padLeft(2, '0')}.'
+        '${dt.year}';
+    final t = '${dt.hour.toString().padLeft(2, '0')}:'
+        '${dt.minute.toString().padLeft(2, '0')}';
+    return '$d  $t';
+  }
+
+  /// Build [SwissReceiptData] from the real ticket for printing.
+  SwissReceiptData _buildReceiptData(TicketEntity ticket) {
+    final isDineIn = ticket.orderType == OrderType.dineIn;
+
+    final receiptItems = ticket.items.map((item) {
+      return SwissReceiptItem(
+        name: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.subtotal,
+        mwstCode: MwStCode.forProduct(
+          taxGroup: item.taxGroup,
+          isDineIn: isDineIn,
+        ),
+        modifiers: item.modifiers.map((m) => m.modifierName).toList(),
+        notes: item.notes,
+      );
+    }).toList();
+
+    // MwSt breakdown: code → gross amount
+    final breakdown = <String, int>{};
+    for (final item in ticket.items) {
+      final code = MwStCode.forProduct(
+        taxGroup: item.taxGroup,
+        isDineIn: isDineIn,
+      ).code;
+      breakdown[code] = (breakdown[code] ?? 0) + item.subtotal;
+    }
+
+    final tenant = ref.read(tenantInfoProvider).valueOrNull;
+    final restaurantName = tenant?.name ?? 'GastroCore Restaurant';
+    final address = tenant?.address ?? '';
+    final phone = tenant?.phone != null ? 'Tel: ${tenant!.phone}' : '';
+
+    return SwissReceiptData(
+      restaurantName: restaurantName.toUpperCase(),
+      address: address,
+      phone: phone,
+      receiptNo: ticket.orderNumber,
+      dateTime: ticket.openedAt,
+      cashierName: ticket.cashierName,
+      tableName: ticket.tableId,
+      orderNo: ticket.orderNumber,
+      orderTypeLabel: isDineIn ? 'Hier essen' : 'Zum Mitnehmen',
+      items: receiptItems,
+      total: ticket.total,
+      subtotal: ticket.subtotal,
+      discountAmount: ticket.discountAmount,
+      mwstBreakdown: breakdown,
+      footerText: 'Afiyet Olsun! · Merci de votre visite!',
+      openDrawer: false,
+    );
+  }
+
+  Future<void> _onPrint() async {
+    final ticket = _ticket;
+    if (ticket == null) return;
+    final useCase = ref.read(printReceiptUseCaseProvider);
+    await useCase(_buildReceiptData(ticket));
+  }
+
+  Future<void> _onShare() async {
+    final ticket = _ticket;
+    if (ticket == null) return;
+    final data = _buildReceiptData(ticket);
+    final text = _buildShareText(data);
+    await Share.share(
+      text,
+      subject: '${data.restaurantName} - Fiş #${data.receiptNo}',
+    );
+  }
+
+  String _buildShareText(SwissReceiptData data) {
+    const w = 42;
+    final lines = <String>[];
+
+    // Header
+    final name = data.restaurantName;
+    lines.add(name.padLeft((w + name.length) ~/ 2));
+    if (data.address != null && data.address!.isNotEmpty) {
+      lines.add(data.address!);
+    }
+    if (data.phone != null && data.phone!.isNotEmpty) lines.add(data.phone!);
+    lines.add('-' * w);
+
+    // Meta
+    if (data.dateTime != null) {
+      lines.add('Tarih: ${_formatDateTime(data.dateTime!)}');
+    }
+    if (data.cashierName != null) lines.add('Kasiyer: ${data.cashierName}');
+    if (data.tableName != null) lines.add('Masa:    ${data.tableName}');
+    if (data.orderTypeLabel != null) lines.add(data.orderTypeLabel!);
+    lines.add('=' * w);
+
+    // Items
+    for (final item in data.items) {
+      final qty = item.quantity % 1 == 0
+          ? item.quantity.toInt().toString()
+          : item.quantity.toStringAsFixed(1);
+      final label = '$qty x ${item.name}';
+      final price = 'CHF ${_formatCents(item.totalPrice)}';
+      final pad = w - label.length - price.length;
+      lines.add('$label${' ' * (pad > 1 ? pad : 1)}$price');
+      for (final m in item.modifiers) {
+        lines.add('  + $m');
+      }
+      if (item.notes != null) lines.add('  * ${item.notes}');
+    }
+
+    lines.add('-' * w);
+    if (data.discountAmount != 0) {
+      lines.add('İndirim:  -CHF ${_formatCents(data.discountAmount)}');
+    }
+    final totalLabel = 'TOPLAM';
+    final totalPrice = 'CHF ${_formatCents(data.total)}';
+    final totalPad = w - totalLabel.length - totalPrice.length;
+    lines.add('$totalLabel${' ' * (totalPad > 1 ? totalPad : 1)}$totalPrice');
+    lines.add('=' * w);
+
+    if (data.footerText != null) lines.add(data.footerText!);
+    lines.add('Fiş No: ${data.receiptNo}');
+
+    return lines.join('\n');
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Keep _ticket in sync with the database.
+    ref.listen(ticketByIdProvider(widget.ticketId), (_, next) {
+      next.whenData((t) {
+        if (t != null && mounted) setState(() => _ticket = t);
+      });
+    });
+
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
       body: Column(
         children: [
           _buildTopBar(),
-          Expanded(child: _buildReceiptArea()),
+          Expanded(
+            child: _ticket == null
+                ? const Center(child: CircularProgressIndicator())
+                : _buildReceiptArea(_ticket!),
+          ),
           _buildBottomActions(),
         ],
       ),
@@ -217,9 +280,7 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
 
           // Search icon
           GestureDetector(
-            onTap: () {
-              // TODO: Search orders
-            },
+            onTap: () => context.go('/order-center'),
             child: Container(
               width: 36,
               height: 36,
@@ -240,10 +301,10 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
   }
 
   // -------------------------------------------------------------------------
-  // Receipt area (center)
+  // Receipt area — rendered from real ticket data
   // -------------------------------------------------------------------------
 
-  Widget _buildReceiptArea() {
+  Widget _buildReceiptArea(TicketEntity ticket) {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 32),
@@ -270,42 +331,58 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Restaurant name
-                Text(
-                  _receipt.restaurantName,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A1A1A),
-                    letterSpacing: 1.5,
-                  ),
-                ),
+                // Restaurant name — from live tenant record
+                Consumer(builder: (context, ref, _) {
+                  final tenant =
+                      ref.watch(tenantInfoProvider).valueOrNull;
+                  final name = tenant?.name ?? 'GastroCore Restaurant';
+                  return Text(
+                    name.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1A1A1A),
+                      letterSpacing: 1.5,
+                    ),
+                  );
+                }),
                 const SizedBox(height: 4),
 
-                // Address
-                Text(
-                  _receipt.address,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF555555),
-                  ),
-                ),
+                // Address — from tenant record
+                Consumer(builder: (context, ref, _) {
+                  final tenant =
+                      ref.watch(tenantInfoProvider).valueOrNull;
+                  final address = tenant?.address;
+                  if (address == null || address.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Text(
+                    address,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF555555)),
+                  );
+                }),
                 const SizedBox(height: 2),
 
-                // Phone
-                Text(
-                  _receipt.phone,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF555555),
-                  ),
-                ),
+                // Phone — from tenant record
+                Consumer(builder: (context, ref, _) {
+                  final tenant =
+                      ref.watch(tenantInfoProvider).valueOrNull;
+                  final phone = tenant?.phone;
+                  if (phone == null || phone.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Text(
+                    'Tel: $phone',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF555555)),
+                  );
+                }),
                 const SizedBox(height: 12),
 
-                // Dashed divider
                 _buildDashedDivider(),
                 const SizedBox(height: 10),
 
@@ -314,14 +391,11 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      _receipt.dateTime,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF333333),
-                      ),
+                      _formatDateTime(ticket.openedAt),
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF333333)),
                     ),
                     Text(
-                      'Fis No: ${_receipt.receiptNumber}',
+                      'Fis No: #${ticket.orderNumber}',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -337,24 +411,19 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Garson: ${_receipt.waiter}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF555555),
-                      ),
+                      ticket.waiterId != null
+                          ? 'Garson: ${ticket.waiterId}'
+                          : '',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF555555)),
                     ),
                     Text(
-                      _receipt.tableName,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF555555),
-                      ),
+                      ticket.tableId != null ? 'Masa ${ticket.tableId}' : '',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF555555)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
 
-                // Dashed divider
                 _buildDashedDivider(),
                 const SizedBox(height: 10),
 
@@ -383,15 +452,15 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                // Items
-                for (final item in _receipt.items) ...[
+                // Real order items
+                for (final item in ticket.items) ...[
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
                       children: [
                         Expanded(
                           child: Text(
-                            '${item.qty}x ${item.name}',
+                            '${item.quantity.ceil()}x ${item.productName}',
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF1A1A1A),
@@ -412,7 +481,6 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                 ],
                 const SizedBox(height: 8),
 
-                // Dashed divider
                 _buildDashedDivider(),
                 const SizedBox(height: 10),
 
@@ -422,13 +490,10 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                   children: [
                     const Text(
                       'Ara Toplam',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF555555),
-                      ),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF555555)),
                     ),
                     Text(
-                      '\u20BA${_formatCents(_receipt.subtotal)}',
+                      '\u20BA${_formatCents(ticket.subtotal)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF333333),
@@ -439,19 +504,16 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                 ),
                 const SizedBox(height: 4),
 
-                // Tax
+                // Tax (inclusive — informational)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'KDV (%10)',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF555555),
-                      ),
+                      'KDV (dahil)',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF555555)),
                     ),
                     Text(
-                      '\u20BA${_formatCents(_receipt.taxAmount)}',
+                      '\u20BA${_formatCents(ticket.taxAmount)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF333333),
@@ -460,6 +522,29 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                     ),
                   ],
                 ),
+
+                // Discount (if any)
+                if (ticket.discountAmount > 0) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Indirim',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF555555)),
+                      ),
+                      Text(
+                        '-\u20BA${_formatCents(ticket.discountAmount)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF333333),
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
                 const SizedBox(height: 8),
 
                 _buildDashedDivider(),
@@ -478,55 +563,11 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                       ),
                     ),
                     Text(
-                      '\u20BA${_formatCents(_receipt.grandTotal)}',
+                      '\u20BA${_formatCents(ticket.total)}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF1A1A1A),
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // Payment info
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${_receipt.paymentMethod}:',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF555555),
-                      ),
-                    ),
-                    Text(
-                      '\u20BA${_formatCents(_receipt.paidAmount)}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF333333),
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Para Ustu:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF555555),
-                      ),
-                    ),
-                    Text(
-                      '\u20BA${_formatCents(_receipt.changeAmount)}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF333333),
                         fontFeatures: [FontFeature.tabularFigures()],
                       ),
                     ),
@@ -573,10 +614,7 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                 const Text(
                   'GastroCore v0.1.0 | Powered by GastroCore',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: Color(0xFF999999),
-                  ),
+                  style: TextStyle(fontSize: 9, color: Color(0xFF999999)),
                 ),
               ],
             ),
@@ -621,11 +659,9 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
         children: [
           const Spacer(),
 
-          // Print button (gradient blue)
+          // Print button — wired to PrinterService via use case
           GestureDetector(
-            onTap: () {
-              // TODO: Integrate with printer service
-            },
+            onTap: _onPrint,
             child: Container(
               height: 48,
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -659,9 +695,7 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
 
           // Email button (secondary)
           GestureDetector(
-            onTap: () {
-              // TODO: Send receipt via email
-            },
+            onTap: _onShare,
             child: Container(
               height: 48,
               padding: const EdgeInsets.symmetric(horizontal: 24),

@@ -1257,7 +1257,7 @@ class _StepSummary extends ConsumerWidget {
         // RIGHT — confirm panel
         SizedBox(
           width: MediaQuery.of(context).size.width * 0.35,
-          child: Container(
+          child: ColoredBox(
             color: AppColors.surface,
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(28),

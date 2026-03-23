@@ -97,7 +97,7 @@ class _StaffManagementTabState extends ConsumerState<StaffManagementTab> {
             // Staff list
             Expanded(
               child: usersAsync.when(
-                data: (users) => _buildStaffList(users),
+                data: _buildStaffList,
                 loading: () => const Center(
                   child: CircularProgressIndicator(
                     color: AppColors.primary,
@@ -121,7 +121,7 @@ class _StaffManagementTabState extends ConsumerState<StaffManagementTab> {
                 label: 'Personel Ekle',
                 icon: Icons.person_add_rounded,
                 height: 44,
-                onPressed: () => _showStaffDialog(),
+                onPressed: _showStaffDialog,
               ),
             ),
           ],

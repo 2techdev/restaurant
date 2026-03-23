@@ -133,10 +133,20 @@ class _OrderCenterScreenState extends ConsumerState<OrderCenterScreen> {
           ),
           const SizedBox(width: 4),
 
-          // Print icon
+          // Print icon — navigates to receipt preview for the active ticket
           GestureDetector(
             onTap: () {
-              // TODO: quick print
+              final ticket = ref.read(currentTicketProvider);
+              if (ticket == null || ticket.status == TicketStatus.draft) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('No active order to print.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+                return;
+              }
+              context.push(AppRoutes.receiptFor(ticket.id));
             },
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 8),

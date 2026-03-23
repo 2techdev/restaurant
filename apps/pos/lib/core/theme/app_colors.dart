@@ -13,7 +13,7 @@ abstract final class AppColors {
   // ---------------------------------------------------------------------------
 
   /// Base layer - "The Tabletop" (main background, darkest)
-  static const Color surfaceDim = Color(0xFF111319);
+  static const Color surfaceDim = Color(0xFF0B0E14);
 
   /// Intermediate layer - "The Tray" (sidebar, panels)
   static const Color surface = Color(0xFF151720);
@@ -50,7 +50,7 @@ abstract final class AppColors {
   // ---------------------------------------------------------------------------
 
   /// Primary accent - action blue
-  static const Color primary = Color(0xFFAFC6FF);
+  static const Color primary = Color(0xFF90ABFF);
 
   /// Primary container - deeper blue for gradients
   static const Color primaryContainer = Color(0xFF528DFF);
@@ -68,20 +68,20 @@ abstract final class AppColors {
   // Semantic Colors
   // ---------------------------------------------------------------------------
 
-  /// Success / available / paid / completed
-  static const Color green = Color(0xFF05B046);
+  /// Success / available / paid / completed / KDS ready
+  static const Color green = Color(0xFF69F6B8);
 
   /// On green (text on green bg)
-  static const Color onGreen = Color(0xFF003A11);
+  static const Color onGreen = Color(0xFF003322);
 
   /// Secondary container green
-  static const Color greenContainer = Color(0xFF05B046);
+  static const Color greenContainer = Color(0xFF69F6B8);
 
   /// Warning / pending / kitchen / attention
   static const Color orange = Color(0xFFFF9F0A);
 
-  /// Error / occupied / void / urgent / destructive
-  static const Color red = Color(0xFFFF3B30);
+  /// Error / occupied / void / urgent / destructive / KDS overdue
+  static const Color red = Color(0xFFFF6F7E);
 
   /// Info / highlight / notes / special instructions
   static const Color yellow = Color(0xFFFFD60A);
@@ -93,9 +93,9 @@ abstract final class AppColors {
   // Dim Semantic (tinted backgrounds for badges / status chips)
   // ---------------------------------------------------------------------------
 
-  static const Color greenDim = Color(0x1A05B046);
+  static const Color greenDim = Color(0x1A69F6B8);
   static const Color orangeDim = Color(0x1AFF9F0A);
-  static const Color redDim = Color(0x1AFF3B30);
+  static const Color redDim = Color(0x1AFF6F7E);
   static const Color yellowDim = Color(0x1AFFD60A);
   static const Color purpleDim = Color(0x1ABF5AF2);
 

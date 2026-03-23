@@ -9,39 +9,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
-
-// ---------------------------------------------------------------------------
-// Demo data (MVP)
-// ---------------------------------------------------------------------------
-
-enum _PaymentMethod { cash, creditCard, debitCard, split }
-
-class _DemoOrderItem {
-  final String name;
-  final int qty;
-  final int price;
-  final String? detail;
-
-  const _DemoOrderItem({
-    required this.name,
-    required this.qty,
-    required this.price,
-    this.detail,
-  });
-
-  int get subtotal => price * qty;
-}
-
-const _kDemoItems = [
-  _DemoOrderItem(name: 'Ribeye Steak', qty: 2, price: 42000, detail: 'Medium Rare, Peppercorn'),
-  _DemoOrderItem(name: 'Truffle Fries', qty: 1, price: 14500),
-  _DemoOrderItem(name: 'Efes Pilsen 50cl', qty: 3, price: 12000),
-];
+import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
+import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Payment Screen
 // ---------------------------------------------------------------------------
+
+enum _PaymentMethod { cash, creditCard, debitCard, split }
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final String ticketId;
@@ -57,10 +35,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String _amountStr = '';
   bool _paymentComplete = false;
 
-  int get _subtotal =>
-      _kDemoItems.fold<int>(0, (sum, item) => sum + item.subtotal);
-  int get _taxAmount => (_subtotal * 0.10).round();
-  int get _grandTotal => _subtotal + _taxAmount;
+  /// Cached ticket — updated whenever the async provider emits a new value.
+  TicketEntity? _ticket;
+
+  // Derived from real ticket data.
+  int get _subtotal => _ticket?.subtotal ?? 0;
+  int get _taxAmount => _ticket?.taxAmount ?? 0;
+  int get _grandTotal => _ticket?.total ?? 0;
+  List<OrderItemEntity> get _items => _ticket?.items ?? [];
 
   int get _enteredAmount {
     if (_amountStr.isEmpty) return 0;
@@ -100,17 +82,36 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     setState(() => _amountStr = amount.toString());
   }
 
-  void _onCompletePayment() {
+  Future<void> _onCompletePayment() async {
+    // Record payment against the real ticket.
+    final repo = ref.read(orderRepositoryProvider);
+    await repo.updateTicketStatus(widget.ticketId, TicketStatus.completed);
+    ref.read(currentTicketProvider.notifier).clear();
+
     setState(() => _paymentComplete = true);
     Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) context.go('/order-center');
+      if (mounted) context.go(AppRoutes.receiptFor(widget.ticketId));
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Keep _ticket in sync with the database.
+    ref.listen(ticketByIdProvider(widget.ticketId), (_, next) {
+      next.whenData((t) {
+        if (t != null && mounted) setState(() => _ticket = t);
+      });
+    });
+
     if (_paymentComplete) {
       return _buildCompletionView();
+    }
+
+    // Show loading spinner until ticket arrives.
+    if (_ticket == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Scaffold(
@@ -293,11 +294,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   // -------------------------------------------------------------------------
-  // Order Summary (left panel)
+  // Order Summary (left panel) — populated from real ticket
   // -------------------------------------------------------------------------
 
   Widget _buildOrderSummary() {
-    return Container(
+    final ticket = _ticket!;
+    final tableLabel = ticket.tableId != null
+        ? 'Masa #${ticket.tableId}'
+        : 'Siparis #${ticket.orderNumber}';
+
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xFF191B22),
         borderRadius: BorderRadius.circular(12),
@@ -317,27 +323,30 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF282A30),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Table #14',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFFC3C6D7)),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF282A30),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      tableLabel,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFFC3C6D7)),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          // Items
+          // Items from real ticket
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              itemCount: _kDemoItems.length,
+              itemCount: _items.length,
               itemBuilder: (context, index) {
-                final item = _kDemoItems[index];
+                final item = _items[index];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Row(
@@ -352,7 +361,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            '${item.qty}',
+                            '${item.quantity.ceil()}',
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFE2E2EB)),
                           ),
                         ),
@@ -363,12 +372,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              item.name,
+                              item.productName,
                               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFE2E2EB)),
                             ),
-                            if (item.detail != null)
+                            if (item.notes != null)
                               Text(
-                                item.detail!,
+                                item.notes!,
                                 style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFFC3C6D7)),
                               ),
                           ],
@@ -384,7 +393,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               },
             ),
           ),
-          // Totals
+          // Totals from real ticket
           Container(
             margin: const EdgeInsets.all(24),
             padding: const EdgeInsets.all(16),
@@ -396,7 +405,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               children: [
                 _buildTotalRow('Subtotal', '\u20BA${_formatCents(_subtotal)}', false),
                 const SizedBox(height: 12),
-                _buildTotalRow('KDV (10%)', '\u20BA${_formatCents(_taxAmount)}', false),
+                _buildTotalRow('KDV (dahil)', '\u20BA${_formatCents(_taxAmount)}', false),
                 const SizedBox(height: 12),
                 Container(height: 1, color: const Color(0xFF424753).withValues(alpha: 0.2)),
                 const SizedBox(height: 12),

@@ -1,17 +1,22 @@
 /// KDS Main Screen — full-screen ticket grid for kitchen display.
 ///
 /// Renders incoming order tickets sorted oldest-first.
-/// Color coding: new/pending = blue, in-progress = yellow, late >10 min = red.
+/// Color coding: new/pending = green, in-progress = yellow, late >N min = red.
 /// Tap a ticket to bump (mark ready). Long-press to recall (un-bump).
 library;
 
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:typed_data';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/kitchen/domain/entities/kitchen_ticket_entity.dart';
@@ -20,7 +25,7 @@ import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_provi
 import 'package:gastrocore_pos/features/kds_app/router/kds_router.dart';
 
 // ---------------------------------------------------------------------------
-// Urgency helpers
+// Urgency helpers — green → yellow → red timer coding
 // ---------------------------------------------------------------------------
 
 enum _Urgency { fresh, inProgress, late }
@@ -32,16 +37,17 @@ _Urgency _getUrgency(KitchenTicketEntity ticket, int lateThresholdMin) {
   return _Urgency.fresh;
 }
 
+// Green (#69F6B8) = ready/sent/fresh  •  Yellow = cooking  •  Red (#FF6F7E) = overdue
 Color _urgencyBorderColor(_Urgency u) => switch (u) {
-      _Urgency.fresh => const Color(0xFF3B82F6), // blue
-      _Urgency.inProgress => const Color(0xFFFBBF24), // yellow
-      _Urgency.late => const Color(0xFFEF4444), // red
+      _Urgency.fresh => AppColors.green,           // #69F6B8
+      _Urgency.inProgress => const Color(0xFFFBBF24), // amber
+      _Urgency.late => AppColors.red,              // #FF6F7E
     };
 
 Color _urgencyBadgeColor(_Urgency u) => switch (u) {
-      _Urgency.fresh => const Color(0x1A3B82F6),
+      _Urgency.fresh => AppColors.greenDim,        // 10% tint of #69F6B8
       _Urgency.inProgress => const Color(0x1AFBBF24),
-      _Urgency.late => const Color(0x1AEF4444),
+      _Urgency.late => AppColors.redDim,           // 10% tint of #FF6F7E
     };
 
 String _urgencyLabel(_Urgency u) => switch (u) {
@@ -55,6 +61,55 @@ String _formatElapsed(KitchenTicketEntity ticket) {
   final m = elapsed.inMinutes.toString().padLeft(2, '0');
   final s = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
   return '$m:$s';
+}
+
+// ---------------------------------------------------------------------------
+// Beep WAV generator — no audio asset file required
+// ---------------------------------------------------------------------------
+
+Uint8List _generateBeepWav({
+  double frequency = 880.0,
+  int sampleRate = 22050,
+  int durationMs = 180,
+}) {
+  final numSamples = (sampleRate * durationMs / 1000).round();
+  final data = ByteData(44 + numSamples * 2);
+
+  // RIFF header: "RIFF"
+  data.setUint8(0, 0x52); data.setUint8(1, 0x49);
+  data.setUint8(2, 0x46); data.setUint8(3, 0x46);
+  data.setUint32(4, 36 + numSamples * 2, Endian.little);
+  data.setUint8(8, 0x57); data.setUint8(9, 0x41);
+  data.setUint8(10, 0x56); data.setUint8(11, 0x45);
+
+  // fmt chunk
+  data.setUint8(12, 0x66); data.setUint8(13, 0x6D);
+  data.setUint8(14, 0x74); data.setUint8(15, 0x20);
+  data.setUint32(16, 16, Endian.little);
+  data.setUint16(20, 1, Endian.little);   // PCM
+  data.setUint16(22, 1, Endian.little);   // mono
+  data.setUint32(24, sampleRate, Endian.little);
+  data.setUint32(28, sampleRate * 2, Endian.little);
+  data.setUint16(32, 2, Endian.little);
+  data.setUint16(34, 16, Endian.little);
+
+  // data chunk
+  data.setUint8(36, 0x64); data.setUint8(37, 0x61);
+  data.setUint8(38, 0x74); data.setUint8(39, 0x61);
+  data.setUint32(40, numSamples * 2, Endian.little);
+
+  // PCM samples with 20ms linear fade-in/out envelope
+  const fadeSamples = 22050 * 20 ~/ 1000;
+  for (int i = 0; i < numSamples; i++) {
+    final t = i / sampleRate;
+    double sample = math.sin(2 * math.pi * frequency * t);
+    double env = 1.0;
+    if (i < fadeSamples) env = i / fadeSamples;
+    if (i > numSamples - fadeSamples) env = (numSamples - i) / fadeSamples;
+    final value = (sample * env * 28000).round().clamp(-32768, 32767);
+    data.setInt16(44 + i * 2, value, Endian.little);
+  }
+  return data.buffer.asUint8List();
 }
 
 // ---------------------------------------------------------------------------
@@ -75,6 +130,10 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
   // Physical bump-bar keyboard: Space / Enter bumps the oldest ticket.
   late final FocusNode _keyFocus;
 
+  // Audio
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  String? _beepFilePath;
+
   @override
   void initState() {
     super.initState();
@@ -83,12 +142,14 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     });
     _keyFocus = FocusNode();
     _loadPrefs();
+    _initBeepFile();
   }
 
   @override
   void dispose() {
     _clockTimer.cancel();
     _keyFocus.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -96,10 +157,24 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     final prefs = await SharedPreferences.getInstance();
     final threshold = prefs.getInt('kds_late_threshold') ?? 10;
     final largeFont = prefs.getBool('kds_large_font') ?? false;
+    final soundAlerts = prefs.getBool('kds_sound_alerts') ?? true;
     if (mounted) {
       ref.read(kdsLateThresholdProvider.notifier).state = threshold;
       ref.read(kdsLargeFontProvider.notifier).state = largeFont;
+      ref.read(kdsSoundAlertsProvider.notifier).state = soundAlerts;
     }
+  }
+
+  /// Write a synthesised 880 Hz beep WAV to the temp dir once.
+  Future<void> _initBeepFile() async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/kds_alert.wav');
+      if (!file.existsSync()) {
+        await file.writeAsBytes(_generateBeepWav());
+      }
+      _beepFilePath = file.path;
+    } catch (_) {}
   }
 
   // -------------------------------------------------------------------------
@@ -112,14 +187,13 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
   }
 
   Future<void> _recallTicket(String id) async {
-    // Un-bump: restore status to 'preparing' so it reappears on the KDS.
     HapticFeedback.mediumImpact();
     final repo = ref.read(kitchenRepositoryProvider);
     await repo.recallTicket(id);
   }
 
   // -------------------------------------------------------------------------
-  // New-ticket detection
+  // New-ticket detection + sound alert
   // -------------------------------------------------------------------------
 
   void _detectNewTickets(List<KitchenTicketEntity> tickets) {
@@ -132,8 +206,17 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
   }
 
   void _onNewTicket() {
-    // Visual flash — sound integration point for audioplayers package.
     HapticFeedback.vibrate();
+    if (ref.read(kdsSoundAlertsProvider)) {
+      _playBeep();
+    }
+  }
+
+  Future<void> _playBeep() async {
+    if (_beepFilePath == null) return;
+    try {
+      await _audioPlayer.play(DeviceFileSource(_beepFilePath!));
+    } catch (_) {}
   }
 
   // -------------------------------------------------------------------------
@@ -156,7 +239,6 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
           final key = event.logicalKey;
           if (key == LogicalKeyboardKey.space ||
               key == LogicalKeyboardKey.enter) {
-            // Bump the oldest ticket via bump-bar hardware.
             final tickets = ticketsAsync.valueOrNull ?? const [];
             if (tickets.isNotEmpty) _bumpTicket(tickets.first.id);
           }
@@ -196,7 +278,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     String? error,
   }) {
     return Scaffold(
-      backgroundColor: AppColors.surfaceDim,
+      backgroundColor: AppColors.surfaceDim, // #0B0E14
       body: Column(
         children: [
           _buildTopBar(tickets, completed),
@@ -228,7 +310,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
 
     return Container(
       height: 72,
-      color: const Color(0xFF1A1D27),
+      color: AppColors.surface, // #151720
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
@@ -238,7 +320,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             height: 36,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
+                colors: [AppColors.primary, Color(0xFF528DFF)],
               ),
               borderRadius: BorderRadius.circular(8),
             ),
@@ -262,8 +344,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
           if (stationFilter != null)
             Container(
               margin: const EdgeInsets.only(left: 8),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.accentDim,
                 borderRadius: BorderRadius.circular(20),
@@ -273,7 +354,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+                  color: AppColors.primary, // #90ABFF for active items
                   letterSpacing: 1.5,
                 ),
               ),
@@ -283,17 +364,15 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
           const SizedBox(width: 16),
           _statChip('COOKING', '$cooking', const Color(0xFFFBBF24)),
           const SizedBox(width: 16),
-          _statChip('DONE TODAY', '$completed', AppColors.green),
+          _statChip('DONE TODAY', '$completed', AppColors.green), // #69F6B8
           const Spacer(),
-          // Action buttons
           _topBarIcon(Icons.filter_list, 'Station filter',
               () => context.go(KdsRoutes.stationFilter)),
           const SizedBox(width: 8),
           _topBarIcon(Icons.settings_outlined, 'Settings',
               () => context.go(KdsRoutes.settings)),
           const SizedBox(width: 8),
-          _topBarIcon(Icons.logout, 'Logout',
-              () => context.go(KdsRoutes.login)),
+          _topBarIcon(Icons.logout, 'Logout', () => context.go(KdsRoutes.login)),
         ],
       ),
     );
@@ -325,8 +404,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     );
   }
 
-  Widget _topBarIcon(
-      IconData icon, String tooltip, VoidCallback onTap) {
+  Widget _topBarIcon(IconData icon, String tooltip, VoidCallback onTap) {
     return Tooltip(
       message: tooltip,
       child: GestureDetector(
@@ -361,7 +439,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             Icon(
               Icons.check_circle_outline,
               size: 72,
-              color: Color(0xFF4ADE80),
+              color: AppColors.green, // #69F6B8 — all-clear is green
             ),
             SizedBox(height: 20),
             Text(
@@ -381,7 +459,6 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
       padding: const EdgeInsets.all(20),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Adaptive columns based on available width.
           final minCardWidth = largeFont ? 340.0 : 280.0;
           final cols =
               (constraints.maxWidth / minCardWidth).floor().clamp(1, 6);
@@ -425,7 +502,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
       onLongPress: () => _recallTicket(ticket.id),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF1D1F26),
+          color: AppColors.surfaceContainerLow, // #191B22
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: borderColor.withValues(alpha: 0.35),
@@ -441,13 +518,13 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
-            // Urgency top-strip
+            // Urgency top-strip (green / yellow / red)
             Container(height: 5, color: borderColor),
 
             // Header
             Container(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-              color: const Color(0xFF282A30).withValues(alpha: 0.5),
+              color: AppColors.surfaceContainerHigh.withValues(alpha: 0.5),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -460,7 +537,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                           style: TextStyle(
                             fontSize: titleSize,
                             fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             letterSpacing: -1.5,
                             height: 1.0,
                           ),
@@ -491,6 +568,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
+                      // Timer text inherits urgency color: green→yellow→red
                       Text(
                         _formatElapsed(ticket),
                         style: TextStyle(
@@ -524,7 +602,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
               ),
             ),
 
-            // Items
+            // Items list
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
@@ -543,11 +621,12 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Quantity badge — active blue (#90ABFF dim)
                         Container(
                           width: largeFont ? 30 : 24,
                           height: largeFont ? 30 : 24,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2A2F3D),
+                            color: AppColors.accentDim,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Center(
@@ -558,7 +637,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                               style: TextStyle(
                                 fontSize: largeFont ? 16 : 13,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: AppColors.primary, // #90ABFF
                               ),
                             ),
                           ),
@@ -577,6 +656,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                                   height: 1.3,
                                 ),
                               ),
+                              // Modifiers
                               ...mods.map(
                                 (mod) => Padding(
                                   padding: const EdgeInsets.only(top: 2),
@@ -584,13 +664,13 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                                     '\u2022 $mod',
                                     style: TextStyle(
                                       fontSize: modSize,
-                                      color: const Color(0xFFC3C6D7),
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ),
                               ),
-                              if (item.notes != null &&
-                                  item.notes!.isNotEmpty)
+                              // Special instructions — highlighted in yellow
+                              if (item.notes != null && item.notes!.isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 4),
                                   child: Text(
@@ -612,23 +692,23 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
               ),
             ),
 
-            // BUMP button
+            // BUMP button — green (#69F6B8) for ready/sent state
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Container(
                 width: double.infinity,
                 height: largeFont ? 64 : 52,
                 decoration: BoxDecoration(
-                  color: AppColors.green,
+                  color: AppColors.green, // #69F6B8
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.check_circle,
                       size: 20,
-                      color: Color(0xFF003A11),
+                      color: AppColors.onGreen, // #003322
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -636,7 +716,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                       style: TextStyle(
                         fontSize: largeFont ? 20 : 17,
                         fontWeight: FontWeight.w900,
-                        color: const Color(0xFF003A11),
+                        color: AppColors.onGreen,
                       ),
                     ),
                   ],
@@ -678,13 +758,14 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
   Widget _buildFooter() {
     return Container(
       height: 40,
-      color: const Color(0xFF1A1D27),
+      color: AppColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
-          _footerDot(AppColors.green, 'Live sync active'),
+          _footerDot(AppColors.green, 'Live sync active'), // #69F6B8
           const SizedBox(width: 24),
-          _footerDot(AppColors.primary, 'Tap = bump • Long-press = recall • Space/Enter = bump oldest'),
+          _footerDot(AppColors.primary, // #90ABFF
+              'Tap = bump  •  Long-press = recall  •  Space/Enter = bump oldest'),
           const Spacer(),
           const Text(
             'GASTROCORE KDS',

@@ -104,7 +104,7 @@ class _CategoryManagementPanelState
                       label: 'Add Category',
                       icon: Icons.add_rounded,
                       height: 44,
-                      onPressed: () => _showCategoryDialog(),
+                      onPressed: _showCategoryDialog,
                     ),
                   ),
                 ],

@@ -115,10 +115,29 @@ func Recover(next http.Handler) http.Handler {
 	})
 }
 
-// CORS adds standard CORS headers for development and cross-origin POS device access.
+// allowedOrigins lists the permitted CORS origins for the GastroCore API.
+// POS Flutter apps communicate directly (no CORS needed); these cover web dashboards
+// and the online ordering widget.
+var allowedOrigins = map[string]bool{
+	"https://pos.2tech.ch":        true,
+	"https://www.pos.2tech.ch":    true,
+	"http://localhost:3000":        true,
+	"http://localhost:8080":        true,
+	"http://localhost:5173":        true,
+	"http://192.168.1.134:8080":   true,
+	"http://192.168.1.134:8090":   true,
+}
+
+// CORS adds CORS headers, allowing only known origins.
+// Requests from unlisted origins are served without Access-Control-Allow-Origin,
+// so browsers will block cross-origin fetches from unknown sources.
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		if origin != "" && allowedOrigins[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-Device-ID")
 		w.Header().Set("Access-Control-Max-Age", "86400")

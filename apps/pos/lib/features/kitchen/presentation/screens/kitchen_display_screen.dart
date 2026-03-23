@@ -6,6 +6,7 @@
 library;
 
 import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -64,6 +65,7 @@ class KitchenDisplayScreen extends ConsumerStatefulWidget {
 
 class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
   late final Timer _refreshTimer;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   // Track previous ticket IDs for new-ticket audible alert detection.
   Set<String> _previousTicketIds = {};
@@ -75,11 +77,14 @@ class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
     _refreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
+    // Release audio player resources when playback completes.
+    _audioPlayer.setReleaseMode(ReleaseMode.stop);
   }
 
   @override
   void dispose() {
     _refreshTimer.cancel();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -106,9 +111,17 @@ class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
     _previousTicketIds = currentIds;
   }
 
-  void _playNewTicketAlert() {
-    // TODO(v2): integrate audioplayers for beep sequence.
-    // For MVP, a visual flash is sufficient.
+  Future<void> _playNewTicketAlert() async {
+    try {
+      // Three short beeps: play the system notification tone three times with
+      // a short gap between each burst.
+      for (int i = 0; i < 3; i++) {
+        await _audioPlayer.play(AssetSource('audio/kds_new_ticket.wav'));
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
+    } catch (_) {
+      // Audio unavailable on this device — fail silently.
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -571,7 +584,7 @@ class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            '${item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 1)}',
+                            item.quantity.toStringAsFixed(item.quantity == item.quantity.roundToDouble() ? 0 : 1),
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,

@@ -212,7 +212,7 @@ class _LangCardState extends State<_LangCard>
             boxShadow: widget.isSelected
                 ? [
                     BoxShadow(
-                      color: KioskColors.primary.withOpacity(0.2),
+                      color: KioskColors.primary.withValues(alpha: 0.2),
                       blurRadius: 20,
                       spreadRadius: 2,
                     ),

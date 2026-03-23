@@ -165,7 +165,6 @@ class SyncNotifier extends StateNotifier<SyncState> {
     state = state.copyWith(pendingCount: state.pendingCount + 1);
   }
 
-  Future<String> _getLastCursor() => _repo.getLastCursor();
 }
 
 /// Global sync state provider.

@@ -99,5 +99,5 @@ class BackupOperationNotifier extends StateNotifier<BackupOpState> {
 
 final backupOperationProvider =
     StateNotifierProvider<BackupOperationNotifier, BackupOpState>(
-  (ref) => BackupOperationNotifier(ref),
+  BackupOperationNotifier.new,
 );

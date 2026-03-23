@@ -205,7 +205,7 @@ class _CategoryRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ColoredBox(
       color: KioskColors.bgCard,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),

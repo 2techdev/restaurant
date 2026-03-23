@@ -9,8 +9,11 @@
 ///   6. Additional     — printer group, prep time, barcode, stock status, display order, active
 library;
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
@@ -202,6 +205,7 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
     _nameCtrl = TextEditingController(text: e?.name ?? '');
     _descCtrl = TextEditingController(text: e?.description ?? '');
     _categoryId = e?.categoryId ?? widget.initialCategoryId;
+    _imagePath = e?.imagePath;
     _customHexCtrl = TextEditingController();
 
     // Default spec row – replaced by DB specs when editing (see _loadData)
@@ -284,6 +288,57 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
       s.dispose();
     }
     super.dispose();
+  }
+
+  // =========================================================================
+  // Image picker
+  // =========================================================================
+
+  Future<void> _pickImage() async {
+    try {
+      final picker = ImagePicker();
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded),
+                title: const Text('Camera'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded),
+                title: const Text('Gallery'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+              if (_imagePath != null)
+                ListTile(
+                  leading: const Icon(Icons.delete_rounded, color: Colors.red),
+                  title: const Text('Remove image',
+                      style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    setState(() => _imagePath = null);
+                    Navigator.pop(ctx);
+                  },
+                ),
+            ],
+          ),
+        ),
+      );
+      if (source == null) return;
+      final picked = await picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 800,
+      );
+      if (picked != null && mounted) {
+        setState(() => _imagePath = picked.path);
+      }
+    } catch (_) {
+      // Permission denied or picker unavailable — fail silently.
+    }
   }
 
   // =========================================================================
@@ -498,9 +553,7 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
             _buildLabel('Image'),
             const SizedBox(height: 8),
             GestureDetector(
-              onTap: () {
-                // TODO: Image picker integration
-              },
+              onTap: _pickImage,
               child: Container(
                 width: 100,
                 height: 100,
@@ -511,8 +564,15 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
                 child: _imagePath != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: const Icon(Icons.image_rounded,
-                            size: 40, color: AppColors.textDim),
+                        child: Image.file(
+                          File(_imagePath!),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.broken_image_rounded,
+                            size: 40,
+                            color: AppColors.textDim,
+                          ),
+                        ),
                       )
                     : const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -600,7 +660,7 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
               style: TextStyle(fontSize: 11, color: AppColors.textDim, height: 1.5),
             ),
             const SizedBox(height: 12),
-            ...List.generate(_specs.length, (i) => _buildSpecRow(i)),
+            ...List.generate(_specs.length, _buildSpecRow),
             const SizedBox(height: 8),
             GestureDetector(
               onTap: _addSpecRow,
@@ -1126,8 +1186,7 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
               _buildLabel('Combo Contents'),
               const SizedBox(height: 8),
               if (_comboItems.isNotEmpty)
-                ...List.generate(
-                    _comboItems.length, (i) => _buildComboItemRow(i)),
+                ...List.generate(_comboItems.length, _buildComboItemRow),
               const SizedBox(height: 8),
               GestureDetector(
                 onTap: _showComboProductSelector,
@@ -1656,6 +1715,7 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
           name: name,
           price: priceInCents,
           categoryId: _categoryId,
+          imagePath: () => _imagePath,
           description: () =>
               _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
           taxGroup: _taxGroup,
@@ -1692,6 +1752,7 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
           barcode: _barcodeCtrl.text.trim().isEmpty
               ? null
               : _barcodeCtrl.text.trim(),
+          imagePath: _imagePath,
           prepTimeMinutes: int.tryParse(_prepTimeCtrl.text),
           stockStatus: _stockStatus,
           isOpenPrice: _isOpenPrice,

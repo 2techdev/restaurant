@@ -465,7 +465,7 @@ class _Toggle extends StatelessWidget {
 class _SaveBtn extends StatelessWidget {
   const _SaveBtn({required this.onPressed, this.label = 'Save'});
 
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final String label;
 
   @override
@@ -942,25 +942,27 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 12),
-            ...PaymentGateway.values.map(
-              (gw) => RadioListTile<PaymentGateway>(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  gw.label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                value: gw,
-                groupValue: settings.activeGateway,
-                activeColor: AppColors.primary,
-                onChanged: (v) {
-                  if (v == null) return;
-                  ref
-                      .read(paymentSettingsProvider.notifier)
-                      .update((s) => s.copyWith(activeGateway: v));
-                },
+            RadioGroup<PaymentGateway>(
+              groupValue: settings.activeGateway,
+              onChanged: (v) => ref
+                  .read(paymentSettingsProvider.notifier)
+                  .update((s) => s.copyWith(activeGateway: v)),
+              child: Column(
+                children: PaymentGateway.values
+                    .map(
+                      (gw) => RadioListTile<PaymentGateway>(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          gw.label,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        value: gw,
+                      ),
+                    )
+                    .toList(),
               ),
             ),
           ],
@@ -1359,37 +1361,40 @@ class _AppearanceSection extends ConsumerWidget {
         _Card(
           title: l10n.settingsTheme.toUpperCase(),
           children: [
-            ...AppThemeMode.values.map(
-              (mode) => RadioListTile<AppThemeMode>(
-                contentPadding: EdgeInsets.zero,
-                title: Row(
-                  children: [
-                    Icon(
-                      switch (mode) {
-                        AppThemeMode.dark => Icons.dark_mode_rounded,
-                        AppThemeMode.light => Icons.light_mode_rounded,
-                        AppThemeMode.system => Icons.brightness_auto_rounded,
-                      },
-                      size: 18,
-                      color: AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      mode.label,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
+            RadioGroup<AppThemeMode>(
+              groupValue: settings.themeMode,
+              onChanged: (v) { if (v != null) ref.read(appSettingsProvider.notifier).setTheme(v); },
+              child: Column(
+                children: AppThemeMode.values
+                    .map(
+                      (mode) => RadioListTile<AppThemeMode>(
+                        contentPadding: EdgeInsets.zero,
+                        title: Row(
+                          children: [
+                            Icon(
+                              switch (mode) {
+                                AppThemeMode.dark => Icons.dark_mode_rounded,
+                                AppThemeMode.light => Icons.light_mode_rounded,
+                                AppThemeMode.system =>
+                                  Icons.brightness_auto_rounded,
+                              },
+                              size: 18,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              mode.label,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        value: mode,
                       ),
-                    ),
-                  ],
-                ),
-                value: mode,
-                groupValue: settings.themeMode,
-                activeColor: AppColors.primary,
-                onChanged: (v) {
-                  if (v == null) return;
-                  ref.read(appSettingsProvider.notifier).setTheme(v);
-                },
+                    )
+                    .toList(),
               ),
             ),
           ],
@@ -1402,23 +1407,25 @@ class _AppearanceSection extends ConsumerWidget {
               style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 12),
-            ...AppLanguage.values.map(
-              (lang) => RadioListTile<AppLanguage>(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  '${lang.flag}  ${lang.label}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                value: lang,
-                groupValue: settings.language,
-                activeColor: AppColors.primary,
-                onChanged: (v) {
-                  if (v == null) return;
-                  ref.read(appSettingsProvider.notifier).setLanguage(v);
-                },
+            RadioGroup<AppLanguage>(
+              groupValue: settings.language,
+              onChanged: (v) { if (v != null) ref.read(appSettingsProvider.notifier).setLanguage(v); },
+              child: Column(
+                children: AppLanguage.values
+                    .map(
+                      (lang) => RadioListTile<AppLanguage>(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          '${lang.flag}  ${lang.label}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        value: lang,
+                      ),
+                    )
+                    .toList(),
               ),
             ),
           ],
@@ -1520,7 +1527,7 @@ class _BackupSection extends ConsumerWidget {
           children: [
             _SaveBtn(
               label: isBusy ? 'Working…' : 'Create Backup Now',
-              onPressed: isBusy ? () {} : () => notifier.createBackup(),
+              onPressed: isBusy ? null : notifier.createBackup,
             ),
           ],
         ),

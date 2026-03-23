@@ -309,7 +309,7 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
     final ticket = ref.watch(currentTicketProvider);
     final cartQtys = _buildCartQuantities(ticket?.items ?? []);
 
-    return Container(
+    return ColoredBox(
       color: _Tok.surfaceLow,
       child: Column(
         children: [
@@ -1101,7 +1101,7 @@ class _ProductCardState extends State<_ProductCard> {
   }
 
   Widget _buildPlaceholder(ProductEntity p) {
-    return Container(
+    return ColoredBox(
       color: _Tok.surfaceHigh,
       child: Center(
         child: Icon(

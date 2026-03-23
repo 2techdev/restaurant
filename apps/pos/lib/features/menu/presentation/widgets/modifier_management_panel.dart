@@ -106,7 +106,7 @@ class _ModifierManagementPanelState
           ),
           Expanded(
             child: groupsAsync.when(
-              data: (groups) => _buildGroupList(groups),
+              data: _buildGroupList,
               loading: () => const Center(
                 child: CircularProgressIndicator(
                     color: AppColors.primary, strokeWidth: 2),
@@ -124,7 +124,7 @@ class _ModifierManagementPanelState
               label: 'Add Modifier Group',
               icon: Icons.add_rounded,
               height: 44,
-              onPressed: () => _showGroupDialog(),
+              onPressed: _showGroupDialog,
             ),
           ),
         ],
@@ -178,7 +178,7 @@ class _ModifierManagementPanelState
     final groups = groupsAsync.valueOrNull;
     final selectedGroup = groups?.where((g) => g.id == _selectedGroupId).firstOrNull;
 
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),

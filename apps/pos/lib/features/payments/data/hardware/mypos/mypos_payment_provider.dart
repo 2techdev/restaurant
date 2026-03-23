@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:gastrocore_pos/core/payment/config/mypos_config.dart';
 import 'package:gastrocore_pos/core/payment/interfaces/hardware_payment_provider.dart';
 import 'package:gastrocore_pos/core/payment/models/hardware_payment_method.dart';
@@ -57,10 +58,10 @@ class MyPosPaymentProvider implements HardwarePaymentProvider {
     try {
       final connected = await _client!.connect();
       _initialized = connected;
-      print('[MyPosPaymentProvider] Connected via TCP/IP: $connected '
+      debugPrint('[MyPosPaymentProvider] Connected via TCP/IP: $connected '
           '(${_config.terminalIp}:${_config.terminalPort})');
     } catch (e) {
-      print('[MyPosPaymentProvider] Connection error: $e');
+      debugPrint('[MyPosPaymentProvider] Connection error: $e');
       _initialized = false;
     }
   }
@@ -90,13 +91,13 @@ class MyPosPaymentProvider implements HardwarePaymentProvider {
               message: 'TWINT only supports CHF payments',
             );
           }
-          print('[MyPosPaymentProvider] TWINT: ${request.amount} CHF');
+          debugPrint('[MyPosPaymentProvider] TWINT: ${request.amount} CHF');
           myposResult = await _client!.processTwintPayment(
             amountCents: request.amountMinorUnits,
           );
 
         case HardwarePaymentMethod.card:
-          print('[MyPosPaymentProvider] Card: ${request.amount} ${_config.currency}');
+          debugPrint('[MyPosPaymentProvider] Card: ${request.amount} ${_config.currency}');
           myposResult = await _client!.processPayment(
             amountCents: request.amountMinorUnits,
             currency: _config.currency,
@@ -130,7 +131,7 @@ class MyPosPaymentProvider implements HardwarePaymentProvider {
         rawResponse: {'errorCode': myposResult.errorCode},
       );
     } catch (e) {
-      print('[MyPosPaymentProvider] Payment exception: $e');
+      debugPrint('[MyPosPaymentProvider] Payment exception: $e');
       return HardwarePaymentResult.error(
         transactionId: request.reference,
         amount: request.amount,
@@ -151,7 +152,7 @@ class MyPosPaymentProvider implements HardwarePaymentProvider {
       );
       return result.success;
     } catch (e) {
-      print('[MyPosPaymentProvider] Refund error: $e');
+      debugPrint('[MyPosPaymentProvider] Refund error: $e');
       return false;
     }
   }
@@ -162,7 +163,7 @@ class MyPosPaymentProvider implements HardwarePaymentProvider {
     try {
       return await _client!.cancelTransaction();
     } catch (e) {
-      print('[MyPosPaymentProvider] Cancel error: $e');
+      debugPrint('[MyPosPaymentProvider] Cancel error: $e');
       return false;
     }
   }
@@ -180,7 +181,7 @@ class MyPosPaymentProvider implements HardwarePaymentProvider {
         if (result.errorMessage != null) 'error': result.errorMessage,
       };
     } catch (e) {
-      print('[MyPosPaymentProvider] End-of-day error: $e');
+      debugPrint('[MyPosPaymentProvider] End-of-day error: $e');
       return {};
     }
   }
