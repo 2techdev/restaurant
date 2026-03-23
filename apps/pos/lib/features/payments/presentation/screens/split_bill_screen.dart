@@ -775,7 +775,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
           const SizedBox(width: 16),
           // Reset Split
           GestureDetector(
-            onTap: () => setState(() => _paidGuests.clear()),
+            onTap: () => setState(_paidGuests.clear),
             child: Container(
               height: 64,
               padding: const EdgeInsets.symmetric(horizontal: 32),

@@ -1,106 +1,216 @@
 package reports
 
 import (
-	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/gastrocore/server/internal/shared/middleware"
 	"github.com/gastrocore/server/internal/shared/response"
 )
 
 // handleDailyReport returns a daily sales summary.
-// GET /api/v1/reports/daily?date=YYYY-MM-DD
+// GET /api/v1/reports/daily?date=2026-03-23
 func (m *Module) handleDailyReport(w http.ResponseWriter, r *http.Request) {
-	date := r.URL.Query().Get("date")
-	if date == "" {
-		date = time.Now().Format("2006-01-02")
+	tenantID := middleware.GetTenantID(r.Context())
+	if tenantID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Tenant context required")
+		return
 	}
 
-	var totalRevenue, totalOrders, totalTax, totalDiscounts int
+	dateStr := r.URL.Query().Get("date")
+	var day time.Time
+	if dateStr != "" {
+		var err error
+		day, err = time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			response.Error(w, http.StatusBadRequest, "INVALID_DATE", "date must be YYYY-MM-DD")
+			return
+		}
+	} else {
+		now := time.Now()
+		day = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	}
+	dayEnd := day.Add(24*time.Hour - time.Nanosecond)
+
+	// Core revenue aggregation
+	var totalRevenue, totalTax, totalDiscounts, netRevenue int64
+	var totalOrders int
+	var avgOrderValue int64
+
 	err := m.db.QueryRowContext(r.Context(), `
 		SELECT
-			COALESCE(SUM(total_amount), 0)    AS revenue,
-			COUNT(*)                           AS orders,
-			COALESCE(SUM(tax_amount), 0)       AS tax,
-			COALESCE(SUM(discount_amount), 0)  AS discounts
+			COUNT(*) FILTER (WHERE status NOT IN ('void','open')),
+			COALESCE(SUM(total) FILTER (WHERE status NOT IN ('void','open')), 0),
+			COALESCE(AVG(total) FILTER (WHERE status NOT IN ('void','open'))::BIGINT, 0),
+			COALESCE(SUM(tax_amount) FILTER (WHERE status NOT IN ('void','open')), 0),
+			COALESCE(SUM(discount_amount) FILTER (WHERE status NOT IN ('void','open')), 0),
+			COALESCE(SUM(total - discount_amount) FILTER (WHERE status NOT IN ('void','open')), 0)
 		FROM tickets
-		WHERE DATE(created_at) = $1
-		  AND status NOT IN ('cancelled')
-		  AND is_deleted = false
-	`, date).Scan(&totalRevenue, &totalOrders, &totalTax, &totalDiscounts)
+		WHERE tenant_id = $1
+		  AND is_deleted = FALSE
+		  AND created_at >= $2
+		  AND created_at <= $3
+	`, tenantID, day, dayEnd).Scan(
+		&totalOrders, &totalRevenue, &avgOrderValue,
+		&totalTax, &totalDiscounts, &netRevenue,
+	)
 	if err != nil {
-		slog.Error("reports: daily query", "error", err)
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to aggregate daily stats")
+		return
 	}
 
-	avgOrderValue := 0
-	if totalOrders > 0 {
-		avgOrderValue = totalRevenue / totalOrders
+	// Orders by type
+	typeRows, err := m.db.QueryContext(r.Context(), `
+		SELECT order_type, COUNT(*)
+		FROM tickets
+		WHERE tenant_id = $1 AND is_deleted = FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $2 AND created_at <= $3
+		GROUP BY order_type
+	`, tenantID, day, dayEnd)
+	ordersByType := map[string]int{}
+	if err == nil {
+		defer typeRows.Close()
+		for typeRows.Next() {
+			var ot string
+			var cnt int
+			if typeRows.Scan(&ot, &cnt) == nil {
+				ordersByType[ot] = cnt
+			}
+		}
+	}
+
+	// Payments by method (from payments table)
+	payRows, err := m.db.QueryContext(r.Context(), `
+		SELECT payment_method, COUNT(*), COALESCE(SUM(amount), 0)
+		FROM payments p
+		JOIN tickets t ON t.id = p.ticket_id
+		WHERE p.tenant_id = $1 AND p.is_deleted = FALSE
+		  AND p.paid_at >= $2 AND p.paid_at <= $3
+		GROUP BY payment_method
+	`, tenantID, day, dayEnd)
+	paymentsByMethod := map[string]int64{}
+	if err == nil {
+		defer payRows.Close()
+		for payRows.Next() {
+			var method string
+			var cnt int
+			var amount int64
+			if payRows.Scan(&method, &cnt, &amount) == nil {
+				_ = cnt
+				paymentsByMethod[method] = amount
+			}
+		}
+	}
+
+	// Hourly breakdown (24 buckets)
+	hourlyRows, err := m.db.QueryContext(r.Context(), `
+		SELECT EXTRACT(HOUR FROM created_at)::INT, COALESCE(SUM(total), 0)
+		FROM tickets
+		WHERE tenant_id = $1 AND is_deleted = FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $2 AND created_at <= $3
+		GROUP BY EXTRACT(HOUR FROM created_at)
+	`, tenantID, day, dayEnd)
+	hourlyBreakdown := make([]int64, 24)
+	if err == nil {
+		defer hourlyRows.Close()
+		for hourlyRows.Next() {
+			var hour int
+			var amount int64
+			if hourlyRows.Scan(&hour, &amount) == nil && hour >= 0 && hour < 24 {
+				hourlyBreakdown[hour] = amount
+			}
+		}
 	}
 
 	response.JSON(w, http.StatusOK, map[string]any{
-		"date":                date,
+		"date":                day.Format("2006-01-02"),
 		"total_revenue":       totalRevenue,
 		"total_orders":        totalOrders,
 		"average_order_value": avgOrderValue,
 		"total_tax":           totalTax,
 		"total_discounts":     totalDiscounts,
-		"net_revenue":         totalRevenue - totalTax,
-		"orders_by_type":      map[string]int{},
-		"payments_by_method":  map[string]int{},
-		"hourly_breakdown":    []any{},
+		"net_revenue":         netRevenue,
+		"orders_by_type":      ordersByType,
+		"payments_by_method":  paymentsByMethod,
+		"hourly_breakdown":    hourlyBreakdown,
 	})
 }
 
 // handleProductReport returns product performance data.
 // GET /api/v1/reports/products?date_from=&date_to=&category_id=
 func (m *Module) handleProductReport(w http.ResponseWriter, r *http.Request) {
-	dateFrom := r.URL.Query().Get("date_from")
-	dateTo := r.URL.Query().Get("date_to")
-	if dateFrom == "" {
-		dateFrom = time.Now().AddDate(0, 0, -30).Format("2006-01-02")
+	tenantID := middleware.GetTenantID(r.Context())
+	if tenantID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Tenant context required")
+		return
 	}
-	if dateTo == "" {
-		dateTo = time.Now().Format("2006-01-02")
+
+	q := r.URL.Query()
+	dateFrom, dateTo := parseDateRange(q.Get("date_from"), q.Get("date_to"))
+	categoryID := q.Get("category_id")
+
+	// Build query with optional category filter
+	catFilter := ""
+	args := []any{tenantID, dateFrom, dateTo}
+	if categoryID != "" {
+		catFilter = " AND p.category_id = $4"
+		args = append(args, categoryID)
 	}
 
 	rows, err := m.db.QueryContext(r.Context(), `
 		SELECT
 			oi.product_id,
 			oi.product_name,
-			SUM(oi.quantity)              AS qty,
-			SUM(oi.quantity * oi.unit_price) AS revenue
+			COALESCE(p.category_id::TEXT, '') as category_id,
+			COUNT(*) as order_count,
+			SUM(oi.quantity) as total_quantity,
+			SUM(oi.subtotal) as total_revenue,
+			AVG(oi.unit_price)::BIGINT as avg_price
 		FROM order_items oi
+		LEFT JOIN products p ON p.id = oi.product_id::UUID
 		JOIN tickets t ON t.id = oi.ticket_id
-		WHERE DATE(t.created_at) BETWEEN $1 AND $2
-		  AND t.status NOT IN ('cancelled')
-		  AND t.is_deleted = false
-		  AND oi.is_deleted = false
-		GROUP BY oi.product_id, oi.product_name
-		ORDER BY qty DESC
-	`, dateFrom, dateTo)
-
-	type productPerf struct {
-		ProductID   string `json:"product_id"`
-		ProductName string `json:"product_name"`
-		Quantity    int    `json:"quantity"`
-		Revenue     int    `json:"revenue"`
+		WHERE oi.tenant_id = $1
+		  AND oi.is_deleted = FALSE
+		  AND t.is_deleted = FALSE
+		  AND t.status NOT IN ('void','open')
+		  AND t.created_at >= $2 AND t.created_at <= $3
+		`+catFilter+`
+		GROUP BY oi.product_id, oi.product_name, p.category_id
+		ORDER BY total_revenue DESC
+		LIMIT 100
+	`, args...)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to aggregate product stats")
+		return
 	}
-	products := []productPerf{}
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var p productPerf
-			if err := rows.Scan(&p.ProductID, &p.ProductName, &p.Quantity, &p.Revenue); err == nil {
-				products = append(products, p)
-			}
+	defer rows.Close()
+
+	type ProductPerf struct {
+		ProductID   string  `json:"product_id"`
+		ProductName string  `json:"product_name"`
+		CategoryID  string  `json:"category_id"`
+		OrderCount  int     `json:"order_count"`
+		TotalQty    float64 `json:"total_quantity"`
+		TotalRev    int64   `json:"total_revenue"`
+		AvgPrice    int64   `json:"avg_price"`
+	}
+
+	products := make([]ProductPerf, 0)
+	for rows.Next() {
+		var p ProductPerf
+		if err := rows.Scan(
+			&p.ProductID, &p.ProductName, &p.CategoryID,
+			&p.OrderCount, &p.TotalQty, &p.TotalRev, &p.AvgPrice,
+		); err == nil {
+			products = append(products, p)
 		}
-	} else {
-		slog.Error("reports: product query", "error", err)
 	}
 
 	response.JSON(w, http.StatusOK, map[string]any{
-		"date_from": dateFrom,
-		"date_to":   dateTo,
+		"date_from": dateFrom.Format("2006-01-02"),
+		"date_to":   dateTo.Format("2006-01-02"),
 		"products":  products,
 	})
 }
@@ -108,278 +218,166 @@ func (m *Module) handleProductReport(w http.ResponseWriter, r *http.Request) {
 // handleStaffReport returns staff performance data.
 // GET /api/v1/reports/staff?date_from=&date_to=
 func (m *Module) handleStaffReport(w http.ResponseWriter, r *http.Request) {
-	dateFrom := r.URL.Query().Get("date_from")
-	dateTo := r.URL.Query().Get("date_to")
-	if dateFrom == "" {
-		dateFrom = time.Now().AddDate(0, 0, -30).Format("2006-01-02")
+	tenantID := middleware.GetTenantID(r.Context())
+	if tenantID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Tenant context required")
+		return
 	}
-	if dateTo == "" {
-		dateTo = time.Now().Format("2006-01-02")
-	}
+
+	dateFrom, dateTo := parseDateRange(
+		r.URL.Query().Get("date_from"),
+		r.URL.Query().Get("date_to"),
+	)
 
 	rows, err := m.db.QueryContext(r.Context(), `
 		SELECT
-			t.waiter_name,
-			COUNT(*)               AS order_count,
-			SUM(t.total_amount)    AS total_revenue
+			t.waiter_id::TEXT,
+			COALESCE(u.name, 'Unknown') as waiter_name,
+			COUNT(*) as order_count,
+			COALESCE(SUM(t.total), 0) as total_revenue,
+			COALESCE(AVG(t.total)::BIGINT, 0) as avg_order_value
 		FROM tickets t
-		WHERE DATE(t.created_at) BETWEEN $1 AND $2
-		  AND t.status NOT IN ('cancelled')
-		  AND t.is_deleted = false
-		  AND t.waiter_name IS NOT NULL
-		GROUP BY t.waiter_name
-		ORDER BY order_count DESC
-	`, dateFrom, dateTo)
-
-	type staffPerf struct {
-		WaiterName   string `json:"waiter_name"`
-		OrderCount   int    `json:"order_count"`
-		TotalRevenue int    `json:"total_revenue"`
+		LEFT JOIN users u ON u.id = t.waiter_id AND u.tenant_id = t.tenant_id
+		WHERE t.tenant_id = $1
+		  AND t.is_deleted = FALSE
+		  AND t.waiter_id IS NOT NULL
+		  AND t.status NOT IN ('void','open')
+		  AND t.created_at >= $2 AND t.created_at <= $3
+		GROUP BY t.waiter_id, u.name
+		ORDER BY total_revenue DESC
+	`, tenantID, dateFrom, dateTo)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to aggregate staff stats")
+		return
 	}
-	staff := []staffPerf{}
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var s staffPerf
-			if err := rows.Scan(&s.WaiterName, &s.OrderCount, &s.TotalRevenue); err == nil {
-				staff = append(staff, s)
-			}
+	defer rows.Close()
+
+	type StaffPerf struct {
+		WaiterID      string `json:"waiter_id"`
+		WaiterName    string `json:"waiter_name"`
+		OrderCount    int    `json:"order_count"`
+		TotalRevenue  int64  `json:"total_revenue"`
+		AvgOrderValue int64  `json:"avg_order_value"`
+	}
+
+	staff := make([]StaffPerf, 0)
+	for rows.Next() {
+		var s StaffPerf
+		if err := rows.Scan(
+			&s.WaiterID, &s.WaiterName,
+			&s.OrderCount, &s.TotalRevenue, &s.AvgOrderValue,
+		); err == nil {
+			staff = append(staff, s)
 		}
-	} else {
-		slog.Error("reports: staff query", "error", err)
 	}
 
 	response.JSON(w, http.StatusOK, map[string]any{
-		"date_from": dateFrom,
-		"date_to":   dateTo,
+		"date_from": dateFrom.Format("2006-01-02"),
+		"date_to":   dateTo.Format("2006-01-02"),
 		"staff":     staff,
 	})
 }
 
 // handleShiftReport returns shift summaries.
-// GET /api/v1/reports/shifts?date_from=&date_to=
+// GET /api/v1/reports/shifts?date_from=&date_to=&user_id=
 func (m *Module) handleShiftReport(w http.ResponseWriter, r *http.Request) {
-	dateFrom := r.URL.Query().Get("date_from")
-	dateTo := r.URL.Query().Get("date_to")
-	if dateFrom == "" {
-		dateFrom = time.Now().AddDate(0, 0, -7).Format("2006-01-02")
-	}
-	if dateTo == "" {
-		dateTo = time.Now().Format("2006-01-02")
+	tenantID := middleware.GetTenantID(r.Context())
+	if tenantID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Tenant context required")
+		return
 	}
 
-	response.JSON(w, http.StatusOK, map[string]any{
-		"date_from": dateFrom,
-		"date_to":   dateTo,
-		"shifts":    []any{},
-	})
-}
+	q := r.URL.Query()
+	dateFrom, dateTo := parseDateRange(q.Get("date_from"), q.Get("date_to"))
+	userID := q.Get("user_id")
 
-// handleSalesReport returns aggregated sales data for export.
-// GET /api/v1/reports/sales?from=YYYY-MM-DD&to=YYYY-MM-DD&group_by=day|week|month
-func (m *Module) handleSalesReport(w http.ResponseWriter, r *http.Request) {
-	from := r.URL.Query().Get("from")
-	to := r.URL.Query().Get("to")
-	groupBy := r.URL.Query().Get("group_by")
-
-	if from == "" {
-		from = time.Now().AddDate(0, 0, -30).Format("2006-01-02")
-	}
-	if to == "" {
-		to = time.Now().Format("2006-01-02")
-	}
-	if groupBy == "" {
-		groupBy = "day"
-	}
-
-	truncFn := "DATE(created_at)"
-	switch groupBy {
-	case "week":
-		truncFn = "DATE_TRUNC('week', created_at)"
-	case "month":
-		truncFn = "DATE_TRUNC('month', created_at)"
+	userFilter := ""
+	args := []any{tenantID, dateFrom, dateTo}
+	if userID != "" {
+		userFilter = " AND s.user_id = $4"
+		args = append(args, userID)
 	}
 
 	rows, err := m.db.QueryContext(r.Context(), `
 		SELECT
-			`+truncFn+`             AS period,
-			COUNT(*)                AS order_count,
-			COALESCE(SUM(total_amount), 0)   AS revenue,
-			COALESCE(SUM(tax_amount), 0)     AS tax,
-			COALESCE(SUM(discount_amount), 0) AS discounts
-		FROM tickets
-		WHERE DATE(created_at) BETWEEN $1 AND $2
-		  AND status NOT IN ('cancelled')
-		  AND is_deleted = false
-		GROUP BY period
-		ORDER BY period ASC
-	`, from, to)
-
-	type salesPoint struct {
-		Period     string `json:"period"`
-		OrderCount int    `json:"order_count"`
-		Revenue    int    `json:"revenue"`
-		Tax        int    `json:"tax"`
-		Discounts  int    `json:"discounts"`
+			s.id,
+			s.user_id::TEXT,
+			COALESCE(u.name, 'Unknown') as user_name,
+			s.opened_at,
+			s.closed_at,
+			COALESCE(s.opening_float, 0) as opening_float,
+			COALESCE(s.closing_float, 0) as closing_float,
+			COALESCE(s.total_cash, 0) as total_cash,
+			COALESCE(s.total_card, 0) as total_card,
+			COALESCE(s.total_other, 0) as total_other,
+			COALESCE(s.order_count, 0) as order_count,
+			s.notes
+		FROM shifts s
+		LEFT JOIN users u ON u.id = s.user_id AND u.tenant_id = s.tenant_id
+		WHERE s.tenant_id = $1
+		  AND s.opened_at >= $2 AND s.opened_at <= $3
+		`+userFilter+`
+		ORDER BY s.opened_at DESC
+		LIMIT 100
+	`, args...)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to query shifts")
+		return
 	}
-	points := []salesPoint{}
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var p salesPoint
-			if err := rows.Scan(&p.Period, &p.OrderCount, &p.Revenue, &p.Tax, &p.Discounts); err == nil {
-				points = append(points, p)
-			}
-		}
-	} else {
-		slog.Error("reports: sales query", "error", err)
-	}
+	defer rows.Close()
 
-	// Sales by category.
-	catRows, err := m.db.QueryContext(r.Context(), `
-		SELECT
-			p.category_id,
-			c.name                        AS category_name,
-			SUM(oi.quantity)              AS qty,
-			SUM(oi.quantity * oi.unit_price) AS revenue
-		FROM order_items oi
-		JOIN tickets t  ON t.id  = oi.ticket_id
-		JOIN products p ON p.id  = oi.product_id
-		JOIN categories c ON c.id = p.category_id
-		WHERE DATE(t.created_at) BETWEEN $1 AND $2
-		  AND t.status NOT IN ('cancelled')
-		  AND t.is_deleted = false
-		  AND oi.is_deleted = false
-		GROUP BY p.category_id, c.name
-		ORDER BY revenue DESC
-	`, from, to)
-
-	type catSales struct {
-		CategoryID   string `json:"category_id"`
-		CategoryName string `json:"category_name"`
-		Quantity     int    `json:"quantity"`
-		Revenue      int    `json:"revenue"`
-	}
-	cats := []catSales{}
-	if err == nil {
-		defer catRows.Close()
-		for catRows.Next() {
-			var c catSales
-			if err := catRows.Scan(&c.CategoryID, &c.CategoryName, &c.Quantity, &c.Revenue); err == nil {
-				cats = append(cats, c)
-			}
-		}
+	type ShiftSummary struct {
+		ID           string     `json:"id"`
+		UserID       string     `json:"user_id"`
+		UserName     string     `json:"user_name"`
+		OpenedAt     time.Time  `json:"opened_at"`
+		ClosedAt     *time.Time `json:"closed_at"`
+		OpeningFloat int64      `json:"opening_float"`
+		ClosingFloat int64      `json:"closing_float"`
+		TotalCash    int64      `json:"total_cash"`
+		TotalCard    int64      `json:"total_card"`
+		TotalOther   int64      `json:"total_other"`
+		OrderCount   int        `json:"order_count"`
+		Notes        *string    `json:"notes,omitempty"`
 	}
 
-	// Payment method breakdown.
-	pmRows, err := m.db.QueryContext(r.Context(), `
-		SELECT
-			payment_method,
-			COUNT(*)             AS count,
-			SUM(amount)          AS total
-		FROM payments p
-		JOIN tickets t ON t.id = p.ticket_id
-		WHERE DATE(t.created_at) BETWEEN $1 AND $2
-		  AND t.is_deleted = false
-		GROUP BY payment_method
-		ORDER BY total DESC
-	`, from, to)
-
-	type pmBreakdown struct {
-		Method string `json:"method"`
-		Count  int    `json:"count"`
-		Total  int    `json:"total"`
-	}
-	payments := []pmBreakdown{}
-	if err == nil {
-		defer pmRows.Close()
-		for pmRows.Next() {
-			var pm pmBreakdown
-			if err := pmRows.Scan(&pm.Method, &pm.Count, &pm.Total); err == nil {
-				payments = append(payments, pm)
-			}
+	shifts := make([]ShiftSummary, 0)
+	for rows.Next() {
+		var s ShiftSummary
+		if err := rows.Scan(
+			&s.ID, &s.UserID, &s.UserName,
+			&s.OpenedAt, &s.ClosedAt,
+			&s.OpeningFloat, &s.ClosingFloat,
+			&s.TotalCash, &s.TotalCard, &s.TotalOther,
+			&s.OrderCount, &s.Notes,
+		); err == nil {
+			shifts = append(shifts, s)
 		}
 	}
 
 	response.JSON(w, http.StatusOK, map[string]any{
-		"from":               from,
-		"to":                 to,
-		"group_by":           groupBy,
-		"timeline":           points,
-		"by_category":        cats,
-		"by_payment_method":  payments,
+		"date_from": dateFrom.Format("2006-01-02"),
+		"date_to":   dateTo.Format("2006-01-02"),
+		"shifts":    shifts,
 	})
 }
 
-// handleMWSTReport returns Swiss MWST (VAT) breakdown by tax rate.
-// GET /api/v1/reports/mwst?from=YYYY-MM-DD&to=YYYY-MM-DD
-func (m *Module) handleMWSTReport(w http.ResponseWriter, r *http.Request) {
-	from := r.URL.Query().Get("from")
-	to := r.URL.Query().Get("to")
+// parseDateRange parses from/to date strings, defaulting to the last 7 days.
+func parseDateRange(fromStr, toStr string) (from, to time.Time) {
+	now := time.Now()
+	to = time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, now.Location())
+	from = to.AddDate(0, 0, -6)
+	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
 
-	if from == "" {
-		from = time.Now().AddDate(0, -1, 0).Format("2006-01-02")
-	}
-	if to == "" {
-		to = time.Now().Format("2006-01-02")
-	}
-
-	// Swiss MWST rates: 2.6% (accommodation), 3.8% (reduced/food), 8.1% (standard).
-	// tax_group in products: 'standard' → 8.1%, 'reduced' → 3.8%, 'exempt' → 0%.
-	rows, err := m.db.QueryContext(r.Context(), `
-		SELECT
-			p.tax_group,
-			SUM(oi.quantity * oi.unit_price)  AS gross_amount,
-			CASE p.tax_group
-				WHEN 'standard'     THEN 0.081
-				WHEN 'reduced'      THEN 0.038
-				WHEN 'accommodation'THEN 0.026
-				ELSE 0.0
-			END AS rate
-		FROM order_items oi
-		JOIN tickets t  ON t.id  = oi.ticket_id
-		JOIN products p ON p.id  = oi.product_id
-		WHERE DATE(t.created_at) BETWEEN $1 AND $2
-		  AND t.status NOT IN ('cancelled')
-		  AND t.is_deleted = false
-		  AND oi.is_deleted = false
-		GROUP BY p.tax_group
-		ORDER BY rate DESC
-	`, from, to)
-
-	type mwstLine struct {
-		TaxGroup    string  `json:"tax_group"`
-		Rate        float64 `json:"rate"`
-		GrossAmount int     `json:"gross_amount"`
-		NetAmount   int     `json:"net_amount"`
-		TaxAmount   int     `json:"tax_amount"`
-	}
-	lines := []mwstLine{}
-	totalGross, totalTax := 0, 0
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var l mwstLine
-			if err := rows.Scan(&l.TaxGroup, &l.GrossAmount, &l.Rate); err == nil {
-				// net = gross / (1 + rate), tax = gross - net
-				net := int(float64(l.GrossAmount) / (1.0 + l.Rate))
-				l.NetAmount = net
-				l.TaxAmount = l.GrossAmount - net
-				totalGross += l.GrossAmount
-				totalTax += l.TaxAmount
-				lines = append(lines, l)
-			}
+	if fromStr != "" {
+		if t, err := time.Parse("2006-01-02", fromStr); err == nil {
+			from = t
 		}
-	} else {
-		slog.Error("reports: mwst query", "error", err)
 	}
-
-	response.JSON(w, http.StatusOK, map[string]any{
-		"from":        from,
-		"to":          to,
-		"lines":       lines,
-		"total_gross": totalGross,
-		"total_tax":   totalTax,
-		"total_net":   totalGross - totalTax,
-	})
+	if toStr != "" {
+		if t, err := time.Parse("2006-01-02", toStr); err == nil {
+			to = time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 0, t.Location())
+		}
+	}
+	return
 }

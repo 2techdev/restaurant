@@ -37,7 +37,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
       case TableStatus.available:
         return const Color(0xFF22C55E);
       case TableStatus.occupied:
-        return AppColors.primary;
+        return const Color(0xFF528DFF);
       case TableStatus.reserved:
         return const Color(0xFFFB923C);
       case TableStatus.dirty:
@@ -49,11 +49,11 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
   Widget build(BuildContext context) {
     final floorsAsync = ref.watch(floorsProvider);
 
-    return Container(
+    return ColoredBox(
       color: AppColors.surfaceDim,
       child: floorsAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primaryLight),
+          child: CircularProgressIndicator(color: Color(0xFFAFC6FF)),
         ),
         error: (err, _) => Center(
           child: Text(
@@ -117,7 +117,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
               children: [
                 _buildFilterChip('All Tables', _TableFilter.all, null),
                 _buildFilterChip('Available', _TableFilter.available, const Color(0xFF22C55E)),
-                _buildFilterChip('Occupied', _TableFilter.occupied, AppColors.primary),
+                _buildFilterChip('Occupied', _TableFilter.occupied, const Color(0xFF528DFF)),
                 _buildFilterChip('Unpaid', _TableFilter.unpaid, const Color(0xFFFB923C)),
               ],
             ),
@@ -127,7 +127,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: AppColors.surfaceContainerHigh,
+              color: const Color(0xFF191B22),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -152,8 +152,8 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
           color: isActive
-              ? AppColors.surfaceContainerHigh
-              : AppColors.surfaceContainerHigh,
+              ? const Color(0xFF282A30)
+              : const Color(0xFF191B22),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -176,7 +176,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
                 fontSize: 14,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                 color: isActive
-                    ? AppColors.primaryLight
+                    ? const Color(0xFFAFC6FF)
                     : AppColors.textSecondary,
               ),
             ),
@@ -194,7 +194,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.surfaceContainerHigh : Colors.transparent,
+          color: isActive ? const Color(0xFF282A30) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
@@ -235,7 +235,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.surfaceContainerHigh,
+                color: const Color(0xFF191B22),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -263,11 +263,11 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
             ),
             const SizedBox(height: 12),
             // Stats
-            _buildStatCard('$freeCount', 'Free', const Color(0xFF22C55E)),
+            _buildStatCard(freeCount.toString(), 'Free', const Color(0xFF22C55E)),
             const SizedBox(height: 12),
-            _buildStatCard('${busyCount.toString().padLeft(2, '0')}', 'Busy', AppColors.primary),
+            _buildStatCard(busyCount.toString().padLeft(2, '0'), 'Busy', const Color(0xFF528DFF)),
             const SizedBox(height: 12),
-            _buildStatCard('${checkCount.toString().padLeft(2, '0')}', 'Check', const Color(0xFFFB923C)),
+            _buildStatCard(checkCount.toString().padLeft(2, '0'), 'Check', const Color(0xFFFB923C)),
             const SizedBox(height: 12),
             // Add table button
             Container(
@@ -277,7 +277,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
                 color: const Color(0xFF33343B),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.add, size: 24, color: AppColors.primaryLight),
+              child: const Icon(Icons.add, size: 24, color: Color(0xFFAFC6FF)),
             ),
           ],
         ),
@@ -290,7 +290,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerHigh,
+        color: const Color(0xFF191B22),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -326,7 +326,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
 
     return tablesAsync.when(
       loading: () => const Center(
-        child: CircularProgressIndicator(color: AppColors.primaryLight),
+        child: CircularProgressIndicator(color: Color(0xFFAFC6FF)),
       ),
       error: (err, _) => Center(
         child: Text(
@@ -380,7 +380,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [AppColors.primaryLight, AppColors.primary],
+                      colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -430,13 +430,13 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: isAvailable
-              ? AppColors.surfaceContainerHigh
-              : AppColors.surfaceContainerHigh,
+              ? const Color(0xFF191B22)
+              : const Color(0xFF282A30),
           borderRadius: BorderRadius.circular(12),
           boxShadow: isOccupied
               ? [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.1),
+                    color: const Color(0xFF528DFF).withValues(alpha: 0.1),
                     blurRadius: 15,
                   ),
                 ]
@@ -481,7 +481,7 @@ class _TableViewTabState extends ConsumerState<TableViewTab> {
                               ? const Color(0xFFE2E2EB).withValues(alpha: 0.4)
                               : isUnpaid
                                   ? const Color(0xFFFB923C)
-                                  : AppColors.primary,
+                                  : const Color(0xFF528DFF),
                           letterSpacing: -2.0,
                         ),
                       ),

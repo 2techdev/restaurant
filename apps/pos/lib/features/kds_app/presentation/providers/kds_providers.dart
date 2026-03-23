@@ -14,3 +14,6 @@ final kdsLargeFontProvider = StateProvider<bool>((ref) => false);
 
 /// Minutes after which a ticket is considered late (turns red).
 final kdsLateThresholdProvider = StateProvider<int>((ref) => 10);
+
+/// Whether sound alerts are enabled when new tickets arrive.
+final kdsSoundAlertsProvider = StateProvider<bool>((ref) => true);

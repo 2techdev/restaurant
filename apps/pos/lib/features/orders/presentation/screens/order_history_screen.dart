@@ -187,7 +187,7 @@ class _OrderHistoryScreenState extends ConsumerState<OrderHistoryScreen> {
           SizedBox(
             width: 220,
             height: 40,
-            child: Container(
+            child: DecoratedBox(
               decoration: BoxDecoration(
                 color: AppColors.bgInput,
                 borderRadius: BorderRadius.circular(10),

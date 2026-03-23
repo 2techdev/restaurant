@@ -301,7 +301,7 @@ class _TableTile extends StatelessWidget {
     final isOccupied = table.status == TableStatus.occupied;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerLow,
           borderRadius: BorderRadius.circular(16),

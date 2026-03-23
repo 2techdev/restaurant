@@ -90,7 +90,7 @@ class _KdsLoginScreenState extends ConsumerState<KdsLoginScreen> {
   Widget build(BuildContext context) {
     final savedPinAsync = ref.watch(_savedPinProvider);
 
-    savedPinAsync.whenData((pin) => _tryAutoLogin(pin));
+    savedPinAsync.whenData(_tryAutoLogin);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,

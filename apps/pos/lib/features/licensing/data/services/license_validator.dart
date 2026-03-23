@@ -5,15 +5,17 @@
 ///   Base64url( UTF-8( JSON ) )
 ///
 /// where the JSON object contains:
-///   {
-///     "v":                1,
-///     "businessId":       "<UUID>",
-///     "tier":             "free" | "professional" | "enterprise",
-///     "issuedAt":         "<ISO-8601 UTC>",
-///     "expiresAt":        "<ISO-8601 UTC>",
-///     "deviceFingerprint":"<optional string>",
-///     "sig":              "<Base64url Ed25519 signature>"
-///   }
+/// ```json
+/// {
+///   "v": 1,
+///   "businessId": "UUID",
+///   "tier": "free | professional | enterprise",
+///   "issuedAt": "ISO-8601 UTC",
+///   "expiresAt": "ISO-8601 UTC",
+///   "deviceFingerprint": "optional string",
+///   "sig": "Base64url Ed25519 signature"
+/// }
+/// ```
 ///
 /// The signed message is the canonical JSON of all fields *except* "sig",
 /// with keys sorted alphabetically, no whitespace, UTF-8 encoded.
@@ -38,16 +40,17 @@ import 'package:gastrocore_pos/features/licensing/domain/entities/license_tier.d
 // Embedded public key
 // ---------------------------------------------------------------------------
 
-/// Development Ed25519 public key (RFC 8032 Test Vector 1).
+/// Production Ed25519 public key for GastroCore license validation.
 ///
-/// Replace with the real production public key before release.
-/// Corresponds to the private seed:
-///   9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae3d55
+/// Generated 2026-03-23. The matching private seed lives exclusively on
+/// the GastroCore license server — never commit it to this repository.
+/// To rotate keys: generate a new pair with scripts/generate_license.js,
+/// replace these bytes, and re-issue licenses for existing customers.
 const List<int> kDevPublicKey = [
-  0xd7, 0x5a, 0x98, 0x01, 0x26, 0x08, 0x60, 0x82,
-  0xf7, 0xa4, 0xe8, 0x2b, 0xef, 0x20, 0xa6, 0x81,
-  0x0f, 0x5f, 0x01, 0xb4, 0x94, 0xc8, 0x9b, 0x84,
-  0xdb, 0x5a, 0xc9, 0x2e, 0x7c, 0x6a, 0x6b, 0x3d,
+  0x6d, 0xd7, 0x0c, 0xf7, 0x21, 0x8b, 0x9d, 0x81,
+  0x14, 0xd8, 0x47, 0xd8, 0xeb, 0xd6, 0x20, 0x19,
+  0xf2, 0x5f, 0xba, 0x42, 0x91, 0xe4, 0x4b, 0x67,
+  0x51, 0xd9, 0x9a, 0xd0, 0x8a, 0x2f, 0xbb, 0x4e,
 ];
 
 // ---------------------------------------------------------------------------
@@ -105,7 +108,7 @@ final _sqrtM1 =
     BigInt.two.modPow((_p - BigInt.one) ~/ BigInt.from(4), _p);
 
 // Base point full (extended coordinates [X, Y, Z, T])
-final _B = _makeBasePoint();
+final basePoint = _makeBasePoint();
 
 BigInt _modInv(BigInt a, BigInt m) => a.modInverse(m);
 
@@ -219,7 +222,7 @@ bool _ed25519Verify(
     final h = _decodeLittleEndian(hBytes) % _l;
 
     // Check: [8][S]B == [8]R + [8][h]A
-    final lhs = _encodePoint(_scalarMul(_B, BigInt.from(8) * S % _l));
+    final lhs = _encodePoint(_scalarMul(basePoint, BigInt.from(8) * S % _l));
     final rhs = _encodePoint(
       _pointAdd(
         _scalarMul(R, BigInt.from(8)),

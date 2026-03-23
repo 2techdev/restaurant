@@ -12,8 +12,11 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
+import 'package:gastrocore_pos/core/printing/printing_provider.dart';
 import 'package:gastrocore_pos/features/home/data/repositories/dashboard_repository.dart';
 import 'package:gastrocore_pos/features/home/domain/entities/dashboard_summary.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Repository
@@ -60,13 +63,20 @@ class HardwareStatus {
 
 /// Provider for [HardwareStatus].
 ///
-/// Currently returns simulated disconnected state.
-/// Replace the body with real connectivity checks once the printing and
-/// payment-terminal providers are fully implemented.
+/// Reads live printer connectivity from [printerStatusProvider].
+/// Payment terminal wiring is pending a terminal SDK integration.
 final hardwareStatusProvider = Provider<HardwareStatus>((ref) {
-  // TODO: wire to real printer provider and payment terminal provider.
-  return const HardwareStatus(
-    printerConnected: false,
-    terminalConnected: false,
+  final printerStatus = ref.watch(printerStatusProvider);
+  final paymentSettings =
+      ref.watch(paymentSettingsProvider).valueOrNull;
+  // Terminal is "connected" when a non-none gateway is configured.
+  // Full live connectivity detection requires vendor SDKs (Wallee/myPOS),
+  // so we use gateway != none as a proxy for "terminal set up".
+  final terminalConfigured =
+      paymentSettings?.activeGateway != null &&
+          paymentSettings!.activeGateway != PaymentGateway.none;
+  return HardwareStatus(
+    printerConnected: printerStatus.valueOrNull?.isConnected ?? false,
+    terminalConnected: terminalConfigured,
   );
 });

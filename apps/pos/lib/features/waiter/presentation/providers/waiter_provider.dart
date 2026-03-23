@@ -13,6 +13,7 @@ import 'package:gastrocore_pos/features/menu/data/repositories/menu_repository_i
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/orders/data/repositories/order_repository_impl.dart';
+import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/tables/data/repositories/table_repository_impl.dart';
 import 'package:gastrocore_pos/features/tables/domain/entities/table_entity.dart';
@@ -95,6 +96,7 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
   Future<void> addProduct(
     ProductEntity product, {
     double quantity = 1,
+    List<OrderItemModifierEntity> modifiers = const [],
     String? notes,
   }) async {
     if (state == null) return;
@@ -102,6 +104,7 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
       ticketId: state!.id,
       product: product,
       quantity: quantity,
+      modifiers: modifiers,
       notes: notes,
     );
     state = updated;

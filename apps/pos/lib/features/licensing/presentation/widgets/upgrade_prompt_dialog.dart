@@ -102,7 +102,7 @@ class _UpgradeDialogState extends ConsumerState<_UpgradeDialog> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _tierColor(tier).withOpacity(0.15),
+                      color: _tierColor(tier).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: _tierColor(tier), width: 1),
                     ),

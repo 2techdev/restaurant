@@ -16,8 +16,7 @@ if (keyPropertiesFile.exists()) {
 
 android {
     namespace = "com.gastrocore.gastrocore_pos"
-    // Explicit SDK versions — do not rely on flutter.* variables for release.
-    compileSdk = 36
+    compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -30,14 +29,14 @@ android {
     }
 
     defaultConfig {
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.gastrocore.gastrocore_pos"
-        // Android 5.0 Lollipop (API 21) — covers >98% of active Android devices.
+        // You can update the following values to match your application needs.
+        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // Ensure multidex is available on API 21 (needed for large Flutter apps).
-        multiDexEnabled = true
     }
 
     // ---------------------------------------------------------------------------
@@ -85,30 +84,23 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = keyProperties["keyAlias"] as? String ?: ""
-            keyPassword = keyProperties["keyPassword"] as? String ?: ""
-            storeFile = (keyProperties["storeFile"] as? String)?.let { rootProject.file(it) }
-            storePassword = keyProperties["storePassword"] as? String ?: ""
+            keyAlias = keyProperties["keyAlias"]?.toString() ?: ""
+            keyPassword = keyProperties["keyPassword"]?.toString() ?: ""
+            storeFile = keyProperties["storeFile"]?.let { rootProject.file(it.toString()) }
+            storePassword = keyProperties["storePassword"]?.toString() ?: ""
         }
     }
 
     buildTypes {
-        debug {
-            // Debug builds get a different applicationId suffix so they can
-            // be installed alongside the release build on the same device.
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
-            isDebuggable = true
-            isMinifyEnabled = false
-            isShrinkResources = false
-        }
         release {
-            signingConfig = signingConfigs.getByName("release")
-            isDebuggable = false
+            // Use release signing when key.properties is present, debug signing otherwise.
+            signingConfig = if (keyPropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
-            // proguard-android-optimize.txt enables aggressive R8 optimisations
-            // on top of our custom rules.
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -130,8 +122,6 @@ repositories {
 dependencies {
     implementation(files("libs/slavesdk2.1.8.aar"))
     implementation("androidx.gridlayout:gridlayout:1.0.0")
-    // Multidex support for API 21 (Flutter apps exceed 64k method limit).
-    implementation("androidx.multidex:multidex:2.0.1")
     // integration_test is a dev dependency but GeneratedPluginRegistrant.java references it
     // in all build modes due to a Flutter tool bug. Add it for release compilation only;
     // R8 will strip unused test code from the release APK.

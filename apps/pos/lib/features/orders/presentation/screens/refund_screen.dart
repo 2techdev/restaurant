@@ -90,7 +90,7 @@ class _RefundScreenState extends ConsumerState<RefundScreen> {
     });
   }
 
-  void _clearSelection() => setState(() => _selectedIds.clear());
+  void _clearSelection() => setState(_selectedIds.clear);
 
   Future<void> _onSubmitRefund(TicketEntity ticket) async {
     final currentUser = ref.read(currentUserProvider);
@@ -322,7 +322,7 @@ class _RefundScreenState extends ConsumerState<RefundScreen> {
     List<OrderItemEntity> refundable,
     List<OrderItemEntity> selected,
   ) {
-    return Container(
+    return ColoredBox(
       color: AppColors.surfaceDim,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,7 +513,7 @@ class _RefundScreenState extends ConsumerState<RefundScreen> {
     int tax,
     int total,
   ) {
-    return Container(
+    return ColoredBox(
       color: AppColors.surface,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -623,7 +623,7 @@ class _RefundScreenState extends ConsumerState<RefundScreen> {
 
             if (_selectedReason == 'Diğer') ...[
               const SizedBox(height: 12),
-              Container(
+              DecoratedBox(
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(8),
@@ -654,7 +654,7 @@ class _RefundScreenState extends ConsumerState<RefundScreen> {
                   color: AppColors.textPrimary),
             ),
             const SizedBox(height: 10),
-            Container(
+            DecoratedBox(
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(8),

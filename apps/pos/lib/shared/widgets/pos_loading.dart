@@ -45,7 +45,7 @@ class PosLoadingOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ColoredBox(
       color: AppColors.bgOverlay,
       child: Center(
         child: Column(

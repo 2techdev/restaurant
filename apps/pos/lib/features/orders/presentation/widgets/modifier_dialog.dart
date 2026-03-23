@@ -529,7 +529,7 @@ class _ModifierDialogContentState
           ),
         ),
         const SizedBox(height: 10),
-        Container(
+        DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(10),

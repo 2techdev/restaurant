@@ -7,7 +7,7 @@ void main() {
   // Test verileri
   // ---------------------------------------------------------------------------
 
-  SwissReceiptData _minimal({
+  SwissReceiptData makeMinimal({
     Map<String, int> mwstBreakdown = const {},
     List<SwissReceiptItem> items = const [],
     List<SwissPaymentLine> payments = const [],
@@ -25,7 +25,7 @@ void main() {
     );
   }
 
-  SwissReceiptItem _item({
+  SwissReceiptItem makeItem({
     String name = 'Mineralwasser',
     double quantity = 1,
     int unitPrice = 450,
@@ -50,7 +50,7 @@ void main() {
   // ---------------------------------------------------------------------------
   // Yardımcı: byte dizisinden yazdırılabilir metin oluştur
   // ---------------------------------------------------------------------------
-  String _text(List<int> bytes) => String.fromCharCodes(
+  String extractText(List<int> bytes) => String.fromCharCodes(
         bytes.where((b) => b >= 0x20 || b == 0x0A),
       );
 
@@ -60,18 +60,18 @@ void main() {
 
   group('Temel çıktı', () {
     test('build() boş olmayan byte dizisi döndürür', () {
-      final bytes = SwissReceiptBuilder(data: _minimal()).build();
+      final bytes = SwissReceiptBuilder(data: makeMinimal()).build();
       expect(bytes, isNotEmpty);
     });
 
     test('ESC @ (initialize) ile başlar', () {
-      final bytes = SwissReceiptBuilder(data: _minimal()).build();
+      final bytes = SwissReceiptBuilder(data: makeMinimal()).build();
       expect(bytes[0], 0x1B);
       expect(bytes[1], 0x40);
     });
 
     test('GS V 1 (partial cut) ile biter', () {
-      final bytes = SwissReceiptBuilder(data: _minimal()).build();
+      final bytes = SwissReceiptBuilder(data: makeMinimal()).build();
       // feed(4) + cut(): son ESC/POS komutu GS V 1
       expect(bytes.contains(0x1D), isTrue);
       expect(bytes.contains(0x56), isTrue);
@@ -79,9 +79,9 @@ void main() {
 
     test('Kasa çekmecesi komutu yalnızca openDrawer=true ise eklenir', () {
       final withDrawer =
-          SwissReceiptBuilder(data: _minimal(openDrawer: true)).build();
+          SwissReceiptBuilder(data: makeMinimal(openDrawer: true)).build();
       final withoutDrawer =
-          SwissReceiptBuilder(data: _minimal()).build();
+          SwissReceiptBuilder(data: makeMinimal()).build();
 
       // ESC p = [0x1B, 0x70]
       bool hasDrawerCmd(List<int> bytes) {
@@ -102,8 +102,8 @@ void main() {
 
   group('Başlık bölümü', () {
     test('Restoran adı byte dizisinde bulunur', () {
-      final data = _minimal().copyWith(restaurantName: 'Gastro Alp');
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final data = makeMinimal().copyWith(restaurantName: 'Gastro Alp');
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Gastro Alp'));
     });
 
@@ -115,7 +115,7 @@ void main() {
         total: 0,
         address: 'Bahnhofstrasse 1, 8001 Zuerich',
       );
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Bahnhofstrasse 1'));
     });
 
@@ -127,7 +127,7 @@ void main() {
         total: 0,
         phone: '+41 44 123 45 67',
       );
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Tel: +41 44 123 45 67'));
     });
 
@@ -139,12 +139,12 @@ void main() {
         total: 0,
         mwstNr: 'CHE-123.456.789 MWST',
       );
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('MWST-Nr: CHE-123.456.789 MWST'));
     });
 
     test('MWST-Nr yoksa "MWST-Nr:" etiketi yazdırılmaz', () {
-      final text = _text(SwissReceiptBuilder(data: _minimal()).build());
+      final text = extractText(SwissReceiptBuilder(data: makeMinimal()).build());
       expect(text, isNot(contains('MWST-Nr:')));
     });
   });
@@ -161,7 +161,7 @@ void main() {
         items: const [],
         total: 0,
       );
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('00042'));
     });
 
@@ -173,7 +173,7 @@ void main() {
         total: 0,
         cashierName: 'Max Muster',
       );
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Max Muster'));
     });
 
@@ -185,7 +185,7 @@ void main() {
         total: 0,
         tableName: 'T-05',
       );
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('T-05'));
     });
   });
@@ -196,53 +196,53 @@ void main() {
 
   group('Kalem bölümü', () {
     test('Ürün adı yazdırılır', () {
-      final item = _item(name: 'Cordon Bleu');
-      final data = _minimal(items: [item]);
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final item = makeItem(name: 'Cordon Bleu');
+      final data = makeMinimal(items: [item]);
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Cordon Bleu'));
     });
 
     test('MwSt kodu köşeli parantez ile yazdırılır', () {
-      final item = _item(mwstCode: MwStCode.b);
-      final data = _minimal(items: [item]);
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final item = makeItem(mwstCode: MwStCode.b);
+      final data = makeMinimal(items: [item]);
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('[B]'));
     });
 
     test('Modifikatörler "+ " önekiyle yazdırılır', () {
-      final item = _item(modifiers: ['ohne Pommes', 'Salat extra']);
-      final data = _minimal(items: [item]);
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final item = makeItem(modifiers: ['ohne Pommes', 'Salat extra']);
+      final data = makeMinimal(items: [item]);
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('+ ohne Pommes'));
       expect(text, contains('+ Salat extra'));
     });
 
     test('Notlar "! " önekiyle yazdırılır', () {
-      final item = _item(notes: 'Keine Saetze');
-      final data = _minimal(items: [item]);
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final item = makeItem(notes: 'Keine Saetze');
+      final data = makeMinimal(items: [item]);
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('! Keine Saetze'));
     });
 
     test('Kalem indirimi "Rabatt" etiketi ile yazdırılır', () {
-      final item = _item(discountAmount: 100); // CHF 1.00
-      final data = _minimal(items: [item]);
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final item = makeItem(discountAmount: 100); // CHF 1.00
+      final data = makeMinimal(items: [item]);
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Rabatt'));
     });
 
     test('İndirim yoksa "Rabatt" yazdırılmaz', () {
-      final item = _item(discountAmount: 0);
-      final data = _minimal(items: [item]);
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final item = makeItem(discountAmount: 0);
+      final data = makeMinimal(items: [item]);
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       // Genel indirim de yok
       expect(text, isNot(contains('Rabatt')));
     });
 
     test('CHF fiyat formatı doğru (2 ondalık)', () {
-      final item = _item(unitPrice: 2850, totalPrice: 2850);
-      final data = _minimal(items: [item]);
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final item = makeItem(unitPrice: 2850, totalPrice: 2850);
+      final data = makeMinimal(items: [item]);
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('28.50'));
     });
   });
@@ -253,14 +253,14 @@ void main() {
 
   group('Toplamlar bölümü', () {
     test('TOTAL etiketi yazdırılır', () {
-      final data = _minimal(total: 3375);
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final data = makeMinimal(total: 3375);
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('TOTAL'));
     });
 
     test('Toplam tutar (CHF) doğru formatlanır', () {
-      final data = _minimal(total: 3375);
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final data = makeMinimal(total: 3375);
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('33.75'));
     });
 
@@ -273,7 +273,7 @@ void main() {
         subtotal: 3750,
         discountAmount: 375,
       );
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Subtotal'));
       expect(text, contains('Rabatt'));
       expect(text, contains('37.50'));
@@ -290,8 +290,8 @@ void main() {
         const SwissPaymentLine(method: 'Bar', amount: 5000),
         const SwissPaymentLine(method: 'TWINT', amount: 3375),
       ];
-      final data = _minimal(payments: payments, total: 8375);
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final data = makeMinimal(payments: payments, total: 8375);
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Bar'));
       expect(text, contains('TWINT'));
     });
@@ -306,7 +306,7 @@ void main() {
         tenderedAmount: 5000,
         changeAmount: 1625,
       );
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Gegeben'));
       expect(text, contains('50.00'));
     });
@@ -321,7 +321,7 @@ void main() {
         tenderedAmount: 5000,
         changeAmount: 1625,
       );
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Rueckgeld'));
       expect(text, contains('16.25'));
     });
@@ -333,20 +333,20 @@ void main() {
 
   group('MwSt tablosu', () {
     test('mwstBreakdown boşsa MwSt-Abrechnung yazdırılmaz', () {
-      final data = _minimal(mwstBreakdown: const {});
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final data = makeMinimal(mwstBreakdown: const {});
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, isNot(contains('MwSt-Abrechnung')));
     });
 
     test('MwSt-Abrechnung başlığı yazdırılır', () {
-      final data = _minimal(mwstBreakdown: {'A': 2850});
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final data = makeMinimal(mwstBreakdown: {'A': 2850});
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('MwSt-Abrechnung'));
     });
 
     test('MwSt kodu ve oranı yazdırılır', () {
-      final data = _minimal(mwstBreakdown: {'A': 2850, 'B': 450});
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final data = makeMinimal(mwstBreakdown: {'A': 2850, 'B': 450});
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('A'));
       expect(text, contains('8.1%'));
       expect(text, contains('B'));
@@ -387,14 +387,14 @@ void main() {
     });
 
     test('Toplam satırı yazdırılır', () {
-      final data = _minimal(mwstBreakdown: {'A': 2850, 'B': 450});
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final data = makeMinimal(mwstBreakdown: {'A': 2850, 'B': 450});
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Total'));
     });
 
     test('Kodlar alfabetik sırada yazdırılır (A → B → C)', () {
-      final data = _minimal(mwstBreakdown: {'C': 1000, 'A': 2850, 'B': 450});
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final data = makeMinimal(mwstBreakdown: {'C': 1000, 'A': 2850, 'B': 450});
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       final aIdx = text.lastIndexOf('8.1%');
       final bIdx = text.lastIndexOf('2.6%');
       final cIdx = text.lastIndexOf('3.8%');
@@ -416,12 +416,12 @@ void main() {
         total: 0,
         footerText: 'Auf Wiedersehen!',
       );
-      final text = _text(SwissReceiptBuilder(data: data).build());
+      final text = extractText(SwissReceiptBuilder(data: data).build());
       expect(text, contains('Auf Wiedersehen!'));
     });
 
     test('footerText yoksa varsayılan teşekkür mesajı kullanılır', () {
-      final text = _text(SwissReceiptBuilder(data: _minimal()).build());
+      final text = extractText(SwissReceiptBuilder(data: makeMinimal()).build());
       expect(text, contains('Vielen Dank'));
     });
 

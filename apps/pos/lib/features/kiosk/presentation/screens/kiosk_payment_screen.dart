@@ -494,12 +494,12 @@ class _PaymentMethodCardState extends State<_PaymentMethodCard>
         child: Container(
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
-            color: widget.color.withOpacity(0.06),
+            color: widget.color.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(kKioskRadiusXL),
-            border: Border.all(color: widget.color.withOpacity(0.4), width: 2),
+            border: Border.all(color: widget.color.withValues(alpha: 0.4), width: 2),
             boxShadow: [
               BoxShadow(
-                color: widget.color.withOpacity(0.1),
+                color: widget.color.withValues(alpha: 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, 4),
               ),
@@ -511,7 +511,7 @@ class _PaymentMethodCardState extends State<_PaymentMethodCard>
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: widget.color.withOpacity(0.15),
+                  color: widget.color.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(

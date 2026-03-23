@@ -189,7 +189,7 @@ class _OrderPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ColoredBox(
       color: bgColor,
       child: Column(
         children: [
@@ -321,7 +321,7 @@ class _PreparingOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: OdsColors.preparingCardBg,
         borderRadius: BorderRadius.circular(kOdsRadiusMedium),
@@ -394,7 +394,7 @@ class _ReadyOrderCardState extends State<_ReadyOrderCard>
     return AnimatedBuilder(
       animation: _pulse,
       builder: (context, child) {
-        return Container(
+        return DecoratedBox(
           decoration: BoxDecoration(
             color: OdsColors.readyCardBg,
             borderRadius: BorderRadius.circular(kOdsRadiusMedium),

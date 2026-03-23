@@ -51,3 +51,19 @@ final tenantIdProvider = Provider<String>((ref) {
 /// Using a [StateProvider] so the settings screen can persist a new value
 /// without requiring an app restart.
 final deviceIdProvider = StateProvider<String>((ref) => 'DEV-POS-01');
+
+// ---------------------------------------------------------------------------
+// Tenant info
+// ---------------------------------------------------------------------------
+
+/// The [Tenant] record for the current tenant, loaded once on startup.
+///
+/// Used by the receipt preview, backoffice header, and anywhere that needs
+/// the restaurant's name, address, phone, or currency.
+final tenantInfoProvider = StreamProvider<Tenant?>((ref) {
+  final db = ref.watch(databaseProvider);
+  final tenantId = ref.watch(tenantIdProvider);
+  return (db.select(db.tenants)
+        ..where((t) => t.id.equals(tenantId)))
+      .watchSingleOrNull();
+});

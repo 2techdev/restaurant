@@ -139,49 +139,49 @@ void main() {
 
     tearDown(() => db.close());
 
-    Future<AuditAction> _firstAction() async {
+    Future<AuditAction> firstAction() async {
       final entries = await db.auditLogDao.getEntries(tenantId: 'tenant-1');
       return entries.first.action;
     }
 
     test('logOrderCreated', () async {
       await svc.logOrderCreated('tkt-1');
-      expect(await _firstAction(), AuditAction.orderCreated);
+      expect(await firstAction(), AuditAction.orderCreated);
     });
 
     test('logOrderCancelled', () async {
       await svc.logOrderCancelled('tkt-2', reason: 'test');
-      expect(await _firstAction(), AuditAction.orderCancelled);
+      expect(await firstAction(), AuditAction.orderCancelled);
     });
 
     test('logOrderVoided', () async {
       await svc.logOrderVoided('tkt-3');
-      expect(await _firstAction(), AuditAction.orderVoided);
+      expect(await firstAction(), AuditAction.orderVoided);
     });
 
     test('logPaymentReceived', () async {
       await svc.logPaymentReceived('pay-1');
-      expect(await _firstAction(), AuditAction.paymentReceived);
+      expect(await firstAction(), AuditAction.paymentReceived);
     });
 
     test('logPaymentRefunded', () async {
       await svc.logPaymentRefunded('pay-2');
-      expect(await _firstAction(), AuditAction.paymentRefunded);
+      expect(await firstAction(), AuditAction.paymentRefunded);
     });
 
     test('logDiscountApplied', () async {
       await svc.logDiscountApplied('tkt-4');
-      expect(await _firstAction(), AuditAction.discountApplied);
+      expect(await firstAction(), AuditAction.discountApplied);
     });
 
     test('logShiftOpened', () async {
       await svc.logShiftOpened('shift-1');
-      expect(await _firstAction(), AuditAction.shiftOpened);
+      expect(await firstAction(), AuditAction.shiftOpened);
     });
 
     test('logShiftClosed', () async {
       await svc.logShiftClosed('shift-1');
-      expect(await _firstAction(), AuditAction.shiftClosed);
+      expect(await firstAction(), AuditAction.shiftClosed);
     });
 
     test('logUserLoggedIn uses provided userId/userName', () async {
@@ -194,7 +194,7 @@ void main() {
 
     test('logCashDrawerOpened', () async {
       await svc.logCashDrawerOpened('shift-2');
-      expect(await _firstAction(), AuditAction.cashDrawerOpened);
+      expect(await firstAction(), AuditAction.cashDrawerOpened);
     });
   });
 

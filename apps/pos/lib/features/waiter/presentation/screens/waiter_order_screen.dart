@@ -185,6 +185,7 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
         onSendToKitchen: _sendToKitchen,
         onRequestBill: _requestBill,
         onMarkServed: _markServed,
+        onSplitBill: ticket != null ? () => _splitBill(ticket) : null,
       ),
     );
   }
@@ -221,6 +222,10 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
         ),
       );
     }
+  }
+
+  void _splitBill(TicketEntity ticket) {
+    context.push(WaiterRoutes.splitBillFor(ticket.id));
   }
 
   Future<void> _markServed() async {
@@ -626,12 +631,14 @@ class _ActionBar extends StatelessWidget {
   final VoidCallback onSendToKitchen;
   final VoidCallback onRequestBill;
   final VoidCallback onMarkServed;
+  final VoidCallback? onSplitBill;
 
   const _ActionBar({
     required this.ticket,
     required this.onSendToKitchen,
     required this.onRequestBill,
     required this.onMarkServed,
+    this.onSplitBill,
   });
 
   bool get _hasUnsent =>
@@ -683,7 +690,7 @@ class _ActionBar extends StatelessWidget {
             ),
             const SizedBox(width: 10),
           ],
-          if (_canBill)
+          if (_canBill) ...[
             Expanded(
               flex: 2,
               child: _ActionButton(
@@ -693,6 +700,16 @@ class _ActionBar extends StatelessWidget {
                 onTap: onRequestBill,
               ),
             ),
+            if (onSplitBill != null) ...[
+              const SizedBox(width: 10),
+              _ActionButton(
+                label: 'Split',
+                icon: Icons.call_split_outlined,
+                color: AppColors.yellow,
+                onTap: onSplitBill!,
+              ),
+            ],
+          ],
         ],
       ),
     );

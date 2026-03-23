@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,7 +55,7 @@ class WalleePaymentProvider implements HardwarePaymentProvider {
     final prefs = await SharedPreferences.getInstance();
     _trxSyncNumber = prefs.getInt(_prefKeyTrxSync) ?? 1;
     _initialized = true;
-    print('[WalleePaymentProvider] Initialised — terminal ${_config.terminalIp}:${_config.ltiPort}, trxSync: $_trxSyncNumber');
+    debugPrint('[WalleePaymentProvider] Initialised — terminal ${_config.terminalIp}:${_config.ltiPort}, trxSync: $_trxSyncNumber');
   }
 
   @override
@@ -166,7 +167,7 @@ class WalleePaymentProvider implements HardwarePaymentProvider {
           responseXml.contains('Successful') ||
           responseXml.contains('approved');
     } catch (e) {
-      print('[WalleePaymentProvider] Refund error: $e');
+      debugPrint('[WalleePaymentProvider] Refund error: $e');
       return false;
     }
   }
@@ -182,7 +183,7 @@ class WalleePaymentProvider implements HardwarePaymentProvider {
       }
       return true;
     } catch (e) {
-      print('[WalleePaymentProvider] Cancel error: $e');
+      debugPrint('[WalleePaymentProvider] Cancel error: $e');
       return false;
     }
   }
@@ -197,7 +198,7 @@ class WalleePaymentProvider implements HardwarePaymentProvider {
         'timestamp': DateTime.now().toIso8601String(),
       };
     } catch (e) {
-      print('[WalleePaymentProvider] End-of-day error: $e');
+      debugPrint('[WalleePaymentProvider] End-of-day error: $e');
       return {};
     }
   }

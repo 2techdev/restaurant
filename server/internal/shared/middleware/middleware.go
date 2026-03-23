@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
@@ -14,10 +13,6 @@ import (
 
 	"github.com/gastrocore/server/internal/shared/response"
 )
-
-// maxRequestBodyBytes is the maximum size of an incoming request body (1 MiB).
-// Online ordering requests and sync payloads are well below this limit.
-const maxRequestBodyBytes = 1 << 20 // 1 MiB
 
 // contextKey is a private type for context keys in this package.
 type contextKey string
@@ -120,88 +115,39 @@ func Recover(next http.Handler) http.Handler {
 	})
 }
 
-// CORSConfig holds the configuration for the CORS middleware.
-type CORSConfig struct {
-	// AllowedOrigins is the list of origins that are allowed to make cross-origin
-	// requests. Use "*" (single element) to allow all origins (development only).
-	AllowedOrigins []string
+// allowedOrigins lists the permitted CORS origins for the GastroCore API.
+// POS Flutter apps communicate directly (no CORS needed); these cover web dashboards
+// and the online ordering widget.
+var allowedOrigins = map[string]bool{
+	"https://pos.2tech.ch":        true,
+	"https://www.pos.2tech.ch":    true,
+	"http://localhost:3000":        true,
+	"http://localhost:8080":        true,
+	"http://localhost:5173":        true,
+	"http://192.168.1.134:8080":   true,
+	"http://192.168.1.134:8090":   true,
 }
 
-// CORS adds CORS headers with origin validation. Pass a CORSConfig with the
-// desired allowed origins.  In production set CORS_ORIGINS to a
-// comma-separated list of permitted origins; "*" is accepted only in
-// development and emits a startup warning.
-func CORS(cfg CORSConfig) Middleware {
-	allowed := make(map[string]bool, len(cfg.AllowedOrigins))
-	wildcard := false
-	for _, o := range cfg.AllowedOrigins {
-		if o == "*" {
-			wildcard = true
-		} else {
-			allowed[o] = true
-		}
-	}
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			origin := r.Header.Get("Origin")
-			if wildcard {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
-			} else if origin != "" && allowed[origin] {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
-				w.Header().Set("Vary", "Origin")
-			}
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-Device-ID")
-			w.Header().Set("Access-Control-Max-Age", "86400")
-
-			if r.Method == http.MethodOptions {
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// SecurityHeaders adds security-related HTTP response headers.
-// HSTS is only sent when the request arrived over TLS or behind a trusted proxy
-// (X-Forwarded-Proto: https).
-func SecurityHeaders(isProd bool) Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Prevent MIME-type sniffing
-			w.Header().Set("X-Content-Type-Options", "nosniff")
-			// Deny embedding in frames (clickjacking protection)
-			w.Header().Set("X-Frame-Options", "DENY")
-			// Minimal referrer info on cross-origin requests
-			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-			// Restrict browser features
-			w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
-			// CSP: this is a JSON API – no scripts/styles/frames needed
-			w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
-
-			// HSTS: only add on HTTPS connections (direct TLS or proxied)
-			if isProd {
-				proto := r.Header.Get("X-Forwarded-Proto")
-				if proto == "https" || r.TLS != nil {
-					w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
-				}
-			}
-
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// MaxBodySize limits the size of incoming request bodies to prevent resource
-// exhaustion attacks. Requests with bodies exceeding the limit receive 413.
-func MaxBodySize(next http.Handler) http.Handler {
+// CORS adds CORS headers, allowing only known origins.
+// Requests from unlisted origins are served without Access-Control-Allow-Origin,
+// so browsers will block cross-origin fetches from unknown sources.
+func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+		origin := r.Header.Get("Origin")
+		if origin != "" && allowedOrigins[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+		}
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-Device-ID")
+		w.Header().Set("Access-Control-Max-Age", "86400")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		next.ServeHTTP(w, r)
-		// Drain and discard any unread bytes to allow connection reuse.
-		_, _ = io.Copy(io.Discard, r.Body)
 	})
 }
 

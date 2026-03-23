@@ -348,7 +348,7 @@ class _ProductSummaryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ColoredBox(
       color: KioskColors.bgCard,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -396,7 +396,7 @@ class _ProductSummaryPanel extends StatelessWidget {
   }
 
   Widget _imagePlaceholder(String name) {
-    return Container(
+    return ColoredBox(
       color: KioskColors.bgCardAlt,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

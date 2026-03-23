@@ -588,7 +588,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
   Widget _buildPinPad() {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 400),
-      child: Container(
+      child: ColoredBox(
         color: AppColors.surfaceDim,
         child: SingleChildScrollView(
           child: Column(

@@ -18,6 +18,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `docs/DEVELOPMENT.md` — developer setup, Drift DAO patterns, Riverpod patterns, coding conventions, PR process, common tasks
   - `docs/DATABASE.md` — full schema reference for all 31 tables, indexes, materialized views, triggers, migration guide, schema conventions
   - `docs/TESTING.md` — running tests, writing unit/widget/integration tests, Go test patterns, test database setup, coverage targets
+- `ROADMAP.md` — living roadmap with Phase 1–4, per-item status (✅/🔄/🔲/❌), licensing tiers, test targets, frozen architecture decisions
+- `RELEASE_NOTES.md` — v1.0.0-beta release notes covering all apps (POS, KDS, Waiter, Kiosk, ODS, Online), Swiss-specific features, known issues, technical specs
+- `PROJECT_STATUS.md` — comprehensive codebase status report: implemented features, stubs/TODOs, missing items, test coverage, build artifacts, error inventory
+
+## [Unreleased — Swiss VAT Phase 1]
+
+### Added
 - ODS (Order Display Screen) feature module scaffolded — customer-facing order status display
 - `apps/online` Flutter Web app scaffolded for online ordering (screens, widgets, providers)
 - Go backend `stores` module (handlers, models, routes)

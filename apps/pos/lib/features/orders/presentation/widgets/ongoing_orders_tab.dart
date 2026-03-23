@@ -34,7 +34,7 @@ class _OngoingOrdersTabState extends ConsumerState<OngoingOrdersTab> {
   Widget build(BuildContext context) {
     final ticketsAsync = ref.watch(openTicketsProvider);
 
-    return Container(
+    return ColoredBox(
       color: AppColors.surfaceDim,
       child: ticketsAsync.when(
         loading: () => const Center(

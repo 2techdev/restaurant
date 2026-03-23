@@ -333,7 +333,7 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
                 ),
               ),
               const SizedBox(height: 8),
-              Container(
+              DecoratedBox(
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(10),
@@ -424,7 +424,7 @@ class _DiscountDialogState extends ConsumerState<DiscountDialog> {
               ),
               if (_selectedReason == 'Diğer') ...[
                 const SizedBox(height: 10),
-                Container(
+                DecoratedBox(
                   decoration: BoxDecoration(
                     color: AppColors.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(8),

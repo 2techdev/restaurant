@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:gastrocore_pos/core/payment/interfaces/hardware_payment_provider.dart';
 import 'package:gastrocore_pos/core/payment/models/hardware_payment_method.dart';
 import 'package:gastrocore_pos/core/payment/models/hardware_payment_request.dart';
@@ -64,7 +65,7 @@ class PaymentEngine {
     }
     await Future.wait(futures);
     _initialized = true;
-    print('[PaymentEngine] Initialised — primary: ${primaryProvider.providerName}'
+    debugPrint('[PaymentEngine] Initialised — primary: ${primaryProvider.providerName}'
         '${fallbackProvider != null ? ", fallback: ${fallbackProvider!.providerName}" : ""}');
   }
 
@@ -99,7 +100,7 @@ class PaymentEngine {
     }
 
     // Primary had a technical failure → try fallback
-    print('[PaymentEngine] Primary failed, trying fallback: ${fallbackProvider!.providerName}');
+    debugPrint('[PaymentEngine] Primary failed, trying fallback: ${fallbackProvider!.providerName}');
     final fallbackResult = await _processWithProvider(fallbackProvider!, request);
     return fallbackResult;
   }
@@ -125,11 +126,11 @@ class PaymentEngine {
     final result = await provider.processPayment(request);
 
     if (isTwint && result.isApproved) {
-      print('[PaymentEngine] TWINT approved via ${provider.providerName}');
+      debugPrint('[PaymentEngine] TWINT approved via ${provider.providerName}');
     } else if (result.isApproved) {
-      print('[PaymentEngine] Approved via ${provider.providerName}');
+      debugPrint('[PaymentEngine] Approved via ${provider.providerName}');
     } else {
-      print('[PaymentEngine] ${provider.providerName} → ${result.status.name}: ${result.errorMessage}');
+      debugPrint('[PaymentEngine] ${provider.providerName} → ${result.status.name}: ${result.errorMessage}');
     }
 
     return result;

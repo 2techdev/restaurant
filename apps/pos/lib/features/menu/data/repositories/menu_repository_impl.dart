@@ -100,7 +100,7 @@ class MenuRepositoryImpl {
       )
       ..orderBy([(p) => OrderingTerm.asc(p.displayOrder)]);
     final rows = await query.get();
-    return rows.map((r) => _productToEntity(r)).toList();
+    return rows.map(_productToEntity).toList();
   }
 
   /// Return all products (active and inactive) for admin views.
@@ -114,7 +114,7 @@ class MenuRepositoryImpl {
         (p) => OrderingTerm.asc(p.displayOrder),
       ]);
     final rows = await query.get();
-    return rows.map((r) => _productToEntity(r)).toList();
+    return rows.map(_productToEntity).toList();
   }
 
   /// Return all active products belonging to [categoryId].
@@ -126,7 +126,7 @@ class MenuRepositoryImpl {
       )
       ..orderBy([(p) => OrderingTerm.asc(p.displayOrder)]);
     final rows = await query.get();
-    return rows.map((r) => _productToEntity(r)).toList();
+    return rows.map(_productToEntity).toList();
   }
 
   /// Return products (including inactive) belonging to [categoryId] for admin.
@@ -139,7 +139,7 @@ class MenuRepositoryImpl {
       )
       ..orderBy([(p) => OrderingTerm.asc(p.displayOrder)]);
     final rows = await query.get();
-    return rows.map((r) => _productToEntity(r)).toList();
+    return rows.map(_productToEntity).toList();
   }
 
   /// Fetch a product by [id] with its full modifier tree loaded.
@@ -168,7 +168,7 @@ class MenuRepositoryImpl {
       )
       ..orderBy([(p) => OrderingTerm.asc(p.displayOrder)]);
     final rows = await query.get();
-    return rows.map((r) => _productToEntity(r)).toList();
+    return rows.map(_productToEntity).toList();
   }
 
   /// Insert a new product.

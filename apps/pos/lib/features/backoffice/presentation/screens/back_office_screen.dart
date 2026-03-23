@@ -14,7 +14,7 @@ import 'package:gastrocore_pos/features/backoffice/presentation/widgets/menu_man
 import 'package:gastrocore_pos/features/backoffice/presentation/widgets/table_management_tab.dart';
 import 'package:gastrocore_pos/features/backoffice/presentation/widgets/staff_management_tab.dart';
 import 'package:gastrocore_pos/features/backoffice/presentation/widgets/reports_tab.dart';
-import 'package:gastrocore_pos/features/inventory/presentation/screens/inventory_list_screen.dart';
+import 'package:gastrocore_pos/features/backoffice/presentation/widgets/inventory_management_tab.dart';
 
 // ---------------------------------------------------------------------------
 // Sidebar tab definition
@@ -35,7 +35,7 @@ const _tabs = <_SidebarTab>[
   _SidebarTab(icon: Icons.table_bar_rounded, label: 'Masa Duzenle'),
   _SidebarTab(icon: Icons.people_rounded, label: 'Personel'),
   _SidebarTab(icon: Icons.bar_chart_rounded, label: 'Raporlar'),
-  _SidebarTab(icon: Icons.inventory_2_rounded, label: 'Envanter'),
+  _SidebarTab(icon: Icons.inventory_2_rounded, label: 'Stok Yonetimi'),
   _SidebarTab(icon: Icons.settings_rounded, label: 'Ayarlar'),
 ];
 
@@ -301,7 +301,7 @@ class _BackOfficeScreenState extends ConsumerState<BackOfficeScreen> {
         TableManagementTab(),
         StaffManagementTab(),
         ReportsTab(),
-        InventoryListScreen(),
+        InventoryManagementTab(),
         _SettingsPlaceholder(),
       ],
     );

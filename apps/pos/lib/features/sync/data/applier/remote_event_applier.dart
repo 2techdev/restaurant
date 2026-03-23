@@ -15,7 +15,6 @@
 /// schema-mismatched server cannot corrupt unrelated state.
 library;
 
-import 'package:drift/drift.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 
 /// Responsible for writing a pulled [RemotePayload] into the correct table.

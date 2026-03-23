@@ -945,6 +945,249 @@ void main() {
   });
 
   // =========================================================================
+  // Swiss accommodation VAT (3.8%) — Swiss Sondersatz
+  // =========================================================================
+
+  group('Swiss accommodation VAT (3.8%)', () {
+    FareConfig swissFullConfig() {
+      return const FareConfig(
+        isTaxInclusive: true,
+        currency: 'CHF',
+        roundingRule: RoundingRule(rule: 'round', unit: 'five_percent'),
+        taxRates: [
+          TaxRateConfig(
+            name: 'food',
+            rate: 8.1,
+            dineInRate: '8.1',
+            takeawayRate: '2.6',
+          ),
+          TaxRateConfig(
+            name: 'beverage',
+            rate: 8.1,
+            dineInRate: '8.1',
+            takeawayRate: '8.1',
+          ),
+          TaxRateConfig(
+            name: 'accommodation',
+            rate: 3.8,
+          ),
+        ],
+      );
+    }
+
+    test('accommodation item taxed at 3.8% inclusive', () {
+      final result = FareEngine.calculateFare(
+        items: [
+          const FareLineItem(
+            productId: 'p-hotel',
+            productName: 'Overnight Stay',
+            quantity: 1,
+            unitPrice: 10000, // CHF 100.00
+            taxGroup: 'accommodation',
+            isTaxInclusive: true,
+          ),
+        ],
+        config: swissFullConfig(),
+        orderType: 'dine_in',
+      );
+
+      // preTax = round(10000 / 1.038) = 9634, tax = 366
+      expect(result.dishesTaxes.length, 1);
+      expect(result.dishesTaxes.first.name, 'accommodation');
+      expect(result.dishesTaxes.first.rate, '3.8');
+      expect(result.dishesTaxTotal, greaterThan(0));
+      expect(result.dishesTotal, 10000);
+    });
+
+    test('mixed food (8.1%) + accommodation (3.8%) tracks two tax groups', () {
+      final result = FareEngine.calculateFare(
+        items: [
+          const FareLineItem(
+            productId: 'p-meal',
+            productName: 'Breakfast',
+            quantity: 1,
+            unitPrice: 2500,
+            taxGroup: 'food',
+            isTaxInclusive: true,
+          ),
+          const FareLineItem(
+            productId: 'p-hotel',
+            productName: 'Room',
+            quantity: 1,
+            unitPrice: 10000,
+            taxGroup: 'accommodation',
+            isTaxInclusive: true,
+          ),
+        ],
+        config: swissFullConfig(),
+        orderType: 'dine_in',
+      );
+
+      expect(result.dishesTaxes.length, 2);
+      final foodTax = result.dishesTaxes.firstWhere((t) => t.name == 'food');
+      final accomTax =
+          result.dishesTaxes.firstWhere((t) => t.name == 'accommodation');
+      expect(foodTax.rate, '8.1');
+      expect(accomTax.rate, '3.8');
+      expect(result.dishesOriginTotal, 12500);
+    });
+  });
+
+  // =========================================================================
+  // Taxable additional costs
+  // =========================================================================
+
+  group('taxable additional costs', () {
+    test('non-taxable cover charge adds to total without tax', () {
+      final result = FareEngine.calculateFare(
+        items: [foodItem(unitPrice: 2500)],
+        config: swissConfig(),
+        orderType: 'dine_in',
+        additionalCosts: [
+          const AdditionalCost(
+            id: 'cover',
+            name: 'Couvert',
+            amount: 300,
+            isTaxable: false,
+          ),
+        ],
+      );
+
+      expect(result.additionalCostTotal, 300);
+      expect(result.receivableTotal, 2800);
+    });
+
+    test('taxable additional cost includes tax breakdown', () {
+      final result = FareEngine.calculateFare(
+        items: [foodItem(unitPrice: 2500)],
+        config: swissConfig(),
+        orderType: 'dine_in',
+        additionalCosts: [
+          const AdditionalCost(
+            id: 'corkage',
+            name: 'Korkengeld',
+            amount: 1000,
+            isTaxable: true,
+            taxGroup: 'beverage',
+          ),
+        ],
+      );
+
+      expect(result.additionalCostTotal, 1000);
+      expect(result.receivableTotal, 3500);
+    });
+  });
+
+  // =========================================================================
+  // Order discount with tax effect
+  // =========================================================================
+
+  group('order discount with tax effect', () {
+    test('order discount affecting tax reduces tax proportionally', () {
+      final result = FareEngine.calculateFare(
+        items: [foodItem(unitPrice: 5000)],
+        config: swissConfig(),
+        orderType: 'dine_in',
+        orderDiscount: const OrderDiscount(
+          type: 'percentage',
+          value: 1000, // 10%
+          affectsTax: true,
+        ),
+      );
+
+      // 10% of 5000 = 500
+      expect(result.orderDiscountTotal, 500);
+      expect(result.taxOrderDiscountTotal, greaterThan(0));
+      expect(result.receivableTotal, 4500);
+    });
+
+    test('order discount NOT affecting tax leaves tax unchanged', () {
+      final result = FareEngine.calculateFare(
+        items: [foodItem(unitPrice: 5000)],
+        config: swissConfig(),
+        orderType: 'dine_in',
+        orderDiscount: const OrderDiscount(
+          type: 'fixed',
+          value: 500,
+          affectsTax: false,
+        ),
+      );
+
+      expect(result.orderDiscountTotal, 500);
+      expect(result.taxOrderDiscountTotal, 0);
+      expect(result.receivableTotal, 4500);
+    });
+  });
+
+  // =========================================================================
+  // Service fee with tax
+  // =========================================================================
+
+  group('service fee with tax', () {
+    test('taxable service fee (inclusive) extracts tax', () {
+      final result = FareEngine.calculateFare(
+        items: [foodItem(unitPrice: 2500)],
+        config: FareConfig(
+          isTaxInclusive: true,
+          currency: 'CHF',
+          roundingRule: const RoundingRule(rule: 'round', unit: 'five_percent'),
+          taxRates: const [
+            TaxRateConfig(
+              name: 'food',
+              rate: 8.1,
+              dineInRate: '8.1',
+              takeawayRate: '2.6',
+            ),
+          ],
+          serviceFee: const ServiceFeeConfig(
+            takenType: 'fixed_amount',
+            value: 500,
+            orderTypes: ['dine_in'],
+            isTaxable: true,
+            taxGroup: 'food',
+          ),
+        ),
+        orderType: 'dine_in',
+      );
+
+      expect(result.serviceFeeAmount, 500);
+      expect(result.serviceFeeTax, greaterThan(0));
+    });
+  });
+
+  // =========================================================================
+  // Refund total integration
+  // =========================================================================
+
+  group('refund total', () {
+    test('refund reduces unpaid balance', () {
+      // After fully paying, refund 500 cents increases unpaid by 500.
+      final result = FareEngine.calculateFare(
+        items: [foodItem(unitPrice: 2500)],
+        config: swissConfig(),
+        orderType: 'dine_in',
+        payTotal: 2500,
+        refundTotal: 500,
+      );
+
+      // unpaid = 2500 - 2500 + 0 + 500 = 500
+      expect(result.unpaidTotal, 500);
+    });
+
+    test('temporary charge adds to receivable', () {
+      final result = FareEngine.calculateFare(
+        items: [foodItem(unitPrice: 2500)],
+        config: swissConfig(),
+        orderType: 'dine_in',
+        temporaryCharge: 300,
+      );
+
+      // 2500 + 300 = 2800, round to 5 = 2800
+      expect(result.receivableTotal, 2800);
+    });
+  });
+
+  // =========================================================================
   // RoundingRule standalone tests
   // =========================================================================
 

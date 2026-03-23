@@ -9,7 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/router/app_router.dart';
-import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
@@ -25,16 +24,16 @@ import 'package:gastrocore_pos/features/orders/presentation/widgets/menu_setting
 // ---------------------------------------------------------------------------
 
 abstract final class _Tok {
-  static const Color surfaceBase = AppColors.surfaceDim;
-  static const Color surfaceLow = AppColors.surface;
-  static const Color surfaceMedium = AppColors.surfaceContainerHigh;
-  static const Color surfaceHigh = AppColors.surfaceContainerHighest;
-  static const Color textPrimary = AppColors.textPrimary;
-  static const Color textSecondary = AppColors.textSecondary;
-  static const Color textDim = AppColors.textDim;
-  static const Color accentBlue = AppColors.primary;
-  static const Color accentBlueLight = AppColors.primaryLight;
-  static const Color badgeRed = AppColors.red;
+  static const Color surfaceBase = Color(0xFF111319);
+  static const Color surfaceLow = Color(0xFF1A1D27);
+  static const Color surfaceMedium = Color(0xFF222633);
+  static const Color surfaceHigh = Color(0xFF2A2F3D);
+  static const Color textPrimary = Color(0xFFF0F0F5);
+  static const Color textSecondary = Color(0xFF8E8E9A);
+  static const Color textDim = Color(0xFF5A5A6A);
+  static const Color accentBlue = Color(0xFF528DFF);
+  static const Color accentBlueLight = Color(0xFFAFC6FF);
+  static const Color badgeRed = Color(0xFFEF4444);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +309,7 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
     final ticket = ref.watch(currentTicketProvider);
     final cartQtys = _buildCartQuantities(ticket?.items ?? []);
 
-    return Container(
+    return ColoredBox(
       color: _Tok.surfaceLow,
       child: Column(
         children: [
@@ -455,7 +454,7 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
                     color: _showPictures
-                        ? AppColors.coralDim
+                        ? _Tok.accentBlue.withValues(alpha: 0.15)
                         : _Tok.surfaceMedium,
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -466,19 +465,19 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
                         _showPictures ? Icons.image : Icons.text_fields,
                         size: 16,
                         color: _showPictures
-                            ? AppColors.coral
+                            ? _Tok.accentBlue
                             : _Tok.textSecondary,
                       ),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          _showPictures ? 'Photos' : 'Text',
+                          _showPictures ? 'Resimli Mod' : 'Text Mod',
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: _showPictures
-                                ? AppColors.coral
+                                ? _Tok.accentBlue
                                 : _Tok.textSecondary,
                           ),
                         ),
@@ -605,7 +604,7 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
           // Order type selector + order number
           Row(
             children: [
-              Icon(icon, size: 16, color: _Tok.textSecondary),
+              Icon(icon, size: 16, color: _Tok.accentBlue),
               const SizedBox(width: 6),
               Text(
                 '$label | #$orderNum',
@@ -859,10 +858,9 @@ class _CategoryItem extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.coralDim : Colors.transparent,
           border: Border(
             left: BorderSide(
-              color: isActive ? AppColors.coral : Colors.transparent,
+              color: isActive ? _Tok.accentBlue : Colors.transparent,
               width: 3,
             ),
           ),
@@ -874,7 +872,7 @@ class _CategoryItem extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-            color: isActive ? AppColors.coral : _Tok.textSecondary,
+            color: isActive ? _Tok.textPrimary : _Tok.textDim,
           ),
         ),
       ),
@@ -1009,15 +1007,8 @@ class _ProductCardState extends State<_ProductCard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: _Tok.surfaceMedium,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -1056,11 +1047,11 @@ class _ProductCardState extends State<_ProductCard> {
                 if (widget.showPrice) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'CHF ${_formatPrice(p.price)}',
+                    _formatPrice(p.price),
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: _Tok.textPrimary,
+                      color: _Tok.accentBlueLight,
                     ),
                   ),
                 ],
@@ -1075,15 +1066,8 @@ class _ProductCardState extends State<_ProductCard> {
   Widget _buildTextCard(ProductEntity p) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: _Tok.surfaceMedium,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -1103,11 +1087,11 @@ class _ProductCardState extends State<_ProductCard> {
           if (widget.showPrice) ...[
             const SizedBox(height: 6),
             Text(
-              'CHF ${_formatPrice(p.price)}',
+              _formatPrice(p.price),
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: _Tok.textPrimary,
+                color: _Tok.accentBlueLight,
               ),
             ),
           ],
@@ -1117,38 +1101,13 @@ class _ProductCardState extends State<_ProductCard> {
   }
 
   Widget _buildPlaceholder(ProductEntity p) {
-    const bgColors = [
-      Color(0xFFFFF3E0),
-      Color(0xFFE8F5E9),
-      Color(0xFFE3F2FD),
-      Color(0xFFFCE4EC),
-      Color(0xFFF3E5F5),
-      Color(0xFFE0F7FA),
-      Color(0xFFFFF8E1),
-      Color(0xFFE8EAF6),
-    ];
-    const fgColors = [
-      Color(0xFFE65100),
-      Color(0xFF2E7D32),
-      Color(0xFF1565C0),
-      Color(0xFFC62828),
-      Color(0xFF6A1B9A),
-      Color(0xFF00695C),
-      Color(0xFFF57F17),
-      Color(0xFF283593),
-    ];
-    final idx = p.name.isNotEmpty ? p.name.codeUnitAt(0) % bgColors.length : 0;
-    return Container(
-      color: bgColors[idx],
+    return ColoredBox(
+      color: _Tok.surfaceHigh,
       child: Center(
-        child: Text(
-          p.name.isNotEmpty ? p.name[0].toUpperCase() : '?',
-          style: TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w800,
-            color: fgColors[idx].withValues(alpha: 0.5),
-            letterSpacing: -1,
-          ),
+        child: Icon(
+          Icons.restaurant,
+          size: 28,
+          color: _Tok.textDim.withValues(alpha: 0.4),
         ),
       ),
     );
@@ -1182,7 +1141,7 @@ class _OrderTab extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: isActive ? AppColors.coral : Colors.transparent,
+              color: isActive ? _Tok.accentBlue : Colors.transparent,
               width: 2,
             ),
           ),
@@ -1203,7 +1162,7 @@ class _OrderTab extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
                   color: isActive
-                      ? AppColors.coralDim
+                      ? _Tok.accentBlue.withValues(alpha: 0.2)
                       : _Tok.surfaceHigh,
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1212,7 +1171,7 @@ class _OrderTab extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: isActive ? AppColors.coral : _Tok.textDim,
+                    color: isActive ? _Tok.accentBlue : _Tok.textDim,
                   ),
                 ),
               ),
@@ -1275,7 +1234,7 @@ class _OrderItemRow extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: _Tok.textSecondary,
+                color: _Tok.accentBlue,
               ),
             ),
           ),
@@ -1437,8 +1396,15 @@ class _GradientButton extends StatelessWidget {
         height: 50,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
+          gradient: enabled && isPrimary
+              ? const LinearGradient(
+                  colors: [_Tok.accentBlueLight, _Tok.accentBlue],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
           color: enabled
-              ? (isPrimary ? AppColors.coral : AppColors.navSurface)
+              ? (isPrimary ? null : _Tok.surfaceHigh)
               : _Tok.surfaceMedium,
         ),
         child: Row(
@@ -1449,14 +1415,18 @@ class _GradientButton extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
-                color: enabled ? Colors.white : _Tok.textDim,
+                color: enabled
+                    ? (isPrimary ? const Color(0xFF001944) : _Tok.accentBlueLight)
+                    : _Tok.textDim,
               ),
             ),
             const SizedBox(width: 8),
             Icon(
               icon,
               size: 18,
-              color: enabled ? Colors.white : _Tok.textDim,
+              color: enabled
+                  ? (isPrimary ? const Color(0xFF001944) : _Tok.accentBlueLight)
+                  : _Tok.textDim,
             ),
           ],
         ),
@@ -1492,17 +1462,17 @@ class _OrderTypeChip extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.coralDim : _Tok.surfaceHigh,
+            color: isActive ? _Tok.accentBlue.withValues(alpha: 0.15) : _Tok.surfaceHigh,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isActive ? AppColors.coral : Colors.transparent,
+              color: isActive ? _Tok.accentBlue : Colors.transparent,
               width: 1.5,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 14, color: isActive ? AppColors.coral : _Tok.textDim),
+              Icon(icon, size: 14, color: isActive ? _Tok.accentBlue : _Tok.textDim),
               const SizedBox(width: 4),
               Flexible(
                 child: Text(
@@ -1512,7 +1482,7 @@ class _OrderTypeChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                    color: isActive ? AppColors.coral : _Tok.textSecondary,
+                    color: isActive ? _Tok.accentBlue : _Tok.textSecondary,
                   ),
                 ),
               ),
