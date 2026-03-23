@@ -49,30 +49,28 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
   // Shows a brief "Saved" indicator after a position is persisted to SQLite.
   String? _savedLabel;
 
+  // Stitch status colors
   Color _statusColor(TableStatus status) => switch (status) {
-        TableStatus.available => AppColors.green,
-        TableStatus.occupied => AppColors.primary,
-        TableStatus.reserved => AppColors.orange,
-        TableStatus.dirty => AppColors.red,
+        TableStatus.available => AppColors.green,     // #69F6B8
+        TableStatus.occupied => AppColors.coral,      // #FF6F7E (BUSY)
+        TableStatus.reserved => AppColors.orange,     // #FFAB4E
+        TableStatus.dirty => AppColors.yellow,        // #FFD166
       };
 
   String _statusLabel(TableStatus status) => switch (status) {
-        TableStatus.available => 'Free',
-        TableStatus.occupied => 'Occupied',
-        TableStatus.reserved => 'Reserved',
-        TableStatus.dirty => 'Dirty',
+        TableStatus.available => 'AVAILABLE',
+        TableStatus.occupied => 'BUSY',
+        TableStatus.reserved => 'RESERVED',
+        TableStatus.dirty => 'CHECK',
       };
 
   @override
   Widget build(BuildContext context) {
     final floorsAsync = ref.watch(floorsProvider);
     final editMode = ref.watch(tableEditModeProvider);
-    // Must be watched unconditionally (not inside when()) to avoid
-    // _dependents.isEmpty assertion when async state transitions.
-    final selectedFloorId = ref.watch(selectedFloorProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceDim, // base void
+      backgroundColor: AppColors.surfaceDim,
       floatingActionButton: _buildFab(editMode),
       body: floorsAsync.when(
         loading: () => const Center(
@@ -83,6 +81,7 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
         ),
         data: (floors) {
           // Auto-select the first floor.
+          final selectedFloorId = ref.watch(selectedFloorProvider);
           if (selectedFloorId == null && floors.isNotEmpty) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               ref.read(selectedFloorProvider.notifier).state = floors.first.id;
@@ -596,13 +595,14 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
 
   Widget _buildFloorGrid(List<RestaurantTableEntity> tables) {
     return LayoutBuilder(builder: (context, constraints) {
-      final cols = (constraints.maxWidth / 160).floor().clamp(2, 6);
+      // Stitch: 3-4 columns for table map
+      final cols = (constraints.maxWidth / 200).floor().clamp(3, 4);
       return GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.4,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 1.3,
         ),
         itemCount: tables.length,
         itemBuilder: (_, i) => _buildTableTile(tables[i]),
@@ -611,51 +611,67 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
   }
 
   Widget _buildTableTile(RestaurantTableEntity table) {
-    final borderColor = _statusColor(table.status);
+    final statusColor = _statusColor(table.status);
     final isRound = table.shape == TableShape.circle;
 
     return GestureDetector(
       onTap: () => _onTableTap(table),
       onLongPress: () => showTableDetailSheet(context, table),
       child: Container(
+        // Stitch: bg surfaceContainerHigh (#1C2028), no border
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerHigh,
           borderRadius: isRound
               ? BorderRadius.circular(100)
               : BorderRadius.circular(4),
-          border: Border(
-            left: BorderSide(color: borderColor, width: 3),
-          ),
         ),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Table number — huge, font-black
             Text(
               table.name,
               style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary),
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
+              ),
             ),
             const SizedBox(height: 4),
-            Text(
-              _statusLabel(table.status),
-              style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: borderColor),
+            // Status badge
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                _statusLabel(table.status),
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  color: statusColor,
+                  letterSpacing: 0.6,
+                ),
+              ),
             ),
             const SizedBox(height: 4),
+            // Guest / seat count
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.person_rounded,
-                    size: 12, color: AppColors.textDim),
+                    size: 11, color: AppColors.textDim),
                 const SizedBox(width: 2),
-                Text('${table.capacity}',
-                    style: const TextStyle(
-                        fontSize: 10, color: AppColors.textDim)),
+                Text(
+                  '${table.capacity}',
+                  style: const TextStyle(
+                      fontSize: 10, color: AppColors.textDim),
+                ),
               ],
             ),
           ],
@@ -681,9 +697,10 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(4),
-              border: Border(left: BorderSide(color: borderColor, width: 3)),
+              color: AppColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(10),
+              border:
+                  Border(left: BorderSide(color: borderColor, width: 3)),
             ),
             child: Row(
               children: [
@@ -941,13 +958,21 @@ class _DraggableTableTile extends StatelessWidget {
         width: table.width,
         height: table.height,
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerHigh,
+          color: AppColors.surfaceContainerLow,
           borderRadius: isRound
               ? BorderRadius.circular(200)
-              : BorderRadius.circular(4),
-          border: Border(
-            left: BorderSide(color: statusColor, width: 3),
-          ),
+              : table.shape == TableShape.square
+                  ? BorderRadius.circular(8)
+                  : BorderRadius.circular(10),
+          border: Border.all(
+              color: statusColor.withValues(alpha: 0.8), width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: statusColor.withValues(alpha: 0.15),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -993,7 +1018,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.border.withValues(alpha: 0.25)
+      ..color = AppColors.border.withValues(alpha: 0.4)
       ..strokeWidth = 0.5;
 
     const step = 40.0;

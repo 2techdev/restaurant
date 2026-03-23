@@ -1,9 +1,8 @@
-/// Order Center Screen — Lightspeed-inspired professional POS UI.
+/// Order Center Screen — Stitch "Klein Professional POS" UI.
 ///
-/// Main POS hub with:
-/// - [GcSidebar] left navigation (dark navy, 64px)
-/// - Three tabs in the top bar: Ongoing, Table, Menu
-/// - IndexedStack for instant tab switching (no rebuilds)
+/// Main POS hub — 64px top bar replaces sidebar navigation.
+/// Four tabs: ONGOING | TABLES | MENU | STAFF
+/// IndexedStack for instant tab switching (no rebuilds).
 library;
 
 import 'package:flutter/material.dart';
@@ -18,7 +17,6 @@ import 'package:gastrocore_pos/features/orders/presentation/providers/order_prov
 import 'package:gastrocore_pos/features/orders/presentation/widgets/ongoing_orders_tab.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/table_view_tab.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/menu_order_tab.dart';
-import 'package:gastrocore_pos/shared/widgets/gc_sidebar.dart';
 
 // ---------------------------------------------------------------------------
 // Order Center Screen
@@ -32,7 +30,8 @@ class OrderCenterScreen extends ConsumerStatefulWidget {
 }
 
 class _OrderCenterScreenState extends ConsumerState<OrderCenterScreen> {
-  int _selectedTab = 2; // 0 = Ongoing, 1 = Table, 2 = Menu
+  // 0=ONGOING, 1=TABLES, 2=MENU, 3=STAFF
+  int _selectedTab = 2;
 
   void _switchToMenu() => setState(() => _selectedTab = 2);
 
@@ -56,31 +55,19 @@ class _OrderCenterScreenState extends ConsumerState<OrderCenterScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
-      body: Row(
+      body: Column(
         children: [
-          // ── Navigation sidebar ──────────────────────────────────────────
-          GcSidebar(
-            activeRoute: '/order-center',
-            userName: userName,
-            userInitials: _initials(userName),
-            onLogout: () => context.go(AppRoutes.shiftClose),
-          ),
-
-          // ── Main content area ───────────────────────────────────────────
+          // ── Stitch 64px top bar ─────────────────────────────────────────
+          _buildTopBar(userName),
+          // ── Content area ────────────────────────────────────────────────
           Expanded(
-            child: Column(
+            child: IndexedStack(
+              index: _selectedTab,
               children: [
-                _buildTopBar(userName),
-                Expanded(
-                  child: IndexedStack(
-                    index: _selectedTab,
-                    children: [
-                      OngoingOrdersTab(onOrderTap: _onOrderTap),
-                      TableViewTab(onSwitchToMenu: _switchToMenu),
-                      const MenuOrderTab(),
-                    ],
-                  ),
-                ),
+                OngoingOrdersTab(onOrderTap: _onOrderTap),
+                TableViewTab(onSwitchToMenu: _switchToMenu),
+                const MenuOrderTab(),
+                _buildStaffPlaceholder(),
               ],
             ),
           ),
@@ -90,87 +77,132 @@ class _OrderCenterScreenState extends ConsumerState<OrderCenterScreen> {
   }
 
   // -------------------------------------------------------------------------
-  // Top bar
+  // Stitch Top Bar — 64px, bg surfaceContainerLow (#10131A)
   // -------------------------------------------------------------------------
 
   Widget _buildTopBar(String userName) {
+    const tabs = ['ONGOING', 'TABLES', 'MENU', 'STAFF'];
+
     return Container(
-      height: 56,
+      height: 64,
+      color: AppColors.surfaceContainerLow,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
       child: Row(
         children: [
-          // Logo
+          // ── Wordmark ─────────────────────────────────────────────────────
           const Text(
-            'Gastro',
+            'GASTROCORE',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
               color: AppColors.textPrimary,
-              letterSpacing: -0.3,
+              letterSpacing: -0.5,
             ),
           ),
-          const Text(
-            'Core',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.primary,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(width: 24),
 
-          // Tabs
-          _buildTab('Ongoing', 0, 'tab_ongoing'),
-          _buildTab('Tables', 1, 'tab_table'),
-          _buildTab('Menu', 2, 'tab_menu'),
+          const SizedBox(width: 32),
+
+          // ── Navigation tabs ───────────────────────────────────────────────
+          ...List.generate(tabs.length, (i) => _buildTopTab(tabs[i], i)),
 
           const Spacer(),
 
-          // Action icons
-          _buildIconButton(
-            icon: Icons.search_rounded,
-            tooltip: 'Search',
-            onTap: () => setState(() => _selectedTab = 2),
-          ),
+          // ── Action icons ──────────────────────────────────────────────────
+          _buildTopIconBtn(Icons.notifications_none_rounded, 'Notifications'),
           const SizedBox(width: 4),
-          _buildIconButton(
-            icon: Icons.print_rounded,
-            tooltip: 'Print receipt',
-            onTap: () {},
-          ),
+          _buildTopIconBtn(Icons.settings_outlined, 'Settings',
+              onTap: () => context.go(AppRoutes.settings)),
           const SizedBox(width: 12),
 
-          // User info
-          Text(
-            userName,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+          // ── User avatar + name ────────────────────────────────────────────
+          _buildUserChip(userName),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopTab(String label, int index) {
+    final isActive = _selectedTab == index;
+    return GestureDetector(
+      key: Key('tab_$index'),
+      onTap: () => setState(() => _selectedTab = index),
+      child: Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isActive ? AppColors.primaryContainer : Colors.transparent,
+              width: 2,
             ),
           ),
-          const SizedBox(width: 8),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: isActive ? AppColors.primary : AppColors.textDim,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopIconBtn(IconData icon, String tooltip,
+      {VoidCallback? onTap}) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap ?? () {},
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Icon(icon, size: 18, color: AppColors.textSecondary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserChip(String userName) {
+    return GestureDetector(
+      onTap: () => context.go(AppRoutes.shiftClose),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.primary.withValues(alpha: 0.12),
+              color: AppColors.primaryContainer.withValues(alpha: 0.25),
             ),
             child: Center(
               child: Text(
                 _initials(userName),
                 style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
                   color: AppColors.primary,
                 ),
               ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            userName,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -178,68 +210,37 @@ class _OrderCenterScreenState extends ConsumerState<OrderCenterScreen> {
     );
   }
 
-  Widget _buildTab(String label, int index, String keyId) {
-    final isActive = _selectedTab == index;
-    return GestureDetector(
-      key: Key(keyId),
-      onTap: () => setState(() => _selectedTab = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        height: 56,
+  // -------------------------------------------------------------------------
+  // Staff placeholder tab
+  // -------------------------------------------------------------------------
+
+  Widget _buildStaffPlaceholder() {
+    return Container(
+      color: AppColors.surfaceDim,
+      child: const Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Spacer(),
+            Icon(Icons.people_outline_rounded,
+                size: 48, color: AppColors.textDim),
+            SizedBox(height: 12),
             Text(
-              label,
+              'Staff Management',
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive
-                    ? AppColors.primary
-                    : AppColors.textSecondary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 8),
-            // Active underline
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              height: 3,
-              width: isActive ? 32 : 0,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(2),
+            SizedBox(height: 4),
+            Text(
+              'Coming soon',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textDim,
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIconButton({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onTap,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: AppColors.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(8),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          splashColor: AppColors.primary.withValues(alpha: 0.08),
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: Icon(
-              icon,
-              size: 20,
-              color: AppColors.textSecondary,
-            ),
-          ),
         ),
       ),
     );

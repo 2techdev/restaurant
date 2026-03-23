@@ -1,199 +1,159 @@
 /// Design-system color palette for GastroCore POS.
 ///
-/// Klein Professional POS — Organic Brutalism dark theme.
-/// Dark surfaces with blue accent, no borders, tonal layering for depth.
-/// Optimised for 12+ hour daily restaurant use on dark displays.
+/// Stitch "Klein Professional POS" dark design system.
+/// Ultra-dense tablet UI with surface-layering depth hierarchy.
+/// No borders — tonal surfaces express depth.
 library;
 
 import 'dart:ui';
 
 abstract final class AppColors {
   // ---------------------------------------------------------------------------
-  // Surface Hierarchy — dark tonal layering (NO borders)
-  // Depth is expressed through surface color shifts, not shadows or lines.
+  // Surface Hierarchy — dark tonal system (no borders)
+  // Background shifts express depth through surface elevation.
   // ---------------------------------------------------------------------------
 
-  /// Base scaffold background — infinite void
+  /// Base scaffold background — deepest dark
   static const Color surfaceDim = Color(0xFF0B0E14);
 
-  /// Default panel surface — navigation / sidebar bg
-  static const Color surface = Color(0xFF10131A);
+  /// Standard surface — containers, panels
+  static const Color surface = Color(0xFF161A21);
 
-  /// Cards, product tiles — same as surface for order panel
+  /// Low surface — nav, order panel background
   static const Color surfaceContainerLow = Color(0xFF10131A);
 
-  /// Inset areas, grouping — slightly lighter
+  /// Standard container
   static const Color surfaceContainer = Color(0xFF161A21);
 
-  /// Interactive cards (default state)
+  /// Card surface — product tiles, bill items
   static const Color surfaceContainerHigh = Color(0xFF1C2028);
 
-  /// Active / hover cards — most elevated interactive surface
+  /// Most elevated — numpad keys, input fields
   static const Color surfaceContainerHighest = Color(0xFF22262F);
 
-  /// Floating / modal states (dialogs, bottom sheets)
+  /// Hover / pressed state surface
   static const Color surfaceBright = Color(0xFF282C36);
 
   /// Input field background
-  static const Color bgInput = Color(0xFF161A21);
+  static const Color bgInput = Color(0xFF1C2028);
 
-  /// Modal overlay (50% dark)
+  /// Modal overlay
   static const Color bgOverlay = Color(0x80000000);
 
   // Legacy aliases kept for backward compatibility
   static const Color bgPrimary = surfaceDim;
   static const Color bgSecondary = surface;
   static const Color bgCard = surfaceContainerHigh;
-  static const Color bgCardHover = surfaceContainerHighest;
+  static const Color bgCardHover = surfaceBright;
 
   // ---------------------------------------------------------------------------
-  // Navigation — dark surface (same dark palette, no separate treatment)
+  // Navigation — always dark, matches surfaceContainerLow
   // ---------------------------------------------------------------------------
 
-  /// Sidebar / nav background
   static const Color navSurface = Color(0xFF10131A);
-
-  /// Hover state on nav items
   static const Color navSurfaceHover = Color(0xFF1C2028);
-
-  /// Active nav item highlight
   static const Color navSurfaceActive = Color(0xFF316BF3);
-
-  /// Default icon/text on nav
-  static const Color navText = Color(0xFFA9ABB3);
-
-  /// Active icon/text on nav
-  static const Color navTextActive = Color(0xFFECEDF6);
-
-  /// Divider inside nav
-  static const Color navDivider = Color(0xFF45484F);
+  static const Color navText = Color(0xFF73757D);
+  static const Color navTextActive = Color(0xFF90ABFF);
+  static const Color navDivider = Color(0xFF1C2028);
 
   // ---------------------------------------------------------------------------
-  // Primary — Blue (professional dark POS feel)
+  // Primary — Stitch periwinkle blue
   // ---------------------------------------------------------------------------
 
-  /// Primary action color — blue (lighter for dark bg readability)
+  /// Primary action color — periwinkle
   static const Color primary = Color(0xFF90ABFF);
 
-  /// Primary CTA / button fill — darker blue (primaryDim)
-  static const Color primaryDim = Color(0xFF316BF3);
+  /// Primary dim — button backgrounds, price badges
+  static const Color primaryContainer = Color(0xFF316BF3);
 
-  /// Primary container — medium blue
-  static const Color primaryContainer = Color(0xFF7B9CFF);
-
-  /// On primary — dark text on primary bg
-  static const Color onPrimary = Color(0xFF002873);
-
-  /// Light alias (same as container)
-  static const Color primaryLight = Color(0xFF7B9CFF);
+  /// Primary light — highlights
+  static const Color primaryLight = Color(0xFF90ABFF);
 
   /// Alias for primary
   static const Color accent = Color(0xFF90ABFF);
 
-  /// Pressed/hover accent — use primaryDim
-  static const Color accentHover = Color(0xFF316BF3);
+  /// Primary hover
+  static const Color accentHover = Color(0xFFAAC0FF);
 
-  /// Tinted blue background (selected states, active indicators)
-  static const Color accentDim = Color(0x2090ABFF);
-
-  // ---------------------------------------------------------------------------
-  // Secondary — Green (Ready / Sent / Available states)
-  // ---------------------------------------------------------------------------
-
-  /// Secondary — mint green (available, sent to kitchen, complete)
-  static const Color secondary = Color(0xFF69F6B8);
-
-  /// Secondary dim variant
-  static const Color secondaryDim = Color(0xFF58E7AB);
-
-  /// Secondary container background (dark green for badges)
-  static const Color secondaryContainer = Color(0xFF006C49);
+  /// Tinted primary background — ~20% opacity
+  static const Color accentDim = Color(0x3390ABFF);
 
   // ---------------------------------------------------------------------------
-  // Tertiary / Coral — Action colors (Send to Kitchen, urgency)
+  // Secondary — Ready / Sent green
   // ---------------------------------------------------------------------------
 
-  /// Coral / action red — primary CTA (send to kitchen, urgent actions)
-  static const Color coral = Color(0xFFFF6F7E);
-
-  /// Darker coral for pressed / gradient end
-  static const Color coralDark = Color(0xFFD7383B);
-
-  /// Tinted coral background for badges / tags
-  static const Color coralDim = Color(0x20FF6F7E);
-
-  // Tertiary aliases
-  static const Color tertiary = Color(0xFFFF6F7E);
-  static const Color tertiaryDim = Color(0xFFFF6F7E);
-
-  // ---------------------------------------------------------------------------
-  // Semantic Colors
-  // ---------------------------------------------------------------------------
-
-  /// Success — available, paid, completed
+  /// Success — available, paid, completed, sent to kitchen
   static const Color green = Color(0xFF69F6B8);
 
   /// On green (text on green bg)
-  static const Color onGreen = Color(0xFF003828);
+  static const Color onGreen = Color(0xFF003822);
 
-  /// Secondary container green (same as secondaryContainer)
-  static const Color greenContainer = Color(0xFF006C49);
-
-  /// Warning — pending, attention
-  static const Color orange = Color(0xFFFFB74D);
-
-  /// Error — void, destructive, occupied
-  static const Color red = Color(0xFFFF716C);
-
-  /// Error dim variant
-  static const Color errorDim = Color(0xFFD7383B);
-
-  /// Info / highlight / notes
-  static const Color yellow = Color(0xFFFFD54F);
-
-  /// Special / promo / VIP
-  static const Color purple = Color(0xFFCE93D8);
-
-  // error alias
-  static const Color error = Color(0xFFFF716C);
+  /// Secondary container green
+  static const Color greenContainer = Color(0xFF69F6B8);
 
   // ---------------------------------------------------------------------------
-  // Dim Semantic — tinted badge / chip backgrounds (dark theme)
+  // Tertiary / Error — warning red-pink
   // ---------------------------------------------------------------------------
 
-  static const Color greenDim = Color(0xFF006C49);
-  static const Color orangeDim = Color(0x30FFB74D);
-  static const Color redDim = Color(0x25FF716C);
-  static const Color yellowDim = Color(0x25FFD54F);
-  static const Color purpleDim = Color(0x25CE93D8);
+  /// Coral / error — void, destructive, error states
+  static const Color coral = Color(0xFFFF6F7E);
+
+  /// Darker coral for pressed states
+  static const Color coralDark = Color(0xFFE55A6A);
+
+  /// Tinted coral background
+  static const Color coralDim = Color(0x33FF6F7E);
 
   // ---------------------------------------------------------------------------
-  // Text Hierarchy — NOT pure white (reduces eye strain on dark displays)
+  // Semantic colors
   // ---------------------------------------------------------------------------
 
-  /// Primary text — warm white on dark (onSurface)
+  /// Warning / amber — reserved, pending
+  static const Color orange = Color(0xFFFFAB4E);
+
+  /// Error (alias for coral)
+  static const Color red = Color(0xFFFF6F7E);
+
+  /// Info / highlight
+  static const Color yellow = Color(0xFFFFD166);
+
+  /// Special / promo
+  static const Color purple = Color(0xFFB794FF);
+
+  // ---------------------------------------------------------------------------
+  // Dim semantic — tinted badge backgrounds
+  // ---------------------------------------------------------------------------
+
+  static const Color greenDim = Color(0x2269F6B8);
+  static const Color orangeDim = Color(0x22FFAB4E);
+  static const Color redDim = Color(0x22FF6F7E);
+  static const Color yellowDim = Color(0x22FFD166);
+  static const Color purpleDim = Color(0x22B794FF);
+
+  // ---------------------------------------------------------------------------
+  // Text Hierarchy
+  // ---------------------------------------------------------------------------
+
+  /// Primary text — near white
   static const Color textPrimary = Color(0xFFECEDF6);
 
-  /// Secondary text — muted (onSurfaceVariant)
+  /// Secondary text — muted
   static const Color textSecondary = Color(0xFFA9ABB3);
 
   /// Dim / placeholder / disabled
   static const Color textDim = Color(0xFF73757D);
 
   // ---------------------------------------------------------------------------
-  // Borders & Dividers — ONLY the one-allowed subtle separator
-  // No decorative borders. Only structural separators at 5% opacity white.
+  // Borders & Dividers — very subtle on dark system
   // ---------------------------------------------------------------------------
 
-  /// Default divider — very subtle (outlineVariant)
-  static const Color border = Color(0xFF45484F);
+  /// Default border — ~10% white
+  static const Color border = Color(0x1AECEDF6);
 
   /// Focused / active element border
   static const Color borderFocused = Color(0xFF90ABFF);
 
-  /// Subtle separators (slightly lighter than border)
-  static const Color outlineVariant = Color(0xFF45484F);
-
-  /// Outline (icons, mid-emphasis)
-  static const Color outline = Color(0xFF73757D);
+  /// Subtle separators
+  static const Color outlineVariant = Color(0x0FECEDF6);
 }

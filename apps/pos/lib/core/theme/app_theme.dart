@@ -1,8 +1,8 @@
 /// Complete dark theme for GastroCore POS.
 ///
-/// Klein Professional POS — Organic Brutalism dark theme.
-/// Material 3 dark theme — no shadows, tonal layering, tight border radius,
-/// ultra-dense spacing, Inter font with extreme weight contrasts.
+/// Stitch "Klein Professional POS" design system.
+/// Material 3 dark theme — ultra-dense tablet UI,
+/// surface-layering depth hierarchy (no borders, no shadows on cards).
 library;
 
 import 'package:flutter/material.dart';
@@ -10,32 +10,38 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 // ---------------------------------------------------------------------------
-// Border radius constants — tight/dense professional feel
+// Border radius constants — tight 4px Stitch design system
 // ---------------------------------------------------------------------------
 
-/// Small radius — chips, badges, small buttons, cards (4px → dense pro feel).
+/// Small radius — chips, badges, small buttons, cards.
 const double kRadiusSmall = 4.0;
 
-/// Medium radius — dialogs, inputs (8px).
-const double kRadiusMedium = 8.0;
+/// Medium radius — inputs, action buttons.
+const double kRadiusMedium = 4.0;
 
-/// Large radius — sheets, modals (12px).
-const double kRadiusLarge = 12.0;
+/// Large radius — sheets, modals, prominent panels.
+const double kRadiusLarge = 8.0;
 
 // ---------------------------------------------------------------------------
-// Shadow presets — MINIMAL, dark theme uses tonal layering not shadows
+// Shadow presets — minimal in dark tonal system
 // ---------------------------------------------------------------------------
 
-/// No shadow for cards — tonal layering expresses depth instead.
+/// No shadows on cards — tonal surface layering expresses depth.
 const List<BoxShadow> kCardShadow = [];
 
-/// No panel shadow — background color difference defines separation.
-const List<BoxShadow> kPanelShadow = [];
+/// Subtle separator shadow for the order panel.
+const List<BoxShadow> kPanelShadow = [
+  BoxShadow(
+    color: Color(0x40000000),
+    blurRadius: 16,
+    offset: Offset(-2, 0),
+  ),
+];
 
-/// Subtle glow for primary action buttons only.
+/// Primary action button glow.
 const List<BoxShadow> kButtonShadow = [
   BoxShadow(
-    color: Color(0x3090ABFF),
+    color: Color(0x5090ABFF),
     blurRadius: 12,
     offset: Offset(0, 4),
   ),
@@ -45,31 +51,31 @@ const List<BoxShadow> kButtonShadow = [
 // Theme
 // ---------------------------------------------------------------------------
 
-/// Builds the application-wide dark [ThemeData].
+/// Builds the application-wide dark [ThemeData] (Stitch design system).
 ThemeData buildAppTheme() {
   final colorScheme = ColorScheme.dark(
-    brightness: Brightness.dark,
     primary: AppColors.primary,
-    onPrimary: AppColors.onPrimary,
+    onPrimary: const Color(0xFF0B0E14),
     primaryContainer: AppColors.primaryContainer,
-    onPrimaryContainer: AppColors.onPrimary,
-    secondary: AppColors.secondary,
+    onPrimaryContainer: AppColors.primary,
+    secondary: AppColors.green,
     onSecondary: AppColors.onGreen,
-    secondaryContainer: AppColors.secondaryContainer,
-    tertiary: AppColors.tertiary,
+    tertiary: AppColors.coral,
     onTertiary: Colors.white,
-    error: AppColors.error,
+    error: AppColors.red,
     onError: Colors.white,
     surface: AppColors.surface,
     onSurface: AppColors.textPrimary,
+    surfaceDim: AppColors.surfaceDim,
     surfaceContainerLowest: AppColors.surfaceDim,
     surfaceContainerLow: AppColors.surfaceContainerLow,
     surfaceContainer: AppColors.surfaceContainer,
     surfaceContainerHigh: AppColors.surfaceContainerHigh,
     surfaceContainerHighest: AppColors.surfaceContainerHighest,
     onSurfaceVariant: AppColors.textSecondary,
-    outline: AppColors.outline,
+    outline: AppColors.border,
     outlineVariant: AppColors.outlineVariant,
+    scrim: AppColors.bgOverlay,
   );
 
   return ThemeData(
@@ -86,11 +92,10 @@ ThemeData buildAppTheme() {
       PosColors(),
     ],
 
-    // -- Typography — Inter, extreme weight contrasts -------------------------
+    // -- Typography — Inter font, weight contrast 400 vs 800 ----------------
     textTheme: const TextTheme(
-      // Display — totals, large numbers (Inter 800)
       displayLarge: TextStyle(
-        fontSize: 36,
+        fontSize: 32,
         fontWeight: FontWeight.w800,
         color: AppColors.textPrimary,
         letterSpacing: -0.5,
@@ -99,31 +104,25 @@ ThemeData buildAppTheme() {
         fontSize: 28,
         fontWeight: FontWeight.w800,
         color: AppColors.textPrimary,
-        letterSpacing: -0.4,
       ),
       displaySmall: TextStyle(
         fontSize: 24,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
-        letterSpacing: -0.3,
       ),
-      // Headline — section headers (Inter 700, tight tracking)
       headlineMedium: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
-        letterSpacing: -0.02 * 20,
       ),
       headlineSmall: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
-        letterSpacing: -0.02 * 18,
       ),
-      // Title — product names (Inter 600)
       titleLarge: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
       ),
       titleMedium: TextStyle(
@@ -136,7 +135,6 @@ ThemeData buildAppTheme() {
         fontWeight: FontWeight.w600,
         color: AppColors.textSecondary,
       ),
-      // Body — descriptions (Inter 400)
       bodyLarge: TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w400,
@@ -152,28 +150,25 @@ ThemeData buildAppTheme() {
         fontWeight: FontWeight.w400,
         color: AppColors.textSecondary,
       ),
-      // Label — ALL-CAPS status tags (Inter 700)
       labelLarge: TextStyle(
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
-        letterSpacing: 0.8,
       ),
       labelMedium: TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
         color: AppColors.textSecondary,
-        letterSpacing: 0.8,
       ),
       labelSmall: TextStyle(
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: FontWeight.w700,
         color: AppColors.textDim,
-        letterSpacing: 1.0,
+        letterSpacing: 0.5,
       ),
     ),
 
-    // -- Card — tight radius, no shadow, tonal bg ----------------------------
+    // -- Card — no elevation, tonal surface ------------------------------------
     cardTheme: CardThemeData(
       color: AppColors.surfaceContainerHigh,
       elevation: 0,
@@ -183,7 +178,7 @@ ThemeData buildAppTheme() {
       margin: EdgeInsets.zero,
     ),
 
-    // -- Input decoration ----------------------------------------------------
+    // -- Input decoration -------------------------------------------------------
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.bgInput,
@@ -198,40 +193,40 @@ ThemeData buildAppTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
-        borderSide: const BorderSide(color: AppColors.borderFocused, width: 1),
+        borderSide: const BorderSide(color: AppColors.borderFocused, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
-        borderSide: const BorderSide(color: AppColors.error),
+        borderSide: const BorderSide(color: AppColors.red),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
-        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.red, width: 1.5),
       ),
       hintStyle: const TextStyle(color: AppColors.textDim, fontSize: 13),
       labelStyle: const TextStyle(color: AppColors.textSecondary),
     ),
 
-    // -- Elevated button — primaryDim bg, tight radius -----------------------
+    // -- Elevated button -------------------------------------------------------
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primaryDim,
+        backgroundColor: AppColors.primaryContainer,
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        minimumSize: const Size(0, 48),
+        minimumSize: const Size(0, 44),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kRadiusSmall),
         ),
         textStyle: const TextStyle(
           fontSize: 13,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           letterSpacing: 0.5,
         ),
       ),
     ),
 
-    // -- Text button ---------------------------------------------------------
+    // -- Text button ----------------------------------------------------------
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: AppColors.primary,
@@ -246,12 +241,12 @@ ThemeData buildAppTheme() {
       ),
     ),
 
-    // -- Outlined button -----------------------------------------------------
+    // -- Outlined button ------------------------------------------------------
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.textPrimary,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        minimumSize: const Size(0, 48),
+        minimumSize: const Size(0, 44),
         side: const BorderSide(color: AppColors.border),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kRadiusSmall),
@@ -263,24 +258,25 @@ ThemeData buildAppTheme() {
       ),
     ),
 
-    // -- Dialog — surfaceBright bg, tight radius ----------------------------
+    // -- Dialog ---------------------------------------------------------------
     dialogTheme: DialogThemeData(
-      backgroundColor: AppColors.surfaceBright,
-      elevation: 0,
+      backgroundColor: AppColors.surfaceContainerHigh,
+      elevation: 8,
+      shadowColor: const Color(0x40000000),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(kRadiusMedium),
+        borderRadius: BorderRadius.circular(kRadiusLarge),
       ),
     ),
 
     // -- Bottom sheet --------------------------------------------------------
     bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: AppColors.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(kRadiusMedium)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(kRadiusLarge)),
       ),
     ),
 
-    // -- Divider — very subtle -----------------------------------------------
+    // -- Divider -------------------------------------------------------------
     dividerTheme: const DividerThemeData(
       color: AppColors.border,
       thickness: 1,
@@ -289,7 +285,7 @@ ThemeData buildAppTheme() {
 
     // -- Snackbar ------------------------------------------------------------
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: AppColors.surfaceContainerHighest,
       contentTextStyle: const TextStyle(color: AppColors.textPrimary),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
@@ -297,12 +293,11 @@ ThemeData buildAppTheme() {
       behavior: SnackBarBehavior.floating,
     ),
 
-    // -- AppBar --------------------------------------------------------------
+    // -- AppBar (used sparingly) ---------------------------------------------
     appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.surfaceContainerLow,
       foregroundColor: AppColors.textPrimary,
       elevation: 0,
-      shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
     ),
@@ -310,25 +305,18 @@ ThemeData buildAppTheme() {
     // -- Chip ----------------------------------------------------------------
     chipTheme: ChipThemeData(
       backgroundColor: AppColors.surfaceContainerHigh,
-      selectedColor: AppColors.primaryDim,
+      selectedColor: AppColors.accentDim,
       labelStyle: const TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
-        letterSpacing: 0.5,
+        letterSpacing: 0.3,
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRadiusSmall),
       ),
       side: BorderSide.none,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    ),
-
-    // -- FloatingActionButton ------------------------------------------------
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: AppColors.primaryDim,
-      foregroundColor: Colors.white,
-      elevation: 0,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     ),
   );
 }
@@ -337,8 +325,7 @@ ThemeData buildAppTheme() {
 // Custom theme extension for POS-specific colours
 // ---------------------------------------------------------------------------
 
-/// Additional colours that don't map to Material's [ColorScheme] but are
-/// essential for POS UI elements: status indicators, table states, badges.
+/// Additional colours that don't map to Material's [ColorScheme].
 class PosColors extends ThemeExtension<PosColors> {
   const PosColors({
     this.green = AppColors.green,
