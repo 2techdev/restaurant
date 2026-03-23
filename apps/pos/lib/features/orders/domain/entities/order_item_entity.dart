@@ -137,6 +137,10 @@ class OrderItemEntity {
   /// Course number for multi-course service (1 = first course, etc.).
   final int course;
 
+  /// Gang (course group) ID assigned to this item.
+  /// References GangTemplate.id. Null = no Gang assigned.
+  final String? gangId;
+
   /// Modifiers applied to this item.
   final List<OrderItemModifierEntity> modifiers;
 
@@ -187,6 +191,7 @@ class OrderItemEntity {
     this.sentToKitchen = false,
     this.notes,
     this.course = 1,
+    this.gangId,
     this.modifiers = const [],
     this.isTaxFree = false,
     this.isOpenPrice = false,
@@ -220,6 +225,7 @@ class OrderItemEntity {
     bool? sentToKitchen,
     String? Function()? notes,
     int? course,
+    String? Function()? gangId,
     List<OrderItemModifierEntity>? modifiers,
     bool? isTaxFree,
     bool? isOpenPrice,
@@ -244,6 +250,7 @@ class OrderItemEntity {
       sentToKitchen: sentToKitchen ?? this.sentToKitchen,
       notes: notes != null ? notes() : this.notes,
       course: course ?? this.course,
+      gangId: gangId != null ? gangId() : this.gangId,
       modifiers: modifiers ?? this.modifiers,
       isTaxFree: isTaxFree ?? this.isTaxFree,
       isOpenPrice: isOpenPrice ?? this.isOpenPrice,

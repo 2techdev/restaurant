@@ -59,6 +59,9 @@ class KitchenTicketItemEntity {
   /// Current preparation status of this individual item.
   final KitchenTicketStatus status;
 
+  /// Gang (course group) ID for this item. Null = no Gang assigned.
+  final String? gangId;
+
   const KitchenTicketItemEntity({
     required this.id,
     required this.kitchenTicketId,
@@ -68,6 +71,7 @@ class KitchenTicketItemEntity {
     this.modifiersText,
     this.notes,
     this.status = KitchenTicketStatus.pending,
+    this.gangId,
   });
 
   /// Create a copy with selectively overridden fields.
@@ -80,6 +84,7 @@ class KitchenTicketItemEntity {
     String? Function()? modifiersText,
     String? Function()? notes,
     KitchenTicketStatus? status,
+    String? Function()? gangId,
   }) {
     return KitchenTicketItemEntity(
       id: id ?? this.id,
@@ -91,6 +96,7 @@ class KitchenTicketItemEntity {
           modifiersText != null ? modifiersText() : this.modifiersText,
       notes: notes != null ? notes() : this.notes,
       status: status ?? this.status,
+      gangId: gangId != null ? gangId() : this.gangId,
     );
   }
 

@@ -145,14 +145,37 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
   /// (already resolved from the modifier selection UI). The item subtotal is
   /// calculated from the product price, quantity, and modifier deltas.
   /// Tax is computed tax-inclusive using Swiss MWST rates.
+  /// Resolve the best Gang ID for a product.
+  ///
+  /// Resolution order:
+  ///   1. Explicitly passed [gangId] (waiter override)
+  ///   2. Product-level [product.defaultGangId]
+  ///   3. Category-level default (looked up from gang templates map)
+  ///   4. null (no Gang assigned)
+  String? resolveGang(ProductEntity product, {String? gangId}) {
+    if (gangId != null) return gangId;
+    if (product.defaultGangId != null) return product.defaultGangId;
+    // Category-level fallback is applied by the UI before calling addItem,
+    // or can be supplied explicitly. No further resolution needed here.
+    return null;
+  }
+
   void addItem(
     ProductEntity product, {
     double quantity = 1,
     List<OrderItemModifierEntity> selectedModifiers = const [],
     String? notes,
     int course = 1,
+    /// Gang to assign to this item. If null, resolves from product default.
+    String? gangId,
+    /// Category-level default Gang (fallback when product has no default).
+    String? categoryGangId,
   }) {
     if (state == null) return;
+
+    // Resolve Gang: explicit > product default > category default
+    final resolvedGangId =
+        gangId ?? product.defaultGangId ?? categoryGangId;
 
     final modifierTotal =
         selectedModifiers.fold<int>(0, (s, m) => s + m.priceDelta);
@@ -185,11 +208,24 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
       taxAmount: taxAmount,
       notes: notes,
       course: course,
+      gangId: resolvedGangId,
       modifiers: modifiers,
       taxGroup: product.taxGroup,
     );
 
     state = state!.addItem(item);
+  }
+
+  /// Override the Gang assignment for an existing order item.
+  ///
+  /// Used by the waiter to change a Gang after the item was added.
+  void updateItemGang(String itemId, String? gangId) {
+    if (state == null) return;
+    final updatedItems = state!.items.map((item) {
+      if (item.id != itemId) return item;
+      return item.copyWith(gangId: () => gangId);
+    }).toList();
+    state = state!.copyWith(items: updatedItems);
   }
 
   /// Extract the MWST amount from a tax-inclusive gross price.

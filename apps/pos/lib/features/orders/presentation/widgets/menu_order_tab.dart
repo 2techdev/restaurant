@@ -18,6 +18,7 @@ import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dar
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/modifier_dialog.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/menu_settings_dialog.dart';
+import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Design Tokens
@@ -161,7 +162,16 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
   // Product tap handler
   // -------------------------------------------------------------------------
 
+  /// Resolve the category-level default Gang ID for a product.
+  String? _categoryGangId(String categoryId) {
+    final categories = ref.read(categoriesProvider).valueOrNull ?? [];
+    final cat = categories.where((c) => c.id == categoryId).firstOrNull;
+    return cat?.defaultGangId;
+  }
+
   Future<void> _onProductTapped(ProductEntity product) async {
+    final categoryGangId = _categoryGangId(product.categoryId);
+
     if (product.modifierGroups.isNotEmpty) {
       final modifierGroups = ModifierGroupData.fromProductEntity(product);
 
@@ -191,10 +201,14 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
               quantity: result.quantity.toDouble(),
               selectedModifiers: orderModifiers,
               notes: result.notes.isNotEmpty ? result.notes : null,
+              categoryGangId: categoryGangId,
             );
       }
     } else {
-      ref.read(currentTicketProvider.notifier).addItem(product);
+      ref.read(currentTicketProvider.notifier).addItem(
+            product,
+            categoryGangId: categoryGangId,
+          );
     }
   }
 
@@ -505,6 +519,7 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
 
   Widget _buildOrderPanel() {
     final ticket = ref.watch(currentTicketProvider);
+    final gangMap = ref.watch(gangTemplateMapProvider);
     final allItems = ticket?.items ?? [];
 
     // Split items by sent status
@@ -545,10 +560,15 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
                     itemBuilder: (context, index) {
                       final item = activeItems[index];
                       final isOrdering = _orderPanelTab == 0;
+                      final gang = item.gangId != null
+                          ? gangMap[item.gangId]
+                          : null;
                       return _OrderItemRow(
                         item: item,
                         isEditable: isOrdering,
                         formatCHF: _formatCHF,
+                        gangLabel: gang?.name,
+                        gangColor: gang?.flutterColor,
                         onIncrement: isOrdering
                             ? () => ref
                                 .read(currentTicketProvider.notifier)
@@ -1195,6 +1215,12 @@ class _OrderItemRow extends StatelessWidget {
   final VoidCallback? onDecrement;
   final VoidCallback? onDismissed;
 
+  /// Gang name to show as a badge (e.g. "Vorspeise"). Null = no badge.
+  final String? gangLabel;
+
+  /// Color for the Gang badge border and text.
+  final Color? gangColor;
+
   const _OrderItemRow({
     required this.item,
     required this.isEditable,
@@ -1202,6 +1228,8 @@ class _OrderItemRow extends StatelessWidget {
     this.onIncrement,
     this.onDecrement,
     this.onDismissed,
+    this.gangLabel,
+    this.gangColor,
   });
 
   String _modifierSummary() {
@@ -1244,15 +1272,48 @@ class _OrderItemRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item.productName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: _Tok.textPrimary,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.productName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _Tok.textPrimary,
+                        ),
+                      ),
+                    ),
+                    // Gang badge — small colored pill showing Gang name
+                    if (gangLabel != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: (gangColor ?? _Tok.accentBlue)
+                              .withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: (gangColor ?? _Tok.accentBlue)
+                                .withValues(alpha: 0.4),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Text(
+                          gangLabel!,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: gangColor ?? _Tok.accentBlue,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 if (item.modifiers.isNotEmpty)
                   Padding(

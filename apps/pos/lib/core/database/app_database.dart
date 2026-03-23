@@ -10,6 +10,8 @@ import 'package:gastrocore_pos/features/sync/data/daos/sync_event_dao.dart';
 
 import 'tables/audit_log.dart';
 import 'tables/bills.dart';
+import 'tables/gang_templates.dart';
+import 'tables/order_gang_states.dart';
 import 'tables/cash_movements.dart';
 import 'tables/categories.dart';
 import 'tables/combo_items.dart';
@@ -71,6 +73,8 @@ part 'app_database.g.dart';
     ProductSpecifications,
     LicenseTokens,
     DayCloseSummaries,
+    GangTemplates,
+    OrderGangStates,
   ],
   daos: [AuditLogDao, SyncEventDao],
 )
@@ -78,7 +82,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -102,6 +106,15 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         // Add day_close_summaries table introduced in v6.
         await m.createTable(dayCloseSummaries);
+      }
+      if (from < 7) {
+        // Gang ordering system introduced in v7.
+        await m.createTable(gangTemplates);
+        await m.createTable(orderGangStates);
+        await m.addColumn(products, products.defaultGangId);
+        await m.addColumn(categories, categories.defaultGangId);
+        await m.addColumn(orderItems, orderItems.gangId);
+        await m.addColumn(kitchenTicketItems, kitchenTicketItems.gangId);
       }
     },
     onCreate: (m) async {

@@ -23,6 +23,9 @@ class CategoryEntity {
 
   final bool isActive;
 
+  /// Default Gang for products in this category (references gang_templates.id).
+  final String? defaultGangId;
+
   const CategoryEntity({
     required this.id,
     required this.tenantId,
@@ -32,6 +35,7 @@ class CategoryEntity {
     required this.icon,
     this.parentId,
     required this.isActive,
+    this.defaultGangId,
   });
 
   /// Create a copy with selectively overridden fields.
@@ -44,6 +48,7 @@ class CategoryEntity {
     String? icon,
     String? Function()? parentId,
     bool? isActive,
+    String? Function()? defaultGangId,
   }) {
     return CategoryEntity(
       id: id ?? this.id,
@@ -54,6 +59,8 @@ class CategoryEntity {
       icon: icon ?? this.icon,
       parentId: parentId != null ? parentId() : this.parentId,
       isActive: isActive ?? this.isActive,
+      defaultGangId:
+          defaultGangId != null ? defaultGangId() : this.defaultGangId,
     );
   }
 

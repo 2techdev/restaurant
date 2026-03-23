@@ -125,6 +125,8 @@ class SeedData {
       await db.delete(db.syncMetadata).go();
       await db.delete(db.auditLog).go();
       await db.delete(db.users).go();
+      await db.delete(db.orderGangStates).go();
+      await db.delete(db.gangTemplates).go();
       await db.delete(db.tenants).go();
     });
   }
@@ -136,6 +138,7 @@ class SeedData {
   Future<void> _seed() async {
     await _seedTenant();
     await _seedUsers();
+    await _seedGangs();
     await _seedCategories();
     await _seedProducts();
     await _seedModifiers();
@@ -248,6 +251,73 @@ class SeedData {
   }
 
   // -------------------------------------------------------------------------
+  // Gangs (Swiss default Gangs seeded with known IDs)
+  // -------------------------------------------------------------------------
+
+  Future<void> _seedGangs() async {
+    final now = DateTime.now();
+    final gangs = [
+      GangTemplatesCompanion(
+        id: const Value('gang-1'),
+        tenantId: Value(_tenantId),
+        name: const Value('Vorspeise'),
+        sortOrder: const Value(1),
+        color: const Value('#90ABFF'),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+        syncStatus: const Value(0),
+        isDeleted: const Value(false),
+      ),
+      GangTemplatesCompanion(
+        id: const Value('gang-2'),
+        tenantId: Value(_tenantId),
+        name: const Value('Hauptgang'),
+        sortOrder: const Value(2),
+        color: const Value('#69F6B8'),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+        syncStatus: const Value(0),
+        isDeleted: const Value(false),
+      ),
+      GangTemplatesCompanion(
+        id: const Value('gang-3'),
+        tenantId: Value(_tenantId),
+        name: const Value('Dessert'),
+        sortOrder: const Value(3),
+        color: const Value('#BF5AF2'),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+        syncStatus: const Value(0),
+        isDeleted: const Value(false),
+      ),
+      GangTemplatesCompanion(
+        id: const Value('gang-4'),
+        tenantId: Value(_tenantId),
+        name: const Value('Getränke'),
+        sortOrder: const Value(4),
+        color: const Value('#FF9F0A'),
+        isDefault: const Value(true),
+        isActive: const Value(true),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+        syncStatus: const Value(0),
+        isDeleted: const Value(false),
+      ),
+    ];
+    await db.batch((batch) {
+      for (final g in gangs) {
+        batch.insert(db.gangTemplates, g, mode: InsertMode.insertOrIgnore);
+      }
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // Categories
   // -------------------------------------------------------------------------
 
@@ -267,6 +337,7 @@ class SeedData {
         icon: '\uD83E\uDD57', // 🥗
         color: '#34C759',
         order: 0,
+        gangId: 'gang-1', // Vorspeise
       ),
       (
         id: _catHauptId,
@@ -274,6 +345,7 @@ class SeedData {
         icon: '\uD83C\uDF56', // 🍖
         color: '#FF3B30',
         order: 1,
+        gangId: 'gang-2', // Hauptgang
       ),
       (
         id: _catPizzaPastaId,
@@ -281,6 +353,7 @@ class SeedData {
         icon: '\uD83C\uDF55', // 🍕
         color: '#FF6B35',
         order: 2,
+        gangId: 'gang-2', // Hauptgang
       ),
       (
         id: _catDessertId,
@@ -288,6 +361,7 @@ class SeedData {
         icon: '\uD83C\uDF70', // 🍰
         color: '#FF375F',
         order: 3,
+        gangId: 'gang-3', // Dessert
       ),
       (
         id: _catGetraenkeId,
@@ -295,6 +369,7 @@ class SeedData {
         icon: '\uD83E\uDD64', // 🥤
         color: '#4F8CFF',
         order: 4,
+        gangId: 'gang-4', // Getränke
       ),
     ];
 
@@ -307,6 +382,7 @@ class SeedData {
           icon: Value(c.icon),
           color: Value(c.color),
           displayOrder: Value(c.order),
+          defaultGangId: Value(c.gangId),
           isActive: const Value(true),
           createdAt: Value(now),
           updatedAt: Value(now),

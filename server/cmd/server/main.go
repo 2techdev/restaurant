@@ -19,6 +19,7 @@ import (
 	"github.com/gastrocore/server/internal/menu"
 	"github.com/gastrocore/server/internal/online"
 	"github.com/gastrocore/server/internal/orders"
+	"github.com/gastrocore/server/internal/pos"
 	"github.com/gastrocore/server/internal/reports"
 	"github.com/gastrocore/server/internal/shared/config"
 	"github.com/gastrocore/server/internal/shared/database"
@@ -54,18 +55,25 @@ func main() {
 	go kdsHub.Run()
 
 	// ---------------------------------------------------------------------------
+	// POS hub — real-time push for online orders to POS terminals.
+	// ---------------------------------------------------------------------------
+	posHub := pos.NewHub()
+	go posHub.Run()
+
+	// ---------------------------------------------------------------------------
 	// Initialize modules
 	// ---------------------------------------------------------------------------
 	authModule := auth.NewModule(db, cfg)
 	syncModule := gosync.NewModule(db, cfg)
 	menuModule := menu.NewModule(db)
 	ordersModule := orders.NewModule(db)
-	onlineModule := online.NewModule(db, kdsHub) // kdsHub satisfies KDSNotifier
+	onlineModule := online.NewModule(db, kdsHub, posHub) // kdsHub→KDSNotifier, posHub→POSNotifier
 	reportsModule := reports.NewModule(db)
 	devicesModule := devices.NewModule(db)
 	licensesModule := licenses.NewModule(db, cfg)
 	storesModule := stores.NewModule(db, cfg)
 	kdsModule := kds.NewModule(db, kdsHub)
+	posModule := pos.NewModule(db, posHub)
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -117,6 +125,7 @@ func main() {
 	licensesModule.RegisterRoutes(mux)
 	storesModule.RegisterRoutes(mux)
 	kdsModule.RegisterRoutes(mux)
+	posModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain

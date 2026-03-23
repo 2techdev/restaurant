@@ -23,6 +23,17 @@ func NewModule(db *sql.DB, cfg *config.Config) *Module {
 
 // RegisterRoutes registers all store management routes on the given mux.
 func (m *Module) RegisterRoutes(mux *http.ServeMux) {
+	// ── Tenant-scoped store API (uses JWT brand/store context) ──────────────
+	mux.HandleFunc("GET /api/v1/stores", m.handleTenantListStores)
+	mux.HandleFunc("POST /api/v1/stores", m.handleTenantCreateStore)
+	mux.HandleFunc("GET /api/v1/stores/{id}", m.handleTenantGetStore)
+	mux.HandleFunc("PUT /api/v1/stores/{id}", m.handleTenantUpdateStore)
+	mux.HandleFunc("GET /api/v1/stores/{id}/users", m.handleTenantListUsers)
+	mux.HandleFunc("POST /api/v1/stores/{id}/users", m.handleTenantCreateUser)
+	mux.HandleFunc("DELETE /api/v1/stores/{id}/users/{uid}", m.handleTenantDeleteUser)
+	mux.HandleFunc("GET /api/v1/stores/{id}/sync", m.handleTenantSyncFull)
+	mux.HandleFunc("POST /api/v1/stores/{id}/sync", m.handleTenantSyncPush)
+	mux.HandleFunc("GET /api/v1/stores/{id}/sync/delta", m.handleTenantSyncDelta)
 	// Organization
 	mux.HandleFunc("GET /api/v1/admin/organization", m.handleGetOrganization)
 	mux.HandleFunc("PUT /api/v1/admin/organization", m.handleUpdateOrganization)

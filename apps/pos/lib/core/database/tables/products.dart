@@ -16,6 +16,11 @@ class Products extends Table {
   IntColumn get displayOrder => integer().withDefault(const Constant(0))();
   IntColumn get prepTimeMinutes => integer().nullable()();
   TextColumn get printerGroup => text().withDefault(const Constant('kitchen'))();
+
+  /// Default Gang assignment for this product (references gang_templates.id).
+  /// Null means fall back to category default or no Gang.
+  TextColumn get defaultGangId => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   IntColumn get syncStatus => integer().withDefault(const Constant(0))();

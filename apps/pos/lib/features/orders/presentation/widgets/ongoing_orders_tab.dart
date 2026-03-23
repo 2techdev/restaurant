@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/features/online_orders/presentation/providers/online_order_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 
@@ -55,42 +56,59 @@ class _OngoingOrdersTabState extends ConsumerState<OngoingOrdersTab> {
               tickets.where((t) => t.orderType == OrderType.takeaway).length;
           final deliveryCount =
               tickets.where((t) => t.orderType == OrderType.delivery).length;
+          final onlineCount = tickets
+              .where((t) =>
+                  t.orderType == OrderType.online ||
+                  t.channel == OrderChannel.web ||
+                  t.channel == OrderChannel.qr)
+              .length;
+
+          // Pending online orders count for the badge.
+          final pendingOnline = ref.watch(pendingOnlineOrdersProvider).length;
 
           return Column(
             children: [
               // -- Filter chips --
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
-                child: Row(
-                  children: [
-                    _buildFilterChip(
-                      'All',
-                      allCount,
-                      _OrderFilter.all,
-                      AppColors.accent,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      'Dine In',
-                      dineInCount,
-                      _OrderFilter.dineIn,
-                      AppColors.green,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      'Takeaway',
-                      takeawayCount,
-                      _OrderFilter.takeaway,
-                      AppColors.accent,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildFilterChip(
-                      'Delivery',
-                      deliveryCount,
-                      _OrderFilter.delivery,
-                      AppColors.purple,
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip(
+                        'All',
+                        allCount,
+                        _OrderFilter.all,
+                        AppColors.accent,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Dine In',
+                        dineInCount,
+                        _OrderFilter.dineIn,
+                        AppColors.green,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Takeaway',
+                        takeawayCount,
+                        _OrderFilter.takeaway,
+                        AppColors.accent,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Delivery',
+                        deliveryCount,
+                        _OrderFilter.delivery,
+                        AppColors.purple,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildOnlineFilterChip(
+                        onlineCount,
+                        pendingOnline,
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
@@ -145,6 +163,13 @@ class _OngoingOrdersTabState extends ConsumerState<OngoingOrdersTab> {
       case _OrderFilter.delivery:
         return tickets
             .where((t) => t.orderType == OrderType.delivery)
+            .toList();
+      case _OrderFilter.online:
+        return tickets
+            .where((t) =>
+                t.orderType == OrderType.online ||
+                t.channel == OrderChannel.web ||
+                t.channel == OrderChannel.qr)
             .toList();
     }
   }
@@ -201,6 +226,80 @@ class _OngoingOrdersTabState extends ConsumerState<OngoingOrdersTab> {
     );
   }
 
+  /// Filter chip with an optional red dot badge for pending online orders.
+  Widget _buildOnlineFilterChip(int count, int pendingCount) {
+    final isActive = _activeFilter == _OrderFilter.online;
+    const color = AppColors.accent;
+    return GestureDetector(
+      onTap: () => setState(() => _activeFilter = _OrderFilter.online),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive
+              ? color.withValues(alpha: 0.15)
+              : AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+          border: pendingCount > 0
+              ? Border.all(
+                  color: color.withValues(alpha: 0.4), width: 1.5)
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Online',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                color: isActive ? color : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? color.withValues(alpha: 0.2)
+                        : AppColors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: isActive ? color : AppColors.textDim,
+                    ),
+                  ),
+                ),
+                // Red dot for pending (unacknowledged) orders.
+                if (pendingCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return const Center(
       child: Column(
@@ -238,7 +337,7 @@ class _OngoingOrdersTabState extends ConsumerState<OngoingOrdersTab> {
 // Filter enum
 // ---------------------------------------------------------------------------
 
-enum _OrderFilter { all, dineIn, takeaway, delivery }
+enum _OrderFilter { all, dineIn, takeaway, delivery, online }
 
 // ---------------------------------------------------------------------------
 // Order Card
@@ -311,6 +410,10 @@ class _OrderCardState extends State<_OrderCard> {
     final t = widget.ticket;
     final badgeColor = _typeBadgeColor(t.orderType);
 
+    final isOnlineOrder = t.channel == OrderChannel.web ||
+        t.channel == OrderChannel.qr ||
+        t.orderType == OrderType.online;
+
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
       onTapUp: (_) {
@@ -325,12 +428,16 @@ class _OrderCardState extends State<_OrderCard> {
               ? AppColors.surfaceBright
               : AppColors.surfaceContainerLow,
           borderRadius: BorderRadius.circular(12),
+          border: isOnlineOrder
+              ? Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.3), width: 1.5)
+              : null,
         ),
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Type badge + elapsed time
+            // Type badge + optional ONLINE tag + elapsed time
             Row(
               children: [
                 Container(
@@ -349,6 +456,26 @@ class _OrderCardState extends State<_OrderCard> {
                     ),
                   ),
                 ),
+                if (isOnlineOrder) ...[
+                  const SizedBox(width: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: const Text(
+                      'ONLINE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.accent,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 Text(
                   _formatElapsed(t.openedAt),

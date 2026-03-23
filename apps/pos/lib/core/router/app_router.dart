@@ -1,19 +1,22 @@
 /// GoRouter configuration for GastroCore POS.
 ///
-/// Defines all application routes and maps them to their screen widgets.
-/// The navigation flow is: login -> shift-open -> home (dashboard) ->
-/// order-center (main POS with Ongoing/Table/Menu tabs).
+/// Navigation flow:
+///   1. App launch → auth guard checks brand JWT.
+///   2. No valid JWT → `/brand-login` (email/password).
+///   3. Valid JWT → `/login` (staff PIN selection).
+///   4. Successful PIN → `/shift-open` or `/home`.
 library;
 
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/auth/presentation/screens/pin_login_screen.dart';
+import 'package:gastrocore_pos/features/brand_auth/presentation/screens/brand_login_screen.dart';
+import 'package:gastrocore_pos/features/brand_auth/presentation/screens/register_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_open_screen.dart';
 import 'package:gastrocore_pos/features/home/presentation/screens/home_screen.dart';
 import 'package:gastrocore_pos/features/orders/presentation/screens/order_center_screen.dart';
-// Legacy screens kept for reference but routes redirect to order-center
-// import 'package:gastrocore_pos/features/orders/presentation/screens/pos_screen.dart';
-// import 'package:gastrocore_pos/features/tables/presentation/screens/floor_plan_screen.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/screens/kitchen_display_screen.dart';
 import 'package:gastrocore_pos/features/payments/presentation/screens/payment_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_close_screen.dart';
@@ -33,7 +36,15 @@ import 'package:gastrocore_pos/features/menu/presentation/screens/menu_managemen
 // ---------------------------------------------------------------------------
 
 abstract final class AppRoutes {
+  // ── Brand auth (new) ──────────────────────────────────────────────────────
+  static const String brandLogin = '/brand-login';
+  static const String register = '/register';
+  static const String forgotPassword = '/forgot-password';
+
+  // ── Staff PIN login ───────────────────────────────────────────────────────
   static const String login = '/login';
+
+  // ── Core POS screens ─────────────────────────────────────────────────────
   static const String shiftOpen = '/shift-open';
   static const String home = '/home';
   static const String orderCenter = '/order-center';
@@ -51,7 +62,7 @@ abstract final class AppRoutes {
   static const String menuManagement = '/menu-management';
   static const String auditLog = '/audit-log';
 
-  // Legacy routes kept for backward compatibility
+  // ── Legacy aliases ────────────────────────────────────────────────────────
   static const String pos = '/pos';
   static const String tables = '/tables';
 
@@ -66,7 +77,25 @@ abstract final class AppRoutes {
 
   /// Build a refund route for a specific ticket.
   static String refundFor(String ticketId) => '/refund/$ticketId';
+
+  // ---------------------------------------------------------------------------
+  // Auth guard helpers
+  // ---------------------------------------------------------------------------
+
+  /// Routes accessible without brand JWT authentication.
+  static const _publicRoutes = {brandLogin, register, forgotPassword};
+
+  /// Returns `true` when [path] requires brand authentication.
+  static bool requiresBrandAuth(String path) =>
+      !_publicRoutes.contains(path);
 }
+
+// ---------------------------------------------------------------------------
+// Auth state accessor type
+// ---------------------------------------------------------------------------
+
+/// Provides the current brand auth state to the router redirect.
+typedef BrandAuthReader = ({bool isInitialized, bool isAuthenticated});
 
 // ---------------------------------------------------------------------------
 // Router factory
@@ -74,108 +103,214 @@ abstract final class AppRoutes {
 
 /// Creates a new [GoRouter] instance for the application.
 ///
-/// Each call returns a **fresh** router so that widget tests can obtain an
-/// independent navigation stack without sharing state from a previous run.
+/// [authReader] is called on every redirect evaluation and returns the
+/// current brand auth snapshot. Pass `null` for flavors that skip brand auth
+/// (KDS, kiosk, etc.).
 ///
-/// Redirect `/` to `/login` so the app always starts at the PIN login screen.
-/// After login with an open shift, navigate to `/home` (dashboard).
-/// After opening a shift, navigate to `/home`.
-/// Legacy `/pos` and `/tables` redirect to `/order-center`.
-GoRouter createAppRouter() => GoRouter(
-  initialLocation: '/',
-  routes: [
-    GoRoute(
-      path: '/',
-      redirect: (_, __) => AppRoutes.login,
-    ),
-    GoRoute(
-      path: AppRoutes.login,
-      builder: (context, state) => const PinLoginScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.shiftOpen,
-      builder: (context, state) => const ShiftOpenScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.home,
-      builder: (context, state) => const HomeScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.orderCenter,
-      builder: (context, state) => const OrderCenterScreen(),
-    ),
-    // Legacy routes redirect to order-center
-    GoRoute(
-      path: AppRoutes.pos,
-      redirect: (_, __) => AppRoutes.orderCenter,
-    ),
-    GoRoute(
-      path: AppRoutes.tables,
-      redirect: (_, __) => AppRoutes.orderCenter,
-    ),
-    GoRoute(
-      path: AppRoutes.kitchen,
-      builder: (context, state) => const KitchenDisplayScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.payment,
-      builder: (context, state) {
-        final ticketId = state.pathParameters['ticketId'] ?? '';
-        return PaymentScreen(ticketId: ticketId);
+/// [authListenable] is used to tell GoRouter when to re-evaluate the redirect
+/// (e.g. when the user logs in or out). Pass `null` for no auto-redirect.
+GoRouter createAppRouter({
+  BrandAuthReader Function()? authReader,
+  Listenable? authListenable,
+}) =>
+    GoRouter(
+      initialLocation: '/',
+      refreshListenable: authListenable,
+      redirect: (context, state) {
+        if (authReader == null) return null;
+
+        final auth = authReader();
+
+        // While startup token-restore is running, don't redirect.
+        if (!auth.isInitialized) return null;
+
+        final path = state.matchedLocation;
+        final isPublic = !AppRoutes.requiresBrandAuth(path);
+
+        if (!auth.isAuthenticated && !isPublic) {
+          return AppRoutes.brandLogin;
+        }
+
+        if (auth.isAuthenticated && isPublic) {
+          // Already logged in — bounce away from auth screens.
+          return AppRoutes.login;
+        }
+
+        return null;
       },
-    ),
-    GoRoute(
-      path: AppRoutes.shiftClose,
-      builder: (context, state) => const ShiftCloseScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.dayClose,
-      builder: (context, state) => const DayCloseScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.receipt,
-      builder: (context, state) {
-        final ticketId = state.pathParameters['ticketId'] ?? '';
-        return ReceiptPreviewScreen(ticketId: ticketId);
-      },
-    ),
-    GoRoute(
-      path: AppRoutes.splitBill,
-      builder: (context, state) {
-        final ticketId = state.pathParameters['ticketId'] ?? '';
-        return SplitBillScreen(ticketId: ticketId);
-      },
-    ),
-    GoRoute(
-      path: AppRoutes.refund,
-      builder: (context, state) {
-        final ticketId = state.pathParameters['ticketId'] ?? '';
-        return RefundScreen(ticketId: ticketId);
-      },
-    ),
-    GoRoute(
-      path: AppRoutes.settings,
-      builder: (context, state) => const SettingsScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.orderHistory,
-      builder: (context, state) => const OrderHistoryScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.backOffice,
-      builder: (context, state) => const BackOfficeScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.shiftHistory,
-      builder: (context, state) => const ShiftHistoryScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.menuManagement,
-      builder: (context, state) => const MenuManagementScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.auditLog,
-      builder: (context, state) => const AuditLogScreen(),
-    ),
-  ],
-);
+      routes: [
+        GoRoute(
+          path: '/',
+          redirect: (_, __) => AppRoutes.login,
+        ),
+
+        // ── Brand auth ─────────────────────────────────────────────────────
+        GoRoute(
+          path: AppRoutes.brandLogin,
+          builder: (context, state) => const BrandLoginScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.register,
+          builder: (context, state) => const RegisterScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.forgotPassword,
+          builder: (context, state) => const _ForgotPasswordScreen(),
+        ),
+
+        // ── Staff PIN login ────────────────────────────────────────────────
+        GoRoute(
+          path: AppRoutes.login,
+          builder: (context, state) => const PinLoginScreen(),
+        ),
+
+        // ── POS screens ────────────────────────────────────────────────────
+        GoRoute(
+          path: AppRoutes.shiftOpen,
+          builder: (context, state) => const ShiftOpenScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.home,
+          builder: (context, state) => const HomeScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.orderCenter,
+          builder: (context, state) => const OrderCenterScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.pos,
+          redirect: (_, __) => AppRoutes.orderCenter,
+        ),
+        GoRoute(
+          path: AppRoutes.tables,
+          redirect: (_, __) => AppRoutes.orderCenter,
+        ),
+        GoRoute(
+          path: AppRoutes.kitchen,
+          builder: (context, state) => const KitchenDisplayScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.payment,
+          builder: (context, state) {
+            final ticketId = state.pathParameters['ticketId'] ?? '';
+            return PaymentScreen(ticketId: ticketId);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.shiftClose,
+          builder: (context, state) => const ShiftCloseScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.dayClose,
+          builder: (context, state) => const DayCloseScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.receipt,
+          builder: (context, state) {
+            final ticketId = state.pathParameters['ticketId'] ?? '';
+            return ReceiptPreviewScreen(ticketId: ticketId);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.splitBill,
+          builder: (context, state) {
+            final ticketId = state.pathParameters['ticketId'] ?? '';
+            return SplitBillScreen(ticketId: ticketId);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.refund,
+          builder: (context, state) {
+            final ticketId = state.pathParameters['ticketId'] ?? '';
+            return RefundScreen(ticketId: ticketId);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.settings,
+          builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.orderHistory,
+          builder: (context, state) => const OrderHistoryScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.backOffice,
+          builder: (context, state) => const BackOfficeScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.shiftHistory,
+          builder: (context, state) => const ShiftHistoryScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.menuManagement,
+          builder: (context, state) => const MenuManagementScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.auditLog,
+          builder: (context, state) => const AuditLogScreen(),
+        ),
+      ],
+    );
+
+// ---------------------------------------------------------------------------
+// Forgot-password placeholder screen
+// ---------------------------------------------------------------------------
+
+class _ForgotPasswordScreen extends StatelessWidget {
+  const _ForgotPasswordScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surfaceDim,
+      appBar: AppBar(
+        backgroundColor: AppColors.surfaceDim,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppColors.textSecondary),
+        title: const Text(
+          'Passwort vergessen',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      body: const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.lock_reset_rounded,
+                size: 64,
+                color: AppColors.primary,
+              ),
+              SizedBox(height: 24),
+              Text(
+                'Passwort zurücksetzen',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Bitte besuchen Sie pos.2tech.ch/reset-password '
+                'in Ihrem Browser, um Ihr Passwort zurückzusetzen.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: AppColors.textSecondary,
+                  height: 1.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

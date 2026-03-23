@@ -13,6 +13,8 @@ import 'package:go_router/go_router.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/online_orders/presentation/providers/online_order_provider.dart';
+import 'package:gastrocore_pos/features/online_orders/presentation/widgets/online_order_overlay.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/ongoing_orders_tab.dart';
@@ -32,6 +34,16 @@ class OrderCenterScreen extends ConsumerStatefulWidget {
 
 class _OrderCenterScreenState extends ConsumerState<OrderCenterScreen> {
   int _selectedTab = 2; // 0 = Ongoing, 1 = Table, 2 = Menu (start on Menu)
+
+  @override
+  void initState() {
+    super.initState();
+    // Activate the POS WebSocket connection for the duration this screen
+    // is mounted. The provider is autoDispose so it tears down cleanly.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(posWsClientProvider);
+    });
+  }
 
   void _switchToMenu() {
     setState(() => _selectedTab = 2);
@@ -54,21 +66,27 @@ class _OrderCenterScreenState extends ConsumerState<OrderCenterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
-      body: Column(
+      body: Stack(
         children: [
-          // -- Top bar with tabs --
-          _buildTopBar(),
-          // -- Tab content (IndexedStack for instant switching) --
-          Expanded(
-            child: IndexedStack(
-              index: _selectedTab,
-              children: [
-                OngoingOrdersTab(onOrderTap: _onOrderTap),
-                TableViewTab(onSwitchToMenu: _switchToMenu),
-                const MenuOrderTab(),
-              ],
-            ),
+          Column(
+            children: [
+              // -- Top bar with tabs --
+              _buildTopBar(),
+              // -- Tab content (IndexedStack for instant switching) --
+              Expanded(
+                child: IndexedStack(
+                  index: _selectedTab,
+                  children: [
+                    OngoingOrdersTab(onOrderTap: _onOrderTap),
+                    TableViewTab(onSwitchToMenu: _switchToMenu),
+                    const MenuOrderTab(),
+                  ],
+                ),
+              ),
+            ],
           ),
+          // -- Online order slide-in notification overlay --
+          const OnlineOrderOverlay(),
         ],
       ),
     );
@@ -110,7 +128,7 @@ class _OrderCenterScreenState extends ConsumerState<OrderCenterScreen> {
           const SizedBox(width: 20),
 
           // Tabs
-          _buildTab('Ongoing', 0, 'tab_ongoing'),
+          _buildOngoingTab(),
           _buildTab('Table', 1, 'tab_table'),
           _buildTab('Menu', 2, 'tab_menu'),
 
@@ -196,6 +214,66 @@ class _OrderCenterScreenState extends ConsumerState<OrderCenterScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// "Ongoing" tab with a red dot when there are pending online orders.
+  Widget _buildOngoingTab() {
+    final pendingCount = ref.watch(pendingOnlineOrdersProvider).length;
+    final isActive = _selectedTab == 0;
+    return GestureDetector(
+      key: const Key('tab_ongoing'),
+      onTap: () => setState(() => _selectedTab = 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        height: 56,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Spacer(),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Ongoing',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight:
+                          isActive ? FontWeight.w700 : FontWeight.w400,
+                      color: isActive
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                Container(
+                  height: 3,
+                  width: 32,
+                  decoration: BoxDecoration(
+                    color: isActive ? AppColors.accent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ],
+            ),
+            if (pendingCount > 0)
+              Positioned(
+                top: 10,
+                right: -4,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: AppColors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

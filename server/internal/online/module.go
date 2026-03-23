@@ -5,6 +5,7 @@ package online
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 )
 
@@ -15,16 +16,24 @@ type KDSNotifier interface {
 	NotifyNewOrder(tenantID, ticketID string, orderNumber int)
 }
 
+// POSNotifier is a narrow interface so that the online module can push full
+// order data to all connected POS terminals without importing the pos package.
+type POSNotifier interface {
+	// NotifyNewOrder pushes the full JSON order payload to POS terminals.
+	NotifyNewOrder(tenantID string, payload json.RawMessage)
+}
+
 // Module is the online-ordering module.
 type Module struct {
 	db         *sql.DB
 	kdsNotify  KDSNotifier // optional; nil means no KDS notification
+	posNotify  POSNotifier // optional; nil means no POS push
 }
 
 // NewModule creates a new online ordering module.
-// kdsNotify may be nil if KDS integration is not needed.
-func NewModule(db *sql.DB, kdsNotify KDSNotifier) *Module {
-	return &Module{db: db, kdsNotify: kdsNotify}
+// kdsNotify and posNotify may be nil if those integrations are not needed.
+func NewModule(db *sql.DB, kdsNotify KDSNotifier, posNotify POSNotifier) *Module {
+	return &Module{db: db, kdsNotify: kdsNotify, posNotify: posNotify}
 }
 
 // RegisterRoutes registers all public online ordering routes.

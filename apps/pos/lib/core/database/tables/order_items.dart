@@ -16,6 +16,12 @@ class OrderItems extends Table {
   BoolColumn get sentToKitchen => boolean().withDefault(const Constant(false))();
   TextColumn get notes => text().nullable()();
   IntColumn get course => integer().withDefault(const Constant(1))();
+
+  /// Gang (course group) assigned to this order line.
+  /// References gang_templates.id. Null = no Gang assigned.
+  /// Waiter can override per-item at order time.
+  TextColumn get gangId => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   IntColumn get syncStatus => integer().withDefault(const Constant(0))();

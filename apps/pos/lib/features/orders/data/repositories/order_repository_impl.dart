@@ -516,6 +516,7 @@ class OrderRepositoryImpl {
       sentToKitchen: row.sentToKitchen,
       notes: row.notes,
       course: row.course,
+      gangId: row.gangId,
       modifiers: modifiers,
     );
   }
@@ -536,6 +537,7 @@ class OrderRepositoryImpl {
       sentToKitchen: Value(entity.sentToKitchen),
       notes: Value(entity.notes),
       course: Value(entity.course),
+      gangId: Value(entity.gangId),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
       isDeleted: const Value(false),

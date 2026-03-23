@@ -4,6 +4,9 @@
 /// first launch, reads the tenant ID, and then starts the app wrapped in a
 /// Riverpod [ProviderScope] with database and tenant overrides so all
 /// providers share a single instance.
+///
+/// On startup the brand auth session is restored so the router can decide
+/// whether to show the brand login screen or the staff PIN screen.
 library;
 
 import 'package:flutter/material.dart';
@@ -15,6 +18,7 @@ import 'package:gastrocore_pos/app.dart';
 import 'package:gastrocore_pos/core/data/app_initializer.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
+import 'package:gastrocore_pos/features/brand_auth/presentation/providers/brand_auth_provider.dart';
 import 'package:gastrocore_pos/features/licensing/data/repositories/license_repository_impl.dart';
 import 'package:gastrocore_pos/features/sync/presentation/providers/sync_provider.dart';
 
@@ -30,12 +34,10 @@ void main() async {
   final tenantId = tenants.first.id;
 
   // Pre-warm the license cache so the first frame knows the correct tier.
-  // This is a read-only call — it never throws; falls back to FREE silently.
   final licenseRepo = LicenseRepositoryImpl(db);
   await licenseRepo.getCurrentLicense(tenantId);
 
   // Generate (or retrieve) a stable device UUID for cloud sync.
-  // Stored in shared_preferences so it survives app restarts.
   final prefs = await SharedPreferences.getInstance();
   var deviceId = prefs.getString('device_id') ?? '';
   if (deviceId.isEmpty) {
@@ -47,14 +49,24 @@ void main() async {
   final syncUrl =
       prefs.getString('sync_server_url') ?? 'http://localhost:8080';
 
+  // Build the ProviderScope so we can restore brand auth before the first frame.
+  final container = ProviderContainer(
+    overrides: [
+      databaseProvider.overrideWithValue(db),
+      tenantIdProvider.overrideWithValue(tenantId),
+      deviceIdProvider.overrideWith((ref) => deviceId),
+      syncServerUrlProvider.overrideWith((ref) => syncUrl),
+    ],
+  );
+
+  // Restore brand auth session (JWT token check + optional server refresh).
+  // This sets isInitialized = true so the GoRouter redirect can decide the
+  // initial route correctly on the very first frame.
+  await container.read(brandAuthProvider.notifier).restoreSession();
+
   runApp(
-    ProviderScope(
-      overrides: [
-        databaseProvider.overrideWithValue(db),
-        tenantIdProvider.overrideWithValue(tenantId),
-        deviceIdProvider.overrideWith((ref) => deviceId),
-        syncServerUrlProvider.overrideWith((ref) => syncUrl),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: const GastroCoreApp(),
     ),
   );
