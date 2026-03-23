@@ -1,11 +1,18 @@
-/// Main POS Screen — Klein Professional POS dark theme.
+/// Main POS Screen — Lightspeed-inspired professional UI.
 ///
 /// Layout (tablet landscape):
-///   [Top bar 64px — GASTROCORE wordmark | nav tabs | user]
-///   [Product area flex] | [Order panel 320px — surfaceContainerLow]
+///   [GcSidebar 64px] | [Product area flex] | [Order panel 340px]
 ///
-/// No sidebar — navigation is in the top bar tabs.
-/// Organic Brutalism: no borders, tonal surface layering, tight radius.
+/// Product area:
+///   Top bar (logo, status, user) → Category tabs (horizontal pills) →
+///   Product grid (white cards, touch-optimised)
+///
+/// Order panel:
+///   White card with shadow → item list with qty controls →
+///   Totals (subtotal, VAT, grand total) →
+///   Send to Kitchen (coral) + Pay (teal) buttons
+///
+/// Wired to real Riverpod providers — all state management unchanged.
 library;
 
 import 'package:flutter/material.dart';
@@ -14,12 +21,13 @@ import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/core/theme/app_theme.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
-import 'package:gastrocore_pos/shared/widgets/pos_top_bar.dart';
+import 'package:gastrocore_pos/shared/widgets/gc_sidebar.dart';
 
 // ---------------------------------------------------------------------------
 // POS Screen
@@ -87,26 +95,147 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
-      body: Column(
+      body: Row(
         children: [
-          // ── Top bar — GASTROCORE | ONGOING | TABLES | MENU | STAFF | user ─
-          PosTopBar(
-            activeTab: PosTab.ongoing,
-            onTabChanged: (tab) => context.go(tab.route),
-            showLogo: true,
-            shiftInfo: 'AM SHIFT',
+          // ── Left nav sidebar (dark navy) ─────────────────────────────────
+          GcSidebar(
+            activeRoute: '/pos',
             userName: userName,
             userInitials: _initials(userName),
+            onLogout: () => context.go('/shift-close'),
           ),
 
-          // ── Content: product area + order panel ─────────────────────────
+          // ── Main content ─────────────────────────────────────────────────
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Column(
               children: [
-                Expanded(child: _buildProductArea()),
-                _buildOrderPanel(),
+                // Top bar
+                _buildTopBar(userName),
+                // Product area + order panel
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Product area (categories + grid)
+                      Expanded(child: _buildProductArea()),
+                      // Order panel
+                      _buildOrderPanel(),
+                    ],
+                  ),
+                ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Top bar
+  // -------------------------------------------------------------------------
+
+  Widget _buildTopBar(String userName) {
+    return Container(
+      height: 56,
+      color: AppColors.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          // Logo
+          const Text(
+            'Gastro',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const Text(
+            'Core',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.coral,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(width: 16),
+
+          // Status badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.greenDim,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.green,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                const Text(
+                  'ONLINE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.green,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Terminal info
+          const Text(
+            'Terminal 01  \u2022  Main Floor',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textDim,
+            ),
+          ),
+
+          const Spacer(),
+
+          // User
+          Text(
+            userName,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.surfaceContainerHigh,
+            ),
+            child: Center(
+              child: Text(
+                _initials(userName),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ),
           ),
         ],
@@ -125,27 +254,27 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
     return Column(
       children: [
-        // Search + category filter bar
+        // Category pills (horizontal scrollable)
         Container(
-          color: AppColors.surfaceContainer,
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          color: AppColors.surface,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Row(
             children: [
               // Search
               Expanded(
                 flex: 2,
                 child: Container(
-                  height: 36,
+                  height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(4),
+                    color: AppColors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     children: [
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       const Icon(
                         Icons.search_rounded,
-                        size: 16,
+                        size: 18,
                         color: AppColors.textDim,
                       ),
                       const SizedBox(width: 8),
@@ -156,13 +285,13 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                               .read(productSearchProvider.notifier)
                               .state = v,
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             color: AppColors.textPrimary,
                           ),
                           decoration: const InputDecoration(
                             hintText: 'Search items...',
                             hintStyle: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               color: AppColors.textDim,
                             ),
                             border: InputBorder.none,
@@ -214,6 +343,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             ],
           ),
         ),
+
+        // Thin separator
+        Container(height: 1, color: AppColors.border),
 
         // Product grid
         Expanded(
@@ -288,24 +420,21 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: isActive
-              ? AppColors.primaryDim
-              : AppColors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(4),
+          color: isActive ? AppColors.navSurface : AppColors.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Center(
           child: Text(
-            label.toUpperCase(),
+            label,
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
               color: isActive ? Colors.white : AppColors.textSecondary,
-              letterSpacing: 0.8,
             ),
           ),
         ),
@@ -331,62 +460,51 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final isDineIn = ticket?.orderType != OrderType.takeaway;
 
     return Container(
-      width: 320,
+      width: 340,
       decoration: const BoxDecoration(
-        color: AppColors.surfaceContainerLow,
-        border: Border(
-          left: BorderSide(
-            color: Color(0x0DFFFFFF), // white 5% — the one allowed separator
-            width: 1,
-          ),
-        ),
+        color: AppColors.surface,
+        boxShadow: kPanelShadow,
       ),
       child: Column(
         children: [
           // ── Panel header ─────────────────────────────────────────────────
           Container(
-            height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 56,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.border)),
+            ),
             child: Row(
               children: [
-                const Text(
-                  'CURRENT BILL',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                    letterSpacing: 1.5,
+                // Order number badge
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    ticket?.orderNumber != null
+                        ? '#${ticket!.orderNumber}'
+                        : 'New Order',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                if (ticket?.orderNumber != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.accentDim,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '#${ticket!.orderNumber}',
-                      style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Text(
                   '${items.length} item${items.length == 1 ? '' : 's'}',
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 12,
                     color: AppColors.textDim,
                   ),
                 ),
-                if (hasItems) ...[
-                  const SizedBox(width: 8),
+                const Spacer(),
+                if (hasItems)
                   GestureDetector(
                     onTap: () {
                       for (final item in List.of(items)) {
@@ -395,17 +513,20 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                             .removeItem(item.id);
                       }
                     },
-                    child: const SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: Icon(
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.redDim,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
                         Icons.delete_outline_rounded,
-                        size: 14,
-                        color: AppColors.textDim,
+                        size: 16,
+                        color: AppColors.red,
                       ),
                     ),
                   ),
-                ],
               ],
             ),
           ),
@@ -488,8 +609,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
           // ── Totals ───────────────────────────────────────────────────────
           Container(
-            color: AppColors.surfaceDim,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
             child: Column(
               children: [
                 _buildTotalRow(
@@ -519,124 +643,186 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
           // ── Action buttons ───────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
             child: Column(
               children: [
-                // Quick action grid: SEND | SPLIT | PRINT | VOID
-                Row(
-                  children: [
-                    _buildQuickAction(
-                      icon: Icons.restaurant_rounded,
-                      label: 'SEND',
-                      color: AppColors.secondary,
-                      enabled: hasItems,
-                      onTap: hasItems
-                          ? () async {
-                              await ref
-                                  .read(currentTicketProvider.notifier)
-                                  .sendToKitchen();
-                            }
-                          : null,
-                    ),
-                    const SizedBox(width: 6),
-                    _buildQuickAction(
-                      icon: Icons.call_split_rounded,
-                      label: 'SPLIT',
-                      color: AppColors.textSecondary,
-                      enabled: hasItems,
-                      onTap: null,
-                    ),
-                    const SizedBox(width: 6),
-                    _buildQuickAction(
-                      icon: Icons.print_outlined,
-                      label: 'PRINT',
-                      color: AppColors.textSecondary,
-                      enabled: hasItems,
-                      onTap: null,
-                    ),
-                    const SizedBox(width: 6),
-                    _buildQuickAction(
-                      icon: Icons.block_rounded,
-                      label: 'VOID',
-                      color: AppColors.red,
-                      enabled: hasItems,
-                      onTap: hasItems
-                          ? () {
-                              for (final item in List.of(items)) {
-                                ref
-                                    .read(currentTicketProvider.notifier)
-                                    .removeItem(item.id);
-                              }
-                            }
-                          : null,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // CHECKOUT — full width, 64px, primaryDim bg
+                // Send to kitchen — coral
                 GestureDetector(
                   onTap: hasItems
                       ? () async {
-                          final saved = await ref
+                          await ref
                               .read(currentTicketProvider.notifier)
-                              .saveCurrentTicket();
-                          if (saved != null && mounted) {
-                            context.go(AppRoutes.paymentFor(saved.id));
-                          }
+                              .sendToKitchen();
                         }
                       : null,
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 200),
-                    opacity: hasItems ? 1.0 : 0.35,
+                    opacity: hasItems ? 1.0 : 0.45,
                     child: Container(
                       width: double.infinity,
-                      height: 56,
+                      height: 52,
                       decoration: BoxDecoration(
                         color: hasItems
-                            ? AppColors.primaryDim
+                            ? AppColors.coral
                             : AppColors.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: hasItems
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.coral.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
+                            : null,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.payment_rounded,
-                            size: 16,
+                            Icons.restaurant_rounded,
+                            size: 18,
                             color: hasItems
                                 ? Colors.white
                                 : AppColors.textDim,
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'CHECKOUT',
+                            'Send to Kitchen',
                             style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
                               color: hasItems
                                   ? Colors.white
                                   : AppColors.textDim,
-                              letterSpacing: 2.0,
+                              letterSpacing: 0.2,
                             ),
                           ),
-                          if (hasItems) ...[
-                            const SizedBox(width: 8),
-                            Text(
-                              _formatCHF(total),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white70,
-                                fontFeatures: [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),
                   ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    // Discount
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          // TODO: open discount dialog
+                        },
+                        child: Container(
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: AppColors.border),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.local_offer_outlined,
+                                size: 16,
+                                color: AppColors.textSecondary,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Discount',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Pay — teal gradient
+                    Expanded(
+                      flex: 2,
+                      child: GestureDetector(
+                        onTap: hasItems
+                            ? () async {
+                                final saved = await ref
+                                    .read(currentTicketProvider.notifier)
+                                    .saveCurrentTicket();
+                                if (saved != null && mounted) {
+                                  context.go(
+                                      AppRoutes.paymentFor(saved.id));
+                                }
+                              }
+                            : null,
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 200),
+                          opacity: hasItems ? 1.0 : 0.45,
+                          child: Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              gradient: hasItems
+                                  ? const LinearGradient(
+                                      colors: [
+                                        AppColors.navSurface,
+                                        AppColors.navSurfaceHover,
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : null,
+                              color: hasItems
+                                  ? null
+                                  : AppColors.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: hasItems ? kButtonShadow : null,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.payment_rounded,
+                                  size: 18,
+                                  color: hasItems
+                                      ? Colors.white
+                                      : AppColors.textDim,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Pay',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: hasItems
+                                        ? Colors.white
+                                        : AppColors.textDim,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                                if (hasItems) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _formatCHF(total),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white70,
+                                      fontFeatures: [
+                                        FontFeature.tabularFigures()
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -647,71 +833,85 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   Widget _buildOrderItem(dynamic item) {
-    // Dark Klein POS order item: transparent bg, hover surfaceContainerHighest
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+        boxShadow: kCardShadow,
       ),
       child: Row(
         children: [
-          // Qty badge — "2x" font-black, primaryDim color
-          GestureDetector(
-            onTap: () {
-              if (item.quantity > 1) {
-                ref
-                    .read(currentTicketProvider.notifier)
-                    .updateItemQuantity(item.id, item.quantity - 1);
-              } else {
-                ref
-                    .read(currentTicketProvider.notifier)
-                    .removeItem(item.id);
-              }
-            },
-            child: Container(
-              width: 32,
-              height: 28,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Center(
-                child: Text(
-                  '${item.quantity.toInt()}x',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.primaryDim,
-                    fontFeatures: [FontFeature.tabularFigures()],
+          // Qty controls
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                _qtyButton(
+                  icon: Icons.remove,
+                  onTap: () {
+                    if (item.quantity > 1) {
+                      ref
+                          .read(currentTicketProvider.notifier)
+                          .updateItemQuantity(item.id, item.quantity - 1);
+                    } else {
+                      ref
+                          .read(currentTicketProvider.notifier)
+                          .removeItem(item.id);
+                    }
+                  },
+                ),
+                SizedBox(
+                  width: 28,
+                  child: Center(
+                    child: Text(
+                      '${item.quantity.toInt()}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                _qtyButton(
+                  icon: Icons.add,
+                  onTap: () => ref
+                      .read(currentTicketProvider.notifier)
+                      .updateItemQuantity(item.id, item.quantity + 1),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          // Name + modifier
+          const SizedBox(width: 10),
+          // Name
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.productName.toUpperCase(),
+                  item.productName,
                   style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
-                    letterSpacing: 0.3,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (item.modifiers.isNotEmpty)
                   Text(
-                    '+ ${item.modifiers.map((m) => m.modifierName).join(', ')}',
+                    item.modifiers
+                        .map((m) => m.modifierName)
+                        .join(', '),
                     style: const TextStyle(
-                      fontSize: 9,
-                      color: AppColors.textSecondary,
-                      fontStyle: FontStyle.italic,
+                      fontSize: 10,
+                      color: AppColors.textDim,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -719,71 +919,29 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 6),
-          // Price + add qty
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                _formatPrice(item.subtotal),
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-              GestureDetector(
-                onTap: () => ref
-                    .read(currentTicketProvider.notifier)
-                    .updateItemQuantity(item.id, item.quantity + 1),
-                child: const Icon(Icons.add,
-                    size: 12, color: AppColors.textDim),
-              ),
-            ],
+          const SizedBox(width: 8),
+          // Price
+          Text(
+            _formatPrice(item.subtotal),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickAction({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required bool enabled,
-    required VoidCallback? onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: enabled ? onTap : null,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 150),
-          opacity: enabled ? 1.0 : 0.3,
-          child: Container(
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 16, color: color),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+  Widget _qtyButton({required IconData icon, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 28,
+        height: 28,
+        child: Icon(icon, size: 14, color: AppColors.textSecondary),
       ),
     );
   }
@@ -794,12 +952,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   Widget _buildServiceTypeToggle(bool isDineIn) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
       child: Container(
-        height: 34,
+        height: 38,
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(4),
+          color: AppColors.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
@@ -838,10 +996,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           duration: const Duration(milliseconds: 150),
           margin: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: isActive
-                ? AppColors.primaryDim
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(4),
+            color: isActive ? AppColors.coral : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: AppColors.coral.withValues(alpha: 0.2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -873,26 +1038,21 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          label.toUpperCase(),
+          label,
           style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: isTotal
-                ? AppColors.primaryDim
-                : AppColors.textSecondary,
-            letterSpacing: 1.2,
-          ),
-        ),
-        Text(
-          isTotal
-              ? value.replaceAll('CHF ', '')
-              : value,
-          style: TextStyle(
-            fontSize: isTotal ? 28 : 12,
-            fontWeight: isTotal ? FontWeight.w900 : FontWeight.w500,
+            fontSize: isTotal ? 14 : 12,
+            fontWeight: isTotal ? FontWeight.w600 : FontWeight.w400,
             color: isTotal
                 ? AppColors.textPrimary
                 : AppColors.textSecondary,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isTotal ? 20 : 13,
+            fontWeight: isTotal ? FontWeight.w800 : FontWeight.w500,
+            color: isTotal ? AppColors.textPrimary : AppColors.textSecondary,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
@@ -932,82 +1092,93 @@ class _ProductCardState extends State<_ProductCard> {
         widget.onTap();
       },
       onTapCancel: () => setState(() => _isPressed = false),
-      // Klein POS product card: dark surfaceContainerHighest bg
-      // Full-image top, price badge bottom-right, tight 4px radius
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
+        duration: const Duration(milliseconds: 120),
         constraints: const BoxConstraints(minHeight: 100),
         decoration: BoxDecoration(
-          color: _isPressed
-              ? AppColors.surfaceBright
-              : AppColors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(4),
+          color: _isPressed ? AppColors.surfaceBright : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: _isPressed ? null : kCardShadow,
+          border: _isPressed
+              ? Border.all(
+                  color: AppColors.coral.withValues(alpha: 0.3))
+              : null,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Image / icon area
-              Container(
-                color: AppColors.surfaceContainerHigh,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image placeholder
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: const Center(
                   child: Icon(
                     Icons.restaurant_rounded,
-                    size: 36,
+                    size: 32,
                     color: AppColors.textDim,
                   ),
                 ),
               ),
-
-              // Info overlay at bottom
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
-                  color: AppColors.surfaceContainerHighest.withValues(alpha: 0.95),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.product.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      // Price badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryDim,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text(
-                          widget.formatPrice(widget.product.price),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            fontFeatures: [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+            ),
+            const SizedBox(height: 8),
+            // Name
+            Text(
+              widget.product.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            if (widget.product.description != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                widget.product.description!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.textDim,
                 ),
               ),
             ],
-          ),
+            const SizedBox(height: 6),
+            // Price + add button
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  widget.formatPrice(widget.product.price),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: AppColors.coral,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.add,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

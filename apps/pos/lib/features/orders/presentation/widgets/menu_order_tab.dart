@@ -25,18 +25,16 @@ import 'package:gastrocore_pos/features/orders/presentation/widgets/menu_setting
 // ---------------------------------------------------------------------------
 
 abstract final class _Tok {
-  // Stitch dark surface hierarchy
   static const Color surfaceBase = AppColors.surfaceDim;
-  static const Color surfaceLow = AppColors.surfaceContainerLow;
+  static const Color surfaceLow = AppColors.surface;
   static const Color surfaceMedium = AppColors.surfaceContainerHigh;
   static const Color surfaceHigh = AppColors.surfaceContainerHighest;
   static const Color textPrimary = AppColors.textPrimary;
   static const Color textSecondary = AppColors.textSecondary;
   static const Color textDim = AppColors.textDim;
   static const Color accentBlue = AppColors.primary;
-  static const Color accentBlueLight = AppColors.primary;
-  static const Color accentDim = AppColors.primaryContainer;  // #316BF3 for price badges
-  static const Color badgeRed = AppColors.green;              // #69F6B8 for qty badge
+  static const Color accentBlueLight = AppColors.primaryLight;
+  static const Color badgeRed = AppColors.red;
 }
 
 // ---------------------------------------------------------------------------
@@ -338,17 +336,15 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
                 }
 
                 final sorted = _sortProducts(products);
-                // Stitch: 5-col on tablet, 4 for big-button mode
-                final crossAxisCount = _useBigButtons ? 4 : 5;
+                final crossAxisCount = _useBigButtons ? 3 : 4;
 
                 return GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    // 4:5 portrait ratio for image-first cards
-                    childAspectRatio: _showPictures ? (4 / 5) : 1.1,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: _showPictures ? 0.82 : 1.0,
                   ),
                   itemCount: sorted.length,
                   itemBuilder: (context, index) {
@@ -459,7 +455,7 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
                     color: _showPictures
-                        ? _Tok.accentBlue.withValues(alpha: 0.15)
+                        ? AppColors.coralDim
                         : _Tok.surfaceMedium,
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -470,19 +466,19 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
                         _showPictures ? Icons.image : Icons.text_fields,
                         size: 16,
                         color: _showPictures
-                            ? _Tok.accentBlue
+                            ? AppColors.coral
                             : _Tok.textSecondary,
                       ),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          _showPictures ? 'Resimli Mod' : 'Text Mod',
+                          _showPictures ? 'Photos' : 'Text',
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: _showPictures
-                                ? _Tok.accentBlue
+                                ? AppColors.coral
                                 : _Tok.textSecondary,
                           ),
                         ),
@@ -529,11 +525,11 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
     final hasAnyItems = allItems.isNotEmpty;
 
     return Container(
-      width: 320,
-      color: _Tok.surfaceLow,  // #10131A
+      width: 300,
+      color: _Tok.surfaceBase,
       child: Column(
         children: [
-          // Header: Current Bill
+          // Header: Order type + number
           _buildOrderPanelHeader(ticket),
 
           // Ordering / Ordered tab bar
@@ -597,94 +593,45 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
   }
 
   Widget _buildOrderPanelHeader(TicketEntity? ticket) {
-    final orderNum = ticket?.orderNumber ?? '—';
-    final tableLabel = ticket?.tableId != null ? 'TABLE' : 'WALK-IN';
-    final typeLabel = _orderTypeLabel(ticket?.orderType).toUpperCase();
+    final label = _orderTypeLabel(ticket?.orderType);
+    final icon = _orderTypeIcon(ticket?.orderType);
+    final orderNum = ticket?.orderNumber ?? '0001';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border, width: 1)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title row
+          // Order type selector + order number
           Row(
             children: [
-              const Text(
-                'Current Bill',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const Spacer(),
-              // Order number badge
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.accentDim,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  '#$orderNum',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          // Table + type info
-          Row(
-            children: [
+              Icon(icon, size: 16, color: _Tok.textSecondary),
+              const SizedBox(width: 6),
               Text(
-                '$tableLabel  ·  $typeLabel',
+                '$label | #$orderNum',
                 style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textDim,
-                  letterSpacing: 0.4,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _Tok.textPrimary,
                 ),
               ),
               const Spacer(),
-              // AM SHIFT badge
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer.withValues(alpha: 0.20),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: const Text(
-                  'AM SHIFT',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+              // Three dots menu
+              GestureDetector(
+                onTap: () {},
+                child: const Icon(Icons.more_vert, size: 18, color: _Tok.textDim),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          // Order type chips
+          // Dine-In / Takeaway / Delivery selector
           Row(
             children: [
               _OrderTypeChip(
                 key: const Key('order_type_dine_in'),
                 label: 'Dine-In',
                 icon: Icons.restaurant,
-                isActive: ticket?.orderType == null ||
-                    ticket?.orderType == OrderType.dineIn,
+                isActive: ticket?.orderType == null || ticket?.orderType == OrderType.dineIn,
                 onTap: () => _setOrderType(OrderType.dineIn),
               ),
               const SizedBox(width: 6),
@@ -773,187 +720,109 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
     required bool hasOrderingItems,
     required bool hasAnyItems,
   }) {
-    // Estimate subtotal and tax for display
-    final subtotal = totalCents;
-    final tax = (totalCents * 0.077).round();
-
     return Container(
-      padding: EdgeInsets.zero,
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.border, width: 1)),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      decoration: BoxDecoration(
+        color: _Tok.surfaceLow,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, -6),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          // ── Totals ───────────────────────────────────────────────────────
+          // Total row
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Column(
-              children: [
-                _StitchTotalRow(label: 'SUBTOTAL', value: _formatCHF(subtotal)),
-                const SizedBox(height: 4),
-                _StitchTotalRow(label: 'TAX 7.7%', value: _formatCHF(tax)),
-                const SizedBox(height: 8),
-                Container(height: 1, color: AppColors.border),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'TOTAL DUE',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    Text(
-                      _formatCHF(subtotal + tax),
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // ── 4-col action bar ─────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            padding: const EdgeInsets.only(bottom: 16),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _StitchActionBtn(
-                  icon: Icons.payment_rounded,
-                  label: 'PAY',
-                  enabled: hasAnyItems,
-                  onTap: hasAnyItems ? () {} : null,
+                Flexible(
+                  child: Text(
+                    'Total ($totalItemCount Items)',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _Tok.textSecondary,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 6),
-                _StitchActionBtn(
-                  icon: Icons.call_split_rounded,
-                  label: 'SPLIT',
-                  enabled: hasAnyItems,
-                  onTap: hasAnyItems ? () {} : null,
-                ),
-                const SizedBox(width: 6),
-                _StitchActionBtn(
-                  icon: Icons.print_rounded,
-                  label: 'PRINT',
-                  enabled: hasAnyItems,
-                  onTap: hasAnyItems ? () {} : null,
-                ),
-                const SizedBox(width: 6),
-                _StitchActionBtn(
-                  icon: Icons.block_rounded,
-                  label: 'VOID',
-                  enabled: hasAnyItems,
-                  isDestructive: true,
-                  onTap: hasAnyItems ? () {} : null,
+                const SizedBox(width: 8),
+                Text(
+                  _formatCHF(totalCents),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: _Tok.textPrimary,
+                  ),
                 ),
               ],
             ),
           ),
 
-          // ── Send to kitchen button ────────────────────────────────────────
-          if (_orderPanelTab == 0 && hasOrderingItems)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-              child: GestureDetector(
-                onTap: () async {
-                  await ref
-                      .read(currentTicketProvider.notifier)
-                      .sendToKitchen();
-                  if (mounted) setState(() => _orderPanelTab = 1);
-                },
-                child: Container(
-                  width: double.infinity,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.restaurant_rounded,
-                          size: 15, color: AppColors.green),
-                      SizedBox(width: 6),
-                      Text(
-                        'SEND TO KITCHEN',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.green,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          // ── CHECKOUT button ──────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: GestureDetector(
-              onTap: hasAnyItems
+          // "Order" button (send to kitchen) - visible when on Ordering tab
+          if (_orderPanelTab == 0) ...[
+            _GradientButton(
+              key: const Key('order_btn'),
+              label: 'Order',
+              icon: Icons.restaurant_menu,
+              enabled: hasOrderingItems,
+              onTap: hasOrderingItems
                   ? () async {
-                      try {
-                        final notifier =
-                            ref.read(currentTicketProvider.notifier);
-                        final ticket = ref.read(currentTicketProvider);
-                        String? ticketId = ticket?.id;
-
-                        if (ticket?.status == TicketStatus.draft) {
-                          final saved = await notifier.saveCurrentTicket();
-                          ticketId = saved?.id;
-                        } else {
-                          ticketId = ticket?.id;
-                        }
-
-                        if (ticketId != null && mounted) {
-                          context.go(AppRoutes.paymentFor(ticketId));
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
-                          );
-                        }
+                      await ref
+                          .read(currentTicketProvider.notifier)
+                          .sendToKitchen();
+                      if (mounted) {
+                        setState(() => _orderPanelTab = 1);
                       }
                     }
                   : null,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 150),
-                opacity: hasAnyItems ? 1.0 : 0.4,
-                child: Container(
-                  key: const Key('checkout_btn'),
-                  width: double.infinity,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryContainer, // #316BF3
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'CHECKOUT',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 2.0,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ),
+            const SizedBox(height: 10),
+          ],
+
+          // "Check Out" button
+          _GradientButton(
+            key: const Key('checkout_btn'),
+            label: 'Check Out',
+            icon: Icons.arrow_forward,
+            enabled: hasAnyItems,
+            isSecondary: _orderPanelTab == 0,
+            onTap: hasAnyItems
+                ? () async {
+                    try {
+                      final notifier = ref.read(currentTicketProvider.notifier);
+                      final ticket = ref.read(currentTicketProvider);
+                      String? ticketId = ticket?.id;
+
+                      // Save if draft (not yet persisted)
+                      if (ticket?.status == TicketStatus.draft) {
+                        final saved = await notifier.saveCurrentTicket();
+                        ticketId = saved?.id;
+                      } else {
+                        ticketId = ticket?.id;
+                      }
+
+                      if (ticketId != null && mounted) {
+                        context.go(AppRoutes.paymentFor(ticketId));
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: _Tok.badgeRed,
+                          ),
+                        );
+                      }
+                    }
+                  }
+                : null,
           ),
         ],
       ),
@@ -990,9 +859,10 @@ class _CategoryItem extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         decoration: BoxDecoration(
+          color: isActive ? AppColors.coralDim : Colors.transparent,
           border: Border(
             left: BorderSide(
-              color: isActive ? _Tok.accentBlue : Colors.transparent,
+              color: isActive ? AppColors.coral : Colors.transparent,
               width: 3,
             ),
           ),
@@ -1004,7 +874,7 @@ class _CategoryItem extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-            color: isActive ? _Tok.textPrimary : _Tok.textDim,
+            color: isActive ? AppColors.coral : _Tok.textSecondary,
           ),
         ),
       ),
@@ -1137,80 +1007,66 @@ class _ProductCardState extends State<_ProductCard> {
   Widget _buildImageCard(ProductEntity p) {
     final hasImage = p.imagePath != null && p.imagePath!.isNotEmpty;
 
-    // Stitch: full-image card with price badge absolute bottom-right
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(4),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Stack(
-        fit: StackFit.expand,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Full image
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 150),
-            opacity: _isPressed ? 1.0 : 0.90,
-            child: hasImage
-                ? Image.network(
-                    p.imagePath!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _buildPlaceholder(p),
-                  )
-                : _buildPlaceholder(p),
-          ),
-
-          // Name overlay at bottom
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(6, 12, 6, 4),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xCC0B0E14)],
-                ),
-              ),
-              child: Text(
-                p.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  letterSpacing: 0.2,
-                ),
-              ),
+          // Image area
+          Expanded(
+            child: SizedBox(
+              width: double.infinity,
+              child: hasImage
+                  ? Image.network(
+                      p.imagePath!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _buildPlaceholder(p),
+                    )
+                  : _buildPlaceholder(p),
             ),
           ),
-
-          // Price badge — absolute bottom-right
-          if (widget.showPrice)
-            Positioned(
-              bottom: 6,
-              right: 6,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer, // #316BF3
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  _formatPrice(p.price),
+          // Name + price
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  p.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 0.1,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _Tok.textPrimary,
+                    height: 1.3,
                   ),
                 ),
-              ),
+                if (widget.showPrice) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'CHF ${_formatPrice(p.price)}',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: _Tok.textPrimary,
+                    ),
+                  ),
+                ],
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -1219,8 +1075,15 @@ class _ProductCardState extends State<_ProductCard> {
   Widget _buildTextCard(ProductEntity p) {
     return Container(
       decoration: BoxDecoration(
-        color: _Tok.surfaceMedium,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -1240,11 +1103,11 @@ class _ProductCardState extends State<_ProductCard> {
           if (widget.showPrice) ...[
             const SizedBox(height: 6),
             Text(
-              _formatPrice(p.price),
+              'CHF ${_formatPrice(p.price)}',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: _Tok.accentBlueLight,
+                color: _Tok.textPrimary,
               ),
             ),
           ],
@@ -1254,13 +1117,38 @@ class _ProductCardState extends State<_ProductCard> {
   }
 
   Widget _buildPlaceholder(ProductEntity p) {
+    const bgColors = [
+      Color(0xFFFFF3E0),
+      Color(0xFFE8F5E9),
+      Color(0xFFE3F2FD),
+      Color(0xFFFCE4EC),
+      Color(0xFFF3E5F5),
+      Color(0xFFE0F7FA),
+      Color(0xFFFFF8E1),
+      Color(0xFFE8EAF6),
+    ];
+    const fgColors = [
+      Color(0xFFE65100),
+      Color(0xFF2E7D32),
+      Color(0xFF1565C0),
+      Color(0xFFC62828),
+      Color(0xFF6A1B9A),
+      Color(0xFF00695C),
+      Color(0xFFF57F17),
+      Color(0xFF283593),
+    ];
+    final idx = p.name.isNotEmpty ? p.name.codeUnitAt(0) % bgColors.length : 0;
     return Container(
-      color: _Tok.surfaceHigh,
+      color: bgColors[idx],
       child: Center(
-        child: Icon(
-          Icons.restaurant,
-          size: 28,
-          color: _Tok.textDim.withValues(alpha: 0.4),
+        child: Text(
+          p.name.isNotEmpty ? p.name[0].toUpperCase() : '?',
+          style: TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.w800,
+            color: fgColors[idx].withValues(alpha: 0.5),
+            letterSpacing: -1,
+          ),
         ),
       ),
     );
@@ -1294,7 +1182,7 @@ class _OrderTab extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: isActive ? _Tok.accentBlue : Colors.transparent,
+              color: isActive ? AppColors.coral : Colors.transparent,
               width: 2,
             ),
           ),
@@ -1315,7 +1203,7 @@ class _OrderTab extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
                   color: isActive
-                      ? _Tok.accentBlue.withValues(alpha: 0.2)
+                      ? AppColors.coralDim
                       : _Tok.surfaceHigh,
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1324,7 +1212,7 @@ class _OrderTab extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: isActive ? _Tok.accentBlue : _Tok.textDim,
+                    color: isActive ? AppColors.coral : _Tok.textDim,
                   ),
                 ),
               ),
@@ -1374,33 +1262,23 @@ class _OrderItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Stitch: left-border accent (4px #316BF3 for editable, transparent for sent)
-    final content = Container(
-      margin: const EdgeInsets.only(bottom: 2),
-      decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(
-            color: isEditable
-                ? AppColors.primaryContainer
-                : Colors.transparent,
-            width: 4,
-          ),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Quantity prefix "1x" in font-black
-          Text(
-            '${item.quantity.toInt()}x',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primary,
+          // Quantity
+          SizedBox(
+            width: 28,
+            child: Text(
+              '${item.quantity.toInt()}x',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _Tok.textSecondary,
+              ),
             ),
           ),
-          const SizedBox(width: 6),
 
           // Name + modifiers
           Expanded(
@@ -1408,62 +1286,72 @@ class _OrderItemRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.productName.toUpperCase(),
+                  item.productName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                    letterSpacing: 0.2,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _Tok.textPrimary,
                   ),
                 ),
                 if (item.modifiers.isNotEmpty)
-                  Text(
-                    _modifierSummary(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      fontStyle: FontStyle.italic,
-                      color: AppColors.textSecondary,
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      _modifierSummary(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: _Tok.textDim,
+                      ),
                     ),
                   ),
                 if (item.notes != null && item.notes!.isNotEmpty)
-                  Text(
-                    item.notes!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      fontStyle: FontStyle.italic,
-                      color: AppColors.textDim,
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      item.notes!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: _Tok.textDim,
+                      ),
                     ),
                   ),
               ],
             ),
           ),
 
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
 
-          // Price — right-aligned, font-black
+          // Price
           Text(
             formatCHF(item.subtotal),
             style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: _Tok.textPrimary,
             ),
           ),
 
           // Qty controls (only in ordering tab)
           if (isEditable) ...[
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Column(
               children: [
-                _QtyButton(icon: Icons.add, onTap: onIncrement),
+                _QtyButton(
+                  icon: Icons.add,
+                  onTap: onIncrement,
+                ),
                 const SizedBox(height: 2),
-                _QtyButton(icon: Icons.remove, onTap: onDecrement),
+                _QtyButton(
+                  icon: Icons.remove,
+                  onTap: onDecrement,
+                ),
               ],
             ),
           ],
@@ -1471,6 +1359,7 @@ class _OrderItemRow extends StatelessWidget {
       ),
     );
 
+    // Swipe to delete only on ordering tab
     if (isEditable && onDismissed != null) {
       return Dismissible(
         key: ValueKey(item.id),
@@ -1479,9 +1368,12 @@ class _OrderItemRow extends StatelessWidget {
         background: Container(
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 16),
-          color: AppColors.redDim,
+          decoration: BoxDecoration(
+            color: _Tok.badgeRed.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
           child: const Icon(Icons.delete_outline,
-              color: AppColors.red, size: 18),
+              color: _Tok.badgeRed, size: 20),
         ),
         child: content,
       );
@@ -1545,15 +1437,8 @@ class _GradientButton extends StatelessWidget {
         height: 50,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          gradient: enabled && isPrimary
-              ? const LinearGradient(
-                  colors: [_Tok.accentBlueLight, _Tok.accentBlue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
           color: enabled
-              ? (isPrimary ? null : _Tok.surfaceHigh)
+              ? (isPrimary ? AppColors.coral : AppColors.navSurface)
               : _Tok.surfaceMedium,
         ),
         child: Row(
@@ -1564,18 +1449,14 @@ class _GradientButton extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
-                color: enabled
-                    ? (isPrimary ? const Color(0xFF001944) : _Tok.accentBlueLight)
-                    : _Tok.textDim,
+                color: enabled ? Colors.white : _Tok.textDim,
               ),
             ),
             const SizedBox(width: 8),
             Icon(
               icon,
               size: 18,
-              color: enabled
-                  ? (isPrimary ? const Color(0xFF001944) : _Tok.accentBlueLight)
-                  : _Tok.textDim,
+              color: enabled ? Colors.white : _Tok.textDim,
             ),
           ],
         ),
@@ -1611,17 +1492,17 @@ class _OrderTypeChip extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isActive ? _Tok.accentBlue.withValues(alpha: 0.15) : _Tok.surfaceHigh,
+            color: isActive ? AppColors.coralDim : _Tok.surfaceHigh,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isActive ? _Tok.accentBlue : Colors.transparent,
+              color: isActive ? AppColors.coral : Colors.transparent,
               width: 1.5,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 14, color: isActive ? _Tok.accentBlue : _Tok.textDim),
+              Icon(icon, size: 14, color: isActive ? AppColors.coral : _Tok.textDim),
               const SizedBox(width: 4),
               Flexible(
                 child: Text(
@@ -1631,105 +1512,11 @@ class _OrderTypeChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                    color: isActive ? _Tok.accentBlue : _Tok.textSecondary,
+                    color: isActive ? AppColors.coral : _Tok.textSecondary,
                   ),
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Stitch total row (SUBTOTAL, TAX)
-// ---------------------------------------------------------------------------
-
-class _StitchTotalRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _StitchTotalRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textDim,
-            letterSpacing: 0.8,
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Stitch square action button (PAY / SPLIT / PRINT / VOID)
-// ---------------------------------------------------------------------------
-
-class _StitchActionBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool enabled;
-  final bool isDestructive;
-  final VoidCallback? onTap;
-
-  const _StitchActionBtn({
-    required this.icon,
-    required this.label,
-    required this.enabled,
-    this.isDestructive = false,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isDestructive ? AppColors.red : AppColors.textSecondary;
-    return Expanded(
-      child: GestureDetector(
-        onTap: enabled ? onTap : null,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 150),
-          opacity: enabled ? 1.0 : 0.35,
-          child: Container(
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 16, color: color),
-                const SizedBox(height: 3),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
