@@ -96,7 +96,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (result == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Payment setup failed. Please try Pay on Pickup.'),
+          content: Text('Zahlung fehlgeschlagen. Bitte an der Kasse bezahlen.'),
           backgroundColor: OnlineColors.red,
         ),
       );
@@ -119,7 +119,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Could not open payment page. Please try again.'),
+            content: Text('Zahlungsseite konnte nicht geöffnet werden. Bitte erneut versuchen.'),
             backgroundColor: OnlineColors.red,
           ),
         );
@@ -231,7 +231,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         ),
                       Text(
                         _paymentMethod == _PaymentMethod.payOnline
-                            ? 'Pay Securely Online'
+                            ? 'Sicher online bezahlen'
                             : l10n.confirmOrder,
                       ),
                     ],
@@ -305,22 +305,22 @@ class _PaymentMethodSelector extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Payment Method',
+            'Zahlungsmethode',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
           _PaymentOption(
             icon: Icons.store_rounded,
-            title: 'Pay on Pickup / At Table',
-            subtitle: 'Pay with cash or card when you receive your order',
+            title: 'Abholung / Am Tisch',
+            subtitle: 'Bar oder mit Karte bei Erhalt Ihrer Bestellung',
             isSelected: selected == _PaymentMethod.payOnPickup,
             onTap: () => onChanged(_PaymentMethod.payOnPickup),
           ),
           const SizedBox(height: 8),
           _PaymentOption(
             icon: Icons.credit_card_rounded,
-            title: 'Pay Online (Card)',
-            subtitle: 'Secure payment via Stripe — Visa, Mastercard, AMEX',
+            title: 'Online bezahlen (Karte)',
+            subtitle: 'Sichere Zahlung via Stripe — Visa, Mastercard, AMEX',
             isSelected: selected == _PaymentMethod.payOnline,
             onTap: () => onChanged(_PaymentMethod.payOnline),
             badge: 'Stripe',
