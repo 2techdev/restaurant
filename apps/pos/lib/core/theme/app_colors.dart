@@ -103,6 +103,33 @@ abstract final class AppColors {
   // Text Hierarchy
   // ---------------------------------------------------------------------------
 
+  /// Coral / tertiary — warm accent for promotions, highlights
+  static const Color coral = Color(0xFFFF6B8A);
+
+  /// Nav surface — sidebar / bottom-nav background
+  static const Color navSurface = Color(0xFF10131A);
+
+  /// Nav surface hover state
+  static const Color navSurfaceHover = Color(0xFF1A1E28);
+
+  /// Nav divider — subtle separator in sidebar
+  static const Color navDivider = Color(0x26424753);
+
+  /// Nav text — default sidebar label color
+  static const Color navText = Color(0xFF8E8E9A);
+
+  /// Nav text active — selected item label color
+  static const Color navTextActive = Color(0xFFF0F0F5);
+
+  /// Primary light — lighter variant of primary for gradients and icons
+  static const Color primaryLight = Color(0xFFB8CBFF);
+
+  /// Primary dim — 10% primary tint for hover/pressed states
+  static const Color primaryDim = Color(0x1A90ABFF);
+
+  /// Error — alias for red, for semantic clarity
+  static const Color error = red;
+
   /// Primary text (high emphasis) - NEVER use pure #FFFFFF
   static const Color textPrimary = Color(0xFFF0F0F5);
 
