@@ -1,14 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    GastroCore POS – Android Network Security Configuration
+    https://developer.android.com/training/articles/security-config
+
+    - Disables cleartext (HTTP) traffic in release builds.
+    - Debug builds retain cleartext to allow localhost / dev-server connections.
+    - Pinning is not configured here because the server certificate rotates.
+      Use the server's TLS certificate from a trusted CA and rely on the
+      system trust store. Add certificate pins below if you switch to a
+      static certificate (e.g. self-signed CA in an enterprise deployment).
+-->
 <network-security-config>
-    <!-- Allow cleartext traffic to LAN hosts for local sync -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">192.168.0.0</domain>
-        <domain includeSubdomains="true">10.0.0.0</domain>
-        <domain includeSubdomains="true">localhost</domain>
-    </domain-config>
+
+    <!-- Production: TLS required for all traffic -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
-            <certificates src="system"/>
+            <!-- Trust the system CA store (includes Let's Encrypt, DigiCert, etc.) -->
+            <certificates src="system" />
         </trust-anchors>
     </base-config>
+
+    <!-- Development override: allow cleartext to localhost only -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>  <!-- Android emulator host -->
+        <domain includeSubdomains="true">192.168.0.0</domain>
+    </domain-config>
+
+    <!--
+        To add certificate pinning for your production server, add a block like:
+
+        <domain-config>
+            <domain includeSubdomains="true">pos.example.com</domain>
+            <pin-set>
+                <pin digest="SHA-256">AAAA...base64-encoded-SPKI-hash==</pin>
+                <pin digest="SHA-256">BBBB...backup-pin==</pin>
+            </pin-set>
+        </domain-config>
+
+        Generate the pin with:
+          openssl s_client -connect pos.example.com:443 | \
+            openssl x509 -pubkey -noout | \
+            openssl pkey -pubin -outform der | \
+            openssl dgst -sha256 -binary | base64
+    -->
+
 </network-security-config>
