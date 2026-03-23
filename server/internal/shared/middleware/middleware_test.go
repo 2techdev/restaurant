@@ -10,41 +10,6 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Health check handler (tested as a standalone inline handler matching the
-// pattern in cmd/server/main.go — no DB so we test the non-DB path)
-// ---------------------------------------------------------------------------
-
-func TestHealthCheck_OKWithoutDB(t *testing.T) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
-			"status":  "ok",
-			"version": "0.1.0",
-			"components": map[string]string{
-				"database": "ok",
-			},
-		})
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
-	}
-
-	var body map[string]any
-	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if body["status"] != "ok" {
-		t.Errorf("status: want ok, got %v", body["status"])
-	}
-}
-
-// ---------------------------------------------------------------------------
 // RequestID middleware
 // ---------------------------------------------------------------------------
 
@@ -73,9 +38,8 @@ func TestRequestID_PreservesExistingID(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	id := w.Header().Get("X-Request-ID")
-	if id != "client-provided-id" {
-		t.Errorf("expected preserved request ID, got %q", id)
+	if w.Header().Get("X-Request-ID") != "client-provided-id" {
+		t.Errorf("expected preserved request ID, got %q", w.Header().Get("X-Request-ID"))
 	}
 }
 
@@ -92,6 +56,24 @@ func TestRequestID_InjectsIDIntoContext(t *testing.T) {
 
 	if capturedID == "" {
 		t.Error("expected request ID in context")
+	}
+}
+
+func TestRequestID_UniquePerRequest(t *testing.T) {
+	ids := make(map[string]bool)
+	handler := RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	for i := 0; i < 50; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		id := w.Header().Get("X-Request-ID")
+		if ids[id] {
+			t.Fatalf("duplicate request ID generated: %s", id)
+		}
+		ids[id] = true
 	}
 }
 
@@ -127,6 +109,21 @@ func TestLogger_Does500Passthrough(t *testing.T) {
 	}
 }
 
+func TestLogger_DefaultsTo200(t *testing.T) {
+	handler := Logger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Write body without calling WriteHeader — defaults to 200
+		w.Write([]byte("ok"))
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 implicit, got %d", w.Code)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Recover middleware
 // ---------------------------------------------------------------------------
@@ -138,8 +135,6 @@ func TestRecover_CatchesPanic(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
 	w := httptest.NewRecorder()
-
-	// Should not propagate panic.
 	handler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {
@@ -169,13 +164,26 @@ func TestRecover_NormalRequestPassesThrough(t *testing.T) {
 	}
 }
 
+func TestRecover_PanicWithNonStringValue(t *testing.T) {
+	handler := Recover(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic(42) // non-string panic
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", w.Code)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // CORS middleware
 // ---------------------------------------------------------------------------
 
 func TestCORS_AddsHeaders(t *testing.T) {
-	cors := CORS(CORSConfig{AllowedOrigins: []string{"*"}})
-	handler := cors(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -189,11 +197,13 @@ func TestCORS_AddsHeaders(t *testing.T) {
 	if w.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Error("expected Access-Control-Allow-Methods to be set")
 	}
+	if w.Header().Get("Access-Control-Allow-Headers") == "" {
+		t.Error("expected Access-Control-Allow-Headers to be set")
+	}
 }
 
 func TestCORS_OptionsReturns204(t *testing.T) {
-	cors := CORS(CORSConfig{AllowedOrigins: []string{"*"}})
-	handler := cors(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("should not reach inner handler for OPTIONS")
 	}))
 
@@ -203,6 +213,24 @@ func TestCORS_OptionsReturns204(t *testing.T) {
 
 	if w.Code != http.StatusNoContent {
 		t.Errorf("expected 204 for OPTIONS, got %d", w.Code)
+	}
+}
+
+func TestCORS_NonOptionsPassesThrough(t *testing.T) {
+	var reached bool
+	handler := CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete} {
+		reached = false
+		req := httptest.NewRequest(method, "/api/resource", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if !reached {
+			t.Errorf("method %s: inner handler should be called", method)
+		}
 	}
 }
 
@@ -237,13 +265,20 @@ func TestAuthRequired_InvalidAuthHeaderFormat(t *testing.T) {
 		t.Error("should not reach inner handler")
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/protected", nil)
-	req.Header.Set("Authorization", "Token abc123") // not "Bearer"
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, req)
-
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401 for invalid format, got %d", w.Code)
+	cases := []string{
+		"Token abc123",      // wrong scheme
+		"Basic dXNlcjpwYXNz", // Basic auth
+		"Bearer",            // missing token
+		"abc123",            // no scheme
+	}
+	for _, authHeader := range cases {
+		req := httptest.NewRequest(http.MethodGet, "/api/protected", nil)
+		req.Header.Set("Authorization", authHeader)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("header=%q: expected 401 for invalid format, got %d", authHeader, w.Code)
+		}
 	}
 }
 
@@ -267,7 +302,7 @@ func TestAuthRequired_InvalidToken(t *testing.T) {
 }
 
 func TestAuthRequired_ValidToken_InjectsContext(t *testing.T) {
-	var capturedTenantID, capturedRole string
+	var capturedTenantID, capturedDeviceID, capturedRole string
 
 	validate := func(token string) (map[string]string, error) {
 		return map[string]string{
@@ -279,6 +314,7 @@ func TestAuthRequired_ValidToken_InjectsContext(t *testing.T) {
 
 	handler := AuthRequired(validate)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedTenantID = GetTenantID(r.Context())
+		capturedDeviceID = GetDeviceID(r.Context())
 		capturedRole = GetRole(r.Context())
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -294,8 +330,31 @@ func TestAuthRequired_ValidToken_InjectsContext(t *testing.T) {
 	if capturedTenantID != "tenant-42" {
 		t.Errorf("tenant_id: want tenant-42, got %q", capturedTenantID)
 	}
+	if capturedDeviceID != "device-99" {
+		t.Errorf("device_id: want device-99, got %q", capturedDeviceID)
+	}
 	if capturedRole != "device" {
 		t.Errorf("role: want device, got %q", capturedRole)
+	}
+}
+
+func TestAuthRequired_BearerCaseInsensitive(t *testing.T) {
+	validate := func(token string) (map[string]string, error) {
+		return map[string]string{"tenant_id": "t-1"}, nil
+	}
+
+	handler := AuthRequired(validate)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// "bearer" (lowercase) should be accepted
+	req := httptest.NewRequest(http.MethodGet, "/api/protected", nil)
+	req.Header.Set("Authorization", "bearer some-token")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("lowercase 'bearer' scheme should be accepted, got %d", w.Code)
 	}
 }
 
@@ -369,6 +428,21 @@ func TestChain_AppliesMiddlewareInOrder(t *testing.T) {
 	}
 }
 
+func TestChain_EmptyMiddlewareList(t *testing.T) {
+	final := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	})
+
+	handler := Chain(final)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTeapot {
+		t.Errorf("expected 418 passthrough, got %d", w.Code)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Context helpers
 // ---------------------------------------------------------------------------
@@ -399,6 +473,7 @@ func TestGetHelpers_WithValues(t *testing.T) {
 	ctx = context.WithValue(ctx, ContextKeyDeviceID, "d-1")
 	ctx = context.WithValue(ctx, ContextKeyUserID, "u-1")
 	ctx = context.WithValue(ctx, ContextKeyRole, "admin")
+	ctx = context.WithValue(ctx, ContextKeyRequestID, "req-1")
 
 	if GetTenantID(ctx) != "t-1" {
 		t.Errorf("GetTenantID: want t-1, got %q", GetTenantID(ctx))
@@ -411,5 +486,73 @@ func TestGetHelpers_WithValues(t *testing.T) {
 	}
 	if GetRole(ctx) != "admin" {
 		t.Errorf("GetRole: want admin, got %q", GetRole(ctx))
+	}
+	if GetRequestID(ctx) != "req-1" {
+		t.Errorf("GetRequestID: want req-1, got %q", GetRequestID(ctx))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Health check (tested inline — no external deps)
+// ---------------------------------------------------------------------------
+
+func TestHealthCheck_OKPattern(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":  "ok",
+			"version": "0.1.0",
+			"components": map[string]string{
+				"database": "ok",
+			},
+		})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["status"] != "ok" {
+		t.Errorf("status: want ok, got %v", body["status"])
+	}
+	if body["version"] != "0.1.0" {
+		t.Errorf("version: want 0.1.0, got %v", body["version"])
+	}
+}
+
+func TestHealthCheck_DegradedPattern(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":  "degraded",
+			"version": "0.1.0",
+			"components": map[string]string{
+				"database": "error",
+			},
+		})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503 for degraded, got %d", w.Code)
+	}
+
+	var body map[string]any
+	json.NewDecoder(w.Body).Decode(&body)
+	if body["status"] != "degraded" {
+		t.Errorf("status: want degraded, got %v", body["status"])
 	}
 }

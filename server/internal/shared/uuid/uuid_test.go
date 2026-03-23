@@ -39,3 +39,21 @@ func TestNew_Version4Bits(t *testing.T) {
 		t.Errorf("expected variant nibble in {8,9,a,b}, got %c in %s", v, id)
 	}
 }
+
+func TestNew_Length(t *testing.T) {
+	id := New()
+	// UUID v4 string: 32 hex + 4 dashes = 36 chars
+	if len(id) != 36 {
+		t.Errorf("expected UUID length 36, got %d: %s", len(id), id)
+	}
+}
+
+func TestNew_HyphensAtCorrectPositions(t *testing.T) {
+	id := New()
+	// Hyphens at positions 8, 13, 18, 23
+	for _, pos := range []int{8, 13, 18, 23} {
+		if id[pos] != '-' {
+			t.Errorf("expected hyphen at position %d, got %c in %s", pos, id[pos], id)
+		}
+	}
+}

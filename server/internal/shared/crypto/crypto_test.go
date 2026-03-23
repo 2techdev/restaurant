@@ -39,7 +39,6 @@ func TestVerifyPassword_WrongPassword(t *testing.T) {
 
 func TestVerifyPassword_TamperedHash(t *testing.T) {
 	hash, _ := HashPassword("secret")
-	// Flip one character in the stored key.
 	tampered := hash[:len(hash)-1] + "X"
 	if VerifyPassword("secret", tampered) {
 		t.Error("VerifyPassword should reject a tampered hash")
@@ -58,8 +57,28 @@ func TestVerifyPassword_InvalidFormat(t *testing.T) {
 func TestHashPassword_Uniqueness(t *testing.T) {
 	h1, _ := HashPassword("same")
 	h2, _ := HashPassword("same")
-	// Different salts → different hashes.
 	if h1 == h2 {
 		t.Error("two hashes of the same password should differ (random salt)")
+	}
+}
+
+func TestHashPassword_DifferentPasswords(t *testing.T) {
+	h1, _ := HashPassword("password1")
+	h2, _ := HashPassword("password2")
+	if h1 == h2 {
+		t.Error("different passwords should produce different hashes")
+	}
+}
+
+func TestVerifyPassword_EmptyPassword(t *testing.T) {
+	hash, err := HashPassword("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !VerifyPassword("", hash) {
+		t.Error("empty password should verify against its own hash")
+	}
+	if VerifyPassword("notempty", hash) {
+		t.Error("non-empty password should not verify against empty password hash")
 	}
 }
