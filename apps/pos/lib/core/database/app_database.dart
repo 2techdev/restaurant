@@ -45,6 +45,9 @@ import 'tables/reservations.dart';
 import 'tables/customers.dart';
 import 'tables/customer_addresses.dart';
 import 'tables/loyalty_transactions.dart';
+import 'tables/fiscal_signatures.dart';
+import 'tables/lan_sync_peers.dart';
+import 'tables/manager_pins.dart';
 
 part 'app_database.g.dart';
 
@@ -86,6 +89,9 @@ part 'app_database.g.dart';
     Customers,
     CustomerAddresses,
     LoyaltyTransactions,
+    FiscalSignatures,
+    LanSyncPeers,
+    ManagerPins,
   ],
   daos: [AuditLogDao, InventoryDao, SyncEventDao],
 )
@@ -119,7 +125,8 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(dayCloseSummaries);
       }
       if (from < 7) {
-        // v7: inventory tables + manager PIN + audit authorizer + reservations.
+        // v7: inventory tables, CRM, fiscal signing (Germany TSE), LAN peer sync,
+        // manager PIN audit trail, and performance indexes.
         await m.createTable(inventoryItems);
         await m.createTable(inventoryTransactions);
         await m.createTable(suppliers);
@@ -127,10 +134,56 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(users, users.managerPinHash);
         await m.addColumn(auditLog, auditLog.managerId);
         await m.addColumn(auditLog, auditLog.managerName);
-        // Add CRM tables introduced in v7.
         await m.createTable(customers);
         await m.createTable(customerAddresses);
         await m.createTable(loyaltyTransactions);
+        await m.createTable(fiscalSignatures);
+        await m.createTable(lanSyncPeers);
+        await m.createTable(managerPins);
+
+        // Performance indexes on high-frequency query columns.
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_tickets_tenant_status '
+          'ON tickets (tenant_id, status) '
+          'WHERE is_deleted = 0',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_tickets_tenant_opened_at '
+          'ON tickets (tenant_id, opened_at DESC) '
+          'WHERE is_deleted = 0',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_tickets_table_id '
+          'ON tickets (table_id) '
+          'WHERE table_id IS NOT NULL AND is_deleted = 0',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_order_items_ticket_id '
+          'ON order_items (ticket_id) '
+          'WHERE is_deleted = 0',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_payments_ticket_id '
+          'ON payments (ticket_id) '
+          'WHERE is_deleted = 0',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_payments_bill_id '
+          'ON payments (bill_id) '
+          'WHERE is_deleted = 0',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_audit_log_tenant_timestamp '
+          'ON audit_log (tenant_id, timestamp DESC)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_license_tokens_tenant_active '
+          'ON license_tokens (tenant_id, is_active)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_fiscal_signatures_receipt_id '
+          'ON fiscal_signatures (receipt_id)',
+        );
       }
     },
     onCreate: (m) async {
