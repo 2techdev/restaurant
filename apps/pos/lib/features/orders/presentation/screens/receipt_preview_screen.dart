@@ -411,8 +411,8 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      ticket.waiterId != null
-                          ? 'Garson: ${ticket.waiterId}'
+                      ticket.cashierName != null
+                          ? 'Bedient: ${ticket.cashierName}'
                           : '',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF555555)),
                     ),
@@ -456,25 +456,53 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                 for (final item in ticket.items) ...[
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            '${item.quantity.ceil()}x ${item.productName}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF1A1A1A),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${item.quantity.ceil()}x ${item.productName}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF1A1A1A),
+                                ),
+                              ),
+                            ),
+                            Text(
+                              'CHF ${_formatCents(item.subtotal)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF1A1A1A),
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (item.modifiers.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 14, top: 2),
+                            child: Text(
+                              item.modifiers.map((m) => m.modifierName).join(', '),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF777777),
+                                fontStyle: FontStyle.italic,
+                              ),
                             ),
                           ),
-                        ),
-                        Text(
-                          '\u20BA${_formatCents(item.subtotal)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF1A1A1A),
-                            fontFeatures: [FontFeature.tabularFigures()],
+                        if (item.notes != null && item.notes!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 14, top: 1),
+                            child: Text(
+                              '* ${item.notes}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF777777),
+                              ),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -493,7 +521,7 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                       style: TextStyle(fontSize: 12, color: Color(0xFF555555)),
                     ),
                     Text(
-                      '\u20BA${_formatCents(ticket.subtotal)}',
+                      'CHF${_formatCents(ticket.subtotal)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF333333),
@@ -513,7 +541,7 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                       style: TextStyle(fontSize: 12, color: Color(0xFF555555)),
                     ),
                     Text(
-                      '\u20BA${_formatCents(ticket.taxAmount)}',
+                      'CHF${_formatCents(ticket.taxAmount)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF333333),
@@ -534,7 +562,7 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                         style: TextStyle(fontSize: 12, color: Color(0xFF555555)),
                       ),
                       Text(
-                        '-\u20BA${_formatCents(ticket.discountAmount)}',
+                        '-CHF ${_formatCents(ticket.discountAmount)}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF333333),
@@ -563,7 +591,7 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                       ),
                     ),
                     Text(
-                      '\u20BA${_formatCents(ticket.total)}',
+                      'CHF${_formatCents(ticket.total)}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,

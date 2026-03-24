@@ -315,6 +315,87 @@ class KitchenTicketData {
 }
 
 // ============================================================================
+// ADİSYON — CHECK/BILL DATA MODELS
+// ============================================================================
+
+/// Adisyon (check/bill) line item — no payment info.
+class AdisyonItem {
+  const AdisyonItem({
+    required this.name,
+    required this.quantity,
+    required this.unitPrice,
+    required this.totalPrice,
+    this.unit = 'Stk',
+    this.modifiers = const [],
+    this.discountAmount = 0,
+  });
+
+  final String name;
+  final double quantity;
+  final String unit;
+
+  /// Unit price in cents.
+  final int unitPrice;
+
+  /// Line total in cents (after item discount).
+  final int totalPrice;
+
+  /// Item-level discount in cents.
+  final int discountAmount;
+
+  final List<String> modifiers;
+}
+
+/// Check/bill (Adisyon) data model.
+///
+/// Used to print an interim bill for the customer without closing the order.
+/// No payment section — customer sees items + total only.
+class AdisyonData {
+  const AdisyonData({
+    required this.restaurantName,
+    required this.items,
+    required this.total,
+    this.address,
+    this.tableName,
+    this.orderNo,
+    this.cashierName,
+    this.subtotal,
+    this.discountAmount = 0,
+    this.mwstBreakdown = const {},
+    this.dateTime,
+    this.footerText,
+    this.printWidth = 42,
+  });
+
+  final String restaurantName;
+  final String? address;
+  final String? tableName;
+  final String? orderNo;
+  final String? cashierName;
+  final List<AdisyonItem> items;
+
+  /// Grand total in cents.
+  final int total;
+
+  /// Subtotal before order-level discount, in cents.
+  final int? subtotal;
+
+  /// Order-level discount in cents.
+  final int discountAmount;
+
+  /// MwSt code → gross amount in cents. Same format as [SwissReceiptData.mwstBreakdown].
+  final Map<String, int> mwstBreakdown;
+
+  final DateTime? dateTime;
+
+  /// Override footer text (default: 'Bitte zahlen / L\'addition s\'il vous plaît').
+  final String? footerText;
+
+  /// Paper width in characters: 80mm → 42, 58mm → 32.
+  final int printWidth;
+}
+
+// ============================================================================
 // Z / X RAPORU — VERİ MODELLERİ
 // ============================================================================
 
