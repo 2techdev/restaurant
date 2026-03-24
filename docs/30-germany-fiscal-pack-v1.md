@@ -1,10 +1,10 @@
-# 30 - Germany Fiscal Pack v1
+# 30 — Germany Fiscal Pack v1
 
-> **Document Status:** Authoritative | **Last Updated:** 2026-03-20
+> **Document Status:** Authoritative | **Last Updated:** 2026-03-24
 >
-> **DEPENDENCY:** Cloud sync (Phase 4) must be stable before starting this phase.
-> Germany fiscal requires internet connectivity for Fiskaly TSE API calls.
-> Do not start this phase before the Swiss pilot is generating stable revenue.
+> **DEPENDENCY:** Cloud sync (Phase 2) must be stable in production before starting this phase.
+> Germany fiscal requires internet for Fiskaly TSE API calls.
+> **Do not start this phase before the Swiss pilot has 30+ days of stable operation and 5+ paying customers.**
 
 ---
 
@@ -18,16 +18,16 @@ Since 1 January 2020, all electronic cash registers in Germany must:
 - Issue receipts with TSE signature data
 - Be capable of generating **DSFinV-K** compliant exports
 
-**Non-compliance:** Fine up to EUR 25,000 per violation. Cannot legally operate a cash register in Germany without TSE certification.
+**Non-compliance:** Fine up to EUR 25,000 per violation. Cannot legally operate a cash register in Germany without TSE.
 
 ### 1.2 DSFinV-K (Digitale Schnittstelle der Finanzverwaltung für Kassensysteme)
 
-A standardized XML/CSV export format required by German tax authorities. Must be produceable on demand (e.g., for a tax audit).
+Standardized XML/CSV export required by German tax authorities on demand (e.g., during a tax audit).
 
 ### 1.3 GoBD (Grundsätze zur ordnungsmäßigen Führung und Aufbewahrung von Büchern)
 
-Principles for proper bookkeeping. Relevant requirements:
-- Immutable transaction log (already implemented via ADR-010)
+Requirements for proper bookkeeping:
+- Immutable transaction log ✅ (already implemented via ADR-010)
 - Sequential numbering without gaps (must be verified)
 - 10-year retention of tax-relevant records
 
@@ -38,20 +38,20 @@ Principles for proper bookkeeping. Relevant requirements:
 **Decision (ADR-008, confirmed):** Use Fiskaly SIGN DE v2 (cloud TSE) rather than hardware TSE dongles.
 
 **Why Fiskaly:**
-- Certified by BSI (Bundesamt für Sicherheit in der Informationstechnik)
+- BSI-certified (Bundesamt für Sicherheit in der Informationstechnik)
 - No hardware to manage or fail
 - REST API — integrates cleanly into Go cloud backend
-- Handles TSE lifecycle management (initialization, re-initialization, export)
+- Handles TSE lifecycle management
 
-**Fiskaly products:**
+**Fiskaly products used:**
 - `SIGN DE v2`: Cloud TSE for signing transactions
-- `SUBMIT DE`: DSFinV-K export generation (optional managed service)
+- `SUBMIT DE`: DSFinV-K export generation (managed service)
 
 ---
 
 ## 3. Transaction Model
 
-### 3.1 German-Specific Terminology
+### 3.1 Terminology Mapping
 
 | GastroCore Term | German Term | Fiskaly Term |
 |----------------|-------------|-------------|
@@ -85,25 +85,27 @@ Every payment (bill close) in Germany requires a Fiskaly transaction:
           ↓
 6. Store TSE response in receipt record
           ↓
-7. Print receipt with TSE QR code
+7. Print receipt with TSE fields and QR code
 ```
 
 ### 3.3 Offline Queue for Fiscal Signing
 
-When POS is offline (no internet), Fiskaly cannot be reached. GastroCore uses the "offline order + online fiscal finalization" model:
+When POS is offline (no internet), Fiskaly cannot be reached:
 
 1. POS takes order and payment offline — writes to local SQLite as normal
-2. Receipt marked as `fiscal_status: 'pending_signature'`
+2. Receipt marked: `fiscal_status = 'pending_signature'`
 3. Receipt printed with "OFFLINE - Signatur ausstehend" notice
 4. When internet returns: background process batch-signs pending receipts via Fiskaly
-5. Signed receipts get `fiscal_status: 'signed'`; receipt updated in DB
-6. Customer can request updated receipt with signature (rare case)
+5. Signed receipts: `fiscal_status = 'signed'`; customer can request updated receipt
 
-**Offline queue capacity:** Alert owner when > 100 unsigned receipts. Alert at > 500 (legal risk zone). Recommend 4G router as internet backup for German restaurants.
+**Alert thresholds:**
+- > 100 unsigned receipts: alert owner
+- > 500 unsigned receipts: legal risk — recommend 4G router backup
+- Recommend: 4G/LTE router as internet backup for all German restaurants
 
 ---
 
-## 4. Receipt with TSE Data
+## 4. German Receipt Format
 
 A compliant German receipt must include:
 
@@ -136,11 +138,9 @@ Seriennr.: [SERIAL]
 Sig.zähler: [COUNTER]
 Transaktion.: [TX_ID]
 
-[QR CODE containing TSE verification data]
+[QR CODE — Kassenbeleg-V1 format]
 ────────────────────────────────
 ```
-
-The QR code payload follows the Kassenbeleg-V1 format (can be verified with BSI test tools).
 
 ---
 
@@ -148,18 +148,14 @@ The QR code payload follows the Kassenbeleg-V1 format (can be verified with BSI 
 
 | Rate | Applies To |
 |------|-----------|
-| 19% | Standard (alcohol, most beverages, service) |
-| 7% | Reduced (food for takeaway, non-alcoholic beverages) |
+| 19% | Standard (alcohol, most beverages, dine-in service) |
+| 7% | Reduced (food for takeaway, non-alcoholic beverages takeaway) |
 
-Same dine-in vs. takeaway distinction as Switzerland but with different rates. The `order_type_rules` table and `FareEngine` must handle the German country pack.
-
-**Country detection:** A setting `country_pack` (values: `none`, `switzerland`, `germany`) controls which tax rules and receipt format apply. This drives the country pack behavior at runtime.
+Same dine-in vs takeaway distinction as Switzerland but with different rates. The `order_type_rules` table and `FareEngine` handle the German country pack via `country_pack = 'germany'` setting.
 
 ---
 
-## 6. Table/Session Linkage
-
-Fiskaly requires transaction data to include business context:
+## 6. Fiskaly Transaction Payload
 
 ```json
 {
@@ -168,13 +164,28 @@ Fiskaly requires transaction data to include business context:
       "receipt": {
         "receipt_type": "RECEIPT",
         "amounts_per_vat_id": [
-          { "vat_definition_export_id": 1, "incl_vat": 1190, "excl_vat": 1000, "vat": 190 }
+          {
+            "vat_definition_export_id": 1,
+            "incl_vat": 1190,
+            "excl_vat": 1000,
+            "vat": 190
+          }
         ],
         "amounts_per_payment_type": [
-          { "payment_type": "CASH", "amount": 1190, "currency_code": "EUR" }
+          {
+            "payment_type": "CASH",
+            "amount": 1190,
+            "currency_code": "EUR"
+          }
         ],
         "line_items": [
-          { "business_case": { "type": "SALE" }, "name": "Schnitzel", "amount_per_unit": 1190, "quantity": 1, "tax_rate_applicable": 0.19 }
+          {
+            "business_case": { "type": "SALE" },
+            "name": "Schnitzel",
+            "amount_per_unit": 1190,
+            "quantity": 1,
+            "tax_rate_applicable": 0.19
+          }
         ]
       }
     }
@@ -182,49 +193,33 @@ Fiskaly requires transaction data to include business context:
 }
 ```
 
-The GastroCore `Ticket` entity maps cleanly to this structure. Amounts must be in **EUR cents**.
+Amounts in **EUR cents**. GastroCore's integer-cents money model maps directly.
 
 ---
 
-## 7. Split Bill Handling
+## 7. Split Bill and Table Merge
 
-When a table bill is split:
-- Each split portion generates its own Fiskaly transaction
-- Each portion gets its own receipt with unique TSE signature
-- The original ticket is marked as split; each sub-bill references the original
+**Split bill:** Each split portion generates its own Fiskaly transaction. Each portion gets its own receipt with unique TSE signature. Original ticket marked as split; each sub-bill references original.
 
-No partial transactions — each payment completion = one complete Fiskaly transaction.
+**Table merge:** Merged order = one ticket = one Fiskaly transaction. All items from both tables in transaction line items. Audit trail shows merge event before final transaction.
 
 ---
 
-## 8. Table Merge Handling
-
-When two tables are merged:
-- The merged order becomes one ticket
-- One Fiskaly transaction for the merged total
-- Individual items from both tables appear in the transaction line items
-- Audit trail shows merge event before the final transaction
-
----
-
-## 9. Failure Handling
+## 8. Failure Handling
 
 | Failure Scenario | Response |
 |-----------------|---------|
-| Fiskaly API timeout (> 5s) | Add to offline queue; print receipt with "Signatur ausstehend" |
-| Fiskaly returns error (4xx) | Log error; alert on dashboard; attempt re-sign with corrected data |
-| Fiskaly returns 5xx | Retry with exponential backoff; max 10 retries; then offline queue |
-| TSE quota exhausted | Alert immediately; contact Fiskaly; cannot sign until resolved |
-| Internet down | Offline queue (see section 3.3) |
-| Device offline during finalization | Queue in sync_queue; cloud signs when device reconnects |
+| Fiskaly API timeout (> 5s) | Add to offline queue; print with "Signatur ausstehend" |
+| Fiskaly 4xx error | Log; alert on dashboard; attempt re-sign |
+| Fiskaly 5xx error | Retry exponential backoff; max 10 retries; then offline queue |
+| TSE quota exhausted | Alert immediately; contact Fiskaly |
+| Internet down | Offline queue (section 3.3) |
 
-**Critical rule:** GastroCore NEVER blocks a completed payment waiting for Fiskaly. Payment always succeeds first. Fiscal signing is an async post-payment step.
+**Critical rule:** GastroCore NEVER blocks a completed payment waiting for Fiskaly. Payment always succeeds first. Fiscal signing is async post-payment.
 
 ---
 
-## 10. DSFinV-K Export
-
-DSFinV-K is a structured export required for tax audits. It consists of multiple CSV files:
+## 9. DSFinV-K Export
 
 | File | Contents |
 |------|---------|
@@ -235,77 +230,84 @@ DSFinV-K is a structured export required for tax audits. It consists of multiple
 | `items.csv` | Line items per transaction |
 | `vat.csv` | VAT definitions |
 | `cash_register.csv` | Register metadata |
-| `business_cases.csv` | Business case codes |
 
-**Implementation:** Use Fiskaly's `SUBMIT DE` service (managed DSFinV-K generation) OR generate manually from PostgreSQL.
+**Implementation:** Use Fiskaly `SUBMIT DE` managed service (offloads complex CSV generation to Fiskaly).
 
-**For v1:** Use `SUBMIT DE` managed service if available in our Fiskaly contract. This offloads the complex CSV generation to Fiskaly.
-
-**Export trigger:** Available in cloud dashboard → "Export DSFinV-K" for date range → downloads ZIP.
+**Trigger:** Cloud dashboard → "Export DSFinV-K" for date range → download ZIP.
 
 ---
 
-## 11. Audit/Archive Requirements
+## 10. Audit / Archive Requirements
 
-Under GoBD, tax-relevant records must be retained for **10 years** and be available for inspection.
+GoBD requires tax-relevant records for **10 years**.
 
 GastroCore approach:
 - All transactions immutable in SQLite (local) and PostgreSQL (cloud)
-- Fiscal signatures stored in `receipts` table with full TSE response JSON
-- DSFinV-K export stored in cloud after generation (idempotent regeneration available)
-- Data retention policy in cloud: 10+ years for fiscal data
-- Deletion of tenant account: fiscal data archived, not deleted, for 10 years
+- TSE response JSON stored in `receipts` table
+- DSFinV-K stored in cloud after generation
+- Data retention policy: 10+ years for fiscal data
+- Account deletion: fiscal data archived, not deleted
 
 ---
 
-## 12. What Can Be Deferred in v1
+## 11. Germany Pack Prerequisites
 
-| Deferred Feature | Reason |
-|-----------------|--------|
-| Hardware TSE dongle support | Fiskaly cloud TSE is certified and simpler |
-| Multiple TSE providers | Fiskaly is sufficient; adapter layer prepared for future |
-| Real-time DSFinV-K (continuous export) | Batch/on-demand export is legally sufficient |
-| Automatic fiscal audit preparation | Manual download from dashboard is sufficient |
-| German payment terminals (girocard EC-Karte certification) | Start with card terminal that supports existing payment SDK |
-| Registration with Finanzamt (mandatory since 2024) | Notification procedure — must research current state, may automate later |
-
----
-
-## 13. Germany Pack Implementation Checklist
-
-### Pre-requisites (must be done before starting)
-- [ ] Cloud sync (Phase 4) is stable and in production
-- [ ] Swiss pilot has at least 30 days of stable operation
+Do not start this phase until:
+- [ ] Cloud sync (Phase 2) is stable in production
+- [ ] Swiss pilot has ≥ 30 days of stable operation
+- [ ] Swiss pilot has ≥ 5 paying customers
 - [ ] Fiskaly account created; SIGN DE v2 sandbox access confirmed
 - [ ] German tax advisor consulted on edge cases
+- [ ] German payment terminal availability confirmed (myPOS supports girocard via Maestro)
 
-### Go Backend: Fiskaly Client
-- [ ] Fiskaly HTTP client in `internal/fiscal/` module
-- [ ] TSE initialization: POST /api/v1/tse (create TSE unit)
-- [ ] Start transaction: POST /api/v1/tse/{tse_id}/tx
-- [ ] Finish transaction: PUT /api/v1/tse/{tse_id}/tx/{tx_id}
-- [ ] Store TSE response in PostgreSQL
-- [ ] Retry logic for Fiskaly API failures
+---
+
+## 12. Germany Pack Implementation Checklist
+
+### Go Backend: Fiskaly Client (`internal/fiscal/`)
+
+- [ ] Fiskaly HTTP client with API key auth
+- [ ] TSE initialization: create TSE unit
+- [ ] Start transaction: `POST /api/v1/tse/{tse_id}/tx`
+- [ ] Finish transaction: `PUT /api/v1/tse/{tse_id}/tx/{tx_id}`
+- [ ] Store TSE response in PostgreSQL `receipts` table
+- [ ] Retry logic for Fiskaly failures
 - [ ] Offline queue: process pending signatures on reconnect
 
-### Flutter: Fiscal Flow
+### Flutter: German Fiscal Flow
+
 - [ ] Country pack detection: `country_pack == 'germany'`
 - [ ] After payment confirmation: call Go fiscal endpoint (async, non-blocking)
 - [ ] Poll for fiscal status: update receipt when signed
-- [ ] "Signatur ausstehend" on receipt if offline
-- [ ] German receipt format with TSE fields and QR code
+- [ ] "Signatur ausstehend" shown on receipt if offline
+- [ ] German receipt builder with TSE fields and QR code
+- [ ] German VAT rates (19%, 7%) in tax profiles
 
 ### Cloud Dashboard
-- [ ] DSFinV-K export trigger button with date range selector
-- [ ] Unsigned receipts count indicator (alert if > 50)
+
+- [ ] DSFinV-K export button with date range selector
+- [ ] Unsigned receipts count alert (warn if > 50)
 - [ ] Fiscal signing error log
 
 ### Compliance Validation
-- [ ] Every transaction signed in 1000-transaction test (online)
-- [ ] Offline transactions signed within 60s of reconnect (in batch test)
+
+- [ ] 1000-transaction online test: all signed
+- [ ] Offline test: batch-signed within 60s of reconnect
 - [ ] DSFinV-K export passes BSI validation tool
-- [ ] Receipt QR code verifiable with Fiskaly verification tool
+- [ ] Receipt QR code verifiable with Fiskaly tool
 - [ ] Audit log has no gaps in sequential numbering
+
+---
+
+## 13. What Can Be Deferred in v1
+
+| Item | Reason |
+|------|--------|
+| Hardware TSE dongle support | Fiskaly cloud is certified and simpler |
+| Multiple TSE providers | Fiskaly sufficient; adapter layer prepared |
+| Real-time DSFinV-K (continuous) | Batch/on-demand is legally sufficient |
+| Finanzamt registration automation | Manual notification is acceptable |
+| girocard (EC-Karte) certification | myPOS handles card processing |
 
 ---
 
@@ -313,8 +315,8 @@ GastroCore approach:
 
 - [ ] Every transaction signed by Fiskaly within 5s (online)
 - [ ] Offline transactions batch-signed within 60s of reconnect
-- [ ] DSFinV-K export passes validation tool
-- [ ] Receipt contains all legally required TSE fields
+- [ ] DSFinV-K export passes BSI validation tool
+- [ ] Receipt contains all legally required TSE fields and QR code
 - [ ] Zero fiscal signing failures in 500-transaction test
 - [ ] Audit log proves GoBD compliance (no gaps, immutable, sequential)
-- [ ] At least one German restaurant completes a full day of legally compliant sales
+- [ ] First German restaurant completes a full day of legally compliant sales

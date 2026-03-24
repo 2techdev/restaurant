@@ -1,8 +1,9 @@
-# 22 - Gap Analysis
+# 22 — Gap Analysis
 
-> **Document Status:** Authoritative | **Last Updated:** 2026-03-20
+> **Document Status:** Authoritative | **Last Updated:** 2026-03-24
 >
 > Gaps from current state to Swiss pilot-ready, then to market-ready product.
+> Updated to reflect **cloud sync only** (no LAN sync) architecture decision.
 
 ---
 
@@ -29,251 +30,249 @@
 - When an order is submitted from POS, write `kitchen_tickets` + `kitchen_ticket_items` rows
 - KDS screen reacts to new rows via Drift reactive queries
 - Bump action writes `status = completed` to DB
-- On single-device: this works immediately (same SQLite)
-- On multi-device: requires LAN sync (see GAP-02)
+- On single-device: this works immediately (same SQLite, no sync needed)
+- On multi-device: requires cloud sync (see GAP-11)
 
-**Effort:** 2–3 days (single device wiring). 1–2 weeks (multi-device via LAN sync).
+**Effort:** 3–5 days (single device wiring)
 
 ---
 
-### GAP-02: No Multi-Device / LAN Sync
+### GAP-02: No Production Build Pipeline
 
-**Current:** Every device is a complete island. Two tablets on the same WiFi cannot see each other's orders, tables, or kitchen tickets.
+**Current:** `gastrocore-release.jks` is referenced in `android/app/build.gradle.kts` via `key.properties` but the actual keystore file is unverified. No CI/CD. No AAB build confirmed.
 
-**Required for pilot (minimum):**
-- Primary device model: one device owns the SQLite DB
-- Secondary devices: read/write via HTTP API to primary device over LAN
-- Discovery: mDNS or simple IP configuration
-- POS → KDS ticket delivery: same network, primary pushes to KDS
+**Required:**
+- Verify or create release keystore and `key.properties`
+- Test `flutter build appbundle --release` produces a valid, signed AAB
+- Set `targetSdk 35`, `minSdk 26` explicitly in `build.gradle.kts`
+- Define version policy: `1.0.0+1000` for first release
+- Document manual release checklist
 
-**Full LAN sync (Phase 2):**
-- Outbox/inbox tables already exist (`sync_queue`, `sync_metadata`)
-- Implement bidirectional sync over LAN HTTP
-- Conflict resolution: last-writer-wins on master data, append-only on transactions
-
-**Effort:** 2–3 weeks.
+**Effort:** 1–2 days
 
 ---
 
 ### GAP-03: No License / Feature Flag Enforcement
 
-**Current:** License module is all TODO stubs in Go. No `FlagGate` or tier checks anywhere in Dart code. The app runs all features unconditionally.
+**Current:** License module (`LicenseValidator`, `FlagGate` widget) is implemented and tested, but **zero feature gate checks exist in actual feature code**. App runs all features unconditionally.
 
-**Minimum for pilot (offline-capable license):**
-- Hardcoded "pilot license" — no server needed
-- OR: simple JSON license file in app assets
+**Minimum for pilot (offline mode):**
+- Hardcoded "pilot license" JWT with all Professional features — no server needed
 - Feature flags read from license at startup
+- `FlagGate` widget placed at KDS, cloud sync, multi-branch entry points
 
 **Minimum for commercial launch:**
-- Go license service: validate key → return feature flags JSON
-- Dart: check flags before rendering locked features
-- Grace mode: 7-day offline window before features are gated
+- Go license service validates key → returns signed JWT
+- Flutter checks flags at startup + 7-day offline grace period
+- Upgrade prompt shown on locked features
 
 **Effort:** 3–5 days (pilot mode). 1–2 weeks (production license service).
 
 ---
 
-### GAP-04: No Production Build Pipeline
-
-**Current:** `gastrocore-release.jks` is referenced in `android/app/build.gradle.kts` via `key.properties` but the actual keystore file is unverified. No CI/CD exists. No AAB build verified.
-
-**Required:**
-- Verify or create release keystore and `key.properties`
-- Test `flutter build appbundle --release` produces valid AAB
-- Verify app ID, version code, target SDK
-- Minimum: documented manual release checklist
-
-**Effort:** 1–2 days.
-
----
-
 ## 3. P1 — PILOT-REQUIRED
 
-### GAP-05: Swiss VAT Dine-In vs Takeaway Toggle
+### GAP-04: Swiss VAT Dine-In vs Takeaway Toggle
 
-**Current:** Tax profiles exist in DB. Swiss MWST rates (2.6%, 3.8%, 8.1%) exist in seed data and `SwissReceiptBuilder`. But the **per-order toggle** (dine-in = 8.1% for beverages, takeaway = 2.6%) is not surfaced in the POS order flow.
+**Current:** Tax profiles and FareEngine exist. Swiss MWST rates (2.6%, 3.8%, 8.1%) are in seed data and `SwissReceiptBuilder`. The **per-order toggle** is not surfaced in the POS order flow.
 
 **Required:**
-- Order-level or item-level dine-in/takeaway toggle in POS screen
-- Tax rate resolver reads toggle → applies correct rate
+- Visible dine-in/takeaway toggle in POS order screen (top bar, not buried)
+- FareEngine resolves correct tax rate from toggle + product category
 - Receipt shows correct MWST breakdown per rate
-- `FareEngine` already exists and handles rate resolution — wire the toggle to it
 
-**Effort:** 2–3 days.
+**Effort:** 2–3 days
 
 ---
 
-### GAP-06: 5-Rappen Rounding Not Enforced at Payment
+### GAP-05: 5-Rappen Rounding at Payment Screen
 
-**Current:** `SwissReceiptBuilder` formats 5-Rappen rounded amounts, but rounding logic at the payment screen (cash vs card differentiation) is not verified end-to-end.
+**Current:** `SwissReceiptBuilder` formats rounded amounts. Cash vs card rounding logic at the actual payment screen is not verified end-to-end.
 
 **Required:**
 - Cash payment: total rounded to nearest CHF 0.05
-- Card payment: exact amount (no rounding)
-- Rounding difference tracked in `payments` table as rounding line
-- Unit tests already exist in `swiss_receipt_builder_test.dart` — verify they cover payment flow too
+- Card/TWINT: exact amount (no rounding)
+- Rounding delta tracked as `payments` table line item (`type = 'rounding'`)
+- Receipt shows explicit rounding line
 
-**Effort:** 1 day.
+**Effort:** 1 day
 
 ---
 
-### GAP-07: Manager Override / Void Authorization
+### GAP-06: Settings Save Incomplete
 
-**Current:** Void is implemented (creates new record). But no manager PIN confirmation is enforced for voids above a threshold.
+**Current:** Restaurant name, UID number, and MWST number fields in settings don't reliably persist on save.
 
 **Required:**
-- Void/discount above threshold: require manager PIN
-- Role-based: `cashier` cannot void; `manager` can
-- Threshold configurable in settings (default: CHF 20 or any void)
-- Audit log records void with authorizing manager ID
+- Fix save callbacks for all RestaurantSettings fields
+- Settings verified persisted across app restarts
+- SwissReceiptBuilder reads UID and MWST number from settings
 
-**Effort:** 1–2 days.
+**Effort:** 1 day
+
+---
+
+### GAP-07: Manager Override for Void / Discount
+
+**Current:** Void is implemented (creates new record). No manager PIN enforcement above threshold.
+
+**Required:**
+- Void/discount above configurable threshold: require manager PIN
+- Role-based: `cashier` cannot void without manager auth
+- Audit log records void/discount with authorizing manager ID
+
+**Effort:** 1–2 days
 
 ---
 
 ### GAP-08: Day Close / End-of-Day Report
 
-**Current:** Z-report prints on shift close. But "day close" as a formal workflow (all shifts closed, daily summary, backup signal) is not explicit.
+**Current:** Z-report prints on shift close. No formal day-close procedure.
 
 **Required:**
-- Day close procedure: verify all shifts closed, print daily summary
-- Export daily report as PDF or CSV (local file)
-- Timestamp daily close in audit log
-- "Audit trail complete" indicator
+- Day close: verify all shifts closed + daily summary print + audit log entry
+- Daily CSV export (shift summary, revenue by tax rate, payment methods) to device Downloads
 
-**Effort:** 2–3 days.
+**Effort:** 2–3 days
 
 ---
 
 ### GAP-09: Local Backup / Restore
 
-**Current:** SQLite file exists in app documents directory. No backup export flow.
+**Current:** SQLite backup to Downloads and restore with manager PIN — both complete in `BackupService`. The **trigger UI** (manual export button in settings, auto-backup on shift close) may not be fully wired.
 
-**Required for pilot:**
-- Manual "Export backup" in settings → saves SQLite snapshot to device Downloads
-- "Restore from backup" with manager PIN confirmation
-- Auto-backup trigger on shift close (save to device storage)
+**Required:**
+- Verify backup button in Settings exports SQLite snapshot
+- Auto-backup on each shift close
+- Restore from backup: manager PIN confirmation + file picker
 
-**Effort:** 1–2 days.
+**Effort:** 0.5–1 day (verify and wire triggers)
 
 ---
 
-### GAP-10: Offline Behavior Documentation and Testing
+### GAP-10: KDS Audio Alert
 
-**Current:** Architecture is offline-first but no offline scenario tests exist (connection loss mid-payment, airplane mode, reconnect).
+**Current:** `audioplayers` package is in `pubspec.yaml`. Integration with KDS new-ticket event not wired.
 
 **Required:**
-- Integration test: complete full order flow in airplane mode
-- Test: payment terminal reconnects after Bluetooth drop
-- Test: KDS receives ticket without cloud (LAN only)
+- Short beep sequence when new kitchen ticket arrives
+- Volume respects device media volume
+- Setting to disable in Settings
 
-**Effort:** 2–3 days testing.
+**Effort:** 0.5 day
+
+---
+
+### GAP-11: Discount Dialog UI
+
+**Current:** Discount button is present in the UI. `FareEngine` can calculate discounts. The dialog is not wired.
+
+**Required:**
+- Discount dialog: % or CHF amount input
+- Manager PIN if above configurable threshold
+- FareEngine applies discount; receipt shows discount line
+
+**Effort:** 1 day
 
 ---
 
 ## 4. P2 — MARKET-REQUIRED
 
-### GAP-11: Cloud Sync Engine
+### GAP-12: Cloud Sync Engine (Flutter + Go)
 
-**Current:** `sync_queue` and `sync_metadata` tables exist. Go sync handlers are complete stubs. No sync logic anywhere.
+**Current:** `sync_queue` and `sync_metadata` tables exist. Go sync handlers (upload/download/seed) are structural stubs — routing exists but no real logic. Flutter outbox is never written on mutations.
 
-**Required:**
-- Flutter outbox: write changes to `sync_queue` on every mutation
-- Go sync service: upload endpoint consumes batch, resolves conflicts, stores in PostgreSQL
-- Go sync service: download endpoint returns delta since cursor
-- Flutter inbox: apply downloaded changes to local SQLite
-- Cursor-based pagination for large initial sync (seed)
+**Required (see doc 27 for full spec):**
+- Flutter: write to `sync_queue` on every DB mutation (outbox pattern)
+- Go sync service: real upload/download/seed implementation with PostgreSQL
+- Flutter: background sync runner — drain outbox, apply downloads
 - Conflict resolution: last-writer-wins for master data, append-only for transactions
 
-**Effort:** 4–6 weeks.
+**This is the multi-device enabler.** KDS on a separate device, waiter phone, cloud dashboard all depend on cloud sync.
 
----
-
-### GAP-12: Cloud Dashboard (Owner-Facing)
-
-**Current:** Not started.
-
-**Required (minimal):**
-- Web app (or Flutter web)
-- Login with email+password
-- Sales reports: daily/weekly/monthly
-- Device status: last sync, online/offline
-- Menu management: push changes to devices
-
-**Effort:** 4–6 weeks (minimal), 8+ weeks (full-featured).
+**Effort:** 5–8 weeks
 
 ---
 
 ### GAP-13: Go Backend — Real Implementation
 
-**Current:** All handlers are TODO stubs returning hardcoded empty responses.
+**Current:** auth, sync, menu, stores, devices, licenses, kds modules are MVP-complete. orders lifecycle, reports, and online modules are stubs.
 
 **Required per module:**
-- Auth: JWT generation, refresh, device token
-- Sync: full upload/download/seed/status implementation
-- Licenses: key validation, feature flags, grace period
-- Stores: tenant/branch CRUD
-- Devices: registration, heartbeat, status
-- Reports: aggregate queries from synced data
-- Menu: receive and serve menu from cloud
+- Orders: full lifecycle (state transitions, refunds, line-item updates)
+- Reports: aggregate queries from PostgreSQL
+- Online: full online ordering flow (see GAP-19)
 
-**Effort:** 6–8 weeks total for all modules.
+**Effort:** 4–6 weeks
 
 ---
 
-### GAP-14: CI/CD Pipeline
+### GAP-14: Cloud Dashboard (Owner-Facing)
 
-**Current:** None.
+**Current:** Not started.
+
+**Required (minimal):**
+- Web app with email + password login
+- Daily/weekly/monthly revenue charts
+- Device status (last sync, online/offline)
+- Menu management (CRUD with sync push to devices)
+
+**Effort:** 4–8 weeks
+
+---
+
+### GAP-15: CI/CD Pipeline
+
+**Current:** `.github/workflows/` folder exists but empty.
 
 **Required:**
-- GitHub Actions (or similar): lint → test → build APK/AAB on PR merge
-- Auto-increment version code on release branch
-- Test on Android emulator (or Firebase Test Lab)
-- Go: go vet, go test, docker build on server changes
+- GitHub Actions: lint → test → build AAB on PR merge
+- Auto-increment versionCode on release branch
+- Go: `go vet`, `go test`, Docker build on server changes
+- Keystore stored as encrypted GitHub Secret
 
-**Effort:** 3–5 days.
+**Effort:** 3–5 days
 
 ---
 
-### GAP-15: Germany Fiscal Pack (Fiskaly SIGN DE v2)
+### GAP-16: Germany Fiscal Pack (Fiskaly SIGN DE v2)
 
-**Current:** Stub fiscal module in Go. No implementation.
+**Current:** Stub `internal/fiscal/` module. No implementation.
 
 **Required (see doc 30 for full spec):**
-- TSE client initialization and lifecycle
-- Transaction start → update → finish with Fiskaly API
+- TSE client initialization and transaction lifecycle
 - DSFinV-K export
-- Receipt with TSE QR code and required fields
-- Offline queue for fiscal signing
+- German receipt format with TSE QR code
+- Offline signing queue
 
-**Effort:** 6–8 weeks. **Dependency:** Cloud sync must be stable first.
+**Dependency:** Cloud sync must be stable first.
+
+**Effort:** 6–8 weeks
 
 ---
 
-### GAP-16: Swiss QR-Bill Generation
+### GAP-17: Swiss QR-Bill Generation
 
 **Current:** Not implemented.
 
 **Required:**
-- Swiss QR-bill format (ISO 20022) for B2B invoices
-- QR code with payment reference, IBAN, amount
-- Print on A4 or append to receipt
-- Scope: on-demand invoice printing, not automated
+- Swiss QR-bill (ISO 20022) for on-demand B2B invoices
+- On-demand only: staff triggers "Print Invoice" manually
 
-**Effort:** 1–2 weeks (use established Swiss QR-bill library).
+**Effort:** 1–2 weeks
 
 ---
 
-### GAP-17: Localization Completeness
+### GAP-18: Localization Completeness
 
-**Current:** de/fr ARB files exist but coverage is partial.
+**Current:** German and French ARB files exist, coverage partial.
 
 **Required:**
 - Audit all user-facing strings
-- Complete German and French translations
-- Swiss German consideration (primarily Hochdeutsch)
+- Complete German translations (Hochdeutsch)
+- French translations complete for French-speaking Switzerland
 
-**Effort:** 1 week.
+**Effort:** 1 week
 
 ---
 
@@ -281,14 +280,13 @@
 
 | Gap | Description | Effort |
 |-----|-------------|--------|
-| GAP-18: Online ordering | Web ordering channel | 8–10 weeks |
-| GAP-19: QR table ordering | Customer self-order via QR | 4–6 weeks |
-| GAP-20: Kiosk mode | Self-service tablet | 6–8 weeks |
+| GAP-19: Online ordering | Web ordering channel with payment | 8–10 weeks |
+| GAP-20: QR table ordering | Customer self-order via QR | 4–6 weeks |
 | GAP-21: Multi-branch management | Central menu, cross-branch reports | 6–8 weeks |
 | GAP-22: Retail mode | Barcode scanning, weight items | 8–12 weeks |
-| GAP-23: Custom backoffice | Team's own accounting infrastructure | TBD by team |
-| GAP-24: Waiter handheld app | Separate compact UI for phone | 4–6 weeks |
-| GAP-25: Customer display | Facing-customer order confirmation | 2–3 weeks |
+| GAP-23: Custom backoffice export API | Pull-based CSV/JSON for team's own accounting | 2–3 weeks |
+| GAP-24: Waiter app improvements | Deeper waiter-specific UX, standalone APK | 3–4 weeks |
+| GAP-25: Customer display (ODS) | Live order status on customer-facing screen | 2–3 weeks |
 
 ---
 
@@ -296,30 +294,66 @@
 
 ```
                     Effort (Low → High)
-Impact     Low           Medium          High
-(High)  GAP-04(build) GAP-01(KDS)    GAP-02(LAN sync)
-        GAP-06(round) GAP-05(VAT)    GAP-11(cloud sync)
-        GAP-09(backup)GAP-07(void)   GAP-13(Go backend)
-                      GAP-03(license)GAP-15(fiscal DE)
-(Med)                 GAP-08(dayclose)GAP-12(dashboard)
-                      GAP-10(offline) GAP-14(CI/CD)
-(Low)                 GAP-17(i18n)   GAP-16(QR-bill)
+Impact     Low             Medium            High
+(High)  GAP-02(build)   GAP-01(KDS)      GAP-12(cloud sync)
+        GAP-05(round)   GAP-04(VAT)      GAP-13(Go backend)
+        GAP-06(settings)GAP-07(void)     GAP-16(fiscal DE)
+        GAP-09(backup)  GAP-03(license)
+(Med)   GAP-10(audio)   GAP-08(dayclose) GAP-14(dashboard)
+        GAP-11(discount)GAP-18(i18n)     GAP-15(CI/CD)
+(Low)                   GAP-17(QR-bill)
 ```
 
 ---
 
-## 7. Critical Path to Pilot
+## 7. Critical Path to Pilot (Single Device)
 
-Minimum viable for a **first paying Swiss pilot restaurant**:
+Minimum viable for a **first paying Swiss pilot restaurant on a single device**:
 
 ```
-GAP-04 (build) →  GAP-01 (KDS wired) → GAP-02 (LAN sync, basic)
-                                                     ↓
-GAP-05 (VAT toggle) → GAP-06 (rounding) → GAP-07 (manager override)
-                                                     ↓
-GAP-03 (license, pilot mode) → GAP-08 (day close) → GAP-09 (backup)
-                                                     ↓
-                              PILOT-READY ✅
+GAP-02 (build pipeline)
+        ↓
+GAP-01 (KDS wired — single device)
+        ↓
+GAP-04 (VAT toggle) → GAP-05 (rounding) → GAP-06 (settings save)
+        ↓
+GAP-07 (manager override) → GAP-08 (day close) → GAP-09 (backup)
+        ↓
+GAP-03 (pilot license mode)
+        ↓
+        ✅ PILOT-READY (single device)
 ```
 
-Estimated: **10–14 weeks** from today with 1–2 focused developers.
+**Estimated: 3–5 focused weeks** with a 1-person AI-assisted development setup.
+
+---
+
+## 8. Critical Path to Multi-Device
+
+After single-device pilot is validated:
+
+```
+GAP-12 (cloud sync — Flutter outbox + Go backend)
+        ↓
+KDS on separate tablet ← cloud WebSocket push
+Waiter phone ← table status from cloud
+        ↓
+        ✅ MULTI-DEVICE (cloud-based)
+```
+
+**No LAN sync. All multi-device coordination goes through cloud.**
+
+---
+
+## 9. What Is Explicitly Out of Scope (Do Not Build)
+
+| Item | Reason |
+|------|--------|
+| ERPNext bridge | Permanently removed — custom backoffice is separate project |
+| LAN sync / mDNS discovery | Architecture decision: cloud sync only |
+| Redis | Not needed at v1 scale — PostgreSQL outbox is sufficient |
+| Microservices | Architecture freeze: Go modular monolith only |
+| iOS / web POS | Android tablet only for v1 |
+| Customer loyalty / CRM | Not restaurant core in v1 |
+| Inventory management | Custom backoffice handles it |
+| Delivery platform integration | Post-channel work |
