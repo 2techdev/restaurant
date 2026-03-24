@@ -26,6 +26,7 @@ const (
 	clubWaiter2ID = "cc000000-0001-0000-0000-000000000003"
 	clubKitchenID = "cc000000-0001-0000-0000-000000000004"
 	clubManagerID = "cc000000-0001-0000-0000-000000000005"
+	clubCashierID = "cc000000-0001-0000-0000-000000000006"
 
 	// Categories
 	clubCatSoupStarter  = "cc000000-0002-0000-0000-000000000001"
@@ -42,9 +43,9 @@ const (
 	clubMgBeilage    = "cc000000-0004-0000-0000-000000000003"
 	clubMgZutaten    = "cc000000-0004-0000-0000-000000000004"
 
-	// Floors
-	clubFloorHauptraumID   = "cc000000-0005-0000-0000-000000000001"
-	clubFloorWintergarten  = "cc000000-0005-0000-0000-000000000002"
+	// Floors (Erdgeschoss + Terrasse — displayed names; UUIDs fixed)
+	clubFloorHauptraumID  = "cc000000-0005-0000-0000-000000000001" // Erdgeschoss
+	clubFloorWintergarten = "cc000000-0005-0000-0000-000000000002" // Terrasse
 
 	// Demo tickets / bills
 	clubTicket1ID = "cc000000-0007-0000-0000-000000000001"
@@ -70,6 +71,7 @@ func seedClubDemoAll(tx *sql.Tx, now time.Time) error {
 		seedClubDemoTables,
 		seedClubDemoTaxProfiles,
 		seedClubDemoDemoOrders,
+		seedClubDemoGangTemplates,
 	}
 	for _, fn := range steps {
 		if err := fn(tx, now); err != nil {
@@ -114,6 +116,7 @@ func seedClubDemoUsers(tx *sql.Tx, now time.Time) error {
 		{clubWaiter1ID, "Lisa Moser", "1111", "waiter"},
 		{clubWaiter2ID, "Jan Hofer", "2222", "waiter"},
 		{clubKitchenID, "Marco Koch", "3333", "kitchen"},
+		{clubCashierID, "Tanja Kasse", "4444", "cashier"},
 	}
 	for _, u := range users {
 		if err := exec(tx, `
@@ -164,116 +167,156 @@ func seedClubDemoCategories(tx *sql.Tx, now time.Time) error {
 
 func seedClubDemoProducts(tx *sql.Tx, now time.Time) error {
 	type product struct {
-		id, catID, name, desc, taxGroup, printer string
-		price, prep                              int
+		id, catID, name, desc, taxGroup, printer, imageURL string
+		price, prep                                        int
 	}
+
+	// Unsplash photo URLs (free-to-use, cropped to 600×400, q=80).
+	// Chosen to match the dish type; photo IDs are stable Unsplash public assets.
+	const (
+		imgSoup         = "https://images.unsplash.com/photo-1547592180-85e173d698be?w=600&h=400&fit=crop&q=80"
+		imgBroth        = "https://images.unsplash.com/photo-1591297645085-2d65e1dc87b2?w=600&h=400&fit=crop&q=80"
+		imgBruschetta   = "https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?w=600&h=400&fit=crop&q=80"
+		imgAntipasto    = "https://images.unsplash.com/photo-1541014741259-de529411b96a?w=600&h=400&fit=crop&q=80"
+		imgGoatCheese   = "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=400&fit=crop&q=80"
+		imgFieldSalad   = "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop&q=80"
+		imgCaesarSalad  = "https://images.unsplash.com/photo-1550304943-4f4ed8af0c2a?w=600&h=400&fit=crop&q=80"
+		imgCaprese      = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&h=400&fit=crop&q=80"
+		imgRucola       = "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop&q=80"
+		imgZuriGschnetz = "https://images.unsplash.com/photo-1544025132-083c0b5498a0?w=600&h=400&fit=crop&q=80"
+		imgSchnitzel    = "https://images.unsplash.com/photo-1580554994083-dc4e3e77b19c?w=600&h=400&fit=crop&q=80"
+		imgSteak        = "https://images.unsplash.com/photo-1546833999-b4b27cfa5a0b?w=600&h=400&fit=crop&q=80"
+		imgSalmon       = "https://images.unsplash.com/photo-1534766438357-2b270dbd1b40?w=600&h=400&fit=crop&q=80"
+		imgVegMain      = "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&h=400&fit=crop&q=80"
+		imgPizza        = "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&h=400&fit=crop&q=80"
+		imgPasta        = "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=600&h=400&fit=crop&q=80"
+		imgLasagne      = "https://images.unsplash.com/photo-1574894709920-11097b5b660b?w=600&h=400&fit=crop&q=80"
+		imgApfelstrudel = "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&h=400&fit=crop&q=80"
+		imgTiramisu     = "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&h=400&fit=crop&q=80"
+		imgCremeBrulee  = "https://images.unsplash.com/photo-1560180474-e8563fd75bab?w=600&h=400&fit=crop&q=80"
+		imgSorbet       = "https://images.unsplash.com/photo-1488900128323-21503983a07e?w=600&h=400&fit=crop&q=80"
+		imgChocMousse   = "https://images.unsplash.com/photo-1541599468348-e96984315921?w=600&h=400&fit=crop&q=80"
+		imgWater        = "https://images.unsplash.com/photo-1548869069-88f9a8a2186f?w=600&h=400&fit=crop&q=80"
+		imgCola         = "https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?w=600&h=400&fit=crop&q=80"
+		imgOJuice       = "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=600&h=400&fit=crop&q=80"
+		imgEspresso     = "https://images.unsplash.com/photo-1495312040802-e8e91fdfda55?w=600&h=400&fit=crop&q=80"
+		imgCappuccino   = "https://images.unsplash.com/photo-1534040385115-33dcb3acba5b?w=600&h=400&fit=crop&q=80"
+		imgLatte        = "https://images.unsplash.com/photo-1561882468-9110d70d2ddc?w=600&h=400&fit=crop&q=80"
+		imgTea          = "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=600&h=400&fit=crop&q=80"
+		imgWhiteWine    = "https://images.unsplash.com/photo-1474620153-f63b31c7c0a2?w=600&h=400&fit=crop&q=80"
+		imgRedWine      = "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=600&h=400&fit=crop&q=80"
+		imgProsecco     = "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=400&fit=crop&q=80"
+		imgBeer         = "https://images.unsplash.com/photo-1608270586858-7d4f33e44b29?w=600&h=400&fit=crop&q=80"
+		imgAperol       = "https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?w=600&h=400&fit=crop&q=80"
+	)
+
 	products := []product{
 		// ── Suppen & Vorspeisen ─────────────────────────────────────────────
 		{"cc000000-0003-0001-0000-000000000001", clubCatSoupStarter,
-			"Tagessuppe", "Suppe des Tages mit frischem Brot", "food", "kitchen", 750, 5},
+			"Tagessuppe", "Suppe des Tages mit frischem Brot", "food", "kitchen", imgSoup, 750, 5},
 		{"cc000000-0003-0001-0000-000000000002", clubCatSoupStarter,
-			"Bündner Gerstensuppe", "Traditionelle Gerstensuppe mit Speck und Gemüse", "food", "kitchen", 1050, 8},
+			"Bündner Gerstensuppe", "Traditionelle Gerstensuppe mit Speck und Gemüse", "food", "kitchen", imgBroth, 1050, 8},
 		{"cc000000-0003-0001-0000-000000000003", clubCatSoupStarter,
-			"Bruschetta", "Geröstetes Brot, frische Tomaten, Basilikum, Knoblauch, Olivenöl", "food", "cold", 1050, 5},
+			"Bruschetta", "Geröstetes Brot, frische Tomaten, Basilikum, Knoblauch, Olivenöl", "food", "cold", imgBruschetta, 1050, 5},
 		{"cc000000-0003-0001-0000-000000000004", clubCatSoupStarter,
-			"Gemischter Vorspeisenteller", "Hausgemachte Auswahl kalter Vorspeisen für 2 Personen", "food", "cold", 1850, 8},
+			"Gemischter Vorspeisenteller", "Hausgemachte Auswahl kalter Vorspeisen für 2 Personen", "food", "cold", imgAntipasto, 1850, 8},
 		{"cc000000-0003-0001-0000-000000000005", clubCatSoupStarter,
-			"Ziegenkäse auf Feigenkonfitüre", "Warmer Ziegenkäse auf Toast, Feigenkonfitüre, Rucola", "food", "kitchen", 1650, 8},
+			"Ziegenkäse auf Feigenkonfitüre", "Warmer Ziegenkäse auf Toast, Feigenkonfitüre, Rucola", "food", "kitchen", imgGoatCheese, 1650, 8},
 		// ── Salate ──────────────────────────────────────────────────────────
 		{"cc000000-0003-0002-0000-000000000001", clubCatSalads,
-			"Nüsslisalat mit Speck und Ei", "Feldsalat, knuspriger Speck, hartgekochtes Ei, Senf-Vinaigrette", "food", "cold", 1550, 6},
+			"Nüsslisalat mit Speck und Ei", "Feldsalat, knuspriger Speck, hartgekochtes Ei, Senf-Vinaigrette", "food", "cold", imgFieldSalad, 1550, 6},
 		{"cc000000-0003-0002-0000-000000000002", clubCatSalads,
-			"Caesar Salad", "Römersalat, Croutons, Parmesan, Caesar-Dressing", "food", "cold", 1750, 6},
+			"Caesar Salad", "Römersalat, Croutons, Parmesan, Caesar-Dressing", "food", "cold", imgCaesarSalad, 1750, 6},
 		{"cc000000-0003-0002-0000-000000000003", clubCatSalads,
-			"Caprese", "Büffelmozzarella, Tomaten, Basilikum, Olivenöl extra vergine", "food", "cold", 1450, 4},
+			"Caprese", "Büffelmozzarella, Tomaten, Basilikum, Olivenöl extra vergine", "food", "cold", imgCaprese, 1450, 4},
 		{"cc000000-0003-0002-0000-000000000004", clubCatSalads,
-			"Rucola-Salat", "Rucola, Kirschtomaten, Parmesan-Hobel, Balsamico-Reduktion", "food", "cold", 1350, 4},
+			"Rucola-Salat", "Rucola, Kirschtomaten, Parmesan-Hobel, Balsamico-Reduktion", "food", "cold", imgRucola, 1350, 4},
 		// ── Hauptspeisen ────────────────────────────────────────────────────
 		{"cc000000-0003-0003-0000-000000000001", clubCatMains,
-			"Zürcher Geschnetzeltes", "Kalbsgeschnetzeltes Zürcher Art, Rösti, Rahmsauce, Weisswein", "food", "grill", 3850, 20},
+			"Zürcher Geschnetzeltes", "Kalbsgeschnetzeltes Zürcher Art, Rösti, Rahmsauce, Weisswein", "food", "grill", imgZuriGschnetz, 3850, 20},
 		{"cc000000-0003-0003-0000-000000000002", clubCatMains,
-			"Wiener Schnitzel", "Paniertes Kalbsschnitzel, Zitronenscheibe, Kartoffelsalat", "food", "grill", 3850, 18},
+			"Wiener Schnitzel", "Paniertes Kalbsschnitzel, Zitronenscheibe, Kartoffelsalat", "food", "grill", imgSchnitzel, 3850, 18},
 		{"cc000000-0003-0003-0000-000000000003", clubCatMains,
-			"Entrecôte vom Grill", "220g Schweizer Rind, Grillgemüse, Café-de-Paris-Butter, Pommes", "food", "grill", 4450, 22},
+			"Entrecôte vom Grill", "220g Schweizer Rind, Grillgemüse, Café-de-Paris-Butter, Pommes", "food", "grill", imgSteak, 4450, 22},
 		{"cc000000-0003-0003-0000-000000000004", clubCatMains,
-			"Lachsfilet", "Atlantik-Lachs, Safransauce, Blattspinat, Basmatireis", "food", "kitchen", 3250, 18},
+			"Lachsfilet", "Atlantik-Lachs, Safransauce, Blattspinat, Basmatireis", "food", "kitchen", imgSalmon, 3250, 18},
 		{"cc000000-0003-0003-0000-000000000005", clubCatMains,
-			"Rumpsteak", "250g Rumpsteak, Kräuterbutter, Ratatouille, Pommes frites", "food", "grill", 4250, 20},
+			"Rumpsteak", "250g Rumpsteak, Kräuterbutter, Ratatouille, Pommes frites", "food", "grill", imgSteak, 4250, 20},
 		{"cc000000-0003-0003-0000-000000000006", clubCatMains,
-			"Cordon Bleu", "Hausgemachtes Cordon Bleu, Pommes frites, Gemüsegarnitur", "food", "grill", 3050, 18},
+			"Cordon Bleu", "Hausgemachtes Cordon Bleu, Pommes frites, Gemüsegarnitur", "food", "grill", imgSchnitzel, 3050, 18},
 		{"cc000000-0003-0003-0000-000000000007", clubCatMains,
-			"Rahmspinat mit Spiegelei", "Blattspinat in Rahmsauce, zwei Spiegeleier, Rösti", "food", "kitchen", 2250, 12},
+			"Rahmspinat mit Spiegelei", "Blattspinat in Rahmsauce, zwei Spiegeleier, Rösti", "food", "kitchen", imgVegMain, 2250, 12},
 		{"cc000000-0003-0003-0000-000000000008", clubCatMains,
-			"Poulet Cordon Bleu", "Poulet-Cordon Bleu, Pommes frites, Tomatensalat", "food", "grill", 2950, 16},
+			"Poulet Cordon Bleu", "Poulet-Cordon Bleu, Pommes frites, Tomatensalat", "food", "grill", imgSchnitzel, 2950, 16},
 		{"cc000000-0003-0003-0000-000000000009", clubCatMains,
-			"Rinds-Tagliata", "Aufgeschnittenes Entrecôte, Rucola, Parmesan, Olivenöl, Balsamico", "food", "grill", 4450, 20},
+			"Rinds-Tagliata", "Aufgeschnittenes Entrecôte, Rucola, Parmesan, Olivenöl, Balsamico", "food", "grill", imgSteak, 4450, 20},
 		// ── Pizza & Pasta ────────────────────────────────────────────────────
 		{"cc000000-0003-0004-0000-000000000001", clubCatPizzaPasta,
-			"Pizza Margherita", "Tomatensauce, Mozzarella, frisches Basilikum", "food", "kitchen", 1850, 12},
+			"Pizza Margherita", "Tomatensauce, Mozzarella, frisches Basilikum", "food", "kitchen", imgPizza, 1850, 12},
 		{"cc000000-0003-0004-0000-000000000002", clubCatPizzaPasta,
-			"Pizza Prosciutto e Rucola", "Parmaschinken, Rucola, Kirschtomaten, Parmesan", "food", "kitchen", 2550, 12},
+			"Pizza Prosciutto e Rucola", "Parmaschinken, Rucola, Kirschtomaten, Parmesan", "food", "kitchen", imgPizza, 2550, 12},
 		{"cc000000-0003-0004-0000-000000000003", clubCatPizzaPasta,
-			"Pizza Quattro Formaggi", "Mozzarella, Gorgonzola, Emmentaler, Parmesan", "food", "kitchen", 2650, 12},
+			"Pizza Quattro Formaggi", "Mozzarella, Gorgonzola, Emmentaler, Parmesan", "food", "kitchen", imgPizza, 2650, 12},
 		{"cc000000-0003-0004-0000-000000000004", clubCatPizzaPasta,
-			"Pizza Rustica", "Speck, Zwiebeln, Peperoni, Tomatensauce, Mozzarella", "food", "kitchen", 2350, 12},
+			"Pizza Rustica", "Speck, Zwiebeln, Peperoni, Tomatensauce, Mozzarella", "food", "kitchen", imgPizza, 2350, 12},
 		{"cc000000-0003-0004-0000-000000000005", clubCatPizzaPasta,
-			"Spaghetti Carbonara", "Spaghetti, Pancetta, Ei, Pecorino Romano, schwarzer Pfeffer", "food", "kitchen", 2350, 14},
+			"Spaghetti Carbonara", "Spaghetti, Pancetta, Ei, Pecorino Romano, schwarzer Pfeffer", "food", "kitchen", imgPasta, 2350, 14},
 		{"cc000000-0003-0004-0000-000000000006", clubCatPizzaPasta,
-			"Pasta Bolognese", "Pappardelle, Rindfleisch-Bolognese, Parmesan", "food", "kitchen", 2350, 14},
+			"Pasta Bolognese", "Pappardelle, Rindfleisch-Bolognese, Parmesan", "food", "kitchen", imgPasta, 2350, 14},
 		{"cc000000-0003-0004-0000-000000000007", clubCatPizzaPasta,
-			"Tagliatelle Porcini", "Tagliatelle, Steinpilze, Knoblauch, Rahmsauce, Parmesan", "food", "kitchen", 2550, 15},
+			"Tagliatelle Porcini", "Tagliatelle, Steinpilze, Knoblauch, Rahmsauce, Parmesan", "food", "kitchen", imgPasta, 2550, 15},
 		{"cc000000-0003-0004-0000-000000000008", clubCatPizzaPasta,
-			"Lasagne al Forno", "Hausgemachte Lasagne, Bolognese, Béchamelsauce, Mozzarella gratiniert", "food", "kitchen", 2450, 20},
+			"Lasagne al Forno", "Hausgemachte Lasagne, Bolognese, Béchamelsauce, Mozzarella gratiniert", "food", "kitchen", imgLasagne, 2450, 20},
 		// ── Desserts ─────────────────────────────────────────────────────────
 		{"cc000000-0003-0005-0000-000000000001", clubCatDesserts,
-			"Apfelstrudel", "Hausgemachter Apfelstrudel, Vanilleglace, Zimtsahne", "food", "dessert", 1350, 5},
+			"Apfelstrudel", "Hausgemachter Apfelstrudel, Vanilleglace, Zimtsahne", "food", "dessert", imgApfelstrudel, 1350, 5},
 		{"cc000000-0003-0005-0000-000000000002", clubCatDesserts,
-			"Tiramisu", "Klassisches Tiramisu mit Mascarpone und Amaretto", "food", "dessert", 1250, 3},
+			"Tiramisu", "Klassisches Tiramisu mit Mascarpone und Amaretto", "food", "dessert", imgTiramisu, 1250, 3},
 		{"cc000000-0003-0005-0000-000000000003", clubCatDesserts,
-			"Crème Brûlée", "Vanille-Crème mit karamellisierter Zuckerkruste, saisionale Früchte", "food", "dessert", 1150, 5},
+			"Crème Brûlée", "Vanille-Crème mit karamellisierter Zuckerkruste, saisionale Früchte", "food", "dessert", imgCremeBrulee, 1150, 5},
 		{"cc000000-0003-0005-0000-000000000004", clubCatDesserts,
-			"Sorbet des Tages", "Zwei Kugeln hausgemachtes Sorbet, frische Minze", "food", "dessert", 1050, 3},
+			"Sorbet des Tages", "Zwei Kugeln hausgemachtes Sorbet, frische Minze", "food", "dessert", imgSorbet, 1050, 3},
 		{"cc000000-0003-0005-0000-000000000005", clubCatDesserts,
-			"Schoggimousse", "Schweizer Schokoladenmousse, Vanillesauce, Schlagrahm", "food", "dessert", 1150, 3},
+			"Schoggimousse", "Schweizer Schokoladenmousse, Vanillesauce, Schlagrahm", "food", "dessert", imgChocMousse, 1150, 3},
 		// ── Alkoholfreie Getränke ────────────────────────────────────────────
 		{"cc000000-0003-0006-0000-000000000001", clubCatSoftDrinks,
-			"Mineralwasser", "Still oder Sprudel, 3dl", "beverage", "bar", 450, 0},
+			"Mineralwasser", "Still oder Sprudel, 3dl", "beverage", "bar", imgWater, 450, 0},
 		{"cc000000-0003-0006-0000-000000000002", clubCatSoftDrinks,
-			"Coca-Cola", "3dl, inkl. Eis und Zitrone", "beverage", "bar", 450, 0},
+			"Coca-Cola", "3dl, inkl. Eis und Zitrone", "beverage", "bar", imgCola, 450, 0},
 		{"cc000000-0003-0006-0000-000000000003", clubCatSoftDrinks,
-			"Orangensaft frisch gepresst", "2dl frisch gepresster Orangensaft", "beverage", "bar", 650, 0},
+			"Orangensaft frisch gepresst", "2dl frisch gepresster Orangensaft", "beverage", "bar", imgOJuice, 650, 0},
 		{"cc000000-0003-0006-0000-000000000004", clubCatSoftDrinks,
-			"Espresso", "Doppelter Espresso", "beverage", "bar", 450, 0},
+			"Espresso", "Doppelter Espresso", "beverage", "bar", imgEspresso, 450, 0},
 		{"cc000000-0003-0006-0000-000000000005", clubCatSoftDrinks,
-			"Cappuccino", "Mit feinem Milchschaum und Latte-Art", "beverage", "bar", 590, 0},
+			"Cappuccino", "Mit feinem Milchschaum und Latte-Art", "beverage", "bar", imgCappuccino, 590, 0},
 		{"cc000000-0003-0006-0000-000000000006", clubCatSoftDrinks,
-			"Latte Macchiato", "Milchkaffee mit doppeltem Espresso", "beverage", "bar", 650, 0},
+			"Latte Macchiato", "Milchkaffee mit doppeltem Espresso", "beverage", "bar", imgLatte, 650, 0},
 		{"cc000000-0003-0006-0000-000000000007", clubCatSoftDrinks,
-			"Tee", "Auswahl aus verschiedenen Teesorten", "beverage", "bar", 450, 0},
+			"Tee", "Auswahl aus verschiedenen Teesorten", "beverage", "bar", imgTea, 450, 0},
 		// ── Weine & Bier ─────────────────────────────────────────────────────
 		{"cc000000-0003-0007-0000-000000000001", clubCatWinesBeer,
-			"Fendant du Valais", "1dl, weiss, trocken, Suisse romande", "alcohol", "bar", 650, 0},
+			"Fendant du Valais", "1dl, weiss, trocken, Suisse romande", "alcohol", "bar", imgWhiteWine, 650, 0},
 		{"cc000000-0003-0007-0000-000000000002", clubCatWinesBeer,
-			"Dôle du Valais", "1dl, rot, Pinot Noir & Gamay", "alcohol", "bar", 650, 0},
+			"Dôle du Valais", "1dl, rot, Pinot Noir & Gamay", "alcohol", "bar", imgRedWine, 650, 0},
 		{"cc000000-0003-0007-0000-000000000003", clubCatWinesBeer,
-			"Prosecco", "1dl, prickelnd, Venetien", "alcohol", "bar", 750, 0},
+			"Prosecco", "1dl, prickelnd, Venetien", "alcohol", "bar", imgProsecco, 750, 0},
 		{"cc000000-0003-0007-0000-000000000004", clubCatWinesBeer,
-			"Bier vom Fass", "3dl, Helles vom Fass", "alcohol", "bar", 650, 0},
+			"Bier vom Fass", "3dl, Helles vom Fass", "alcohol", "bar", imgBeer, 650, 0},
 		{"cc000000-0003-0007-0000-000000000005", clubCatWinesBeer,
-			"Heineken", "3dl Flasche", "alcohol", "bar", 550, 0},
+			"Heineken", "3dl Flasche", "alcohol", "bar", imgBeer, 550, 0},
 		{"cc000000-0003-0007-0000-000000000006", clubCatWinesBeer,
-			"Aperol Spritz", "Aperol, Prosecco, Soda, Orange", "alcohol", "bar", 1150, 0},
+			"Aperol Spritz", "Aperol, Prosecco, Soda, Orange", "alcohol", "bar", imgAperol, 1150, 0},
 	}
 
 	for i, p := range products {
 		costPrice := p.price * 35 / 100
 		prepTime := sql.NullInt32{Int32: int32(p.prep), Valid: p.prep > 0}
 		if err := exec(tx, `
-			INSERT INTO products (id, tenant_id, category_id, name, description, price, cost_price, tax_group, is_active, display_order, prep_time_minutes, printer_group, created_at, updated_at, sync_status, is_deleted)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12,$13,0,false)
+			INSERT INTO products (id, tenant_id, category_id, name, description, price, cost_price, tax_group, image_path, is_active, display_order, prep_time_minutes, printer_group, created_at, updated_at, sync_status, is_deleted)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11,$12,$13,$14,0,false)
 			ON CONFLICT (id) DO NOTHING`,
 			p.id, clubDemoTenantID, p.catID, p.name, p.desc, p.price, costPrice,
-			p.taxGroup, i, prepTime, p.printer, now, now,
+			p.taxGroup, p.imageURL, i, prepTime, p.printer, now, now,
 		); err != nil {
 			return fmt.Errorf("product %s: %w", p.name, err)
 		}
@@ -405,8 +448,8 @@ func seedClubDemoFloors(tx *sql.Tx, now time.Time) error {
 		id, name string
 		order    int
 	}{
-		{clubFloorHauptraumID, "Hauptraum", 0},
-		{clubFloorWintergarten, "Wintergarten", 1},
+		{clubFloorHauptraumID, "Erdgeschoss", 0},
+		{clubFloorWintergarten, "Terrasse", 1},
 	}
 	for _, f := range floors {
 		if err := exec(tx, `
@@ -612,6 +655,46 @@ func seedClubDemoDemoOrders(tx *sql.Tx, now time.Time) error {
 			o.total, o.tendered, changeAmt, clubWaiter1ID, closedAt, closedAt, closedAt,
 		); err != nil {
 			return fmt.Errorf("club payment %d: %w", i+1, err)
+		}
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Gang Templates (Vorspeise · Hauptgang · Dessert · Getränke)
+//
+// These course (Gang) templates define the multi-course service structure used
+// by the POS, KDS and Waiter apps.  They are stored in the server's
+// gang_templates table (migration 007) and synced down to each Flutter app's
+// local Drift database at first login.
+// ---------------------------------------------------------------------------
+
+const (
+	clubGangVorspeise = "cc000000-000f-0000-0000-000000000001"
+	clubGangHauptgang = "cc000000-000f-0000-0000-000000000002"
+	clubGangDessert   = "cc000000-000f-0000-0000-000000000003"
+	clubGangGetraenke = "cc000000-000f-0000-0000-000000000004"
+)
+
+func seedClubDemoGangTemplates(tx *sql.Tx, now time.Time) error {
+	type gang struct {
+		id, name, color string
+		sortOrder       int
+	}
+	gangs := []gang{
+		{clubGangVorspeise, "Vorspeise", "#90ABFF", 1},
+		{clubGangHauptgang, "Hauptgang", "#69F6B8", 2},
+		{clubGangDessert, "Dessert", "#BF5AF2", 3},
+		{clubGangGetraenke, "Getränke", "#FF9F0A", 4},
+	}
+	for _, g := range gangs {
+		if err := exec(tx, `
+			INSERT INTO gang_templates (id, tenant_id, name, sort_order, color, is_default, is_active, created_at, updated_at, sync_status, is_deleted)
+			VALUES ($1,$2,$3,$4,$5,true,true,$6,$7,0,false)
+			ON CONFLICT (id) DO NOTHING`,
+			g.id, clubDemoTenantID, g.name, g.sortOrder, g.color, now, now,
+		); err != nil {
+			return fmt.Errorf("gang_template %s: %w", g.name, err)
 		}
 	}
 	return nil
