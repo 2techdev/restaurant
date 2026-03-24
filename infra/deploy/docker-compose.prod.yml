@@ -11,7 +11,6 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-GC_2tech_2026!secure}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
@@ -22,7 +21,7 @@ services:
 
   server:
     build:
-      context: .
+      context: ../../server
       dockerfile: Dockerfile
     container_name: gastrocore-server
     restart: unless-stopped
