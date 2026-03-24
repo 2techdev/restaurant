@@ -11,14 +11,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:gastrocore_pos/core/printing/models/print_models.dart';
+import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
+import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/discount_dialog.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/modifier_dialog.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 
 // ---------------------------------------------------------------------------
 // POS Screen
@@ -489,8 +495,124 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     );
   }
 
-  void _addProduct(ProductEntity product) {
-    ref.read(currentTicketProvider.notifier).addItem(product);
+  Future<void> _addProduct(ProductEntity product) async {
+    final categoryGangId = _categoryGangIdFor(product.categoryId);
+
+    if (product.modifierGroups.isNotEmpty) {
+      final modifierGroups = ModifierGroupData.fromProductEntity(product);
+      final result = await showModifierDialog(
+        context: context,
+        productName: product.name,
+        productPrice: product.price,
+        modifierGroups: modifierGroups,
+      );
+      if (result == null) return;
+
+      final orderModifiers = <OrderItemModifierEntity>[];
+      for (final entry in result.selectedModifiers.entries) {
+        for (final opt in entry.value) {
+          orderModifiers.add(OrderItemModifierEntity(
+            id: IdGenerator.generateId(),
+            orderItemId: '',
+            modifierId: opt.id,
+            modifierName: opt.name,
+            priceDelta: opt.priceDelta,
+          ));
+        }
+      }
+      ref.read(currentTicketProvider.notifier).addItem(
+            product,
+            quantity: result.quantity.toDouble(),
+            selectedModifiers: orderModifiers,
+            notes: result.notes.isNotEmpty ? result.notes : null,
+            categoryGangId: categoryGangId,
+          );
+    } else {
+      ref.read(currentTicketProvider.notifier).addItem(
+            product,
+            categoryGangId: categoryGangId,
+          );
+    }
+  }
+
+  String? _categoryGangIdFor(String categoryId) {
+    final categories = ref.read(categoriesProvider).valueOrNull ?? [];
+    final cat = categories.where((c) => c.id == categoryId).firstOrNull;
+    return cat?.defaultGangId;
+  }
+
+  // -------------------------------------------------------------------------
+  // Print check (Adisyon)
+  // -------------------------------------------------------------------------
+
+  /// Print an interim bill (Adisyon) for the current ticket without
+  /// closing the order. Shows items + total, no payment info.
+  Future<void> _printCheck() async {
+    final ticket = ref.read(currentTicketProvider);
+    if (ticket == null || ticket.items.isEmpty) return;
+
+    final restaurantAsync =
+        ref.read(restaurantSettingsProvider);
+    final restaurantSettings = restaurantAsync.valueOrNull;
+
+    final isDineIn = ticket.orderType != OrderType.takeaway;
+
+    // Build MwSt breakdown map from items
+    final mwstBreakdown = <String, int>{};
+    for (final item in ticket.items) {
+      final code = MwStCode.forProduct(
+        taxGroup: item.taxGroup,
+        isDineIn: isDineIn,
+      );
+      mwstBreakdown[code.code] =
+          (mwstBreakdown[code.code] ?? 0) + item.subtotal;
+    }
+
+    final adisyonItems = ticket.items
+        .map(
+          (item) => AdisyonItem(
+            name: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.subtotal - item.discountAmount,
+            discountAmount: item.discountAmount,
+            modifiers:
+                item.modifiers.map((m) => m.modifierName).toList(),
+          ),
+        )
+        .toList();
+
+    final data = AdisyonData(
+      restaurantName: restaurantSettings?.name.isNotEmpty == true
+          ? restaurantSettings!.name
+          : 'Restaurant',
+      address: restaurantSettings?.address.isNotEmpty == true
+          ? restaurantSettings!.address
+          : null,
+      tableName: ticket.tableId,
+      orderNo: ticket.orderNumber,
+      cashierName: ref.read(currentUserProvider)?.name,
+      items: adisyonItems,
+      total: ticket.total,
+      subtotal: ticket.discountAmount > 0 ? ticket.subtotal : null,
+      discountAmount: ticket.discountAmount,
+      mwstBreakdown: mwstBreakdown,
+      dateTime: DateTime.now(),
+    );
+
+    final ok =
+        await ref.read(printCheckUseCaseProvider).call(data);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok ? 'Adisyon gedruckt.' : 'Drucker nicht erreichbar.',
+          ),
+          backgroundColor: ok ? AppColors.green : AppColors.red,
+        ),
+      );
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -815,6 +937,43 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                // Print check (Adisyon)
+                GestureDetector(
+                  onTap: hasItems ? _printCheck : null,
+                  child: Container(
+                    width: double.infinity,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.receipt_long_rounded,
+                          size: 14,
+                          color: hasItems
+                              ? AppColors.textSecondary
+                              : AppColors.textDim,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'ADISYON YAZDIR',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: hasItems
+                                ? AppColors.textSecondary
+                                : AppColors.textDim,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     // Discount
@@ -1061,6 +1220,34 @@ class _ProductCardState extends State<_ProductCard> {
     return 'CHF $whole.$frac';
   }
 
+  Widget _buildProductImage(String? imagePath) {
+    if (imagePath != null && imagePath.startsWith('http')) {
+      return Image.network(
+        imagePath,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _imagePlaceholder(),
+        loadingBuilder: (_, child, progress) =>
+            progress == null ? child : _imagePlaceholder(),
+      );
+    }
+    return _imagePlaceholder();
+  }
+
+  Widget _imagePlaceholder() {
+    return Container(
+      width: double.infinity,
+      color: AppColors.surfaceContainerHigh,
+      child: const Center(
+        child: Icon(
+          Icons.restaurant_rounded,
+          size: 28,
+          color: AppColors.surfaceContainerHighest,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1083,21 +1270,11 @@ class _ProductCardState extends State<_ProductCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image placeholder
+            // Product image
             Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.restaurant_rounded,
-                    size: 28,
-                    color: AppColors.surfaceContainerHighest,
-                  ),
-                ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: _buildProductImage(widget.product.imagePath),
               ),
             ),
             const SizedBox(height: 10),

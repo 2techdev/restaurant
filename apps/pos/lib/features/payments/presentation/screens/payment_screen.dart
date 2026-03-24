@@ -9,11 +9,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/features/payments/domain/entities/payment_entity.dart';
+import 'package:gastrocore_pos/features/payments/presentation/providers/refund_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Payment Screen
@@ -83,9 +87,35 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Future<void> _onCompletePayment() async {
-    // Record payment against the real ticket.
-    final repo = ref.read(orderRepositoryProvider);
-    await repo.updateTicketStatus(widget.ticketId, TicketStatus.completed);
+    final tenantId = ref.read(tenantIdProvider);
+    final currentUser = ref.read(currentUserProvider);
+    final receivedBy = currentUser?.name ?? 'POS';
+
+    // Map local enum to domain PaymentMethod.
+    final domainMethod = switch (_selectedMethod) {
+      _PaymentMethod.cash => PaymentMethod.cash,
+      _PaymentMethod.creditCard => PaymentMethod.creditCard,
+      _PaymentMethod.debitCard => PaymentMethod.debitCard,
+      _PaymentMethod.split => PaymentMethod.other,
+    };
+
+    // tenderedAmount: for cash use the entered amount (whole CHF → cents),
+    // for card use the exact ticket total.
+    final tendered = _selectedMethod == _PaymentMethod.cash
+        ? _enteredAmount * 100
+        : _grandTotal;
+
+    // Process payment: creates bill, records payment row, closes ticket.
+    final paymentRepo = ref.read(paymentRepositoryProvider);
+    await paymentRepo.processPayment(
+      ticketId: widget.ticketId,
+      tenantId: tenantId,
+      paymentMethod: domainMethod,
+      amount: _grandTotal,
+      tenderedAmount: tendered,
+      receivedBy: receivedBy,
+    );
+
     ref.read(currentTicketProvider.notifier).clear();
 
     setState(() => _paymentComplete = true);
@@ -182,7 +212,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Para Ustu: \u20BA${_formatCents(_changeAmount)}',
+              'Rückgeld: CHF ${_formatCents(_changeAmount)}',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.green),
             ),
           ],
@@ -384,7 +414,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         ),
                       ),
                       Text(
-                        '\u20BA${_formatCents(item.subtotal)}',
+                        'CHF${_formatCents(item.subtotal)}',
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFFE2E2EB)),
                       ),
                     ],
@@ -403,9 +433,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ),
             child: Column(
               children: [
-                _buildTotalRow('Subtotal', '\u20BA${_formatCents(_subtotal)}', false),
+                _buildTotalRow('Subtotal', 'CHF${_formatCents(_subtotal)}', false),
                 const SizedBox(height: 12),
-                _buildTotalRow('KDV (dahil)', '\u20BA${_formatCents(_taxAmount)}', false),
+                _buildTotalRow('KDV (dahil)', 'CHF${_formatCents(_taxAmount)}', false),
                 const SizedBox(height: 12),
                 Container(height: 1, color: const Color(0xFF424753).withValues(alpha: 0.2)),
                 const SizedBox(height: 12),
@@ -415,7 +445,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     const Text('Total', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFE2E2EB))),
                     Flexible(
                       child: Text(
-                        '\u20BA${_formatCents(_grandTotal)}',
+                        'CHF${_formatCents(_grandTotal)}',
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.right,
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFFAFC6FF)),
@@ -584,7 +614,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                               ),
                             ),
                             Text(
-                              _amountStr.isEmpty ? '\u20BA0.00' : '\u20BA$_amountStr.00',
+                              _amountStr.isEmpty ? 'CHF0.00' : 'CHF$_amountStr.00',
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 32,
@@ -615,7 +645,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '\u20BA${_formatCents(_changeAmount)}',
+                                    'CHF${_formatCents(_changeAmount)}',
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontSize: 20,

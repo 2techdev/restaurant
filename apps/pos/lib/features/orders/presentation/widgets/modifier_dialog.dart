@@ -367,7 +367,7 @@ class _ModifierDialogContentState
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
-                  'ZORUNLU',
+                  'PFLICHT',
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
@@ -457,7 +457,7 @@ class _ModifierDialogContentState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Adet',
+          'Anzahl',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -521,7 +521,7 @@ class _ModifierDialogContentState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Notlar',
+          'Bemerkung',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -542,7 +542,7 @@ class _ModifierDialogContentState
               color: AppColors.textPrimary,
             ),
             decoration: const InputDecoration(
-              hintText: 'Ozel not ekleyin...',
+              hintText: 'Besondere Wünsche...',
               hintStyle: TextStyle(
                 fontSize: 14,
                 color: AppColors.textDim,
@@ -582,7 +582,7 @@ class _ModifierDialogContentState
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'TOPLAM',
+                  'TOTAL',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -616,7 +616,7 @@ class _ModifierDialogContentState
               ),
               child: const Center(
                 child: Text(
-                  'Iptal',
+                  'Abbrechen',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -644,7 +644,7 @@ class _ModifierDialogContentState
               ),
               child: const Center(
                 child: Text(
-                  'Siparise Ekle',
+                  'Zur Bestellung',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,

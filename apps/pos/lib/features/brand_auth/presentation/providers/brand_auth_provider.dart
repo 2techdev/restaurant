@@ -195,6 +195,30 @@ class BrandAuthNotifier extends StateNotifier<BrandAuthState> {
   }
 
   // ---------------------------------------------------------------------------
+  // Local / demo mode (no server required)
+  // ---------------------------------------------------------------------------
+
+  /// Activate a local-only session that bypasses brand auth entirely.
+  ///
+  /// This is the entry point for the free offline tier. No network call is
+  /// made; a synthetic [StoreContext] with [isOnlineMode] = false is created.
+  /// Cloud sync remains disabled until the user connects a real account.
+  Future<void> loginAsLocalDemo() async {
+    const ctx = StoreContext(
+      brandId: 'local',
+      storeId: 'local',
+      storeName: 'Demo Restaurant',
+      brandName: 'GastroCore Free',
+      userRole: BrandUserRole.owner,
+      isOnlineMode: false,
+    );
+    state = BrandAuthState(
+      storeContext: ctx,
+      isInitialized: true,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Update last sync timestamp
   // ---------------------------------------------------------------------------
 

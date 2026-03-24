@@ -15,6 +15,7 @@ import 'package:gastrocore_pos/features/auth/presentation/screens/pin_login_scre
 import 'package:gastrocore_pos/features/brand_auth/presentation/screens/brand_login_screen.dart';
 import 'package:gastrocore_pos/features/brand_auth/presentation/screens/register_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_open_screen.dart';
+import 'package:gastrocore_pos/features/shifts/presentation/screens/z_report_screen.dart';
 import 'package:gastrocore_pos/features/home/presentation/screens/home_screen.dart';
 import 'package:gastrocore_pos/features/orders/presentation/screens/order_center_screen.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/screens/kitchen_display_screen.dart';
@@ -61,6 +62,7 @@ abstract final class AppRoutes {
   static const String shiftHistory = '/shift-history';
   static const String menuManagement = '/menu-management';
   static const String auditLog = '/audit-log';
+  static const String zReport = '/z-report';
 
   // ── Legacy aliases ────────────────────────────────────────────────────────
   static const String pos = '/pos';
@@ -203,6 +205,10 @@ GoRouter createAppRouter({
         GoRoute(
           path: AppRoutes.dayClose,
           builder: (context, state) => const DayCloseScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.zReport,
+          builder: (context, state) => const ZReportScreen(),
         ),
         GoRoute(
           path: AppRoutes.receipt,
