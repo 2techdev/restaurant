@@ -82,11 +82,13 @@ const (
 	prodCappuccinoID        = "d0000000-0003-0000-0000-000000000024"
 
 	// Modifier groups
-	mgZutatenID  = "d0000000-0004-0000-0000-000000000001"
-	mgSauceID    = "d0000000-0004-0000-0000-000000000002"
-	mgGarpunktID = "d0000000-0004-0000-0000-000000000003"
-	mgGroesseID  = "d0000000-0004-0000-0000-000000000004"
-	mgBeilageID  = "d0000000-0004-0000-0000-000000000005"
+	mgZutatenID     = "d0000000-0004-0000-0000-000000000001"
+	mgSauceID       = "d0000000-0004-0000-0000-000000000002"
+	mgGarpunktID    = "d0000000-0004-0000-0000-000000000003"
+	mgGroesseID     = "d0000000-0004-0000-0000-000000000004"
+	mgBeilageID     = "d0000000-0004-0000-0000-000000000005"
+	mgDrinkExtraID  = "d0000000-0004-0000-0000-000000000006"
+	mgSchaerfeID    = "d0000000-0004-0000-0000-000000000007"
 
 	// Floors
 	floorHauptraumID = "d0000000-0005-0000-0000-000000000001"
@@ -290,19 +292,19 @@ func seedUsers(tx *sql.Tx, now time.Time) error {
 	users := []struct {
 		id, name, pin, role, avatar string
 	}{
-		{demoAdminID, "Klaus Wagner", "0000", "admin", "assets/images/staff/default.svg"},
-		{demoManagerID, "Max Müller", "1234", "manager", "assets/images/staff/max_mueller.svg"},
-		{demoCashierID, "Sarah Weber", "5678", "cashier", "assets/images/staff/sarah_weber.svg"},
-		{demoWaiter1ID, "Luca Bernasconi", "9012", "waiter", "assets/images/staff/luca_bernasconi.svg"},
-		{demoWaiter2ID, "Anna Fischer", "3456", "waiter", "assets/images/staff/anna_fischer.svg"},
-		{demoWaiter3ID, "Thomas Keller", "7890", "waiter", "assets/images/staff/thomas_keller.svg"},
+		{demoAdminID, "Klaus Wagner", "0000", "admin", "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=100&h=100&fit=crop&q=60"},
+		{demoManagerID, "Max Müller", "1234", "manager", "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&q=60"},
+		{demoCashierID, "Sarah Weber", "5678", "cashier", "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&q=60"},
+		{demoWaiter1ID, "Luca Bernasconi", "9012", "waiter", "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&q=60"},
+		{demoWaiter2ID, "Anna Fischer", "3456", "waiter", "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&q=60"},
+		{demoWaiter3ID, "Thomas Keller", "7890", "waiter", "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&q=60"},
 	}
 	for _, u := range users {
 		if err := exec(tx, `
-			INSERT INTO users (id, tenant_id, name, pin_hash, role, is_active, created_at, updated_at, sync_status, is_deleted)
-			VALUES ($1,$2,$3,$4,$5,true,$6,$7,0,false)
+			INSERT INTO users (id, tenant_id, name, pin_hash, role, avatar, is_active, created_at, updated_at, sync_status, is_deleted)
+			VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,0,false)
 			ON CONFLICT (id) DO NOTHING`,
-			u.id, demoTenantID, u.name, hashPin(u.pin), u.role, now, now,
+			u.id, demoTenantID, u.name, hashPin(u.pin), u.role, u.avatar, now, now,
 		); err != nil {
 			return fmt.Errorf("user %s: %w", u.name, err)
 		}
@@ -344,50 +346,50 @@ func seedCategories(tx *sql.Tx, now time.Time) error {
 
 func seedProducts(tx *sql.Tx, now time.Time) error {
 	type product struct {
-		id, catID, name, desc, taxGroup, printer string
-		price, prep                              int
+		id, catID, name, desc, taxGroup, printer, imagePath string
+		price, prep                                         int
 	}
 	products := []product{
 		// Vorspeisen
-		{prodCaesarSalatID, catVorspeisedID, "Caesar Salat", "Römersalat, Croutons, Parmesan, Caesar-Dressing", "food", "cold", 1250, 8},
-		{prodBruschettaID, catVorspeisedID, "Bruschetta", "Geröstetes Brot, Tomaten, Basilikum, Knoblauch", "food", "cold", 850, 6},
-		{prodTagesuppeID, catVorspeisedID, "Tagessuppe", "Suppe des Tages mit frischem Brot", "food", "kitchen", 700, 5},
-		{prodGemischterVorspID, catVorspeisedID, "Gemischter Vorspeisenteller", "Auswahl hausgemachter kalter Vorspeisen", "food", "cold", 1500, 8},
+		{prodCaesarSalatID, catVorspeisedID, "Caesar Salat", "Römersalat, Croutons, Parmesan, Caesar-Dressing", "food", "cold", "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop&q=80", 1250, 8},
+		{prodBruschettaID, catVorspeisedID, "Bruschetta", "Geröstetes Brot, Tomaten, Basilikum, Knoblauch", "food", "cold", "https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?w=400&h=300&fit=crop&q=80", 850, 6},
+		{prodTagesuppeID, catVorspeisedID, "Tagessuppe", "Suppe des Tages mit frischem Brot", "food", "kitchen", "https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=300&fit=crop&q=80", 700, 5},
+		{prodGemischterVorspID, catVorspeisedID, "Gemischter Vorspeisenteller", "Auswahl hausgemachter kalter Vorspeisen", "food", "cold", "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=300&fit=crop&q=80", 1500, 8},
 		// Hauptspeisen
-		{prodZuerichGeschID, catHauptID, "Zürich Geschnetzeltes", "Kalbsgeschnetzeltes Zürcher Art, Rösti, Rahmsauce", "food", "grill", 2850, 18},
-		{prodWienerSchnitzelID, catHauptID, "Wiener Schnitzel", "Paniertes Kalbsschnitzel, Kartoffelsalat, Zitrone", "food", "grill", 2600, 15},
-		{prodRindsfiletID, catHauptID, "Grilliertes Rindsfilet", "200g Rindsfilet vom Grill, Grillgemüse, Café-de-Paris-Butter", "food", "grill", 3800, 22},
-		{prodLachsfiletID, catHauptID, "Lachsfilet", "Atlantik-Lachs, Safransauce, Blattspinat, Basmati", "food", "kitchen", 3200, 18},
-		{prodCarbonara1ID, catHauptID, "Pasta Carbonara", "Spaghetti, Pancetta, Eigelb, Pecorino Romano", "food", "kitchen", 1950, 12},
-		{prodBurgerClassicID, catHauptID, "Burger Classic", "180g Rindfleisch, Cheddar, Salat, Tomate, Pommes frites", "food", "grill", 2200, 14},
+		{prodZuerichGeschID, catHauptID, "Zürich Geschnetzeltes", "Kalbsgeschnetzeltes Zürcher Art, Rösti, Rahmsauce", "food", "grill", "https://images.unsplash.com/photo-1544025162-d76538661384?w=400&h=300&fit=crop&q=80", 2850, 18},
+		{prodWienerSchnitzelID, catHauptID, "Wiener Schnitzel", "Paniertes Kalbsschnitzel, Kartoffelsalat, Zitrone", "food", "grill", "https://images.unsplash.com/photo-1599921841143-819065a55cc6?w=400&h=300&fit=crop&q=80", 2600, 15},
+		{prodRindsfiletID, catHauptID, "Grilliertes Rindsfilet", "200g Rindsfilet vom Grill, Grillgemüse, Café-de-Paris-Butter", "food", "grill", "https://images.unsplash.com/photo-1558030006-450675393462?w=400&h=300&fit=crop&q=80", 3800, 22},
+		{prodLachsfiletID, catHauptID, "Lachsfilet", "Atlantik-Lachs, Safransauce, Blattspinat, Basmati", "food", "kitchen", "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&h=300&fit=crop&q=80", 3200, 18},
+		{prodCarbonara1ID, catHauptID, "Pasta Carbonara", "Spaghetti, Pancetta, Eigelb, Pecorino Romano", "food", "kitchen", "https://images.unsplash.com/photo-1612874742237-6526221588e3?w=400&h=300&fit=crop&q=80", 1950, 12},
+		{prodBurgerClassicID, catHauptID, "Burger Classic", "180g Rindfleisch, Cheddar, Salat, Tomate, Pommes frites", "food", "grill", "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop&q=80", 2200, 14},
 		// Pizza & Pasta
-		{prodMargheritaID, catPizzaPastaID, "Margherita", "Tomatensauce, Mozzarella, frisches Basilikum", "food", "kitchen", 1600, 10},
-		{prodQuattroFormID, catPizzaPastaID, "Quattro Formaggi", "Mozzarella, Gorgonzola, Emmentaler, Parmesan", "food", "kitchen", 1900, 12},
-		{prodProsciuttoID, catPizzaPastaID, "Prosciutto e Rucola", "Parmaschinken, Rucola, Kirschtomaten, Parmesan", "food", "kitchen", 2100, 12},
-		{prodBologneseID, catPizzaPastaID, "Pasta Bolognese", "Pappardelle, Rindfleisch-Bolognese, Parmesan", "food", "kitchen", 1850, 15},
+		{prodMargheritaID, catPizzaPastaID, "Margherita", "Tomatensauce, Mozzarella, frisches Basilikum", "food", "kitchen", "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400&h=300&fit=crop&q=80", 1600, 10},
+		{prodQuattroFormID, catPizzaPastaID, "Quattro Formaggi", "Mozzarella, Gorgonzola, Emmentaler, Parmesan", "food", "kitchen", "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop&q=80", 1900, 12},
+		{prodProsciuttoID, catPizzaPastaID, "Prosciutto e Rucola", "Parmaschinken, Rucola, Kirschtomaten, Parmesan", "food", "kitchen", "https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400&h=300&fit=crop&q=80", 2100, 12},
+		{prodBologneseID, catPizzaPastaID, "Pasta Bolognese", "Pappardelle, Rindfleisch-Bolognese, Parmesan", "food", "kitchen", "https://images.unsplash.com/photo-1551183053-bf91798d9b1a?w=400&h=300&fit=crop&q=80", 1850, 15},
 		// Desserts
-		{prodTiramisuID, catDessertID, "Tiramisu", "Klassisches Tiramisu mit Mascarpone", "food", "dessert", 950, 3},
-		{prodCremeBruleeID, catDessertID, "Crème Brûlée", "Vanille-Crème mit karamellisierter Zuckerkruste", "food", "dessert", 850, 3},
-		{prodSchokiFondueID, catDessertID, "Schokoladen-Fondue", "Schweizer Schokoladen-Fondue für 2 Personen, Früchte", "food", "dessert", 1800, 8},
-		{prodApfelstrudelID, catDessertID, "Apfelstrudel", "Hausgemachter Apfelstrudel, Vanillesauce, Zimt-Eis", "food", "dessert", 900, 5},
+		{prodTiramisuID, catDessertID, "Tiramisu", "Klassisches Tiramisu mit Mascarpone", "food", "dessert", "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=400&h=300&fit=crop&q=80", 950, 3},
+		{prodCremeBruleeID, catDessertID, "Crème Brûlée", "Vanille-Crème mit karamellisierter Zuckerkruste", "food", "dessert", "https://images.unsplash.com/photo-1470324161839-ce2bb6fa6bc3?w=400&h=300&fit=crop&q=80", 850, 3},
+		{prodSchokiFondueID, catDessertID, "Schokoladen-Fondue", "Schweizer Schokoladen-Fondue für 2 Personen, Früchte", "food", "dessert", "https://images.unsplash.com/photo-1548018560-c7ef2cccf51f?w=400&h=300&fit=crop&q=80", 1800, 8},
+		{prodApfelstrudelID, catDessertID, "Apfelstrudel", "Hausgemachter Apfelstrudel, Vanillesauce, Zimt-Eis", "food", "dessert", "https://images.unsplash.com/photo-1621236378699-8597faf6a176?w=400&h=300&fit=crop&q=80", 900, 5},
 		// Getränke
-		{prodMineralwasserID, catGetraenkeID, "Mineralwasser", "Still oder Sprudel, 500ml", "beverage", "bar", 350, 0},
-		{prodColaID, catGetraenkeID, "Coca-Cola", "330ml Dose", "beverage", "bar", 450, 0},
-		{prodHausweinID, catGetraenkeID, "Hauswein", "1dl Haus-Wein, Rot oder Weiss", "alcohol", "bar", 600, 0},
-		{prodBierFassID, catGetraenkeID, "Bier vom Fass", "3dl frisch vom Fass", "alcohol", "bar", 550, 0},
-		{prodEspressoID, catGetraenkeID, "Espresso", "Doppelter Espresso", "beverage", "bar", 400, 0},
-		{prodCappuccinoID, catGetraenkeID, "Cappuccino", "Mit feinem Milchschaum und Latte-Art", "beverage", "bar", 550, 0},
+		{prodMineralwasserID, catGetraenkeID, "Mineralwasser", "Still oder Sprudel, 500ml", "beverage", "bar", "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=300&fit=crop&q=80", 350, 0},
+		{prodColaID, catGetraenkeID, "Coca-Cola", "330ml Dose", "beverage", "bar", "https://images.unsplash.com/photo-1592415486689-125cbbfcaefd?w=400&h=300&fit=crop&q=80", 450, 0},
+		{prodHausweinID, catGetraenkeID, "Hauswein", "1dl Haus-Wein, Rot oder Weiss", "alcohol", "bar", "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&h=300&fit=crop&q=80", 600, 0},
+		{prodBierFassID, catGetraenkeID, "Bier vom Fass", "3dl frisch vom Fass", "alcohol", "bar", "https://images.unsplash.com/photo-1535958636474-b021ee887b13?w=400&h=300&fit=crop&q=80", 550, 0},
+		{prodEspressoID, catGetraenkeID, "Espresso", "Doppelter Espresso", "beverage", "bar", "https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?w=400&h=300&fit=crop&q=80", 400, 0},
+		{prodCappuccinoID, catGetraenkeID, "Cappuccino", "Mit feinem Milchschaum und Latte-Art", "beverage", "bar", "https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=400&h=300&fit=crop&q=80", 550, 0},
 	}
 
 	for i, p := range products {
 		costPrice := p.price * 35 / 100
 		prepTime := sql.NullInt32{Int32: int32(p.prep), Valid: p.prep > 0}
 		if err := exec(tx, `
-			INSERT INTO products (id, tenant_id, category_id, name, description, price, cost_price, tax_group, is_active, display_order, prep_time_minutes, printer_group, created_at, updated_at, sync_status, is_deleted)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10,$11,$12,$13,0,false)
+			INSERT INTO products (id, tenant_id, category_id, name, description, price, cost_price, tax_group, image_path, is_active, display_order, prep_time_minutes, printer_group, created_at, updated_at, sync_status, is_deleted)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11,$12,$13,$14,0,false)
 			ON CONFLICT (id) DO NOTHING`,
 			p.id, demoTenantID, p.catID, p.name, p.desc, p.price, costPrice,
-			p.taxGroup, i, prepTime, p.printer, now, now,
+			p.taxGroup, p.imagePath, i, prepTime, p.printer, now, now,
 		); err != nil {
 			return fmt.Errorf("product %s: %w", p.name, err)
 		}
@@ -401,15 +403,17 @@ func seedProducts(tx *sql.Tx, now time.Time) error {
 
 func seedModifierGroups(tx *sql.Tx, now time.Time) error {
 	groups := []struct {
-		id, name, selType    string
-		min, max, dispOrder  int
-		required             bool
+		id, name, selType   string
+		min, max, dispOrder int
+		required            bool
 	}{
-		{mgZutatenID, "Zusätzliche Zutaten", "multiple", 0, 5, 0, false},
+		{mgZutatenID, "Extras", "multiple", 0, 5, 0, false},
 		{mgSauceID, "Sauce", "single", 1, 1, 1, true},
 		{mgGarpunktID, "Garpunkt", "single", 1, 1, 2, true},
-		{mgGroesseID, "Getränkegrösse", "single", 1, 1, 3, true},
+		{mgGroesseID, "Grösse", "single", 1, 1, 3, true},
 		{mgBeilageID, "Beilage", "multiple", 0, 3, 4, false},
+		{mgDrinkExtraID, "Getränke Extras", "multiple", 0, 3, 5, false},
+		{mgSchaerfeID, "Schärfe", "single", 0, 1, 6, false},
 	}
 	for _, g := range groups {
 		if err := exec(tx, `
@@ -437,31 +441,37 @@ func seedModifiers(tx *sql.Tx, now time.Time) error {
 
 	// Pre-defined option IDs
 	opts := []opt{
-		// Zusätzliche Zutaten
+		// Extras
 		{"d0000000-0006-0001-0000-000000000001", mgZutatenID, "Käse", 250, 0, false},
-		{"d0000000-0006-0001-0000-000000000002", mgZutatenID, "Champignons", 150, 1, false},
-		{"d0000000-0006-0001-0000-000000000003", mgZutatenID, "Zwiebeln", 100, 2, false},
-		{"d0000000-0006-0001-0000-000000000004", mgZutatenID, "Peperoni", 100, 3, false},
-		{"d0000000-0006-0001-0000-000000000005", mgZutatenID, "Avocado", 300, 4, false},
+		{"d0000000-0006-0001-0000-000000000002", mgZutatenID, "Speck", 300, 1, false},
+		{"d0000000-0006-0001-0000-000000000003", mgZutatenID, "Ei", 150, 2, false},
+		{"d0000000-0006-0001-0000-000000000004", mgZutatenID, "Avocado", 350, 3, false},
 		// Sauce
 		{"d0000000-0006-0002-0000-000000000001", mgSauceID, "Ketchup", 0, 0, true},
-		{"d0000000-0006-0002-0000-000000000002", mgSauceID, "Mayonnaise", 0, 1, false},
-		{"d0000000-0006-0002-0000-000000000003", mgSauceID, "BBQ", 0, 2, false},
-		{"d0000000-0006-0002-0000-000000000004", mgSauceID, "Ranch", 0, 3, false},
-		{"d0000000-0006-0002-0000-000000000005", mgSauceID, "Knoblauch", 0, 4, false},
+		{"d0000000-0006-0002-0000-000000000002", mgSauceID, "Mayo", 0, 1, false},
+		{"d0000000-0006-0002-0000-000000000003", mgSauceID, "Senf", 0, 2, false},
+		{"d0000000-0006-0002-0000-000000000004", mgSauceID, "BBQ", 0, 3, false},
 		// Garpunkt
 		{"d0000000-0006-0003-0000-000000000001", mgGarpunktID, "Rare (blutig)", 0, 0, false},
 		{"d0000000-0006-0003-0000-000000000002", mgGarpunktID, "Medium", 0, 1, true},
 		{"d0000000-0006-0003-0000-000000000003", mgGarpunktID, "Well Done", 0, 2, false},
-		// Getränkegrösse
+		// Grösse
 		{"d0000000-0006-0004-0000-000000000001", mgGroesseID, "Klein", 0, 0, true},
-		{"d0000000-0006-0004-0000-000000000002", mgGroesseID, "Mittel", 100, 1, false},
-		{"d0000000-0006-0004-0000-000000000003", mgGroesseID, "Gross", 200, 2, false},
+		{"d0000000-0006-0004-0000-000000000002", mgGroesseID, "Normal", 200, 1, false},
+		{"d0000000-0006-0004-0000-000000000003", mgGroesseID, "Gross", 400, 2, false},
 		// Beilage
 		{"d0000000-0006-0005-0000-000000000001", mgBeilageID, "Pommes frites", 450, 0, false},
 		{"d0000000-0006-0005-0000-000000000002", mgBeilageID, "Salat", 350, 1, false},
 		{"d0000000-0006-0005-0000-000000000003", mgBeilageID, "Reis", 300, 2, false},
 		{"d0000000-0006-0005-0000-000000000004", mgBeilageID, "Suppe", 400, 3, false},
+		// Getränke Extras
+		{"d0000000-0006-0006-0000-000000000001", mgDrinkExtraID, "Mit Eis", 0, 0, false},
+		{"d0000000-0006-0006-0000-000000000002", mgDrinkExtraID, "Ohne Eis", 0, 1, false},
+		{"d0000000-0006-0006-0000-000000000003", mgDrinkExtraID, "Extra Shot", 100, 2, false},
+		// Schärfe
+		{"d0000000-0006-0007-0000-000000000001", mgSchaerfeID, "Mild", 0, 0, true},
+		{"d0000000-0006-0007-0000-000000000002", mgSchaerfeID, "Medium", 0, 1, false},
+		{"d0000000-0006-0007-0000-000000000003", mgSchaerfeID, "Scharf", 0, 2, false},
 	}
 
 	for _, o := range opts {
@@ -488,11 +498,12 @@ func seedProductModifierLinks(tx *sql.Tx, now time.Time) error {
 	}
 
 	links := []link{
-		// Burger Classic → Garpunkt + Zutaten + Sauce + Beilage
+		// Burger Classic → Garpunkt + Extras + Sauce + Schärfe + Beilage
 		{"d0000000-0009-0001-0000-000000000001", prodBurgerClassicID, mgGarpunktID, 0},
 		{"d0000000-0009-0001-0000-000000000002", prodBurgerClassicID, mgZutatenID, 1},
 		{"d0000000-0009-0001-0000-000000000003", prodBurgerClassicID, mgSauceID, 2},
-		{"d0000000-0009-0001-0000-000000000004", prodBurgerClassicID, mgBeilageID, 3},
+		{"d0000000-0009-0001-0000-000000000005", prodBurgerClassicID, mgSchaerfeID, 3},
+		{"d0000000-0009-0001-0000-000000000004", prodBurgerClassicID, mgBeilageID, 4},
 		// Zürich Geschnetzeltes → Garpunkt + Beilage
 		{"d0000000-0009-0002-0000-000000000001", prodZuerichGeschID, mgGarpunktID, 0},
 		{"d0000000-0009-0002-0000-000000000002", prodZuerichGeschID, mgBeilageID, 1},
@@ -505,19 +516,28 @@ func seedProductModifierLinks(tx *sql.Tx, now time.Time) error {
 		// Lachsfilet + Carbonara → Beilage
 		{"d0000000-0009-0005-0000-000000000001", prodLachsfiletID, mgBeilageID, 0},
 		{"d0000000-0009-0005-0000-000000000002", prodCarbonara1ID, mgBeilageID, 0},
-		// Pizzen → Zusätzliche Zutaten
+		// Pizzen → Extras + Schärfe
 		{"d0000000-0009-0006-0000-000000000001", prodMargheritaID, mgZutatenID, 0},
+		{"d0000000-0009-0006-0000-000000000007", prodMargheritaID, mgSchaerfeID, 1},
 		{"d0000000-0009-0006-0000-000000000002", prodQuattroFormID, mgZutatenID, 0},
+		{"d0000000-0009-0006-0000-000000000008", prodQuattroFormID, mgSchaerfeID, 1},
 		{"d0000000-0009-0006-0000-000000000003", prodProsciuttoID, mgZutatenID, 0},
+		{"d0000000-0009-0006-0000-000000000009", prodProsciuttoID, mgSchaerfeID, 1},
 		// Pasta Bolognese → Beilage
 		{"d0000000-0009-0006-0000-000000000004", prodBologneseID, mgBeilageID, 0},
-		// Getränke → Getränkegrösse
+		// Getränke → Grösse + Getränke Extras
 		{"d0000000-0009-0007-0000-000000000001", prodMineralwasserID, mgGroesseID, 0},
+		{"d0000000-0009-0007-0000-000000000007", prodMineralwasserID, mgDrinkExtraID, 1},
 		{"d0000000-0009-0007-0000-000000000002", prodColaID, mgGroesseID, 0},
+		{"d0000000-0009-0007-0000-000000000008", prodColaID, mgDrinkExtraID, 1},
 		{"d0000000-0009-0007-0000-000000000003", prodHausweinID, mgGroesseID, 0},
+		{"d0000000-0009-0007-0000-000000000009", prodHausweinID, mgDrinkExtraID, 1},
 		{"d0000000-0009-0007-0000-000000000004", prodBierFassID, mgGroesseID, 0},
+		{"d0000000-0009-0007-0000-000000000010", prodBierFassID, mgDrinkExtraID, 1},
 		{"d0000000-0009-0007-0000-000000000005", prodEspressoID, mgGroesseID, 0},
+		{"d0000000-0009-0007-0000-000000000011", prodEspressoID, mgDrinkExtraID, 1},
 		{"d0000000-0009-0007-0000-000000000006", prodCappuccinoID, mgGroesseID, 0},
+		{"d0000000-0009-0007-0000-000000000012", prodCappuccinoID, mgDrinkExtraID, 1},
 	}
 
 	for _, l := range links {

@@ -95,6 +95,16 @@ class BrandAuthNotifier extends StateNotifier<BrandAuthState> {
       final refreshToken = await _storage.readRefreshToken();
 
       if (ctx != null && refreshToken != null && refreshToken.isNotEmpty) {
+        // Local/demo mode: 'local' is a sentinel set by loginAsLocalDemo().
+        // No server call needed — restore directly without any network access.
+        if (refreshToken == 'local') {
+          state = BrandAuthState(
+            storeContext: ctx,
+            isInitialized: true,
+          );
+          return true;
+        }
+
         // Try to refresh the access token to verify validity.
         // On failure (e.g. token expired > 1 year) fall through to login.
         try {
@@ -202,6 +212,9 @@ class BrandAuthNotifier extends StateNotifier<BrandAuthState> {
   ///
   /// This is the entry point for the free offline tier. No network call is
   /// made; a synthetic [StoreContext] with [isOnlineMode] = false is created.
+  /// The session is persisted to secure storage so it survives app restarts —
+  /// the 'local' refresh-token sentinel is detected by [restoreSession] and
+  /// skips any server refresh, keeping the app fully offline.
   /// Cloud sync remains disabled until the user connects a real account.
   Future<void> loginAsLocalDemo() async {
     const ctx = StoreContext(
@@ -211,6 +224,14 @@ class BrandAuthNotifier extends StateNotifier<BrandAuthState> {
       brandName: 'GastroCore Free',
       userRole: BrandUserRole.owner,
       isOnlineMode: false,
+    );
+    // Persist with sentinel tokens so restoreSession() can reload this session
+    // on the next app launch without any network access.
+    await _storage.saveTokens(
+      accessToken: 'local',
+      refreshToken: 'local',
+      storeContext: ctx,
+      rememberMe: true,
     );
     state = BrandAuthState(
       storeContext: ctx,

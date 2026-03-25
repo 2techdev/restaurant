@@ -85,7 +85,16 @@ class AdisyonBuilder {
 
   void _itemLines(EscPosBuilder b) {
     b.alignLeft();
+    String? currentCourse;
+
     for (final item in data.items) {
+      // Print a course/gang header whenever the course label changes.
+      if (item.course != null && item.course != currentCourse) {
+        currentCourse = item.course!;
+        b.newLine();
+        b.boldOn().textLine('-- $currentCourse --').boldOff();
+      }
+
       // Item name on its own line
       b.twoColumnLine(item.name, '', width: _w);
       // Qty × unit price → line total
@@ -99,6 +108,10 @@ class AdisyonBuilder {
       // Modifiers
       for (final mod in item.modifiers) {
         b.textLine('  + $mod');
+      }
+      // Special preparation note
+      if (item.notes != null && item.notes!.isNotEmpty) {
+        b.textLine('  ! ${item.notes}');
       }
     }
   }

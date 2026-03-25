@@ -29,14 +29,14 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PORT: 8080
+      PORT: 8090
       ENV: production
       LOG_LEVEL: info
       DATABASE_URL: postgres://gastrocore:${DB_PASSWORD:-GC_2tech_2026!secure}@postgres:5432/gastrocore?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:-gc-jwt-secret-change-in-prod-2026}
       LICENSE_SIGNING_KEY: ${LICENSE_KEY:-gc-license-key-change-in-prod}
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8090:8090"
 
   redis:
     image: redis:7-alpine

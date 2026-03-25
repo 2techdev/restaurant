@@ -55,6 +55,7 @@ class SeedData {
   String _mgGroesseId = '';
   String _mgBeilageId = '';
   String _mgDrinkExtraId = '';
+  String _mgSchaerfeId = '';
 
   // Product ID buckets for modifier linking & demo orders
   final List<String> _grillIds = [];
@@ -776,7 +777,7 @@ class SeedData {
       displayOrder: 0,
     );
     for (final o in [
-      (name: 'Extra Käse', delta: 200, def: false, order: 0),
+      (name: 'Käse', delta: 250, def: false, order: 0),
       (name: 'Speck', delta: 300, def: false, order: 1),
       (name: 'Ei', delta: 150, def: false, order: 2),
       (name: 'Avocado', delta: 350, def: false, order: 3),
@@ -848,7 +849,7 @@ class SeedData {
     );
     for (final o in [
       (name: 'Klein', delta: 0, def: true, order: 0),
-      (name: 'Mittel', delta: 200, def: false, order: 1),
+      (name: 'Normal', delta: 200, def: false, order: 1),
       (name: 'Gross', delta: 400, def: false, order: 2),
     ]) {
       await addOption(
@@ -907,16 +908,40 @@ class SeedData {
       );
     }
 
+    // -- 7. Schärfe (optional, single) --------------------------------------
+    _mgSchaerfeId = await addGroup(
+      name: 'Schärfe',
+      selectionType: 'single',
+      minSel: 0,
+      maxSel: 1,
+      isRequired: false,
+      displayOrder: 6,
+    );
+    for (final o in [
+      (name: 'Mild', delta: 0, def: true, order: 0),
+      (name: 'Medium', delta: 0, def: false, order: 1),
+      (name: 'Scharf', delta: 0, def: false, order: 2),
+    ]) {
+      await addOption(
+        groupId: _mgSchaerfeId,
+        name: o.name,
+        priceDelta: o.delta,
+        isDefault: o.def,
+        displayOrder: o.order,
+      );
+    }
+
     // -----------------------------------------------------------------------
     // Link modifier groups to products
     // -----------------------------------------------------------------------
 
-    // Burger Classic → Garpunkt + Extras + Sauce + Beilage
+    // Burger Classic → Garpunkt + Extras + Sauce + Schärfe + Beilage
     if (_burgerId != null) {
       await linkGroup(_burgerId!, _mgGarpunktId, 0);
       await linkGroup(_burgerId!, _mgZutatenId, 1);
       await linkGroup(_burgerId!, _mgSauceId, 2);
-      await linkGroup(_burgerId!, _mgBeilageId, 3);
+      await linkGroup(_burgerId!, _mgSchaerfeId, 3);
+      await linkGroup(_burgerId!, _mgBeilageId, 4);
     }
 
     // Grilliertes Rindsfilet & Zürich Geschnetzeltes → Garpunkt + Beilage
@@ -932,9 +957,10 @@ class SeedData {
       await linkGroup(id, _mgBeilageId, 0);
     }
 
-    // Pizzen → Extras
+    // Pizzen → Extras + Schärfe
     for (final id in _pizzaIds) {
       await linkGroup(id, _mgZutatenId, 0);
+      await linkGroup(id, _mgSchaerfeId, 1);
     }
 
     // Getränke → Grösse + Getränke Extras
