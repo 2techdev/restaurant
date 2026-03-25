@@ -53,6 +53,7 @@ enum _Section {
   payment('Payment', Icons.payment_rounded),
   receipt('Receipt', Icons.receipt_long_rounded),
   tax('Tax (MWST)', Icons.calculate_rounded),
+  reports('Reports', Icons.assessment_rounded),
   appearance('Appearance', Icons.palette_rounded),
   backup('Backup & Restore', Icons.backup_rounded),
   auditLog('Audit Log', Icons.history_rounded),
@@ -118,6 +119,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _Section.payment => const _PaymentSection(),
       _Section.receipt => const _ReceiptSection(),
       _Section.tax => const _TaxSection(),
+      _Section.reports => _ReportsSection(onNavigate: _navigateBack),
       _Section.appearance => const _AppearanceSection(),
       _Section.backup => const _BackupSection(),
       _Section.auditLog => _AuditLogLinkSection(onNavigate: _navigateBack),
@@ -2719,6 +2721,100 @@ class _SegmentedRow<T> extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reports Section
+// ---------------------------------------------------------------------------
+
+class _ReportsSection extends StatelessWidget {
+  const _ReportsSection({required this.onNavigate});
+  final VoidCallback onNavigate;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionScaffold(
+      title: 'Reports',
+      children: [
+        _Card(
+          children: [
+            const Text(
+              'Z-Rapport (Tagesabschluss): Zeigt Umsatz, Zahlungen, '
+              'MwSt-Abrechnung und Top-Artikel für den aktuellen Shift. '
+              'Kann jederzeit gedruckt werden.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                context.push(AppRoutes.zReport);
+              },
+              icon: const Icon(Icons.assessment_rounded, size: 18),
+              label: const Text('Z-Rapport öffnen'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: AppColors.surfaceDim,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+        _Card(
+          title: 'Schicht-Geschichte',
+          children: [
+            const Text(
+              'Alle vergangenen Schichten mit Umsatz und Kassenbestand.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                context.push(AppRoutes.shiftHistory);
+              },
+              icon: const Icon(Icons.history_rounded, size: 18),
+              label: const Text('Schicht-Geschichte'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.surfaceContainerHigh,
+                foregroundColor: AppColors.textPrimary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+        _Card(
+          title: 'Tagesabschluss',
+          children: [
+            const Text(
+              'Shift schließen, Kasse zählen und Z-Rapport drucken.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                context.go(AppRoutes.dayClose);
+              },
+              icon: const Icon(Icons.lock_clock_rounded, size: 18),
+              label: const Text('Day Close starten'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.orangeDim,
+                foregroundColor: AppColors.orange,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

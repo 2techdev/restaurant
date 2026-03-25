@@ -54,6 +54,8 @@ class SeedData {
   String _mgGarpunktId = '';
   String _mgGroesseId = '';
   String _mgBeilageId = '';
+  String _mgDrinkExtraId = '';
+  String _mgSchaerfeId = '';
 
   // Product ID buckets for modifier linking & demo orders
   final List<String> _grillIds = [];
@@ -193,37 +195,37 @@ class SeedData {
         name: 'Klaus Wagner',
         pin: '0000',
         role: 'admin',
-        avatar: 'assets/images/staff/default.svg',
+        avatar: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=100&h=100&fit=crop&q=60',
       ),
       (
         name: 'Max Müller',
         pin: '1234',
         role: 'manager',
-        avatar: 'assets/images/staff/max_mueller.svg',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&q=60',
       ),
       (
         name: 'Sarah Weber',
         pin: '5678',
         role: 'cashier',
-        avatar: 'assets/images/staff/sarah_weber.svg',
+        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&q=60',
       ),
       (
         name: 'Luca Bernasconi',
         pin: '9012',
         role: 'waiter',
-        avatar: 'assets/images/staff/luca_bernasconi.svg',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&q=60',
       ),
       (
         name: 'Anna Fischer',
         pin: '3456',
         role: 'waiter',
-        avatar: 'assets/images/staff/anna_fischer.svg',
+        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&q=60',
       ),
       (
         name: 'Thomas Keller',
         pin: '7890',
         role: 'waiter',
-        avatar: 'assets/images/staff/thomas_keller.svg',
+        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&q=60',
       ),
     ];
 
@@ -444,7 +446,7 @@ class SeedData {
       description: 'Römersalat, Croutons, Parmesan, Caesar-Dressing',
       prepTime: 8,
       printerGroup: 'cold',
-      imagePath: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop&q=80',
     );
     await add(
       catId: _catVorspeisedId,
@@ -453,7 +455,7 @@ class SeedData {
       description: 'Geröstetes Brot, Tomaten, Basilikum, Knoblauch',
       prepTime: 6,
       printerGroup: 'cold',
-      imagePath: 'https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?w=400&h=300&fit=crop&q=80',
     );
     await add(
       catId: _catVorspeisedId,
@@ -462,7 +464,7 @@ class SeedData {
       description: 'Suppe des Tages mit frischem Brot',
       prepTime: 5,
       printerGroup: 'kitchen',
-      imagePath: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=300&fit=crop&q=80',
     );
     await add(
       catId: _catVorspeisedId,
@@ -471,7 +473,7 @@ class SeedData {
       description: 'Auswahl hausgemachter kalter Vorspeisen',
       prepTime: 8,
       printerGroup: 'cold',
-      imagePath: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=300&fit=crop&q=80',
     );
 
     // -- Hauptspeisen --
@@ -482,7 +484,7 @@ class SeedData {
       description: 'Kalbsgeschnetzeltes Zürcher Art, Rösti, Rahmsauce',
       prepTime: 18,
       printerGroup: 'grill',
-      imagePath: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1544025162-d76538661384?w=400&h=300&fit=crop&q=80',
     );
     _grillIds.add(_prodZuerichGeschId);
     _mainIds.add(_prodZuerichGeschId);
@@ -494,7 +496,7 @@ class SeedData {
       description: 'Paniertes Kalbsschnitzel, Kartoffelsalat, Zitrone',
       prepTime: 15,
       printerGroup: 'grill',
-      imagePath: 'https://images.unsplash.com/photo-1599921841143-819065a55cc6?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1599921841143-819065a55cc6?w=400&h=300&fit=crop&q=80',
     );
     _grillIds.add(_prodWienerSchnitzelId);
     _mainIds.add(_prodWienerSchnitzelId);
@@ -506,7 +508,7 @@ class SeedData {
       description: '200g Rindsfilet vom Grill, Grillgemüse, Café-de-Paris-Butter',
       prepTime: 22,
       printerGroup: 'grill',
-      imagePath: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1558030006-450675393462?w=400&h=300&fit=crop&q=80',
     );
     _grillIds.add(rindsfiletId);
     _mainIds.add(rindsfiletId);
@@ -518,7 +520,7 @@ class SeedData {
       description: 'Atlantik-Lachs, Safransauce, Blattspinat, Basmati',
       prepTime: 18,
       printerGroup: 'kitchen',
-      imagePath: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&h=300&fit=crop&q=80',
     );
     _mainIds.add(lachsId);
 
@@ -529,7 +531,7 @@ class SeedData {
       description: 'Spaghetti, Pancetta, Eigelb, Pecorino Romano',
       prepTime: 12,
       printerGroup: 'kitchen',
-      imagePath: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=400&h=300&fit=crop&q=80',
     );
     _mainIds.add(carbonaraId);
 
@@ -540,7 +542,7 @@ class SeedData {
       description: '180g Rindfleisch, Cheddar, Salat, Tomate, Pommes frites',
       prepTime: 14,
       printerGroup: 'grill',
-      imagePath: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop&q=80',
     );
     _grillIds.add(_burgerId!);
     _mainIds.add(_burgerId!);
@@ -553,7 +555,7 @@ class SeedData {
       description: 'Tomatensauce, Mozzarella, frisches Basilikum',
       prepTime: 10,
       printerGroup: 'kitchen',
-      imagePath: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400&h=300&fit=crop&q=80',
     );
     _pizzaIds.add(_prodMargheritaId);
 
@@ -564,7 +566,7 @@ class SeedData {
       description: 'Vier Käse: Mozzarella, Gorgonzola, Emmentaler, Parmesan',
       prepTime: 12,
       printerGroup: 'kitchen',
-      imagePath: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=300&fit=crop&q=80',
     );
     _pizzaIds.add(quattroId);
 
@@ -575,7 +577,7 @@ class SeedData {
       description: 'Parmaschinken, Rucola, Kirschtomaten, Parmesan',
       prepTime: 12,
       printerGroup: 'kitchen',
-      imagePath: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400&h=300&fit=crop&q=80',
     );
     _pizzaIds.add(prosciuttoId);
 
@@ -586,7 +588,7 @@ class SeedData {
       description: 'Pappardelle, Rindfleisch-Bolognese, Parmesan',
       prepTime: 15,
       printerGroup: 'kitchen',
-      imagePath: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1551183053-bf91798d9b1a?w=400&h=300&fit=crop&q=80',
     );
 
     // -- Desserts --
@@ -597,7 +599,7 @@ class SeedData {
       description: 'Klassisches Tiramisu mit Mascarpone',
       prepTime: 3,
       printerGroup: 'dessert',
-      imagePath: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=400&h=300&fit=crop&q=80',
     );
     await add(
       catId: _catDessertId,
@@ -606,7 +608,7 @@ class SeedData {
       description: 'Vanille-Crème mit karamellisierter Zuckerkruste',
       prepTime: 3,
       printerGroup: 'dessert',
-      imagePath: 'https://images.unsplash.com/photo-1470124182917-cc6e71b22ecc?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1470324161839-ce2bb6fa6bc3?w=400&h=300&fit=crop&q=80',
     );
     await add(
       catId: _catDessertId,
@@ -615,7 +617,7 @@ class SeedData {
       description: 'Schweizer Schokoladen-Fondue für 2 Personen, Früchte',
       prepTime: 8,
       printerGroup: 'dessert',
-      imagePath: 'https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1548018560-c7ef2cccf51f?w=400&h=300&fit=crop&q=80',
     );
     await add(
       catId: _catDessertId,
@@ -624,7 +626,7 @@ class SeedData {
       description: 'Hausgemachter Apfelstrudel, Vanillesauce, Zimt-Eis',
       prepTime: 5,
       printerGroup: 'dessert',
-      imagePath: 'https://images.unsplash.com/photo-1562440499-64c9a111f713?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1621236378699-8597faf6a176?w=400&h=300&fit=crop&q=80',
     );
 
     // -- Getränke --
@@ -635,7 +637,7 @@ class SeedData {
       description: 'Still oder Sprudel, 500ml',
       taxGroup: 'beverage',
       printerGroup: 'bar',
-      imagePath: 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&h=300&fit=crop&q=80',
     );
     _drinkIds.add(_prodMineralwasserId);
 
@@ -646,7 +648,7 @@ class SeedData {
       description: '330ml Dose',
       taxGroup: 'beverage',
       printerGroup: 'bar',
-      imagePath: 'https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1592415486689-125cbbfcaefd?w=400&h=300&fit=crop&q=80',
     );
     _drinkIds.add(colaId);
 
@@ -657,7 +659,7 @@ class SeedData {
       description: '1dl Haus-Wein, Rot oder Weiss',
       taxGroup: 'alcohol',
       printerGroup: 'bar',
-      imagePath: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&h=300&fit=crop&q=80',
     );
     _drinkIds.add(_prodHausweinId);
 
@@ -668,7 +670,7 @@ class SeedData {
       description: '3dl frisch vom Fass',
       taxGroup: 'alcohol',
       printerGroup: 'bar',
-      imagePath: 'https://images.unsplash.com/photo-1535958636474-b021ee887b13?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1535958636474-b021ee887b13?w=400&h=300&fit=crop&q=80',
     );
     _drinkIds.add(bierFassId);
 
@@ -679,7 +681,7 @@ class SeedData {
       description: 'Doppelter Espresso',
       taxGroup: 'beverage',
       printerGroup: 'bar',
-      imagePath: 'https://images.unsplash.com/photo-1510707577719-ae7c14805e3a?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?w=400&h=300&fit=crop&q=80',
     );
     _drinkIds.add(espressoId);
 
@@ -690,7 +692,7 @@ class SeedData {
       description: 'Mit feinem Milchschaum und Latte-Art',
       taxGroup: 'beverage',
       printerGroup: 'bar',
-      imagePath: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=200&h=250&fit=crop&q=60',
+      imagePath: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=400&h=300&fit=crop&q=80',
     );
     _drinkIds.add(_prodCappuccinoId);
   }
@@ -765,9 +767,9 @@ class SeedData {
       );
     }
 
-    // -- 1. Zusätzliche Zutaten (optional, multiple, max 5) -----------------
+    // -- 1. Extras / Beilagen (optional, multiple, max 5) -------------------
     _mgZutatenId = await addGroup(
-      name: 'Zusätzliche Zutaten',
+      name: 'Extras',
       selectionType: 'multiple',
       minSel: 0,
       maxSel: 5,
@@ -776,10 +778,9 @@ class SeedData {
     );
     for (final o in [
       (name: 'Käse', delta: 250, def: false, order: 0),
-      (name: 'Champignons', delta: 150, def: false, order: 1),
-      (name: 'Zwiebeln', delta: 100, def: false, order: 2),
-      (name: 'Peperoni', delta: 100, def: false, order: 3),
-      (name: 'Avocado', delta: 300, def: false, order: 4),
+      (name: 'Speck', delta: 300, def: false, order: 1),
+      (name: 'Ei', delta: 150, def: false, order: 2),
+      (name: 'Avocado', delta: 350, def: false, order: 3),
     ]) {
       await addOption(
         groupId: _mgZutatenId,
@@ -801,10 +802,9 @@ class SeedData {
     );
     for (final o in [
       (name: 'Ketchup', delta: 0, def: true, order: 0),
-      (name: 'Mayonnaise', delta: 0, def: false, order: 1),
+      (name: 'Mayo', delta: 0, def: false, order: 1),
       (name: 'BBQ', delta: 0, def: false, order: 2),
-      (name: 'Ranch', delta: 0, def: false, order: 3),
-      (name: 'Knoblauch', delta: 0, def: false, order: 4),
+      (name: 'Senf', delta: 0, def: false, order: 3),
     ]) {
       await addOption(
         groupId: _mgSauceId,
@@ -840,7 +840,7 @@ class SeedData {
 
     // -- 4. Getränkegrösse (required, single) --------------------------------
     _mgGroesseId = await addGroup(
-      name: 'Getränkegrösse',
+      name: 'Grösse',
       selectionType: 'single',
       minSel: 1,
       maxSel: 1,
@@ -849,8 +849,8 @@ class SeedData {
     );
     for (final o in [
       (name: 'Klein', delta: 0, def: true, order: 0),
-      (name: 'Mittel', delta: 100, def: false, order: 1),
-      (name: 'Gross', delta: 200, def: false, order: 2),
+      (name: 'Normal', delta: 200, def: false, order: 1),
+      (name: 'Gross', delta: 400, def: false, order: 2),
     ]) {
       await addOption(
         groupId: _mgGroesseId,
@@ -885,16 +885,63 @@ class SeedData {
       );
     }
 
+    // -- 6. Getränke Extras (optional, multiple) -----------------------------
+    _mgDrinkExtraId = await addGroup(
+      name: 'Getränke Extras',
+      selectionType: 'multiple',
+      minSel: 0,
+      maxSel: 3,
+      isRequired: false,
+      displayOrder: 5,
+    );
+    for (final o in [
+      (name: 'Mit Eis', delta: 0, def: false, order: 0),
+      (name: 'Ohne Eis', delta: 0, def: false, order: 1),
+      (name: 'Extra Shot', delta: 100, def: false, order: 2),
+    ]) {
+      await addOption(
+        groupId: _mgDrinkExtraId,
+        name: o.name,
+        priceDelta: o.delta,
+        isDefault: o.def,
+        displayOrder: o.order,
+      );
+    }
+
+    // -- 7. Schärfe (optional, single) --------------------------------------
+    _mgSchaerfeId = await addGroup(
+      name: 'Schärfe',
+      selectionType: 'single',
+      minSel: 0,
+      maxSel: 1,
+      isRequired: false,
+      displayOrder: 6,
+    );
+    for (final o in [
+      (name: 'Mild', delta: 0, def: true, order: 0),
+      (name: 'Medium', delta: 0, def: false, order: 1),
+      (name: 'Scharf', delta: 0, def: false, order: 2),
+    ]) {
+      await addOption(
+        groupId: _mgSchaerfeId,
+        name: o.name,
+        priceDelta: o.delta,
+        isDefault: o.def,
+        displayOrder: o.order,
+      );
+    }
+
     // -----------------------------------------------------------------------
     // Link modifier groups to products
     // -----------------------------------------------------------------------
 
-    // Burger Classic → Garpunkt + Zutaten + Sauce + Beilage
+    // Burger Classic → Garpunkt + Extras + Sauce + Schärfe + Beilage
     if (_burgerId != null) {
       await linkGroup(_burgerId!, _mgGarpunktId, 0);
       await linkGroup(_burgerId!, _mgZutatenId, 1);
       await linkGroup(_burgerId!, _mgSauceId, 2);
-      await linkGroup(_burgerId!, _mgBeilageId, 3);
+      await linkGroup(_burgerId!, _mgSchaerfeId, 3);
+      await linkGroup(_burgerId!, _mgBeilageId, 4);
     }
 
     // Grilliertes Rindsfilet & Zürich Geschnetzeltes → Garpunkt + Beilage
@@ -910,14 +957,16 @@ class SeedData {
       await linkGroup(id, _mgBeilageId, 0);
     }
 
-    // Pizzen → Zusätzliche Zutaten
+    // Pizzen → Extras + Schärfe
     for (final id in _pizzaIds) {
       await linkGroup(id, _mgZutatenId, 0);
+      await linkGroup(id, _mgSchaerfeId, 1);
     }
 
-    // Getränke → Getränkegrösse
+    // Getränke → Grösse + Getränke Extras
     for (final id in _drinkIds) {
       await linkGroup(id, _mgGroesseId, 0);
+      await linkGroup(id, _mgDrinkExtraId, 1);
     }
   }
 

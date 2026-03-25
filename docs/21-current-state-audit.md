@@ -1,309 +1,311 @@
-# 21 - Current State Audit
+# 21 — Current State Audit
 
-> **Document Status:** Authoritative | **Last Updated:** 2026-03-20 | **Based on:** Direct codebase inspection
+> **Document Status:** Authoritative | **Last Updated:** 2026-03-24 | **Based on:** Direct codebase inspection
 >
 > This document reflects **actual code**, not intentions. Every claim here was verified against the repository.
+> Previous version (2026-03-20) is superseded by this audit.
 
 ---
 
 ## 1. Audit Methodology
 
-Inspected: `apps/pos/lib/` (164 Dart files), `server/` (32 Go files), `test/` (20 test files), all 33 DB table definitions, build configs, and all ADRs. Compared against docs 00–20.
+Inspected: `apps/pos/lib/` (282 Dart files, ~25,656 LOC), `apps/online/lib/` (28 Dart files),
+`server/` (56 Go files, ~6,768 LOC), `test/` (44 unit test files, 9 integration suites),
+all 29 Drift table definitions, 6 PostgreSQL migration sets, build configs, pubspec.yaml, go.mod.
+
+Compared against docs 00–20 and the architecture freeze (doc 23).
 
 ---
 
-## 2. What Is Actually Implemented
+## 2. Flutter POS App — What Is Actually Implemented
 
-### 2.1 Auth / PIN Login — COMPLETE ✅
+### 2.1 Core Infrastructure ✅ COMPLETE
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| PIN-based user auth | Done | SHA-256 via `crypto` package |
-| Multi-user profiles | Done | cashier, waiter, manager roles |
-| Failed PIN counter | Done | |
-| `users` table | Done | id (UUID v7), tenantId, name, pin_hash, role, isActive, avatarPath |
+| Drift ORM + 29 SQLite tables | ✅ Complete | Schema version 2; generated `.g.dart` present |
+| GetIt + Riverpod DI | ✅ Complete | All providers registered in `providers.dart` |
+| GoRouter (14 named routes) | ✅ Complete | Route guards present |
+| Money value object | ✅ Complete | Integer cents, CHF, 5-Rappen rounding in `money.dart` |
+| UUID v7 generator | ✅ Complete | Order numbers, receipt numbers |
+| Stitch design system | ✅ Complete | Colors, typography, 15+ shared widgets |
+| App constants/enums | ✅ Complete | TableStatus, OrderStatus, PaymentMethod, OrderType |
+| Error handling | ✅ Complete | Failures + exceptions typed hierarchy |
 
-**Test coverage:** Included in settings/auth tests.
-
----
-
-### 2.2 Orders / POS Screen — COMPLETE ✅
+### 2.2 Fare Engine ✅ COMPLETE (Critical Business Logic)
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Full POS order creation | Done | |
-| Modifier support | Done | paid add-ons, removals, substitutions |
-| Void / refund (immutable) | Done | Creates new record, never mutates |
-| Order types | Done | dine-in, takeaway, delivery, QR, kiosk (enum) |
-| Order state machine | Done | draft→open→submitted→paid→cancelled |
-| `tickets` + `order_items` + `order_item_modifiers` | Done | |
-| Cashier + table-based order views | Done | |
+| FareEngine (25-field calculator) | ✅ Complete | Tax, discount, rounding, modifiers |
+| FareBreakdown + FareConfig models | ✅ Complete | Typed breakdown per tax rate |
+| PriceResolver | ✅ Complete | Resolves price by order type |
+| **Unit tests** | ✅ 30+ test cases passing | Full coverage of edge cases |
 
----
+### 2.3 Authentication / PIN Login ✅ COMPLETE
 
-### 2.3 Payments — COMPLETE ✅
+| Component | Status |
+|-----------|--------|
+| 4-digit PIN login screen | ✅ Done |
+| Multi-user avatar grid | ✅ Done |
+| Failed PIN counter + lockout | ✅ Done |
+| Role-based access (cashier / manager / admin) | ✅ Done |
+| Manager PIN confirmation dialog | ✅ Done — used for restricted actions |
+
+### 2.4 Menu Management ✅ COMPLETE
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Category CRUD (name, color, emoji, order) | ✅ Done | Drag-drop reorder |
+| Product CRUD (price, tax profile, active) | ✅ Done | |
+| Modifier groups (mandatory/optional, min/max) | ✅ Done | |
+| Product–modifier group M2M | ✅ Done | |
+| Bulk price update | ✅ Done | % adjustment, category scope |
+| Swiss MWST tax groups (2.6%, 3.8%, 8.1%) | ✅ Done | In DB seed |
+| Product image picker | 🔄 Package added | `image_picker` in pubspec; UI integration pending |
+| **Unit tests** | ✅ 45/45 passing | |
+
+### 2.5 Order Entry ✅ COMPLETE
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Order creation from POS grid | ✅ Done | |
+| Item add/remove/quantity | ✅ Done | |
+| Modifier selection dialog | ✅ Done | |
+| Per-item and per-order notes | ✅ Done | |
+| Order types: dine-in, takeaway, delivery | ✅ Done | Enum defined |
+| Split bill (by item / by amount / equally) | ✅ Done | |
+| Void / refund (immutable — creates new record) | ✅ Done | |
+| Receipt preview before payment | ✅ Done | |
+| **Discount dialog** | 🔄 Button present | FareEngine ready; dialog UI not wired |
+
+### 2.6 Payments ✅ COMPLETE (Core Flows)
 
 | Method | Status | Notes |
 |--------|--------|-------|
-| Cash (manual) | Done | Change calculation |
-| Wallee LTI | Done | TCP port 50000, XML framing, EP2 receipt fields, trxSyncNumber in SharedPreferences |
-| MyPOS WiFi | Done | TCP port 60180, SlaveSDK AAR, 60s heartbeat PING, 15s ICMP watchdog, 10 reconnect retries |
-| TWINT | Done | Via MyPOS |
-| Split bill | Done | By item, equally by N guests, custom split |
+| Cash with change calculation | ✅ Done | |
+| Simulated card (for testing) | ✅ Done | |
+| Split payment (mixed methods) | ✅ Done | |
+| **myPOS WiFi bridge** | ✅ Done | TCP port 60180, SlaveSDK AAR (`slavesdk2.1.8.aar`), 60s heartbeat, 15s ICMP watchdog, 10 reconnects — field validation needed |
+| **Wallee LTI bridge** | ✅ Done | TCP port 50000, XML framing, EP2 receipt fields — field validation needed |
+| TWINT (via myPOS) | ✅ Done | |
+| Abstract `HardwarePaymentProvider` interface | ✅ Done | Clean extension point for new terminals |
+| `PaymentEngine` orchestrator | ✅ Done | |
+| **Unit tests** | ✅ Passing | `mypos_payment_provider_test`, `wallee_payment_provider_test`, `payment_engine_test` |
 
-**Hardware abstraction:** `HardwarePaymentProvider` interface — adding new terminal = new implementation.
-**Test coverage:** mypos_payment_provider_test, wallee_payment_provider_test, payment_engine_test.
-
----
-
-### 2.4 Menu Management — COMPLETE ✅
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Category CRUD | Done | Drag-drop ordering, color/emoji picker |
-| Product CRUD | Done | name, description, price (cents), tax profile, active toggle |
-| Modifier groups | Done | Single/multi select, mandatory/optional, min/max, CHF price delta |
-| Product–modifier group linking | Done | Many-to-many |
-| Product specifications/variants | Done | Atomic replace transaction |
-| Bulk price update | Done | % adjustment, category scope, CHF preview |
-| Swiss MWST tax groups | Done | food 2.6%, accommodation 3.8%, beverage/alcohol/standard 8.1% |
-
-**Test coverage:** 45/45 unit tests passing.
-
----
-
-### 2.5 Tables / Floor Plan — COMPLETE ✅
+### 2.7 Tables / Floor Plan ✅ COMPLETE
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Multi-floor plan | Done | |
-| Table CRUD | Done | name, capacity, shape (circle/square/rectangle) |
-| Drag-drop placement | Done | InteractiveViewer canvas 1200×800 px |
-| Table states | Done | available, occupied, reserved, dirty |
-| Guest count | Done | |
-| Table merge | Done | primary←secondary order transfer |
-| Order transfer | Done | table-to-table |
-| Real-time Drift Stream | Done | live state updates |
+| Multi-floor plan | ✅ Done | |
+| Table CRUD (name, capacity, shape) | ✅ Done | |
+| Drag-drop placement (InteractiveViewer 1200×800) | ✅ Done | |
+| Table states (available / occupied / reserved / dirty) | ✅ Done | |
+| Guest count | ✅ Done | |
+| Table merge (primary ← secondary order transfer) | ✅ Done | |
+| Order transfer (table-to-table) | ✅ Done | |
+| Drift Stream for live state updates | ✅ Done | |
+| **Table split dialog** | 🔲 Missing | Not yet implemented |
+| **Unit tests** | ✅ 22/22 passing | |
 
-**Test coverage:** 22/22 unit tests passing.
-
----
-
-### 2.6 Shifts — COMPLETE ✅
+### 2.8 Printing ✅ COMPLETE
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Open/close shift flow | Done | |
-| Opening float | Done | |
-| Cash movements | Done | `cash_movements` table |
-| Payment breakdown | Done | cash/card/TWINT, progress bar |
-| Shift history | Done | All terminals / this terminal filter |
-| ShiftIndicatorWidget | Done | Live timer on home screen, updates every minute |
-| Z-report auto-print on close | Done | Non-blocking (close proceeds even if print fails) |
-| Multi-register device ID | Done | StateProvider, configurable in Settings |
+| WiFi/TCP printer (port 9100) | ✅ Done | |
+| USB printer (20+ vendor IDs, auto-reconnect) | ✅ Done | |
+| Bluetooth printer (RFCOMM SPP, EventChannel) | ✅ Done | |
+| Raw ESC/POS byte builder | ✅ Done | |
+| Swiss-compliant receipt (UID, MWST, 5-Rappen) | ✅ Done | 36 tests |
+| Kitchen ticket builder (station-aware) | ✅ Done | 24 tests |
+| Shift / Z-report builder | ✅ Done | 45 tests |
+| Print queue with retry | ✅ Done | |
 
-**Test coverage:** 27/27 unit tests passing.
+### 2.9 Kitchen Display System ✅ UI DONE / ⚠️ DATA NOT WIRED
 
----
+| Component | Status | Notes |
+|-----------|--------|-------|
+| KDS screen (via `main_kds.dart`) | ✅ UI done | Visual is complete and polished |
+| Color-coded urgency (green/orange/red by elapsed time) | ✅ Done | |
+| Per-ticket countdown timer (1s precision) | ✅ Done | |
+| Bump button + stats bar | ✅ Done | |
+| Responsive grid (1–4 columns) | ✅ Done | |
+| **Real data connection** | 🔲 **MISSING** | Still uses `_buildDemoTickets()` hardcoded demo data |
+| `kitchen_tickets` + `kitchen_ticket_items` tables | ✅ Schema exists | DB tables ready, not queried by KDS screen |
+| **KDS audio alert** | 🔄 Package added | `audioplayers` in pubspec; integration pending |
+| **Station routing** | 🔄 Partial | Schema ready; UI routing not implemented |
 
-### 2.7 Printing — COMPLETE ✅
+### 2.10 Waiter App ✅ DONE (Embedded Mode)
 
-| Type | Status | Notes |
-|------|--------|-------|
-| WiFi/TCP | Done | Port 9100, socket |
-| USB | Done | 20+ USB vendor IDs, auto-reconnect |
-| Bluetooth | Done | RFCOMM SPP, EventChannel |
+All waiter app screens are complete inside `main_waiter.dart` entry point. PIN login, table selection (portrait), menu browse, order creation, active orders, bottom navigation — all functional.
 
-| ESC/POS Module | Tests | Status |
-|---------------|-------|--------|
-| EscPosBuilder | Unit | Done |
-| SwissReceiptBuilder | 36 | Done (incl. MWST breakdown, 5-Rappen rounding) |
-| KitchenTicketBuilder | 24 | Done |
-| ReportBuilder (Z/X reports) | 45 | Done |
+**Standalone Waiter APK:** `apps/waiter/` not yet created (Phase 2).
 
----
+### 2.11 Kiosk Mode ✅ DONE (Embedded Mode)
 
-### 2.8 Dashboard / Home — COMPLETE ✅
+Welcome, language selection (DE/FR/IT/EN), menu browse, product detail, cart, checkout, confirmation — all complete via `main_kiosk.dart`. Hardware payment integration for kiosk-specific flow is TBD.
 
-- Home screen with shift indicator, daily sales summary, order stats.
-- `DashboardRepository` + `DashboardSummary` entity.
-- `fl_chart` integration for revenue trend.
+**Standalone Kiosk APK:** Phase 2.
 
----
+### 2.12 Order Display Screen (ODS) 🔲 SCAFFOLDED ONLY
 
-### 2.9 Settings — COMPLETE ✅
+`main_ods.dart` exists as an entry point. Screen is blank. No live order ticker, no customer display logic.
 
-- `AppSettings`, `PaymentSettings`, `PrinterSettings`, `ReceiptSettings`, `RestaurantSettings`, `TaxSettings`
-- All persisted via `SharedPreferences`.
-- Separate settings repository + Riverpod provider.
+### 2.13 Shifts ✅ COMPLETE
 
----
+Shift open, opening float, cash movements, cash reconciliation, shift close, Z-report auto-print on close, shift history (all terminals / this terminal filter), multi-register device ID — all complete. **27/27 unit tests passing.**
 
-### 2.10 Database Schema — SOLID ✅
+### 2.14 Settings ✅ READ / 🔄 WRITE PARTIAL
 
-33 tables in Drift ORM, schema version 2, with migration strategy:
+Settings UI renders all configuration screens. `AppSettings`, `PaymentSettings`, `PrinterSettings`, `ReceiptSettings`, `RestaurantSettings`, `TaxSettings` persist via SharedPreferences. Some save callbacks incomplete — restaurant name and MWST number fields don't persist reliably.
 
-```
-Tenants, Users, Categories, Products, ModifierGroups, Modifiers,
-ProductModifierGroups, Floors, RestaurantTables, Tickets, OrderItems,
-OrderItemModifiers, Bills, Payments, Shifts, CashMovements,
-KitchenTickets, KitchenTicketItems, Receipts, SyncQueue, SyncMetadata,
-AuditLog, TaxProfiles, ProductPrices, OrderTypeRules, ComboItems,
-ProductSpecifications
-```
+### 2.15 Backoffice (Local) ✅ COMPLETE
 
-Key design decisions confirmed in code:
-- UUID v7 for all IDs (uuid 4.5.1)
-- Money as integer cents (no floats)
-- Soft deletes via `is_deleted` flag
-- Audit log table from day 1
-- Sync tables (`sync_queue`, `sync_metadata`) exist but not populated
+In-app backoffice: Menu CRUD, Staff CRUD, Table CRUD, Reports tab — all functional.
+
+### 2.16 Sync Infrastructure 🔄 SCAFFOLDED
+
+`sync_queue` and `sync_metadata` tables exist in Drift schema. Outbox/Inbox DAOs defined. REST sync client partially defined. WebSocket hub structure exists. **Zero sync logic is wired** — outbox is never written on mutations.
+
+### 2.17 Licensing ✅ COMPLETE (Framework)
+
+Ed25519 JWT verification, tier definitions (Starter/Pro/Enterprise), `LicenseValidator`, `FlagGate` widget all implemented. **Unit tested.** However, **no feature gate checks exist in actual feature code** — app runs all features regardless of license tier.
+
+### 2.18 Audit / Backup ✅ COMPLETE
+
+Audit log writer, SQLite backup to Downloads, SQLite restore with manager PIN — all complete.
 
 ---
 
-### 2.11 Go Backend Skeleton — EXISTS, NOT IMPLEMENTED ✅/⚠️
+## 3. Online Ordering Web App (apps/online/) — Audit
 
-Modules registered and routing set up:
+**Status: UI Complete, Zero Backend Integration**
 
-| Module | Route Prefix | Handler Status |
-|--------|-------------|----------------|
-| Auth | `/api/v1/auth` | Stub — all TODO |
-| Menu | `/api/v1/menu` | Stub — all TODO |
-| Orders | `/api/v1/orders` | Stub — all TODO |
-| Sync | `/api/v1/sync` | Stub — all TODO |
-| Reports | `/api/v1/reports` | Stub — all TODO |
-| Devices | `/api/v1/devices` | Stub — all TODO |
-| Stores | `/api/v1/stores` | Stub — all TODO |
-| Licenses | `/api/v1/licenses` | Stub — all TODO |
-| ERPNext Bridge | — | Stub module, no routes |
-| Fiscal | — | Stub module, no routes |
-
-**Middleware:** CORS, logging, panic recovery — implemented.
-**Database:** PostgreSQL connection pooling via `lib/pq` — wired up, migrations exist.
-**Go version:** 1.22.0
+All 7 screens (landing, menu, product detail, cart, checkout, confirmation, tracking) are implemented in Flutter Web with 4-language i18n (DE/FR/IT/EN). Every screen uses `mock_api_client.dart` — no real API calls exist. No payment processing. No tests.
 
 ---
 
-### 2.12 KDS — UI ONLY, NOT WIRED ⚠️
+## 4. Go Backend — Audit
 
-The `KitchenDisplayScreen` is visually complete and impressive:
-- Color-coded ticket cards (green/orange/red borders by elapsed time)
-- Per-ticket timer (seconds precision, refreshes every 1s)
-- Bump (READY) button that removes ticket from grid
-- Pending/Preparing/Ready stats bar
-- Responsive grid (1–4 columns)
+### 4.1 Infrastructure ✅ SOLID
 
-**Critical gap:** All data is **hardcoded demo data** (`_buildDemoTickets()` function). No connection to `kitchen_tickets` or `kitchen_ticket_items` database tables. No real-time updates from actual POS orders.
+HTTP server (graceful shutdown), PostgreSQL connection pooling, complete middleware chain (RequestID, Logger, Recover, CORS, Auth, Tenant, RateLimit), JWT, Ed25519, UUID generation — all implemented and working. Docker Compose with PostgreSQL + Go + Redis-alpine. **Redis: in docker-compose but zero usage in Go code — not needed for v1.**
 
-The `kitchen_tickets` and `kitchen_ticket_items` tables exist in the schema. The `KitchenTicketEntity` domain entity exists. The bridge between orders and KDS display is not built.
+### 4.2 Module Implementation Status
 
----
+| Module | Status | What Works | What's Missing |
+|--------|--------|------------|----------------|
+| **auth** | ✅ MVP | JWT, device registration, multitenant | Refresh token rotation |
+| **sync** | ✅ MVP | Upload/download REST, WebSocket hub | Real conflict resolution, delta sync |
+| **menu** | ✅ MVP | Full CRUD endpoints | Bulk operations |
+| **stores** | ✅ MVP | Store management, tenant API | Store hours |
+| **devices** | ✅ MVP | Device CRUD | Health monitoring |
+| **licenses** | ✅ MVP | License validation endpoint | License revocation |
+| **kds** | ✅ MVP | WebSocket hub | Ticket routing rules |
+| **orders** | 🔄 Partial | Create/list | Order lifecycle, refunds |
+| **reports** | 🔄 Partial | Struct exists | All queries stubbed |
+| **online** | 🔲 Stub | Demo handler | Full flow, payments |
+| **fiscal** | 🔲 Empty | Module file only | Fiskaly TSE (Phase 5) |
+| **erpnext_bridge** | 🔲 REMOVED | Dead code | Not building |
 
-### 2.13 Localization — PARTIAL ✅/⚠️
+### 4.3 Database Migrations
 
-- German (de) and French (fr) ARB files exist
-- `l10n.yaml` configured
-- Generated `AppLocalizations` class exists
-- **Gap:** Coverage is partial — not all strings are localized
+6 migration sets (up/down pairs) covering 26 PostgreSQL tables: tenants, auth, menu, orders, payments, shifts, kitchen, sync, fiscal, stores. All migrations present and runnable.
 
----
+### 4.4 Go Test Coverage
 
-## 3. What Does NOT Exist (Code-Verified)
-
-| Feature | Doc Reference | Code Status |
-|---------|-------------|-------------|
-| Sync engine (Flutter ↔ Go) | ADR-014, doc 10 | Tables exist, zero logic |
-| Cloud sync (Go handlers) | doc 10 | All TODO stubs |
-| License enforcement in app | ADR-011 | No feature flag checks in Dart code |
-| License service (Go) | doc 14 | All TODO stubs |
-| ERPNext bridge | doc 09 | Stub module only — **REMOVED per architecture decision** |
-| Germany fiscal (Fiskaly) | doc 07 | Stub module only |
-| Switzerland QR-bill | doc 08 | Not implemented |
-| Feature flags in Flutter | ADR-011 | No FlagGate checks in feature code |
-| CI/CD pipeline | doc 03 | No .github/workflows or similar |
-| E2E tests (real) | — | `integration_test/app_test.dart` is empty skeleton |
-| Web dashboard | doc 03 | Not started |
-| LAN sync (mDNS/discovery) | ADR-014 | Not started |
-| Device registration | doc 03 | Not started |
-| Redis (pub/sub) | doc 03 | In docker-compose, NOT in go.mod — never used |
-| Online ordering | doc 17 | Not started |
-| QR ordering | doc 17 | Not started |
-| Kiosk mode | doc 17 | Not started |
-| Retail mode | doc 17 | Not started |
-| Multi-branch | doc 03 | Not started |
-| Custom backoffice | — | Not started (replacing ERPNext per latest decision) |
-
----
-
-## 4. Android Build State
-
-| Item | Status | Notes |
-|------|--------|-------|
-| App ID | `com.gastrocore.gastrocore_pos` | Set |
-| Version | `0.1.0+1` | Needs increment before release |
-| Target SDK | Flutter default | Needs explicit `targetSdk 35` for Play compliance |
-| Min SDK | Flutter default | Should be explicit `minSdk 26` |
-| Signing config | `gastrocore-release.jks` key.properties | Config references it, file must exist |
-| AAB build | Not verified | Needs CI/CD |
-| MyPOS SDK AAR | `slavesdk2.1.8.aar` | Bundled in `android/app/libs/` |
+One test file: `sync/handlers_test.go`. All other modules have zero tests.
 
 ---
 
 ## 5. Test Coverage Summary
 
-| Area | Tests | Passing | Coverage Level |
-|------|-------|---------|----------------|
-| Menu | 45 | 45 | High |
-| SwissReceiptBuilder | 36 | 36 | High |
-| ReportBuilder | 45 | 45 | High |
-| Tables | 22 | 22 | High |
-| Shifts | 27 | 27 | High |
-| KitchenTicketBuilder | 24 | 24 | High |
-| Payments (hardware) | ~15 | ~15 | Medium |
-| Settings | ~10 | ~10 | Medium |
-| Integration tests | 1 | 0 | Skeleton only |
-| E2E / UI tests | 0 | — | None |
-| Go backend | 0 | — | None |
-
-**Total unit tests:** ~220+ passing.
-**Gap:** No integration tests, no Go tests, no E2E tests.
+| Category | Files/Suites | Status | Gaps |
+|----------|-------------|--------|------|
+| Unit tests (Flutter) | 44 files, 280+ cases | ✅ Passing | ODS, online app, discount dialog |
+| Integration tests (Flutter) | 9 suites | ✅ Present | E2E automated workflows |
+| Go API tests | 1 file | ✅ Partial | All modules except sync |
+| E2E / Appium tests | 0 | 🔲 None | Everything |
+| Performance tests | 0 | 🔲 None | Everything |
 
 ---
 
-## 6. Contradiction Index (Docs vs Code)
+## 6. Android Build State
+
+| Item | Status | Notes |
+|------|--------|-------|
+| App ID | `com.gastrocore.gastrocore_pos` | Set |
+| Current version | `0.1.0+1` | Must increment before pilot |
+| targetSdk | Needs explicit `35` | Play Store requirement |
+| minSdk | Needs explicit `26` | Android 8.0 |
+| Release keystore | `gastrocore-release.jks` referenced | File existence unverified |
+| Debug APK | ✅ Exists | `build/app/outputs/flutter-apk/app-debug.apk` (142 MB) |
+| Release AAB | 🔲 Not verified | Needs signing test |
+| myPOS AAR | ✅ Bundled | `android/app/libs/slavesdk2.1.8.aar` |
+
+---
+
+## 7. Known Bugs and Critical Gaps
+
+| # | Issue | Severity | Location |
+|---|-------|----------|----------|
+| B1 | KDS shows demo data — not wired to real DB | **BLOCKS PILOT** | `kitchen/` feature |
+| B2 | Discount dialog button non-functional | High | `orders/` feature |
+| B3 | Settings save incomplete (restaurant name, MWST not persisting) | High | `settings/` feature |
+| B4 | KDS audio alert not integrated | Medium | `kitchen/` feature |
+| B5 | ODS screen blank | Medium | `ods/` feature |
+| B6 | Online ordering 100% mock data | High | `apps/online/` |
+| B7 | Go orders module lifecycle incomplete | High | `server/internal/orders/` |
+| B8 | Go reports module stubbed | Medium | `server/internal/reports/` |
+| B9 | Table split dialog missing | Medium | `tables/` feature |
+| B10 | Cloud sync not wired (outbox never populated) | High | `sync/` feature |
+| B11 | No feature gate checks in app code (license not enforced) | High | licensing |
+
+---
+
+## 8. What Is Production-Ready on a Single Device Today
+
+The following can run in a Swiss pilot restaurant on a **single tablet** with **zero internet**:
+
+- ✅ Full order flow: table → order with modifiers → payment → receipt
+- ✅ Cash with change calculation and 5-Rappen rounding (in SwissReceiptBuilder)
+- ✅ myPOS terminal bridge (needs field test)
+- ✅ Wallee terminal bridge (needs field test)
+- ✅ Swiss MWST receipt (8.1% / 2.6% / 3.8%) — SwissReceiptBuilder has 36 tests
+- ✅ Kitchen ticket printing to thermal printer
+- ✅ KDS embedded mode (displays demo data — B1 above blocks real data)
+- ✅ Waiter app embedded mode
+- ✅ Kiosk mode embedded
+- ✅ Shift open/close with Z-report printing
+- ✅ Full local backoffice (menu, staff, tables, reports)
+- ✅ SQLite backup/restore
+- ✅ Audit log
+
+## 9. Gap to Pilot-Ready
+
+See doc 22 for full gap analysis. Short list:
+
+| Gap | Fix | Effort |
+|-----|-----|--------|
+| KDS wiring (B1) | Wire `_buildDemoTickets()` → Drift stream | 3–5 days |
+| Discount dialog (B2) | Wire FareEngine to UI | 1 day |
+| Settings save (B3) | Fix save callbacks | 1 day |
+| Payment hardware field test | On-site with actual device | 1–2 days |
+| Release signing | Keystore + AAB build | 0.5 day |
+| Dine-in/takeaway VAT toggle | Wire toggle → FareEngine | 2 days |
+
+**Estimated gap: 2–3 focused weeks to pilot-ready single-device.**
+
+---
+
+## 10. Contradiction Index (Docs vs Code)
 
 | # | Doc Claims | Code Reality |
 |---|-----------|-------------|
-| 1 | Redis for pub/sub in architecture | Not in `go.mod`, never instantiated |
-| 2 | ERPNext Bridge module | Stub only — now **officially removed** |
-| 3 | "Layer 3 ERPNext Bridge" in architecture diagram | Does not exist in code |
-| 4 | Phase 0 spikes are complete | Phase 0 largely done via implementation |
-| 5 | KDS described as a separate Flutter app | It is a screen in the same POS app |
-| 6 | LAN sync described with mDNS/gRPC | Not started |
-| 7 | Feature flags enforced in Flutter | No `FlagGate` or tier checks in app code |
-| 8 | License token validation (Ed25519) | License service is all TODO |
-| 9 | Sync queue described as outbox pattern | Tables exist, no outbox logic |
-| 10 | Executive summary references ERPNext in "Why this architecture" | Decision reversed — ERPNext removed |
-
----
-
-## 7. Summary Verdict
-
-**What GastroCore is today (2026-03-20):**
-
-A **single-device, offline-only restaurant POS** with:
-- Solid order entry, table management, payment processing, receipt printing
-- Good test coverage on core business logic
-- Beautiful UI including a non-functional KDS demo
-- Database schema ready for sync and multi-device
-- Go backend skeleton that compiles and routes but does nothing
-
-**What GastroCore is not yet:**
-- Multi-device (no LAN sync)
-- Cloud-connected (no sync engine)
-- Kitchen-operational (KDS has no real data)
-- License-enforcing (no feature flags)
-- Compliant (no Germany fiscal, no Swiss QR-bill)
-- Production-distributed (no keystore, no CI/CD, no Play listing)
-
-**Gap to pilot-ready:** ~12–16 weeks of focused development (KDS wiring, LAN sync, Swiss VAT hardening, license basics, production build pipeline).
+| 1 | Redis for pub/sub | Not in `go.mod`, never used |
+| 2 | ERPNext Bridge | Dead stub — officially removed |
+| 3 | Feature flags enforced | No `FlagGate` in feature code |
+| 4 | License token validation live | License service is stub-complete but gating not wired |
+| 5 | KDS is a separate Flutter app | It's a mode in the POS app via `main_kds.dart` |
+| 6 | Sync queue populated on mutations | Tables exist; outbox never written |
+| 7 | Settings fully persisted | Some fields don't save reliably |
+| 8 | LAN sync (old docs) | Architecture decision changed: **cloud sync only** |

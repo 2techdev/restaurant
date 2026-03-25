@@ -142,6 +142,10 @@ class _BrandLoginScreenState extends ConsumerState<BrandLoginScreen> {
 
                               // Login button
                               _buildLoginButton(isLoading),
+                              const SizedBox(height: 16),
+
+                              // Offline / demo mode bypass
+                              _buildOfflineButton(isLoading),
                               const SizedBox(height: 24),
 
                               // Register link
@@ -482,6 +486,36 @@ class _BrandLoginScreenState extends ConsumerState<BrandLoginScreen> {
                   letterSpacing: 0.3,
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildOfflineButton(bool isLoading) {
+    return SizedBox(
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: isLoading
+            ? null
+            : () async {
+                await ref
+                    .read(brandAuthProvider.notifier)
+                    .loginAsLocalDemo();
+                if (mounted) context.go(AppRoutes.login);
+              },
+        icon: const Icon(Icons.wifi_off_rounded, size: 18),
+        label: const Text(
+          'Offline / Demo-Modus',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.textSecondary,
+          side: BorderSide(
+            color: AppColors.textDim.withValues(alpha: 0.4),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       ),
     );
   }

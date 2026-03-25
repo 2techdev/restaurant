@@ -60,8 +60,16 @@ class ReportBuilder {
     _paymentSection(b);
     _divider(b);
     _mwstSection(b);
+    if (data.categoryTotals.isNotEmpty) {
+      _divider(b);
+      _categorySection(b);
+    }
     _divider(b);
     _statsSection(b);
+    if (data.staffSales.isNotEmpty) {
+      _divider(b);
+      _staffSection(b);
+    }
     if (data.openingFloat != null) {
       _divider(b);
       _cashSection(b);
@@ -78,6 +86,21 @@ class ReportBuilder {
   // ---------------------------------------------------------------------------
 
   void _header(EscPosBuilder b) {
+    // Restoran adı ve adresi (opsiyonel)
+    if (data.restaurantName != null) {
+      b
+          .alignCenter()
+          .boldOn()
+          .textSizeDouble()
+          .textLine(data.restaurantName!)
+          .textSizeNormal()
+          .boldOff();
+      if (data.restaurantAddress != null) {
+        b.alignCenter().textLine(data.restaurantAddress!);
+      }
+      b.newLine();
+    }
+
     // Rapor başlığı — büyük font
     b
         .alignCenter()
@@ -129,6 +152,9 @@ class ReportBuilder {
         width: _w,
       );
     }
+    if (data.tipAmount > 0) {
+      b.twoColumnLine('Trinkgeld', _chf(data.tipAmount), width: _w);
+    }
     b.newLine();
     b.boldOn();
     b.twoColumnLine('Nettoumsatz gesamt', _chf(data.netRevenue), width: _w);
@@ -177,12 +203,49 @@ class ReportBuilder {
     b.textLine(_mwstTotalRow(totalNet, totalTax, totalGross));
   }
 
+  void _categorySection(EscPosBuilder b) {
+    b.boldOn().textLine('KATEGORIEN').boldOff();
+    b.newLine().alignLeft();
+
+    int total = 0;
+    for (final entry in data.categoryTotals.entries) {
+      b.twoColumnLine(entry.key, _chf(entry.value), width: _w);
+      total += entry.value;
+    }
+    b.textLine('-' * _w);
+    b.boldOn();
+    b.twoColumnLine('Total', _chf(total), width: _w);
+    b.boldOff();
+  }
+
+  void _staffSection(EscPosBuilder b) {
+    b.boldOn().textLine('MITARBEITER').boldOff();
+    b.newLine().alignLeft();
+
+    int total = 0;
+    for (final entry in data.staffSales.entries) {
+      b.twoColumnLine(entry.key, _chf(entry.value), width: _w);
+      total += entry.value;
+    }
+    b.textLine('-' * _w);
+    b.boldOn();
+    b.twoColumnLine('Total', _chf(total), width: _w);
+    b.boldOff();
+  }
+
   void _statsSection(EscPosBuilder b) {
     b.boldOn().textLine('STATISTIK').boldOff();
     b.newLine().alignLeft();
 
     b.twoColumnLine('Bons gesamt', data.orderCount.toString(), width: _w);
     b.twoColumnLine('Stornierungen', data.voidCount.toString(), width: _w);
+    if (data.voidAmount > 0) {
+      b.twoColumnLine(
+        '  Storno-Betrag',
+        '-${_chf(data.voidAmount)}',
+        width: _w,
+      );
+    }
     b.twoColumnLine('Retouren', data.returnCount.toString(), width: _w);
   }
 

@@ -315,6 +315,96 @@ class KitchenTicketData {
 }
 
 // ============================================================================
+// ADİSYON — CHECK/BILL DATA MODELS
+// ============================================================================
+
+/// Adisyon (check/bill) line item — no payment info.
+class AdisyonItem {
+  const AdisyonItem({
+    required this.name,
+    required this.quantity,
+    required this.unitPrice,
+    required this.totalPrice,
+    this.unit = 'Stk',
+    this.modifiers = const [],
+    this.discountAmount = 0,
+    this.notes,
+    this.course,
+  });
+
+  final String name;
+  final double quantity;
+  final String unit;
+
+  /// Unit price in cents.
+  final int unitPrice;
+
+  /// Line total in cents (after item discount).
+  final int totalPrice;
+
+  /// Item-level discount in cents.
+  final int discountAmount;
+
+  final List<String> modifiers;
+
+  /// Special preparation note for this item (shown on check as '! note').
+  final String? notes;
+
+  /// Gang/course label: 'Vorspeise', 'Hauptgang', 'Dessert', 'Getränke', etc.
+  /// When consecutive items share the same course a section header is printed.
+  final String? course;
+}
+
+/// Check/bill (Adisyon) data model.
+///
+/// Used to print an interim bill for the customer without closing the order.
+/// No payment section — customer sees items + total only.
+class AdisyonData {
+  const AdisyonData({
+    required this.restaurantName,
+    required this.items,
+    required this.total,
+    this.address,
+    this.tableName,
+    this.orderNo,
+    this.cashierName,
+    this.subtotal,
+    this.discountAmount = 0,
+    this.mwstBreakdown = const {},
+    this.dateTime,
+    this.footerText,
+    this.printWidth = 42,
+  });
+
+  final String restaurantName;
+  final String? address;
+  final String? tableName;
+  final String? orderNo;
+  final String? cashierName;
+  final List<AdisyonItem> items;
+
+  /// Grand total in cents.
+  final int total;
+
+  /// Subtotal before order-level discount, in cents.
+  final int? subtotal;
+
+  /// Order-level discount in cents.
+  final int discountAmount;
+
+  /// MwSt code → gross amount in cents. Same format as [SwissReceiptData.mwstBreakdown].
+  final Map<String, int> mwstBreakdown;
+
+  final DateTime? dateTime;
+
+  /// Override footer text (default: 'Bitte zahlen / L\'addition s\'il vous plaît').
+  final String? footerText;
+
+  /// Paper width in characters: 80mm → 42, 58mm → 32.
+  final int printWidth;
+}
+
+// ============================================================================
 // Z / X RAPORU — VERİ MODELLERİ
 // ============================================================================
 
@@ -345,6 +435,8 @@ class ShiftReportData {
     required this.reportNo,
     required this.shiftStart,
     required this.printedAt,
+    this.restaurantName,
+    this.restaurantAddress,
     this.cashierName,
     this.terminalNo,
     this.shiftEnd,
@@ -353,10 +445,14 @@ class ShiftReportData {
     this.netSales = 0,
     this.totalReturns = 0,
     this.netRevenue = 0,
+    this.tipAmount = 0,
     this.paymentBreakdown = const {},
     this.mwstEntries = const [],
+    this.categoryTotals = const {},
+    this.staffSales = const {},
     this.orderCount = 0,
     this.voidCount = 0,
+    this.voidAmount = 0,
     this.returnCount = 0,
     this.openingFloat,
     this.closingFloat,
@@ -368,6 +464,10 @@ class ShiftReportData {
 
   /// Sıralı rapor numarası.
   final int reportNo;
+
+  // ---- Restoran bilgileri ----
+  final String? restaurantName;
+  final String? restaurantAddress;
 
   final String? cashierName;
   final String? terminalNo;
@@ -386,15 +486,32 @@ class ShiftReportData {
   final int totalReturns;
   final int netRevenue;
 
+  /// Bahşiş toplamı (cents). 0 ise gösterilmez.
+  final int tipAmount;
+
   /// Ödeme yöntemi → tutar (cents). Örnek: {'Bar': 125000, 'TWINT': 32500}
   final Map<String, int> paymentBreakdown;
 
   /// Her MwSt oranı için rapor kalemi.
   final List<MwStReportEntry> mwstEntries;
 
+  /// Ürün kategorisi → brüt satış tutarı (cents).
+  /// Örnek: {'Speisen': 312500, 'Getränke': 98750, 'Desserts': 13750}
+  final Map<String, int> categoryTotals;
+
+  /// Personel adı → satış tutarı (cents).
+  /// Örnek: {'Anna M.': 187500, 'Klaus B.': 237500}
+  final Map<String, int> staffSales;
+
   // ---- İstatistikler ----
   final int orderCount;
+
+  /// Storno sayısı.
   final int voidCount;
+
+  /// İptal edilen ürünlerin toplam tutarı (cents).
+  final int voidAmount;
+
   final int returnCount;
 
   // ---- Kasa (cents, null ise bölüm yazdırılmaz) ----

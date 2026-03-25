@@ -7,11 +7,18 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 import 'package:gastrocore_pos/features/overrides/domain/entities/override_action.dart';
 import 'package:gastrocore_pos/features/overrides/presentation/providers/override_provider.dart';
+import 'package:gastrocore_pos/features/payments/data/repositories/payment_repository_impl.dart';
 import 'package:gastrocore_pos/features/payments/data/repositories/refund_repository_impl.dart';
 
 // ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
+
+/// Singleton [PaymentRepositoryImpl] backed by the app database.
+final paymentRepositoryProvider = Provider<PaymentRepositoryImpl>((ref) {
+  final db = ref.watch(databaseProvider);
+  return PaymentRepositoryImpl(db);
+});
 
 final refundRepositoryProvider = Provider<RefundRepositoryImpl>((ref) {
   final db = ref.watch(databaseProvider);

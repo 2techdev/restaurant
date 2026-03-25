@@ -111,7 +111,7 @@ class _OnlineOrderCardState extends ConsumerState<_OnlineOrderCard>
       position: _slide,
       child: FadeTransition(
         opacity: _fade,
-        child: Container(
+        child: DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.surfaceContainer,
             borderRadius: BorderRadius.circular(14),

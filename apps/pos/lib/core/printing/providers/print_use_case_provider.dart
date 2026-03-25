@@ -4,6 +4,7 @@ import '../printing_provider.dart';
 import '../use_cases/print_receipt_use_case.dart';
 import '../use_cases/print_kitchen_ticket_use_case.dart';
 import '../use_cases/print_report_use_case.dart';
+import '../use_cases/print_check_use_case.dart';
 
 /// Satış fişi yazdırma use case'i.
 ///
@@ -38,4 +39,17 @@ final printKitchenTicketUseCaseProvider =
 /// ```
 final printReportUseCaseProvider = Provider<PrintReportUseCase>((ref) {
   return PrintReportUseCase(ref.watch(printerServiceProvider));
+});
+
+/// Adisyon (check/bill) yazdırma use case'i.
+///
+/// Mevcut siparişi kapatmadan müşteri için ara fatura basar.
+///
+/// Kullanım:
+/// ```dart
+/// final useCase = ref.read(printCheckUseCaseProvider);
+/// await useCase(adisyonData);
+/// ```
+final printCheckUseCaseProvider = Provider<PrintCheckUseCase>((ref) {
+  return PrintCheckUseCase(ref.watch(printerServiceProvider));
 });

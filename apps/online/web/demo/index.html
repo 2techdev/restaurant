@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#FF5722">
-  <title>Demo Restaurant Zürich – Online bestellen</title>
+  <title>Club Demo – Online bestellen</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -109,11 +109,17 @@
     }
     .product-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
     .product-card.in-cart { border-color: var(--primary); }
-    .product-img {
+    .product-img-wrap {
       width: 64px; height: 64px; border-radius: 8px;
       background: var(--primary-light); flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 28px;
+      overflow: hidden; display: flex; align-items: center; justify-content: center;
+    }
+    .product-img-wrap img {
+      width: 100%; height: 100%; object-fit: cover;
+      display: block;
+    }
+    .product-img-emoji {
+      font-size: 28px; line-height: 1;
     }
     .product-info { flex: 1; min-width: 0; }
     .product-name { font-size: 15px; font-weight: 600; line-height: 1.3; }
@@ -174,6 +180,13 @@
     }
     .mod-radio.checked { border-color: var(--primary); }
     .mod-radio.checked::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+    .mod-checkbox {
+      width: 20px; height: 20px; border-radius: 4px; border: 2px solid var(--divider);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      transition: all .15s;
+    }
+    .mod-checkbox.checked { border-color: var(--primary); background: var(--primary); }
+    .mod-checkbox.checked::after { content: '✓'; color: #fff; font-size: 12px; font-weight: 700; }
     .mod-name { font-size: 15px; }
     .mod-price { font-size: 14px; color: var(--on-surface-2); }
     .modal-footer { padding: 16px 20px; }
@@ -280,7 +293,7 @@
 
     @media (min-width: 700px) {
       .cart-fab { bottom: 32px; }
-      .product-img { width: 72px; height: 72px; }
+      .product-img-wrap { width: 72px; height: 72px; }
     }
   </style>
 </head>
@@ -291,8 +304,8 @@
   <div class="header-inner">
     <div class="header-logo">🍽️</div>
     <div class="header-info">
-      <h1>Demo Restaurant Zürich</h1>
-      <p>Traditionelle Schweizer Küche · Mitten in Zürich</p>
+      <h1>Club Demo</h1>
+      <p>Schweizer Küche &amp; internationales Flair · Seestrasse 77, Zürich</p>
     </div>
     <span class="header-badge">🟢 Geöffnet</span>
   </div>
@@ -369,68 +382,206 @@
 </div>
 
 <script>
-// ── DATA ──────────────────────────────────────────────────────────────────────
-const EMOJIS = {
-  'cat-1': '🥗', 'cat-2': '🍖', 'cat-3': '🍕', 'cat-4': '🍮', 'cat-5': '🥤',
-};
-const PRODUCT_EMOJIS = {
-  'p-1':'🥗','p-2':'🍜','p-3':'🍞','p-15':'🥩',
-  'p-4':'🍳','p-5':'🍗','p-6':'🥘','p-16':'🥩','p-17':'🍚','p-18':'🐟',
-  'p-7':'🍕','p-19':'🍕','p-8':'🍝','p-9':'🍝','p-20':'🍝',
-  'p-10':'🍮','p-11':'🍫','p-21':'☕','p-22':'🥧',
-  'p-12':'💧','p-13':'🍋','p-14':'☕','p-23':'🍷','p-24':'🍺',
+// ── DATA — Club Demo (matches server/cmd/seed/seed_clubdemo.go) ───────────────
+
+// Unsplash image URLs (same as used in seed_clubdemo.go)
+const IMG = {
+  soup:         'https://images.unsplash.com/photo-1547592180-85e173d698be?w=600&h=400&fit=crop&q=80',
+  broth:        'https://images.unsplash.com/photo-1591297645085-2d65e1dc87b2?w=600&h=400&fit=crop&q=80',
+  bruschetta:   'https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?w=600&h=400&fit=crop&q=80',
+  antipasto:    'https://images.unsplash.com/photo-1541014741259-de529411b96a?w=600&h=400&fit=crop&q=80',
+  goatCheese:   'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=400&fit=crop&q=80',
+  fieldSalad:   'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop&q=80',
+  caesar:       'https://images.unsplash.com/photo-1550304943-4f4ed8af0c2a?w=600&h=400&fit=crop&q=80',
+  caprese:      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&h=400&fit=crop&q=80',
+  rucola:       'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop&q=80',
+  zuriGschnetz: 'https://images.unsplash.com/photo-1544025132-083c0b5498a0?w=600&h=400&fit=crop&q=80',
+  schnitzel:    'https://images.unsplash.com/photo-1580554994083-dc4e3e77b19c?w=600&h=400&fit=crop&q=80',
+  steak:        'https://images.unsplash.com/photo-1546833999-b4b27cfa5a0b?w=600&h=400&fit=crop&q=80',
+  salmon:       'https://images.unsplash.com/photo-1534766438357-2b270dbd1b40?w=600&h=400&fit=crop&q=80',
+  vegMain:      'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&h=400&fit=crop&q=80',
+  pizza:        'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&h=400&fit=crop&q=80',
+  pasta:        'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=600&h=400&fit=crop&q=80',
+  lasagne:      'https://images.unsplash.com/photo-1574894709920-11097b5b660b?w=600&h=400&fit=crop&q=80',
+  strudel:      'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&h=400&fit=crop&q=80',
+  tiramisu:     'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&h=400&fit=crop&q=80',
+  cremeBrulee:  'https://images.unsplash.com/photo-1560180474-e8563fd75bab?w=600&h=400&fit=crop&q=80',
+  sorbet:       'https://images.unsplash.com/photo-1488900128323-21503983a07e?w=600&h=400&fit=crop&q=80',
+  chocMousse:   'https://images.unsplash.com/photo-1541599468348-e96984315921?w=600&h=400&fit=crop&q=80',
+  water:        'https://images.unsplash.com/photo-1548869069-88f9a8a2186f?w=600&h=400&fit=crop&q=80',
+  cola:         'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?w=600&h=400&fit=crop&q=80',
+  ojuice:       'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=600&h=400&fit=crop&q=80',
+  espresso:     'https://images.unsplash.com/photo-1495312040802-e8e91fdfda55?w=600&h=400&fit=crop&q=80',
+  cappuccino:   'https://images.unsplash.com/photo-1534040385115-33dcb3acba5b?w=600&h=400&fit=crop&q=80',
+  latte:        'https://images.unsplash.com/photo-1561882468-9110d70d2ddc?w=600&h=400&fit=crop&q=80',
+  tea:          'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=600&h=400&fit=crop&q=80',
+  whiteWine:    'https://images.unsplash.com/photo-1474620153-f63b31c7c0a2?w=600&h=400&fit=crop&q=80',
+  redWine:      'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=600&h=400&fit=crop&q=80',
+  prosecco:     'https://images.unsplash.com/photo-1565193566173-d8cd15d166ec?w=600&h=400&fit=crop&q=80',
+  beer:         'https://images.unsplash.com/photo-1608270586858-7d4f33e44b29?w=600&h=400&fit=crop&q=80',
+  aperol:       'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?w=600&h=400&fit=crop&q=80',
 };
 
-const categories = [
-  {id:'cat-1', name:'Vorspeisen'},
-  {id:'cat-2', name:'Hauptgerichte'},
-  {id:'cat-3', name:'Pizza & Pasta'},
-  {id:'cat-4', name:'Desserts'},
-  {id:'cat-5', name:'Getränke'},
-];
-
-const sizeGroup = {
-  id:'mg-size', name:'Grösse', selection_type:'single',
+// Modifier groups (matches seed_clubdemo.go)
+const mgPizzaSize = {
+  id:'mg-size', name:'Pizza-Grösse', selection_type:'single',
   min_selections:1, max_selections:1, is_required:true,
   modifiers:[
-    {id:'mod-s', name:'Klein', price_delta:-200, is_default:false},
-    {id:'mod-m', name:'Mittel', price_delta:0,    is_default:true},
-    {id:'mod-l', name:'Gross', price_delta:300,   is_default:false},
+    {id:'mod-32', name:'Standard 32cm', price_delta:0,   is_default:true},
+    {id:'mod-40', name:'Large 40cm',    price_delta:500, is_default:false},
+  ],
+};
+const mgGarpunkt = {
+  id:'mg-garp', name:'Garpunkt', selection_type:'single',
+  min_selections:1, max_selections:1, is_required:true,
+  modifiers:[
+    {id:'mod-rare',   name:'Rare (blutig)', price_delta:0, is_default:false},
+    {id:'mod-medium', name:'Medium',        price_delta:0, is_default:true},
+    {id:'mod-well',   name:'Well Done',     price_delta:0, is_default:false},
+  ],
+};
+const mgBeilage = {
+  id:'mg-beil', name:'Beilage', selection_type:'multiple',
+  min_selections:0, max_selections:3, is_required:false,
+  modifiers:[
+    {id:'mod-pommes', name:'Pommes frites',   price_delta:450, is_default:false},
+    {id:'mod-roesti', name:'Rösti',           price_delta:450, is_default:false},
+    {id:'mod-salat',  name:'Gemischter Salat',price_delta:350, is_default:false},
+    {id:'mod-reis',   name:'Basmatireis',     price_delta:300, is_default:false},
+  ],
+};
+const mgZutaten = {
+  id:'mg-zutat', name:'Zusätzliche Zutaten', selection_type:'multiple',
+  min_selections:0, max_selections:5, is_required:false,
+  modifiers:[
+    {id:'mod-mozz',   name:'Extra Mozzarella', price_delta:250, is_default:false},
+    {id:'mod-champ',  name:'Champignons',       price_delta:150, is_default:false},
+    {id:'mod-pepero', name:'Peperoni',          price_delta:100, is_default:false},
+    {id:'mod-zwieb',  name:'Zwiebeln',          price_delta:100, is_default:false},
+    {id:'mod-olive',  name:'Oliven',            price_delta:150, is_default:false},
   ],
 };
 
+const categories = [
+  {id:'cat-1', name:'Suppen & Vorspeisen', emoji:'🍲'},
+  {id:'cat-2', name:'Salate',             emoji:'🥗'},
+  {id:'cat-3', name:'Hauptspeisen',       emoji:'🍖'},
+  {id:'cat-4', name:'Pizza & Pasta',      emoji:'🍕'},
+  {id:'cat-5', name:'Desserts',           emoji:'🍰'},
+  {id:'cat-6', name:'Getränke',           emoji:'🥤'},
+  {id:'cat-7', name:'Weine & Bier',       emoji:'🍷'},
+];
+
 const products = [
-  {id:'p-1',  cat:'cat-1', name:'Gemischter Salat',       desc:'Frischer Salat mit Saison-Gemüse und Vinaigrette',   price:1450, mods:[]},
-  {id:'p-2',  cat:'cat-1', name:'Suppe des Tages',         desc:'Täglich frisch zubereitet, mit Brot',               price:990,  mods:[]},
-  {id:'p-3',  cat:'cat-1', name:'Bruschetta',              desc:'Röstbrot mit Tomaten, Basilikum und Knoblauch',      price:1190, mods:[]},
-  {id:'p-15', cat:'cat-1', name:'Carpaccio vom Rind',      desc:'Hauchdünn aufgeschnittenes Rinderfilet, Rucola, Parmesan', price:1890, mods:[]},
-  {id:'p-4',  cat:'cat-2', name:'Zürcher Geschnetzeltes',  desc:'Kalbfleisch in Rahmsauce mit Rösti, klassisch zubereitet', price:3490, mods:[]},
-  {id:'p-5',  cat:'cat-2', name:'Poulet Cordon Bleu',      desc:'Gefüllt mit Schinken und Käse, mit Pommes und Salat', price:2990, mods:[]},
-  {id:'p-6',  cat:'cat-2', name:'Veganes Gemüsecurry',     desc:'Saisonales Gemüse in Kokosmilch, mit Basmati-Reis',  price:2290, mods:[]},
-  {id:'p-16', cat:'cat-2', name:'Rindsfilet mit Gemüse',   desc:'200g Rindsfilet, Saisongemüse, Kräuterbutter, Pommes', price:4890, mods:[]},
-  {id:'p-17', cat:'cat-2', name:'Risotto ai Funghi',       desc:'Cremiges Risotto mit Steinpilzen und Parmesan',     price:2590, mods:[]},
-  {id:'p-18', cat:'cat-2', name:'Fischfilet vom Zürichsee',desc:'Felchenfilet, Kapernbutter, Kartoffelpüree, Blattspinat', price:3290, mods:[]},
-  {id:'p-7',  cat:'cat-3', name:'Pizza Margherita',        desc:'Tomatensauce, Mozzarella, frisches Basilikum',      price:1890, mods:[sizeGroup]},
-  {id:'p-19', cat:'cat-3', name:'Pizza Prosciutto',        desc:'Tomatensauce, Mozzarella, Parmaschinken, Rucola',   price:2290, mods:[sizeGroup]},
-  {id:'p-8',  cat:'cat-3', name:'Spaghetti Carbonara',     desc:'Pancetta, Ei, Parmesan, Pfeffer — kein Rahm',       price:2190, mods:[]},
-  {id:'p-9',  cat:"cat-3", name:"Penne all'Arrabiata",     desc:'Tomatensauce mit Chili und Knoblauch, vegan',       price:1890, mods:[]},
-  {id:'p-20', cat:'cat-3', name:'Tagliatelle al Salmone',  desc:'Geräucherter Lachs, Rahmsauce, Kapern, Dill',       price:2490, mods:[]},
-  {id:'p-10', cat:'cat-4', name:'Crème Brûlée',            desc:'Klassische Vanillecreme mit Karamellkruste',        price:950,  mods:[]},
-  {id:'p-11', cat:'cat-4', name:'Schokoladenfondue',       desc:'Dunkle Schweizer Schokolade mit Früchten (für 2)',  price:1890, mods:[]},
-  {id:'p-21', cat:'cat-4', name:'Tiramisu',                desc:'Hausgemacht mit Mascarpone, Espresso und Amaretto', price:1050, mods:[]},
-  {id:'p-22', cat:'cat-4', name:'Apfelstrudel',            desc:'Warm, mit Vanillesauce und Schlagsahne',            price:890,  mods:[]},
-  {id:'p-12', cat:'cat-5', name:'Mineralwasser',           desc:'Still oder prickelnd, 0.5 l',                      price:490,  mods:[]},
-  {id:'p-13', cat:'cat-5', name:'Hausgemachte Limonade',   desc:'Zitrone, Minze und Zucker, 0.4 l',                 price:690,  mods:[]},
-  {id:'p-14', cat:'cat-5', name:'Kaffee',                  desc:'Espresso, Cappuccino oder Filterkaffee',            price:490,  mods:[]},
-  {id:'p-23', cat:'cat-5', name:'Weisswein (Zürich)',      desc:'Riesling-Silvaner, Zürichsee, 1 dl',               price:790,  mods:[]},
-  {id:'p-24', cat:'cat-5', name:'Bier vom Fass',           desc:'Helles oder Dunkel, 0.5 l',                        price:690,  mods:[]},
+  // ── Suppen & Vorspeisen ────────────────────────────────────────────────────
+  {id:'p-101', cat:'cat-1', name:'Tagessuppe',
+    desc:'Suppe des Tages mit frischem Brot', price:750, mods:[], img:IMG.soup, emoji:'🍲'},
+  {id:'p-102', cat:'cat-1', name:'Bündner Gerstensuppe',
+    desc:'Traditionelle Gerstensuppe mit Speck und Gemüse', price:1050, mods:[], img:IMG.broth, emoji:'🍲'},
+  {id:'p-103', cat:'cat-1', name:'Bruschetta',
+    desc:'Geröstetes Brot, frische Tomaten, Basilikum, Knoblauch, Olivenöl', price:1050, mods:[], img:IMG.bruschetta, emoji:'🥖'},
+  {id:'p-104', cat:'cat-1', name:'Gemischter Vorspeisenteller',
+    desc:'Hausgemachte Auswahl kalter Vorspeisen für 2 Personen', price:1850, mods:[], img:IMG.antipasto, emoji:'🍽️'},
+  {id:'p-105', cat:'cat-1', name:'Ziegenkäse auf Feigenkonfitüre',
+    desc:'Warmer Ziegenkäse auf Toast, Feigenkonfitüre, Rucola', price:1650, mods:[], img:IMG.goatCheese, emoji:'🧀'},
+
+  // ── Salate ─────────────────────────────────────────────────────────────────
+  {id:'p-201', cat:'cat-2', name:'Nüsslisalat mit Speck und Ei',
+    desc:'Feldsalat, knuspriger Speck, hartgekochtes Ei, Senf-Vinaigrette', price:1550, mods:[], img:IMG.fieldSalad, emoji:'🥗'},
+  {id:'p-202', cat:'cat-2', name:'Caesar Salad',
+    desc:'Römersalat, Croutons, Parmesan, Caesar-Dressing', price:1750, mods:[], img:IMG.caesar, emoji:'🥗'},
+  {id:'p-203', cat:'cat-2', name:'Caprese',
+    desc:'Büffelmozzarella, Tomaten, Basilikum, Olivenöl extra vergine', price:1450, mods:[], img:IMG.caprese, emoji:'🍅'},
+  {id:'p-204', cat:'cat-2', name:'Rucola-Salat',
+    desc:'Rucola, Kirschtomaten, Parmesan-Hobel, Balsamico-Reduktion', price:1350, mods:[], img:IMG.rucola, emoji:'🥗'},
+
+  // ── Hauptspeisen ───────────────────────────────────────────────────────────
+  {id:'p-301', cat:'cat-3', name:'Zürcher Geschnetzeltes',
+    desc:'Kalbsgeschnetzeltes Zürcher Art, Rösti, Rahmsauce, Weisswein', price:3850, mods:[], img:IMG.zuriGschnetz, emoji:'🍖'},
+  {id:'p-302', cat:'cat-3', name:'Wiener Schnitzel',
+    desc:'Paniertes Kalbsschnitzel, Zitronenscheibe, Kartoffelsalat', price:3850, mods:[mgBeilage], img:IMG.schnitzel, emoji:'🥩'},
+  {id:'p-303', cat:'cat-3', name:'Entrecôte vom Grill',
+    desc:'220g Schweizer Rind, Grillgemüse, Café-de-Paris-Butter, Pommes', price:4450, mods:[mgGarpunkt, mgBeilage], img:IMG.steak, emoji:'🥩'},
+  {id:'p-304', cat:'cat-3', name:'Lachsfilet',
+    desc:'Atlantik-Lachs, Safransauce, Blattspinat, Basmatireis', price:3250, mods:[], img:IMG.salmon, emoji:'🐟'},
+  {id:'p-305', cat:'cat-3', name:'Rumpsteak',
+    desc:'250g Rumpsteak, Kräuterbutter, Ratatouille, Pommes frites', price:4250, mods:[mgGarpunkt, mgBeilage], img:IMG.steak, emoji:'🥩'},
+  {id:'p-306', cat:'cat-3', name:'Cordon Bleu',
+    desc:'Hausgemachtes Cordon Bleu, Pommes frites, Gemüsegarnitur', price:3050, mods:[mgBeilage], img:IMG.schnitzel, emoji:'🥩'},
+  {id:'p-307', cat:'cat-3', name:'Rahmspinat mit Spiegelei',
+    desc:'Blattspinat in Rahmsauce, zwei Spiegeleier, Rösti', price:2250, mods:[], img:IMG.vegMain, emoji:'🌿'},
+  {id:'p-308', cat:'cat-3', name:'Poulet Cordon Bleu',
+    desc:'Poulet-Cordon Bleu, Pommes frites, Tomatensalat', price:2950, mods:[mgBeilage], img:IMG.schnitzel, emoji:'🍗'},
+  {id:'p-309', cat:'cat-3', name:'Rinds-Tagliata',
+    desc:'Aufgeschnittenes Entrecôte, Rucola, Parmesan, Olivenöl, Balsamico', price:4450, mods:[mgGarpunkt, mgBeilage], img:IMG.steak, emoji:'🥩'},
+
+  // ── Pizza & Pasta ──────────────────────────────────────────────────────────
+  {id:'p-401', cat:'cat-4', name:'Pizza Margherita',
+    desc:'Tomatensauce, Mozzarella, frisches Basilikum', price:1850, mods:[mgPizzaSize, mgZutaten], img:IMG.pizza, emoji:'🍕'},
+  {id:'p-402', cat:'cat-4', name:'Pizza Prosciutto e Rucola',
+    desc:'Parmaschinken, Rucola, Kirschtomaten, Parmesan', price:2550, mods:[mgPizzaSize, mgZutaten], img:IMG.pizza, emoji:'🍕'},
+  {id:'p-403', cat:'cat-4', name:'Pizza Quattro Formaggi',
+    desc:'Mozzarella, Gorgonzola, Emmentaler, Parmesan', price:2650, mods:[mgPizzaSize, mgZutaten], img:IMG.pizza, emoji:'🍕'},
+  {id:'p-404', cat:'cat-4', name:'Pizza Rustica',
+    desc:'Speck, Zwiebeln, Peperoni, Tomatensauce, Mozzarella', price:2350, mods:[mgPizzaSize, mgZutaten], img:IMG.pizza, emoji:'🍕'},
+  {id:'p-405', cat:'cat-4', name:'Spaghetti Carbonara',
+    desc:'Spaghetti, Pancetta, Ei, Pecorino Romano, schwarzer Pfeffer', price:2350, mods:[], img:IMG.pasta, emoji:'🍝'},
+  {id:'p-406', cat:'cat-4', name:'Pasta Bolognese',
+    desc:'Pappardelle, Rindfleisch-Bolognese, Parmesan', price:2350, mods:[], img:IMG.pasta, emoji:'🍝'},
+  {id:'p-407', cat:'cat-4', name:'Tagliatelle Porcini',
+    desc:'Tagliatelle, Steinpilze, Knoblauch, Rahmsauce, Parmesan', price:2550, mods:[], img:IMG.pasta, emoji:'🍝'},
+  {id:'p-408', cat:'cat-4', name:'Lasagne al Forno',
+    desc:'Hausgemachte Lasagne, Bolognese, Béchamelsauce, Mozzarella gratiniert', price:2450, mods:[], img:IMG.lasagne, emoji:'🍝'},
+
+  // ── Desserts ───────────────────────────────────────────────────────────────
+  {id:'p-501', cat:'cat-5', name:'Apfelstrudel',
+    desc:'Hausgemachter Apfelstrudel, Vanilleglace, Zimtsahne', price:1350, mods:[], img:IMG.strudel, emoji:'🥐'},
+  {id:'p-502', cat:'cat-5', name:'Tiramisu',
+    desc:'Klassisches Tiramisu mit Mascarpone und Amaretto', price:1250, mods:[], img:IMG.tiramisu, emoji:'🍮'},
+  {id:'p-503', cat:'cat-5', name:'Crème Brûlée',
+    desc:'Vanille-Crème mit karamellisierter Zuckerkruste, saisionale Früchte', price:1150, mods:[], img:IMG.cremeBrulee, emoji:'🍮'},
+  {id:'p-504', cat:'cat-5', name:'Sorbet des Tages',
+    desc:'Zwei Kugeln hausgemachtes Sorbet, frische Minze', price:1050, mods:[], img:IMG.sorbet, emoji:'🍦'},
+  {id:'p-505', cat:'cat-5', name:'Schoggimousse',
+    desc:'Schweizer Schokoladenmousse, Vanillesauce, Schlagrahm', price:1150, mods:[], img:IMG.chocMousse, emoji:'🍫'},
+
+  // ── Getränke ───────────────────────────────────────────────────────────────
+  {id:'p-601', cat:'cat-6', name:'Mineralwasser',
+    desc:'Still oder Sprudel, 3dl', price:450, mods:[], img:IMG.water, emoji:'💧'},
+  {id:'p-602', cat:'cat-6', name:'Coca-Cola',
+    desc:'3dl, inkl. Eis und Zitrone', price:450, mods:[], img:IMG.cola, emoji:'🥤'},
+  {id:'p-603', cat:'cat-6', name:'Orangensaft frisch gepresst',
+    desc:'2dl frisch gepresster Orangensaft', price:650, mods:[], img:IMG.ojuice, emoji:'🍊'},
+  {id:'p-604', cat:'cat-6', name:'Espresso',
+    desc:'Doppelter Espresso', price:450, mods:[], img:IMG.espresso, emoji:'☕'},
+  {id:'p-605', cat:'cat-6', name:'Cappuccino',
+    desc:'Mit feinem Milchschaum und Latte-Art', price:590, mods:[], img:IMG.cappuccino, emoji:'☕'},
+  {id:'p-606', cat:'cat-6', name:'Latte Macchiato',
+    desc:'Milchkaffee mit doppeltem Espresso', price:650, mods:[], img:IMG.latte, emoji:'☕'},
+  {id:'p-607', cat:'cat-6', name:'Tee',
+    desc:'Auswahl aus verschiedenen Teesorten', price:450, mods:[], img:IMG.tea, emoji:'🍵'},
+
+  // ── Weine & Bier ───────────────────────────────────────────────────────────
+  {id:'p-701', cat:'cat-7', name:'Fendant du Valais',
+    desc:'1dl, weiss, trocken, Suisse romande', price:650, mods:[], img:IMG.whiteWine, emoji:'🥂'},
+  {id:'p-702', cat:'cat-7', name:'Dôle du Valais',
+    desc:'1dl, rot, Pinot Noir & Gamay', price:650, mods:[], img:IMG.redWine, emoji:'🍷'},
+  {id:'p-703', cat:'cat-7', name:'Prosecco',
+    desc:'1dl, prickelnd, Venetien', price:750, mods:[], img:IMG.prosecco, emoji:'🥂'},
+  {id:'p-704', cat:'cat-7', name:'Bier vom Fass',
+    desc:'3dl, Helles vom Fass', price:650, mods:[], img:IMG.beer, emoji:'🍺'},
+  {id:'p-705', cat:'cat-7', name:'Heineken',
+    desc:'3dl Flasche', price:550, mods:[], img:IMG.beer, emoji:'🍺'},
+  {id:'p-706', cat:'cat-7', name:'Aperol Spritz',
+    desc:'Aperol, Prosecco, Soda, Orange', price:1150, mods:[], img:IMG.aperol, emoji:'🍹'},
 ];
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let cart = [];       // [{productId, name, price, modifiers, qty}]
+let cart = [];
 let orderType = 'dine_in';
 let pendingProduct = null;
-let selectedMods = {};  // groupId → modifierId
+let selectedMods = {};   // groupId → modifierId  (single)
+let selectedMulti = {};  // groupId → Set of modifierIds (multiple)
 
 function vatRate() { return orderType === 'takeaway' ? 0.026 : 0.081; }
 
@@ -440,34 +591,43 @@ function fmt(cents) {
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
 function render() {
-  // Tabs
   const tabsEl = document.getElementById('catTabs');
   tabsEl.innerHTML = categories.map((c, i) =>
-    `<button class="cat-tab${i===0?' active':''}" onclick="scrollToCat('${c.id}', this)">${EMOJIS[c.id]} ${c.name}</button>`
+    `<button class="cat-tab${i===0?' active':''}" onclick="scrollToCat('${c.id}', this)">${c.emoji} ${c.name}</button>`
   ).join('');
 
-  // Products
   const mainEl = document.getElementById('main');
   mainEl.innerHTML = categories.map(c => {
     const ps = products.filter(p => p.cat === c.id);
     return `<section class="cat-section" id="sec-${c.id}">
-      <h2 class="cat-heading">${EMOJIS[c.id]} ${c.name}</h2>
+      <h2 class="cat-heading">${c.emoji} ${c.name}</h2>
       ${ps.map(p => renderProduct(p)).join('')}
     </section>`;
   }).join('');
 
+  document.querySelectorAll('.cat-section').forEach(s => observer.observe(s));
   updateCartUI();
 }
 
+function productImg(p) {
+  if (p.img) {
+    return `<div class="product-img-wrap">
+      <img src="${p.img}" alt="${p.name}" loading="lazy"
+           onerror="this.parentElement.innerHTML='<span class=\\'product-img-emoji\\'>${p.emoji||'🍽️'}</span>'">
+    </div>`;
+  }
+  return `<div class="product-img-wrap"><span class="product-img-emoji">${p.emoji||'🍽️'}</span></div>`;
+}
+
 function renderProduct(p) {
-  const cartItem = cart.find(ci => ci.productId === p.id && p.mods.length === 0);
+  const hasMods = p.mods.length > 0;
+  const cartItem = cart.find(ci => ci.productId === p.id && ci.mods.length === 0);
   const qty = cartItem ? cartItem.qty : 0;
-  const hasModifiers = p.mods.length > 0;
   const totalQty = cart.filter(ci => ci.productId === p.id).reduce((s,ci) => s + ci.qty, 0);
   const inCart = totalQty > 0;
 
-  const addControl = hasModifiers
-    ? `<button class="product-add" onclick="openModifier('${p.id}',event)" title="Hinzufügen">+</button>`
+  const addControl = hasMods
+    ? `<button class="product-add" onclick="openModifier('${p.id}',event)" title="Optionen">+</button>`
     : qty === 0
       ? `<button class="product-add" onclick="addSimple('${p.id}',event)" title="Hinzufügen">+</button>`
       : `<div class="product-qty">
@@ -476,10 +636,10 @@ function renderProduct(p) {
            <button class="qty-btn" onclick="incQty('${p.id}',event)">+</button>
          </div>`;
 
-  return `<div class="product-card${inCart?' in-cart':''}" onclick="${hasModifiers?`openModifier('${p.id}',event)`:`addSimple('${p.id}',event)`}">
-    <div class="product-img">${PRODUCT_EMOJIS[p.id]||'🍽️'}</div>
+  return `<div class="product-card${inCart?' in-cart':''}" onclick="${hasMods?`openModifier('${p.id}',event)`:`addSimple('${p.id}',event)`}">
+    ${productImg(p)}
     <div class="product-info">
-      <div class="product-name">${p.name}${totalQty>0&&hasModifiers?` <span style="color:var(--primary);font-size:13px">(${totalQty}×)</span>`:''}</div>
+      <div class="product-name">${p.name}${totalQty>0&&hasMods?` <span style="color:var(--primary);font-size:13px">(${totalQty}×)</span>`:''}</div>
       <div class="product-desc">${p.desc}</div>
       <div class="product-price">${fmt(p.price)}</div>
     </div>
@@ -515,12 +675,19 @@ function decQty(productId, e) {
 
 function renderProductCard(productId) {
   const p = products.find(x => x.id === productId);
-  const cardEl = document.querySelector(`[onclick*="'${productId}'"]`)?.closest('.product-card');
-  if (!cardEl) return;
-  const newHtml = renderProduct(p);
+  const el = document.getElementById('card-' + productId);
+  if (!el) {
+    // fallback: re-render entire section
+    const catId = p.cat;
+    const sec = document.getElementById('sec-' + catId);
+    if (!sec) return;
+    sec.innerHTML = `<h2 class="cat-heading">${categories.find(c=>c.id===catId)?.emoji||''} ${categories.find(c=>c.id===catId)?.name||''}</h2>`
+      + products.filter(x=>x.cat===catId).map(x=>renderProduct(x)).join('');
+    return;
+  }
   const tmp = document.createElement('div');
-  tmp.innerHTML = newHtml;
-  cardEl.replaceWith(tmp.firstElementChild);
+  tmp.innerHTML = renderProduct(p);
+  el.replaceWith(tmp.firstElementChild);
 }
 
 function cartTotal() {
@@ -542,10 +709,14 @@ function openModifier(productId, e) {
   e && e.stopPropagation();
   pendingProduct = products.find(x => x.id === productId);
   selectedMods = {};
-  // default selections
+  selectedMulti = {};
   pendingProduct.mods.forEach(g => {
-    const def = g.modifiers.find(m => m.is_default);
-    if (def) selectedMods[g.id] = def.id;
+    if (g.selection_type === 'single') {
+      const def = g.modifiers.find(m => m.is_default);
+      if (def) selectedMods[g.id] = def.id;
+    } else {
+      selectedMulti[g.id] = new Set();
+    }
   });
   renderModModal();
   document.getElementById('modOverlay').classList.add('open');
@@ -557,60 +728,98 @@ function renderModModal() {
   document.getElementById('modDesc').textContent = p.desc;
   document.getElementById('modGroups').innerHTML = p.mods.map(g => `
     <div class="mod-group">
-      <div class="mod-group-name">${g.name}${g.is_required?' (Pflichtfeld)':''}</div>
-      ${g.modifiers.map(m => `
-        <div class="mod-opt" onclick="selectMod('${g.id}','${m.id}')">
+      <div class="mod-group-name">${g.name}${g.is_required?' <span style="color:var(--primary)">*</span>':''}</div>
+      ${g.modifiers.map(m => {
+        const isSingle = g.selection_type === 'single';
+        const checked = isSingle
+          ? selectedMods[g.id] === m.id
+          : (selectedMulti[g.id] && selectedMulti[g.id].has(m.id));
+        const ctrlClass = isSingle ? 'mod-radio' : 'mod-checkbox';
+        return `<div class="mod-opt" onclick="selectMod('${g.id}','${m.id}','${g.selection_type}')">
           <div class="mod-opt-left">
-            <div class="mod-radio${selectedMods[g.id]===m.id?' checked':''}" id="radio-${g.id}-${m.id}"></div>
+            <div class="${ctrlClass}${checked?' checked':''}" id="ctrl-${g.id}-${m.id}"></div>
             <span class="mod-name">${m.name}</span>
           </div>
           <span class="mod-price">${m.price_delta===0?'':m.price_delta>0?'+'+fmt(m.price_delta):fmt(m.price_delta)}</span>
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
     </div>
     <hr class="modal-divider">
   `).join('');
   updateModTotal();
 }
 
-function selectMod(groupId, modId) {
-  selectedMods[groupId] = modId;
-  // Update radio visuals
-  const group = pendingProduct.mods.find(g => g.id === groupId);
-  group.modifiers.forEach(m => {
-    const el = document.getElementById(`radio-${groupId}-${m.id}`);
-    if (el) el.className = 'mod-radio' + (m.id === modId ? ' checked' : '');
-  });
+function selectMod(groupId, modId, selType) {
+  if (selType === 'single') {
+    selectedMods[groupId] = modId;
+    const g = pendingProduct.mods.find(x => x.id === groupId);
+    g.modifiers.forEach(m => {
+      const el = document.getElementById(`ctrl-${groupId}-${m.id}`);
+      if (el) el.className = 'mod-radio' + (m.id === modId ? ' checked' : '');
+    });
+  } else {
+    if (!selectedMulti[groupId]) selectedMulti[groupId] = new Set();
+    const s = selectedMulti[groupId];
+    const g = pendingProduct.mods.find(x => x.id === groupId);
+    if (s.has(modId)) {
+      s.delete(modId);
+    } else {
+      if (s.size < g.max_selections) s.add(modId);
+    }
+    g.modifiers.forEach(m => {
+      const el = document.getElementById(`ctrl-${groupId}-${m.id}`);
+      if (el) el.className = 'mod-checkbox' + (s.has(m.id) ? ' checked' : '');
+    });
+  }
   updateModTotal();
 }
 
-function updateModTotal() {
-  if (!pendingProduct) return;
+function modifierTotalPrice() {
+  if (!pendingProduct) return 0;
   let total = pendingProduct.price;
   pendingProduct.mods.forEach(g => {
-    const selId = selectedMods[g.id];
-    if (selId) {
-      const mod = g.modifiers.find(m => m.id === selId);
-      if (mod) total += mod.price_delta;
+    if (g.selection_type === 'single') {
+      const selId = selectedMods[g.id];
+      if (selId) {
+        const mod = g.modifiers.find(m => m.id === selId);
+        if (mod) total += mod.price_delta;
+      }
+    } else {
+      const s = selectedMulti[g.id] || new Set();
+      s.forEach(modId => {
+        const mod = g.modifiers.find(m => m.id === modId);
+        if (mod) total += mod.price_delta;
+      });
     }
   });
-  document.getElementById('modAddBtn').textContent = `In den Warenkorb · ${fmt(total)}`;
+  return total;
+}
+
+function updateModTotal() {
+  document.getElementById('modAddBtn').textContent = `In den Warenkorb · ${fmt(modifierTotalPrice())}`;
 }
 
 function confirmModifier() {
   if (!pendingProduct) return;
-  let total = pendingProduct.price;
+  const total = modifierTotalPrice();
   const modsArr = [];
   pendingProduct.mods.forEach(g => {
-    const selId = selectedMods[g.id];
-    if (selId) {
-      const mod = g.modifiers.find(m => m.id === selId);
-      if (mod) { total += mod.price_delta; modsArr.push({groupId:g.id, modId:selId, name:mod.name, delta:mod.price_delta}); }
+    if (g.selection_type === 'single') {
+      const selId = selectedMods[g.id];
+      if (selId) {
+        const mod = g.modifiers.find(m => m.id === selId);
+        if (mod) modsArr.push({groupId:g.id, modId:selId, name:mod.name, delta:mod.price_delta});
+      }
+    } else {
+      const s = selectedMulti[g.id] || new Set();
+      s.forEach(modId => {
+        const mod = g.modifiers.find(m => m.id === modId);
+        if (mod) modsArr.push({groupId:g.id, modId, name:mod.name, delta:mod.price_delta});
+      });
     }
   });
   cart.push({productId:pendingProduct.id, name:pendingProduct.name, price:total, mods:modsArr, qty:1});
   updateCartUI();
-  renderProductCard(pendingProduct.id);
   closeModifierOverlay();
 }
 
@@ -669,7 +878,7 @@ function removeCartItem(i) {
 // ── ORDER ─────────────────────────────────────────────────────────────────────
 function placeOrder() {
   closeCartBtn();
-  const orderNum = Math.floor(Math.random() * 90) + 10;
+  const orderNum = Math.floor(Math.random() * 9000) + 1000;
   document.getElementById('successOrderNum').textContent = '#' + orderNum;
   document.getElementById('successScreen').classList.add('open');
   cart = [];
@@ -691,7 +900,7 @@ function setOrderType(type, btn) {
 function scrollToCat(catId, btn) {
   const sec = document.getElementById('sec-' + catId);
   if (sec) {
-    const offset = 68 + 48; // header + tabs height
+    const offset = 68 + 48;
     const top = sec.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({top, behavior:'smooth'});
   }
@@ -699,7 +908,6 @@ function scrollToCat(catId, btn) {
   btn.classList.add('active');
 }
 
-// Highlight active category on scroll
 const observer = new IntersectionObserver(entries => {
   entries.forEach(e => {
     if (e.isIntersecting) {
@@ -715,7 +923,6 @@ const observer = new IntersectionObserver(entries => {
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 render();
-document.querySelectorAll('.cat-section').forEach(s => observer.observe(s));
 </script>
 </body>
 </html>
