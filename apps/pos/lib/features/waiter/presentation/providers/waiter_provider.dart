@@ -4,6 +4,8 @@
 /// current draft ticket), and live streams for tables and active orders.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
@@ -64,12 +66,44 @@ final waiterActiveTicketProvider =
 class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
   final Ref _ref;
 
+  /// Active stream subscription to the current ticket's Drift-backed watcher.
+  ///
+  /// Re-created every time a new ticket becomes active (startOrder / loadTicket
+  /// / transferToTable) so KDS-side item status changes push through to the
+  /// waiter UI without a manual refresh. `null` when no ticket is loaded.
+  StreamSubscription<TicketEntity?>? _watchSub;
+
   WaiterActiveTicketNotifier(this._ref) : super(null);
 
   String get _tenantId => _ref.read(tenantIdProvider);
   String get _deviceId => _ref.read(deviceIdProvider);
 
   WaiterOrderService get _svc => _ref.read(waiterOrderServiceProvider);
+
+  OrderRepositoryImpl get _orderRepo =>
+      OrderRepositoryImpl(_ref.read(databaseProvider));
+
+  /// Bind the reactive watcher to [ticketId], replacing any previous
+  /// subscription. Emissions update [state] so the UI reacts to KDS-side
+  /// changes (e.g. items flipped to ready).
+  void _bindWatcher(String ticketId) {
+    _watchSub?.cancel();
+    _watchSub = _orderRepo.watchTicketById(ticketId).listen((next) {
+      if (!mounted) return;
+      state = next;
+    });
+  }
+
+  void _unbindWatcher() {
+    _watchSub?.cancel();
+    _watchSub = null;
+  }
+
+  @override
+  void dispose() {
+    _unbindWatcher();
+    super.dispose();
+  }
 
   /// Start a new order for [table], claiming the table.
   ///
@@ -94,6 +128,7 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
       guestCount: guestCount ?? 2,
     );
     state = ticket;
+    _bindWatcher(ticket.id);
   }
 
   /// Update the cover count on the active ticket.
@@ -110,9 +145,8 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
 
   /// Load an existing open ticket as the active ticket.
   Future<void> loadTicket(String ticketId) async {
-    final db = _ref.read(databaseProvider);
-    final repo = OrderRepositoryImpl(db);
-    state = await repo.getTicketById(ticketId);
+    state = await _orderRepo.getTicketById(ticketId);
+    if (state != null) _bindWatcher(ticketId);
   }
 
   /// Add a product to the active ticket.
@@ -192,21 +226,21 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
   Future<void> markServed() async {
     if (state == null) return;
     await _svc.markServed(state!.id);
-    // Reload to get updated status.
-    final db = _ref.read(databaseProvider);
-    state = await OrderRepositoryImpl(db).getTicketById(state!.id);
+    state = await _orderRepo.getTicketById(state!.id);
   }
 
   /// Request the bill for the current order.
   Future<void> requestBill() async {
     if (state == null) return;
     await _svc.requestBill(state!.id);
-    final db = _ref.read(databaseProvider);
-    state = await OrderRepositoryImpl(db).getTicketById(state!.id);
+    state = await _orderRepo.getTicketById(state!.id);
   }
 
   /// Clear the active ticket (e.g. after payment or navigating away).
-  void clear() => state = null;
+  void clear() {
+    _unbindWatcher();
+    state = null;
+  }
 }
 
 // ---------------------------------------------------------------------------
