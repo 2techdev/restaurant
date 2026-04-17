@@ -18,6 +18,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 
+import 'package:gastrocore_pos/core/printing/models/print_models.dart';
+import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/gang/domain/entities/gang_template_entity.dart';
 import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
@@ -27,6 +29,8 @@ import 'package:gastrocore_pos/features/kds_app/data/kds_ws_client.dart';
 import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_providers.dart';
 import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_realtime_provider.dart';
 import 'package:gastrocore_pos/features/kds_app/router/kds_router.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Urgency helpers — green → yellow → red timer coding
@@ -264,11 +268,40 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
 
   /// FIRE a Gang — waiter releases the course so the kitchen starts preparing.
   /// Changes that Gang's items on the card from HOLD (dim) to active.
-  Future<void> _fireGang(String ticketId, String gangTemplateId) async {
+  ///
+  /// Also pushes a scoped kitchen ticket to the ESC/POS printer in parallel
+  /// (fire-and-forget) so there's a paper paper-trail at the pass for this
+  /// specific course. Runs via `unawaited` — a missing/offline printer must
+  /// never block the cook line.
+  Future<void> _fireGang(
+    KitchenTicketEntity ticket,
+    GangTemplateEntity gang,
+    List<KitchenTicketItemEntity> items,
+    String gangLabel,
+  ) async {
     HapticFeedback.mediumImpact();
-    await ref
-        .read(gangRepositoryProvider)
-        .fireGang(ticketId, gangTemplateId);
+    await ref.read(gangRepositoryProvider).fireGang(ticket.ticketId, gang.id);
+    unawaited(_printGangFire(ticket, gang, items, gangLabel));
+  }
+
+  /// Best-effort scoped print for a single fired Gang. Mirrors the fallback
+  /// print path in OrderProvider._printKitchenTicket, but narrows the item
+  /// set to the gang being fired and stamps the ESC/POS courseLabel with the
+  /// restaurant's configured Gang label (falls back to "Gang N").
+  Future<void> _printGangFire(
+    KitchenTicketEntity ticket,
+    GangTemplateEntity gang,
+    List<KitchenTicketItemEntity> items,
+    String gangLabel,
+  ) async {
+    if (items.isEmpty) return;
+    try {
+      final useCase = ref.read(printKitchenTicketUseCaseProvider);
+      await useCase(buildGangFirePayload(ticket, gang, items,
+          gangLabel: gangLabel));
+    } catch (_) {
+      // Printer offline / misconfigured — KDS screen still has the gang.
+    }
   }
 
   /// Advance a Gang one step forward in the lifecycle (tap on chip).
@@ -362,6 +395,11 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     final largeFont = ref.watch(kdsLargeFontProvider);
     final lateThreshold = ref.watch(kdsLateThresholdProvider);
     final gangMap = ref.watch(gangTemplateMapProvider);
+    // Settings drive Gang UI policy: gangsEnabled, maxGangs cap, and the
+    // per-ordinal display labels (gangLabels). Defaults keep the screen
+    // usable even while the repo is still loading.
+    final settings = ref.watch(restaurantSettingsProvider).valueOrNull ??
+        const RestaurantSettings();
 
     // Surface server-pushed ticket notifications. The Drift stream is the
     // source of truth for the grid, so we only need to beep + flash a snack
@@ -412,14 +450,19 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             largeFont: largeFont,
             lateThreshold: lateThreshold,
             gangMap: gangMap,
+            settings: settings,
           );
         },
         loading: () => _buildScaffold(const [], 0,
-            largeFont: false, lateThreshold: 10, gangMap: const {}),
+            largeFont: false,
+            lateThreshold: 10,
+            gangMap: const {},
+            settings: settings),
         error: (e, _) => _buildScaffold(const [], 0,
             largeFont: false,
             lateThreshold: 10,
             gangMap: const {},
+            settings: settings,
             error: e.toString()),
       ),
     );
@@ -431,6 +474,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     required bool largeFont,
     required int lateThreshold,
     required Map<String, GangTemplateEntity> gangMap,
+    required RestaurantSettings settings,
     bool loading = false,
     String? error,
   }) {
@@ -447,7 +491,8 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                     : _buildGrid(tickets,
                         largeFont: largeFont,
                         lateThreshold: lateThreshold,
-                        gangMap: gangMap),
+                        gangMap: gangMap,
+                        settings: settings),
           ),
           _buildFooter(),
         ],
@@ -649,6 +694,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     required bool largeFont,
     required int lateThreshold,
     required Map<String, GangTemplateEntity> gangMap,
+    required RestaurantSettings settings,
   }) {
     if (tickets.isEmpty) {
       return const Center(
@@ -694,6 +740,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
               largeFont: largeFont,
               lateThreshold: lateThreshold,
               gangMap: gangMap,
+              settings: settings,
             ),
           );
         },
@@ -710,6 +757,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     required bool largeFont,
     required int lateThreshold,
     required Map<String, GangTemplateEntity> gangMap,
+    required RestaurantSettings settings,
   }) {
     final urgency = _getUrgency(ticket, lateThreshold);
     final borderColor = _urgencyBorderColor(urgency);
@@ -844,6 +892,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                     largeFont: largeFont,
                     itemSize: itemSize,
                     modSize: modSize,
+                    settings: settings,
                   );
                 },
               ),
@@ -890,16 +939,8 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
   // Gang-grouped items list
   // -------------------------------------------------------------------------
 
-  /// Builds the items list for a ticket card, grouped by Gang when available.
-  ///
-  /// Policy: **max 3 courses** (sortOrder ≤ 3). Items in Gangs with sortOrder
-  /// beyond 3 or without a known Gang fall into an "Andere" (ungrouped) block.
-  ///
-  /// Per-Gang lifecycle (from [gangStates]) drives the visual treatment:
-  ///   - pending (HOLD) → dim/gray group, FIRE button on header
-  ///   - fired / in_prep → full gang color, "FIRED" chip
-  ///   - ready           → green accent, "READY" chip
-  ///   - served          → muted (items are about to leave the card)
+  /// Wraps the top-level [buildGangGroupedItemsList] and threads the state's
+  /// fire / advance / recall callbacks into the view.
   Widget _buildGangGroupedItems(
     KitchenTicketEntity ticket, {
     required Map<String, GangTemplateEntity> gangMap,
@@ -907,109 +948,19 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     required bool largeFont,
     required double itemSize,
     required double modSize,
+    required RestaurantSettings settings,
   }) {
-    final items = ticket.items;
-
-    // Only render gangs within the 3-course cap. Anything beyond sortOrder 3
-    // is treated as ungrouped so the kitchen card stays focused on the meal.
-    bool isRenderableGang(String? gangId) {
-      if (gangId == null) return false;
-      final g = gangMap[gangId];
-      return g != null && g.sortOrder <= 3;
-    }
-
-    final hasGangs = gangMap.isNotEmpty &&
-        items.any((i) => isRenderableGang(i.gangId));
-
-    final widgets = <Widget>[];
-
-    if (!hasGangs) {
-      // No gang data — flat list (legacy / simple mode)
-      for (final item in items) {
-        widgets.add(_buildItemRow(
-          item,
-          largeFont: largeFont,
-          itemSize: itemSize,
-          modSize: modSize,
-          gangStatus: null,
-        ));
-      }
-    } else {
-      // Group items by gangId (null bucket = ungrouped / out-of-cap)
-      final grouped = <String?, List<KitchenTicketItemEntity>>{};
-      for (final item in items) {
-        final key = isRenderableGang(item.gangId) ? item.gangId : null;
-        grouped.putIfAbsent(key, () => []).add(item);
-      }
-
-      // Sort groups: known gangs by sortOrder, then null (ungrouped) last
-      final sortedKeys = grouped.keys.toList()
-        ..sort((a, b) {
-          if (a == null && b == null) return 0;
-          if (a == null) return 1;
-          if (b == null) return -1;
-          final orderA = gangMap[a]?.sortOrder ?? 99;
-          final orderB = gangMap[b]?.sortOrder ?? 99;
-          return orderA.compareTo(orderB);
-        });
-
-      for (final key in sortedKeys) {
-        final groupItems = grouped[key]!;
-        final gang = key != null ? gangMap[key] : null;
-        final state = key != null ? gangStates[key] : null;
-        final status = state?.status ?? GangOrderStatus.pending;
-
-        // Gang header row — carries status chip + optional FIRE button.
-        // firedAt drives the in-group timer once the gang is firing.
-        widgets.add(_buildGangHeader(
-          gang,
-          status: status,
-          firedAt: state?.firedAt,
-          largeFont: largeFont,
-          onFire: (gang != null && status == GangOrderStatus.pending)
-              ? () => _fireGang(ticket.ticketId, gang.id)
-              : null,
-          onAdvance: (gang != null &&
-                  (status == GangOrderStatus.fired ||
-                      status == GangOrderStatus.inPrep ||
-                      status == GangOrderStatus.ready))
-              ? () => _advanceGang(ticket.ticketId, gang.id, status)
-              : null,
-          onRecall: (gang != null && status != GangOrderStatus.pending)
-              ? () => _recallGang(ticket.ticketId, gang.id, status)
-              : null,
-        ));
-
-        // Per-gang alert banner — red for allergy, gold for VIP. Makes the
-        // alert impossible to miss when scrolling a packed ticket with
-        // multiple courses, where the ticket-top banner can be scrolled off.
-        final groupAlert = _groupAlert(groupItems);
-        if (groupAlert != null) {
-          widgets.add(_buildGangAlertBanner(
-            text: groupAlert.text,
-            kind: groupAlert.kind,
-            largeFont: largeFont,
-          ));
-        }
-
-        // Items in this group — dimmed when Gang is still on HOLD
-        for (final item in groupItems) {
-          widgets.add(_buildItemRow(
-            item,
-            largeFont: largeFont,
-            itemSize: itemSize,
-            modSize: modSize,
-            gangStatus: gang != null ? status : null,
-          ));
-        }
-
-        widgets.add(const SizedBox(height: 4));
-      }
-    }
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
-      children: widgets,
+    return buildGangGroupedItemsList(
+      ticket,
+      gangMap: gangMap,
+      gangStates: gangStates,
+      largeFont: largeFont,
+      itemSize: itemSize,
+      modSize: modSize,
+      settings: settings,
+      onFire: _fireGang,
+      onAdvance: _advanceGang,
+      onRecall: _recallGang,
     );
   }
 
@@ -1042,453 +993,6 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
         ],
       ),
     );
-  }
-
-  /// Gang-scoped alert banner.
-  ///
-  /// Lives under the Gang header, above that Gang's items. Red for allergy
-  /// (kitchen safety), gold for VIP (service priority). Always visible even
-  /// when the ticket-top banner is scrolled out of view on dense cards.
-  Widget _buildGangAlertBanner({
-    required String text,
-    required _AlertKind kind,
-    required bool largeFont,
-  }) {
-    final (Color bg, Color fg, IconData icon, String tag) = switch (kind) {
-      _AlertKind.allergy => (
-        AppColors.red,
-        Colors.white,
-        Icons.warning_amber_rounded,
-        'ALLERGY',
-      ),
-      _AlertKind.vip => (
-        const Color(0xFFE0B24A), // gold
-        const Color(0xFF2A1A00),
-        Icons.star_rounded,
-        'VIP',
-      ),
-      _AlertKind.none => (
-        AppColors.red,
-        Colors.white,
-        Icons.warning_amber_rounded,
-        'ALERT',
-      ),
-    };
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(
-          horizontal: largeFont ? 10 : 8,
-          vertical: largeFont ? 6 : 5,
-        ),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: largeFont ? 18 : 14, color: fg),
-            const SizedBox(width: 6),
-            Text(
-              tag,
-              style: TextStyle(
-                fontSize: largeFont ? 11 : 9,
-                fontWeight: FontWeight.w900,
-                color: fg,
-                letterSpacing: 1.5,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                text.toUpperCase(),
-                style: TextStyle(
-                  fontSize: largeFont ? 13 : 11,
-                  fontWeight: FontWeight.w800,
-                  color: fg,
-                  letterSpacing: 0.6,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Gang header row.
-  ///
-  /// Color and trailing widget vary by [status]:
-  ///   - pending        → gray header + colored FIRE button (if [onFire] set)
-  ///   - fired / inPrep → gang color + "FIRED" chip + MM:SS timer (5 min amber,
-  ///                      10 min red — the hold-time tells the cook if this
-  ///                      gang is falling behind the ticket's target pace)
-  ///   - ready          → green + "READY" chip
-  ///   - served         → dim + "SERVED" chip
-  Widget _buildGangHeader(
-    GangTemplateEntity? gang, {
-    required GangOrderStatus status,
-    required DateTime? firedAt,
-    required bool largeFont,
-    VoidCallback? onFire,
-    VoidCallback? onAdvance,
-    VoidCallback? onRecall,
-  }) {
-    final baseColor = gang?.flutterColor ?? AppColors.textSecondary;
-    // Fixed-label policy (2026-04-17): always display "GANG N" derived from
-    // sortOrder. We intentionally ignore gang.name so a future backoffice
-    // rename can't accidentally surface custom strings on the cook line.
-    final name = gang != null ? 'Gang ${gang.sortOrder}' : 'Andere';
-
-    // Resolve header foreground based on lifecycle status.
-    final Color headerColor = switch (status) {
-      GangOrderStatus.pending => AppColors.textDim,
-      GangOrderStatus.fired => baseColor,
-      GangOrderStatus.inPrep => baseColor,
-      GangOrderStatus.ready => AppColors.green,
-      GangOrderStatus.served => AppColors.textDim,
-    };
-
-    final bool showTimer = firedAt != null &&
-        (status == GangOrderStatus.fired ||
-            status == GangOrderStatus.inPrep);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6, top: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: headerColor,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            name.toUpperCase(),
-            style: TextStyle(
-              fontSize: largeFont ? 11 : 9,
-              fontWeight: FontWeight.w800,
-              color: headerColor,
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Container(
-              height: 1,
-              color: headerColor.withValues(alpha: 0.25),
-            ),
-          ),
-          if (showTimer) ...[
-            const SizedBox(width: 8),
-            _buildGangFiredTimer(firedAt, largeFont: largeFont),
-          ],
-          const SizedBox(width: 8),
-          _buildGangStatusTrailing(
-            status: status,
-            baseColor: baseColor,
-            largeFont: largeFont,
-            onFire: onFire,
-            onAdvance: onAdvance,
-            onRecall: onRecall,
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Per-gang fired-time readout.
-  ///
-  /// Color thresholds surface hold-time drift to the cook at a glance:
-  ///   < 5 min  → text-primary (on track)
-  ///   5–9 min  → amber (watch)
-  ///   ≥ 10 min → red (pushing back the course)
-  ///
-  /// Re-rendered by the screen's 1-second clock tick.
-  Widget _buildGangFiredTimer(DateTime firedAt, {required bool largeFont}) {
-    final elapsed = DateTime.now().difference(firedAt);
-    final minutes = elapsed.inMinutes;
-    final mm = minutes.toString().padLeft(2, '0');
-    final ss = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
-
-    final Color color;
-    if (minutes >= 10) {
-      color = AppColors.red;
-    } else if (minutes >= 5) {
-      color = const Color(0xFFFBBF24); // amber
-    } else {
-      color = AppColors.textPrimary;
-    }
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: largeFont ? 6 : 4,
-        vertical: largeFont ? 2 : 1,
-      ),
-      child: Text(
-        '$mm:$ss',
-        style: TextStyle(
-          fontSize: largeFont ? 11 : 9,
-          fontWeight: FontWeight.w900,
-          color: color,
-          fontFeatures: const [FontFeature.tabularFigures()],
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  /// Trailing widget on the Gang header: FIRE button when pending, otherwise
-  /// a status chip (FIRED / READY / SERVED).
-  ///
-  /// Chips are interactive on non-pending states:
-  ///   - tap       → [onAdvance] (fired/inPrep → ready; ready → served)
-  ///   - long-press → [onRecall] (one step back, to fix a miss-tap)
-  Widget _buildGangStatusTrailing({
-    required GangOrderStatus status,
-    required Color baseColor,
-    required bool largeFont,
-    VoidCallback? onFire,
-    VoidCallback? onAdvance,
-    VoidCallback? onRecall,
-  }) {
-    if (status == GangOrderStatus.pending && onFire != null) {
-      return GestureDetector(
-        onTap: onFire,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: largeFont ? 10 : 8,
-            vertical: largeFont ? 5 : 3,
-          ),
-          decoration: BoxDecoration(
-            color: baseColor,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.local_fire_department,
-                size: largeFont ? 14 : 12,
-                color: AppColors.onGreen,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                'FIRE',
-                style: TextStyle(
-                  fontSize: largeFont ? 11 : 9,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.onGreen,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Non-pending states → status chip only.
-    final (String label, Color bg, Color fg) = switch (status) {
-      GangOrderStatus.pending => (
-        'HOLD',
-        AppColors.surfaceContainerHigh,
-        AppColors.textDim,
-      ),
-      GangOrderStatus.fired => (
-        'FIRED',
-        baseColor.withValues(alpha: 0.18),
-        baseColor,
-      ),
-      GangOrderStatus.inPrep => (
-        'IN PREP',
-        baseColor.withValues(alpha: 0.18),
-        baseColor,
-      ),
-      GangOrderStatus.ready => (
-        'READY',
-        AppColors.greenDim,
-        AppColors.green,
-      ),
-      GangOrderStatus.served => (
-        'SERVED',
-        AppColors.surfaceContainerHigh,
-        AppColors.textDim,
-      ),
-    };
-
-    // Leading icon hints at the action available on tap — ✓ for mark-ready /
-    // bump, ↩ for recall-only (served).
-    IconData? hintIcon;
-    if (status == GangOrderStatus.fired ||
-        status == GangOrderStatus.inPrep ||
-        status == GangOrderStatus.ready) {
-      hintIcon = Icons.check_rounded;
-    } else if (status == GangOrderStatus.served) {
-      hintIcon = Icons.undo_rounded;
-    }
-
-    Widget chip = Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: largeFont ? 8 : 6,
-        vertical: largeFont ? 4 : 2,
-      ),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (hintIcon != null) ...[
-            Icon(hintIcon, size: largeFont ? 12 : 10, color: fg),
-            const SizedBox(width: 3),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: largeFont ? 10 : 8,
-              fontWeight: FontWeight.w900,
-              color: fg,
-              letterSpacing: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (onAdvance == null && onRecall == null) return chip;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onAdvance,
-      onLongPress: onRecall,
-      child: chip,
-    );
-  }
-
-  Widget _buildItemRow(
-    KitchenTicketItemEntity item, {
-    required bool largeFont,
-    required double itemSize,
-    required double modSize,
-    required GangOrderStatus? gangStatus,
-  }) {
-    final mods = item.modifiersText
-            ?.split(',')
-            .map((s) => s.trim())
-            .where((s) => s.isNotEmpty)
-            .toList() ??
-        const [];
-
-    // Items in a pending (HOLD) gang are rendered gray so the cook sees at a
-    // glance that they're not to be started yet. Alert notes (allergy/VIP)
-    // still use their full red treatment — safety trumps hold styling.
-    final bool isHeld = gangStatus == GangOrderStatus.pending;
-    final Color primaryText =
-        isHeld ? AppColors.textDim : AppColors.textPrimary;
-    final Color secondaryText =
-        isHeld ? AppColors.textDim : AppColors.textSecondary;
-
-    Widget row = Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Quantity badge
-          Container(
-            width: largeFont ? 30 : 24,
-            height: largeFont ? 30 : 24,
-            decoration: BoxDecoration(
-              color: AppColors.accentDim,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Center(
-              child: Text(
-                item.quantity == item.quantity.roundToDouble()
-                    ? item.quantity.toInt().toString()
-                    : item.quantity.toString(),
-                style: TextStyle(
-                  fontSize: largeFont ? 16 : 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.productName,
-                  style: TextStyle(
-                    fontSize: itemSize,
-                    fontWeight: FontWeight.w700,
-                    color: primaryText,
-                    height: 1.3,
-                  ),
-                ),
-                ...mods.map(
-                  (mod) => Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      '\u2022 $mod',
-                      style: TextStyle(
-                          fontSize: modSize, color: secondaryText),
-                    ),
-                  ),
-                ),
-                if (item.notes != null && item.notes!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: _isAlertNote(item.notes)
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.red,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '\u26A0 ${item.notes}',
-                              style: TextStyle(
-                                fontSize: modSize + 1,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            '\u26A0 ${item.notes}',
-                            style: TextStyle(
-                              fontSize: modSize,
-                              color: isHeld
-                                  ? AppColors.textDim
-                                  : AppColors.orange,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-
-    // Reinforce the HOLD treatment with a slight opacity fade.
-    return isHeld ? Opacity(opacity: 0.55, child: row) : row;
   }
 
   // -------------------------------------------------------------------------
@@ -1564,4 +1068,630 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
       ],
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Gang-grouped items list — testable top-level builder
+// ---------------------------------------------------------------------------
+
+/// Callback invoked when the cook taps a pending Gang's FIRE button.
+typedef OnFireGang = void Function(
+  KitchenTicketEntity ticket,
+  GangTemplateEntity gang,
+  List<KitchenTicketItemEntity> items,
+  String gangLabel,
+);
+
+/// Callback invoked when the cook taps a non-pending Gang chip to advance
+/// lifecycle: fired/inPrep → ready → served.
+typedef OnAdvanceGang = void Function(
+  String ticketId,
+  String gangTemplateId,
+  GangOrderStatus current,
+);
+
+/// Callback invoked on long-press to recall a Gang one step in the lifecycle.
+typedef OnRecallGang = void Function(
+  String ticketId,
+  String gangTemplateId,
+  GangOrderStatus current,
+);
+
+/// Builds the per-ticket Gang-grouped items list.
+///
+/// Policy is restaurant-configurable via [RestaurantSettings]:
+///   - `gangsEnabled == false` → flat list ordered by arrival; no headers,
+///     no FIRE buttons. Used by bar / fast-casual flows that don't serve
+///     courses. Ticket-level bump still works.
+///   - `gangsEnabled == true`  → items grouped by Gang sortOrder, capped at
+///     `settings.maxGangs` (1..5). Beyond-cap gangs fall into "Andere".
+///
+/// Extracted to top-level with callback parameters so widget tests can mount
+/// the view directly without spinning up the whole KDS screen.
+@visibleForTesting
+Widget buildGangGroupedItemsList(
+  KitchenTicketEntity ticket, {
+  required Map<String, GangTemplateEntity> gangMap,
+  required Map<String, OrderGangStateEntity> gangStates,
+  required bool largeFont,
+  required double itemSize,
+  required double modSize,
+  required RestaurantSettings settings,
+  required OnFireGang onFire,
+  required OnAdvanceGang onAdvance,
+  required OnRecallGang onRecall,
+}) {
+  final items = ticket.items;
+
+  // Restaurant turned Gang grouping off → flat arrival-order list.
+  if (!settings.gangsEnabled) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+      children: [
+        for (final item in items)
+          _buildItemRowTop(
+            item,
+            largeFont: largeFont,
+            itemSize: itemSize,
+            modSize: modSize,
+            gangStatus: null,
+          ),
+      ],
+    );
+  }
+
+  // Only render gangs within the configured cap. Anything beyond
+  // settings.maxGangs is treated as ungrouped so the card stays focused.
+  final int cap = settings.maxGangs;
+  bool isRenderableGang(String? gangId) {
+    if (gangId == null) return false;
+    final g = gangMap[gangId];
+    return g != null && g.sortOrder <= cap;
+  }
+
+  final hasGangs =
+      gangMap.isNotEmpty && items.any((i) => isRenderableGang(i.gangId));
+
+  final widgets = <Widget>[];
+
+  if (!hasGangs) {
+    // No gang data — flat list (legacy / simple mode)
+    for (final item in items) {
+      widgets.add(_buildItemRowTop(
+        item,
+        largeFont: largeFont,
+        itemSize: itemSize,
+        modSize: modSize,
+        gangStatus: null,
+      ));
+    }
+  } else {
+    // Group items by gangId (null bucket = ungrouped / out-of-cap)
+    final grouped = <String?, List<KitchenTicketItemEntity>>{};
+    for (final item in items) {
+      final key = isRenderableGang(item.gangId) ? item.gangId : null;
+      grouped.putIfAbsent(key, () => []).add(item);
+    }
+
+    // Sort groups: known gangs by sortOrder, then null (ungrouped) last
+    final sortedKeys = grouped.keys.toList()
+      ..sort((a, b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return 1;
+        if (b == null) return -1;
+        final orderA = gangMap[a]?.sortOrder ?? 99;
+        final orderB = gangMap[b]?.sortOrder ?? 99;
+        return orderA.compareTo(orderB);
+      });
+
+    for (final key in sortedKeys) {
+      final groupItems = grouped[key]!;
+      final gang = key != null ? gangMap[key] : null;
+      final state = key != null ? gangStates[key] : null;
+      final status = state?.status ?? GangOrderStatus.pending;
+
+      // Resolve the display label once — used for both the header text
+      // and the ESC/POS courseLabel stamp.
+      final String gangLabel = gang != null
+          ? settings.gangLabelFor(gang.sortOrder)
+          : 'Andere';
+
+      widgets.add(_buildGangHeaderTop(
+        gang,
+        label: gangLabel,
+        status: status,
+        firedAt: state?.firedAt,
+        largeFont: largeFont,
+        onFire: (gang != null && status == GangOrderStatus.pending)
+            ? () => onFire(ticket, gang, groupItems, gangLabel)
+            : null,
+        onAdvance: (gang != null &&
+                (status == GangOrderStatus.fired ||
+                    status == GangOrderStatus.inPrep ||
+                    status == GangOrderStatus.ready))
+            ? () => onAdvance(ticket.ticketId, gang.id, status)
+            : null,
+        onRecall: (gang != null && status != GangOrderStatus.pending)
+            ? () => onRecall(ticket.ticketId, gang.id, status)
+            : null,
+      ));
+
+      // Per-gang alert banner — red for allergy, gold for VIP.
+      final groupAlert = _groupAlert(groupItems);
+      if (groupAlert != null) {
+        widgets.add(_buildGangAlertBannerTop(
+          text: groupAlert.text,
+          kind: groupAlert.kind,
+          largeFont: largeFont,
+        ));
+      }
+
+      // Items in this group — dimmed when Gang is still on HOLD
+      for (final item in groupItems) {
+        widgets.add(_buildItemRowTop(
+          item,
+          largeFont: largeFont,
+          itemSize: itemSize,
+          modSize: modSize,
+          gangStatus: gang != null ? status : null,
+        ));
+      }
+
+      widgets.add(const SizedBox(height: 4));
+    }
+  }
+
+  return ListView(
+    padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+    children: widgets,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Internal top-level widget builders (moved out of State so the view is
+// reachable from widget tests; same visuals as before).
+// ---------------------------------------------------------------------------
+
+Widget _buildGangHeaderTop(
+  GangTemplateEntity? gang, {
+  required String label,
+  required GangOrderStatus status,
+  required DateTime? firedAt,
+  required bool largeFont,
+  VoidCallback? onFire,
+  VoidCallback? onAdvance,
+  VoidCallback? onRecall,
+}) {
+  final baseColor = gang?.flutterColor ?? AppColors.textSecondary;
+  final Color headerColor = switch (status) {
+    GangOrderStatus.pending => AppColors.textDim,
+    GangOrderStatus.fired => baseColor,
+    GangOrderStatus.inPrep => baseColor,
+    GangOrderStatus.ready => AppColors.green,
+    GangOrderStatus.served => AppColors.textDim,
+  };
+
+  final bool showTimer = firedAt != null &&
+      (status == GangOrderStatus.fired || status == GangOrderStatus.inPrep);
+
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 6, top: 4),
+    child: Row(
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: headerColor,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: largeFont ? 11 : 9,
+            fontWeight: FontWeight.w800,
+            color: headerColor,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: headerColor.withValues(alpha: 0.25),
+          ),
+        ),
+        if (showTimer) ...[
+          const SizedBox(width: 8),
+          _buildGangFiredTimerTop(firedAt, largeFont: largeFont),
+        ],
+        const SizedBox(width: 8),
+        _buildGangStatusTrailingTop(
+          status: status,
+          baseColor: baseColor,
+          largeFont: largeFont,
+          onFire: onFire,
+          onAdvance: onAdvance,
+          onRecall: onRecall,
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildGangFiredTimerTop(DateTime firedAt, {required bool largeFont}) {
+  final elapsed = DateTime.now().difference(firedAt);
+  final minutes = elapsed.inMinutes;
+  final mm = minutes.toString().padLeft(2, '0');
+  final ss = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
+
+  final Color color;
+  if (minutes >= 10) {
+    color = AppColors.red;
+  } else if (minutes >= 5) {
+    color = const Color(0xFFFBBF24);
+  } else {
+    color = AppColors.textPrimary;
+  }
+
+  return Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: largeFont ? 6 : 4,
+      vertical: largeFont ? 2 : 1,
+    ),
+    child: Text(
+      '$mm:$ss',
+      style: TextStyle(
+        fontSize: largeFont ? 11 : 9,
+        fontWeight: FontWeight.w900,
+        color: color,
+        fontFeatures: const [FontFeature.tabularFigures()],
+        letterSpacing: 0.5,
+      ),
+    ),
+  );
+}
+
+Widget _buildGangStatusTrailingTop({
+  required GangOrderStatus status,
+  required Color baseColor,
+  required bool largeFont,
+  VoidCallback? onFire,
+  VoidCallback? onAdvance,
+  VoidCallback? onRecall,
+}) {
+  if (status == GangOrderStatus.pending && onFire != null) {
+    return GestureDetector(
+      onTap: onFire,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: largeFont ? 10 : 8,
+          vertical: largeFont ? 5 : 3,
+        ),
+        decoration: BoxDecoration(
+          color: baseColor,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.local_fire_department,
+              size: largeFont ? 14 : 12,
+              color: AppColors.onGreen,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'FIRE',
+              style: TextStyle(
+                fontSize: largeFont ? 11 : 9,
+                fontWeight: FontWeight.w900,
+                color: AppColors.onGreen,
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  final (String label, Color bg, Color fg) = switch (status) {
+    GangOrderStatus.pending => (
+      'HOLD',
+      AppColors.surfaceContainerHigh,
+      AppColors.textDim,
+    ),
+    GangOrderStatus.fired => (
+      'FIRED',
+      baseColor.withValues(alpha: 0.18),
+      baseColor,
+    ),
+    GangOrderStatus.inPrep => (
+      'IN PREP',
+      baseColor.withValues(alpha: 0.18),
+      baseColor,
+    ),
+    GangOrderStatus.ready => (
+      'READY',
+      AppColors.greenDim,
+      AppColors.green,
+    ),
+    GangOrderStatus.served => (
+      'SERVED',
+      AppColors.surfaceContainerHigh,
+      AppColors.textDim,
+    ),
+  };
+
+  IconData? hintIcon;
+  if (status == GangOrderStatus.fired ||
+      status == GangOrderStatus.inPrep ||
+      status == GangOrderStatus.ready) {
+    hintIcon = Icons.check_rounded;
+  } else if (status == GangOrderStatus.served) {
+    hintIcon = Icons.undo_rounded;
+  }
+
+  Widget chip = Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: largeFont ? 8 : 6,
+      vertical: largeFont ? 4 : 2,
+    ),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (hintIcon != null) ...[
+          Icon(hintIcon, size: largeFont ? 12 : 10, color: fg),
+          const SizedBox(width: 3),
+        ],
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: largeFont ? 10 : 8,
+            fontWeight: FontWeight.w900,
+            color: fg,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  if (onAdvance == null && onRecall == null) return chip;
+
+  return GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: onAdvance,
+    onLongPress: onRecall,
+    child: chip,
+  );
+}
+
+Widget _buildGangAlertBannerTop({
+  required String text,
+  required _AlertKind kind,
+  required bool largeFont,
+}) {
+  final (Color bg, Color fg, IconData icon, String tag) = switch (kind) {
+    _AlertKind.allergy => (
+      AppColors.red,
+      Colors.white,
+      Icons.warning_amber_rounded,
+      'ALLERGY',
+    ),
+    _AlertKind.vip => (
+      const Color(0xFFE0B24A),
+      const Color(0xFF2A1A00),
+      Icons.star_rounded,
+      'VIP',
+    ),
+    _AlertKind.none => (
+      AppColors.red,
+      Colors.white,
+      Icons.warning_amber_rounded,
+      'ALERT',
+    ),
+  };
+
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: largeFont ? 10 : 8,
+        vertical: largeFont ? 6 : 5,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: largeFont ? 18 : 14, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            tag,
+            style: TextStyle(
+              fontSize: largeFont ? 11 : 9,
+              fontWeight: FontWeight.w900,
+              color: fg,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text.toUpperCase(),
+              style: TextStyle(
+                fontSize: largeFont ? 13 : 11,
+                fontWeight: FontWeight.w800,
+                color: fg,
+                letterSpacing: 0.6,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildItemRowTop(
+  KitchenTicketItemEntity item, {
+  required bool largeFont,
+  required double itemSize,
+  required double modSize,
+  required GangOrderStatus? gangStatus,
+}) {
+  final mods = item.modifiersText
+          ?.split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList() ??
+      const [];
+
+  final bool isHeld = gangStatus == GangOrderStatus.pending;
+  final Color primaryText =
+      isHeld ? AppColors.textDim : AppColors.textPrimary;
+  final Color secondaryText =
+      isHeld ? AppColors.textDim : AppColors.textSecondary;
+
+  Widget row = Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: largeFont ? 30 : 24,
+          height: largeFont ? 30 : 24,
+          decoration: BoxDecoration(
+            color: AppColors.accentDim,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Center(
+            child: Text(
+              item.quantity == item.quantity.roundToDouble()
+                  ? item.quantity.toInt().toString()
+                  : item.quantity.toString(),
+              style: TextStyle(
+                fontSize: largeFont ? 16 : 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.productName,
+                style: TextStyle(
+                  fontSize: itemSize,
+                  fontWeight: FontWeight.w700,
+                  color: primaryText,
+                  height: 1.3,
+                ),
+              ),
+              ...mods.map(
+                (mod) => Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    '\u2022 $mod',
+                    style: TextStyle(fontSize: modSize, color: secondaryText),
+                  ),
+                ),
+              ),
+              if (item.notes != null && item.notes!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: _isAlertNote(item.notes)
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.red,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '\u26A0 ${item.notes}',
+                            style: TextStyle(
+                              fontSize: modSize + 1,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        )
+                      : Text(
+                          '\u26A0 ${item.notes}',
+                          style: TextStyle(
+                            fontSize: modSize,
+                            color: isHeld
+                                ? AppColors.textDim
+                                : AppColors.orange,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
+  return isHeld ? Opacity(opacity: 0.55, child: row) : row;
+}
+
+// ---------------------------------------------------------------------------
+// Gang-fire ESC/POS payload builder
+// ---------------------------------------------------------------------------
+
+/// Builds the ESC/POS payload for a gang-fire print.
+///
+/// Top-level so the payload shape is unit-testable without spinning up
+/// Riverpod or a PrinterService. The courseLabel stamps the gang label
+/// (e.g. "Gang 1") onto the Bestellbon so the pass can match paper to the
+/// cook's card at a glance.
+@visibleForTesting
+KitchenTicketData buildGangFirePayload(
+  KitchenTicketEntity ticket,
+  GangTemplateEntity gang,
+  List<KitchenTicketItemEntity> items, {
+  String? gangLabel,
+}) {
+  return KitchenTicketData(
+    tableNo: ticket.tableName ?? '#${ticket.orderNumber}',
+    orderNo: ticket.orderNumber,
+    waiterName: ticket.waiterName,
+    courseLabel: gangLabel ?? 'Gang ${gang.sortOrder}',
+    printerGroup: ticket.printerGroup,
+    dateTime: DateTime.now(),
+    items: items
+        .map((i) => KitchenItem(
+              name: i.productName,
+              quantity: i.quantity,
+              modifiers: i.modifiersText
+                      ?.split(',')
+                      .map((s) => s.trim())
+                      .where((s) => s.isNotEmpty)
+                      .toList() ??
+                  const [],
+              notes: i.notes,
+            ))
+        .toList(),
+  );
 }

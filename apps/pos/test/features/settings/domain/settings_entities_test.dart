@@ -29,6 +29,63 @@ void main() {
       expect(defaults.logoPath, isNull);
     });
 
+    test('gang defaults — enabled, 3 gangs, "Gang 1/2/3" labels', () {
+      expect(defaults.gangsEnabled, isTrue);
+      expect(defaults.maxGangs, 3);
+      expect(defaults.gangLabels, kDefaultGangLabels);
+    });
+
+    test('gangLabelFor falls back to "Gang N" when index out of range', () {
+      expect(defaults.gangLabelFor(1), 'Gang 1');
+      expect(defaults.gangLabelFor(4), 'Gang 4'); // past defaults length
+      expect(defaults.gangLabelFor(0), 'Gang 0'); // invalid ordinal still stable
+    });
+
+    test('gangLabelFor returns restaurant override', () {
+      const custom = RestaurantSettings(
+        gangLabels: ['Amuse', 'Entrée', 'Plat', 'Dessert'],
+        maxGangs: 4,
+      );
+      expect(custom.gangLabelFor(1), 'Amuse');
+      expect(custom.gangLabelFor(4), 'Dessert');
+    });
+
+    test('gangLabelFor skips blank override and falls back to "Gang N"', () {
+      const s = RestaurantSettings(gangLabels: ['', '  ', 'Dessert']);
+      expect(s.gangLabelFor(1), 'Gang 1');
+      expect(s.gangLabelFor(2), 'Gang 2');
+      expect(s.gangLabelFor(3), 'Dessert');
+    });
+
+    test('maxGangs is clamped to [1, 5]', () {
+      expect(defaults.copyWith(maxGangs: 0).maxGangs, 1);
+      expect(defaults.copyWith(maxGangs: 99).maxGangs, 5);
+      expect(defaults.copyWith(maxGangs: 4).maxGangs, 4);
+    });
+
+    test('gangsEnabled=false round-trips through JSON', () {
+      const original = RestaurantSettings(gangsEnabled: false, maxGangs: 1);
+      final restored = RestaurantSettings.fromJsonString(original.toJsonString());
+      expect(restored.gangsEnabled, isFalse);
+      expect(restored.maxGangs, 1);
+      expect(restored, original);
+    });
+
+    test('custom gangLabels round-trip through JSON', () {
+      const original = RestaurantSettings(
+        gangLabels: ['Apéro', 'Hauptgang', 'Dessert'],
+      );
+      final restored = RestaurantSettings.fromJsonString(original.toJsonString());
+      expect(restored.gangLabels, ['Apéro', 'Hauptgang', 'Dessert']);
+    });
+
+    test('fromJson clamps maxGangs and defaults missing gang fields', () {
+      final parsed = RestaurantSettings.fromJsonString('{"maxGangs":42}');
+      expect(parsed.maxGangs, 5);
+      expect(parsed.gangsEnabled, isTrue);
+      expect(parsed.gangLabels, kDefaultGangLabels);
+    });
+
     test('copyWith updates only specified fields', () {
       final updated = defaults.copyWith(name: 'Zum Löwen', phone: '+41441234567');
       expect(updated.name, 'Zum Löwen');
