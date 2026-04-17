@@ -6,8 +6,13 @@ import 'package:http/http.dart' as http;
 
 import '../errors/api_exception.dart';
 import '../endpoints/auth_endpoint.dart';
+import '../endpoints/dashboard_endpoint.dart';
 import '../endpoints/menu_endpoint.dart';
 import '../endpoints/orders_endpoint.dart';
+import '../endpoints/payment_endpoint.dart';
+import '../endpoints/report_endpoint.dart';
+import '../endpoints/settings_endpoint.dart';
+import '../endpoints/staff_endpoint.dart';
 import '../endpoints/sync_endpoint.dart';
 import '../endpoints/tables_endpoint.dart';
 
@@ -24,6 +29,11 @@ class GastrocoreClient {
   late final OrdersEndpoint orders;
   late final TablesEndpoint tables;
   late final SyncEndpoint sync;
+  late final PaymentEndpoint payments;
+  late final StaffEndpoint staff;
+  late final SettingsEndpoint settings;
+  late final ReportEndpoint reports;
+  late final DashboardEndpoint dashboard;
 
   GastrocoreClient({
     required this.baseUrl,
@@ -34,6 +44,11 @@ class GastrocoreClient {
     orders = OrdersEndpoint(this);
     tables = TablesEndpoint(this);
     sync = SyncEndpoint(this);
+    payments = PaymentEndpoint(this);
+    staff = StaffEndpoint(this);
+    settings = SettingsEndpoint(this);
+    reports = ReportEndpoint(this);
+    dashboard = DashboardEndpoint(this);
   }
 
   /// Set the bearer token used for authenticated requests.
