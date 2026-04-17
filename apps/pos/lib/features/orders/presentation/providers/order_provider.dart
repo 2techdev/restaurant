@@ -4,11 +4,16 @@
 /// tickets, and actions like adding / removing items and sending to kitchen.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
+import 'package:gastrocore_pos/core/printing/models/print_models.dart';
+import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/kitchen/domain/entities/kitchen_ticket_entity.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_provider.dart';
 import 'package:gastrocore_pos/features/orders/data/repositories/order_repository_impl.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
@@ -318,15 +323,69 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
 
     // Create KDS kitchen ticket for the unsent items.
     if (unsentItems.isNotEmpty) {
-      await kitchenRepo.createTicketFromOrder(
+      final kitchenTicket = await kitchenRepo.createTicketFromOrder(
         ticket: state!,
         items: unsentItems,
         waiterName: currentUser?.name,
       );
+
+      // Printer fallback — fine-dining must always have a physical paper trail
+      // at the pass, even when the KDS tablet is showing the ticket. If no
+      // printer is configured the call fails silently (use case returns false).
+      if (kitchenTicket != null) {
+        unawaited(_printKitchenTicket(kitchenTicket, state!.orderType));
+      }
     }
 
     // Refresh state from DB.
     state = await repo.getTicketById(state!.id);
+  }
+
+  /// Best-effort print of a kitchen ticket. Never throws — kitchen flow
+  /// continues even when a printer is unplugged or misconfigured.
+  Future<void> _printKitchenTicket(
+    KitchenTicketEntity kitchenTicket,
+    OrderType orderType,
+  ) async {
+    try {
+      final useCase = _ref.read(printKitchenTicketUseCaseProvider);
+      final data = KitchenTicketData(
+        tableNo: kitchenTicket.tableName ?? _orderTypeLabel(orderType),
+        orderNo: kitchenTicket.orderNumber,
+        waiterName: kitchenTicket.waiterName,
+        printerGroup: 'Kueche',
+        dateTime: kitchenTicket.sentAt,
+        items: kitchenTicket.items
+            .map((i) => KitchenItem(
+                  name: i.productName,
+                  quantity: i.quantity,
+                  modifiers: i.modifiersText
+                          ?.split(',')
+                          .map((s) => s.trim())
+                          .where((s) => s.isNotEmpty)
+                          .toList() ??
+                      const [],
+                  notes: i.notes,
+                ))
+            .toList(),
+      );
+      await useCase(data);
+    } catch (_) {
+      // Printer unavailable — KDS still has the ticket on screen.
+    }
+  }
+
+  String _orderTypeLabel(OrderType orderType) {
+    switch (orderType) {
+      case OrderType.takeaway:
+        return 'Takeaway';
+      case OrderType.delivery:
+        return 'Delivery';
+      case OrderType.online:
+        return 'Online';
+      case OrderType.dineIn:
+        return 'Dine-in';
+    }
   }
 
   /// Load an existing ticket from the database as the current ticket.

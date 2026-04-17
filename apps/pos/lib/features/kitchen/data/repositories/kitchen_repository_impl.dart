@@ -190,12 +190,16 @@ class KitchenRepositoryImpl {
   /// [ticket] is the order ticket that was just sent to the kitchen.
   /// [items] are the unsent order items to include on the ticket.
   /// [waiterName] is the display name of the logged-in waiter (snapshot).
-  Future<void> createTicketFromOrder({
+  ///
+  /// Returns the created [KitchenTicketEntity] with resolved [tableName], or
+  /// null when [items] is empty. Callers (e.g. printer fallback) can use the
+  /// return value to render the physical Bestellbon without re-querying.
+  Future<KitchenTicketEntity?> createTicketFromOrder({
     required TicketEntity ticket,
     required List<OrderItemEntity> items,
     String? waiterName,
   }) async {
-    if (items.isEmpty) return;
+    if (items.isEmpty) return null;
 
     final now = DateTime.now();
     final kitchenTicketId = IdGenerator.generateId();
@@ -208,6 +212,8 @@ class KitchenRepositoryImpl {
           .getSingleOrNull();
       tableName = tableRow?.name;
     }
+
+    final kitchenItems = <KitchenTicketItemEntity>[];
 
     await _db.transaction(() async {
       await _db.into(_db.kitchenTickets).insert(
@@ -231,10 +237,11 @@ class KitchenRepositoryImpl {
         final modText = item.modifiers.isEmpty
             ? null
             : item.modifiers.map((m) => m.modifierName).join(', ');
+        final itemId = IdGenerator.generateId();
 
         await _db.into(_db.kitchenTicketItems).insert(
               KitchenTicketItemsCompanion(
-                id: Value(IdGenerator.generateId()),
+                id: Value(itemId),
                 kitchenTicketId: Value(kitchenTicketId),
                 orderItemId: Value(item.id),
                 productName: Value(item.productName),
@@ -246,8 +253,33 @@ class KitchenRepositoryImpl {
                 createdAt: Value(now),
               ),
             );
+
+        kitchenItems.add(KitchenTicketItemEntity(
+          id: itemId,
+          kitchenTicketId: kitchenTicketId,
+          orderItemId: item.id,
+          productName: item.productName,
+          quantity: item.quantity,
+          modifiersText: modText,
+          notes: item.notes,
+          status: KitchenTicketStatus.pending,
+          gangId: item.gangId,
+        ));
       }
     });
+
+    return KitchenTicketEntity(
+      id: kitchenTicketId,
+      tenantId: ticket.tenantId,
+      ticketId: ticket.id,
+      tableName: tableName,
+      waiterName: waiterName,
+      orderNumber: ticket.orderNumber,
+      printerGroup: 'kitchen',
+      status: KitchenTicketStatus.pending,
+      items: kitchenItems,
+      sentAt: now,
+    );
   }
 
   // =========================================================================
