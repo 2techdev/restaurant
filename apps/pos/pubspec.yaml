@@ -97,6 +97,9 @@ dependencies:
   # Equatable for value objects
   equatable: ^2.0.7
 
+  # Crash reporting (DSN injected via --dart-define=SENTRY_DSN=...)
+  sentry_flutter: ^8.9.0
+
   # Freezed annotations
   freezed_annotation: ^3.0.0
   json_annotation: ^4.9.0
