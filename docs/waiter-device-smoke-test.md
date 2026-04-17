@@ -1,17 +1,33 @@
-# Sunmi Tablet Smoke-Test Checklist — Waiter App (Sprint 2)
+# Waiter Device Smoke-Test Checklist — Waiter App (Sprint 2)
 
-**Target hardware:** Sunmi V2s Pro / M2 Max (Android 11+, 800×1280 portrait).
-**Build:** `flutter build apk --release --flavor waiter` (or the default APK if
-no flavor is set).
+**Target form factor:** 7–10" tablet in portrait, used by a single waiter on
+the floor.
+**Build:** `flutter build apk --release` (Android) or `flutter build ios
+--release` (iOS) — use the default flavor unless a hardware-specific one has
+been configured by the time this runs.
 **Tester role:** waiter for the fine-dining pilot (Swiss 4-top / 6-top service).
 
 This is the physical-device smoke test for Sprint 2. The items below cover
-the golden paths that are most at risk of breaking on a real tablet versus the
-desktop dev emulator: thermal printer, USB-OTG peripherals, offline
-connectivity, and touch interaction on a 7–8" screen.
+the golden paths that are most at risk of breaking on a real device versus the
+desktop dev emulator: thermal printer, external peripherals, offline
+connectivity, and touch interaction on a 7–10" screen.
 
 Run the full pass **once per release candidate**. Record pass/fail beside each
 item with a short note. Anything red blocks the pilot deploy.
+
+---
+
+## Prerequisites
+
+- **Device choice is still open.** The pilot has not yet committed to a
+  specific tablet (Android generic tablet / iPad / a dedicated POS tablet are
+  all on the table). This checklist is deliberately hardware-agnostic — any
+  step that depends on a specific peripheral is marked `(if available)` and
+  can be filled in as **N/A** with a follow-up ticket once hardware arrives.
+- A working Wi-Fi network the device can join, plus a way to disable
+  connectivity at will (airplane mode / router toggle) for the offline tests.
+- The seeded pilot tenant on the backend, with at least one waiter user and
+  a small product catalog mapped to 2–3 kitchen gangs.
 
 ---
 
@@ -19,10 +35,10 @@ item with a short note. Anything red blocks the pilot deploy.
 
 | # | Step | Expected | Result |
 |---|------|----------|--------|
-| 0.1 | Connect tablet via USB, enable ADB debugging, run `adb install -r build/app/outputs/flutter-apk/app-release.apk` | APK installs without signature conflict | ☐ |
-| 0.2 | Open the app from the launcher | Cold-start under 4 s, no white flash | ☐ |
+| 0.1 | Install the build on the device: **Android** — enable ADB, `adb install -r build/app/outputs/flutter-apk/app-release.apk`; **iOS** — distribute the IPA via TestFlight and accept the invite | App installs without signature conflict | ☐ |
+| 0.2 | Open the app from the launcher / home screen | Cold-start under 4 s, no white flash | ☐ |
 | 0.3 | Log in as the seeded waiter user | Lands on waiter home (tables grid) | ☐ |
-| 0.4 | Rotate the tablet | Portrait only — orientation locked | ☐ |
+| 0.4 | Rotate the device | Portrait only — orientation locked | ☐ |
 
 ## 1. Table → ticket → quick-add (golden path)
 
@@ -69,16 +85,21 @@ item with a short note. Anything red blocks the pilot deploy.
 | 5.1 | From the Order tab, tap "Request bill" | Ticket enters billRequested; totals locked | ☐ |
 | 5.2 | Hand off to cashier device — split by seat | Each seat's subtotal matches what was tagged on the waiter side | ☐ |
 
-## 6. Thermal printer (if connected)
+## 6. Thermal printer (if available)
+
+Connection path depends on the chosen printer — Bluetooth (most generic
+tablets), TCP/LAN (counter-mount printers), or USB-OTG (only on Android
+tablets with the right port/cable).
 
 | # | Step | Expected | Result |
 |---|------|----------|--------|
-| 6.1 | Plug the ESC/POS USB printer into the Sunmi OTG port | Android grants USB permission | ☐ |
+| 6.1 | Pair / connect the ESC/POS thermal printer (Bluetooth, TCP, or USB-OTG) | OS grants the connection; device appears in Settings → Printer | ☐ |
 | 6.2 | From Settings → Printer, run "Test print" | Page prints with the logo + "GastroCore test" header | ☐ |
 | 6.3 | Fire Gang 1 with a printer-bound kitchen station | Kitchen ticket prints with items + gang number + seat numbers | ☐ |
 | 6.4 | Finalize the ticket in cash | Receipt prints with tax breakdown, MWST lines, tenant logo | ☐ |
 
-If no printer is available at the pilot site, mark 6.x as **N/A** and log a
+If no printer is available at the pilot site (or the chosen tablet doesn't
+support the intended connection path), mark 6.x as **N/A** and log a
 follow-up to retest once hardware arrives.
 
 ## 7. Camera / QR (if present)
@@ -88,7 +109,8 @@ follow-up to retest once hardware arrives.
 | 7.1 | From the tables screen, scan a table QR code | Opens that table's ticket directly | ☐ |
 | 7.2 | From Settings → Activation, scan a license QR | Tier lifts from Free to the scanned tier | ☐ |
 
-N/A for Sunmi V2s (no rear camera) — skip and note the model in the row.
+If the chosen device has no rear camera (some dedicated POS tablets), mark
+these **N/A** and note the model on the row.
 
 ## 8. Battery & thermals (endurance)
 
@@ -104,7 +126,7 @@ N/A for Sunmi V2s (no rear camera) — skip and note the model in the row.
 Paste into the pilot-rollout issue:
 
 ```
-Device: Sunmi V2s Pro · Android 11 · APK <git-sha>
+Device: <make/model> · <OS version> · build <git-sha>
 Tested by: <name> · <date>
 Environment: <pilot tenant name>
 
@@ -115,7 +137,7 @@ Section 3: PASS
 Section 4: PASS
 Section 5: PASS
 Section 6: N/A (no printer on site yet)
-Section 7: N/A (no camera on V2s)
+Section 7: N/A (no rear camera on this model)
 Section 8: PASS (17 % drain / 2 h)
 
 Blockers: <none | list>
