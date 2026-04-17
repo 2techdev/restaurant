@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -119,8 +120,24 @@ class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
   // -------------------------------------------------------------------------
 
   Future<void> _bumpTicket(String kitchenTicketId) async {
+    HapticFeedback.lightImpact();
     await ref.read(kitchenRepositoryProvider).completeTicket(kitchenTicketId);
     // Stream auto-removes the ticket — no setState needed.
+  }
+
+  /// Recall a ticket that was bumped by mistake — reverts to preparing so
+  /// it reappears on the board. Wired to long-press for safety (discoverable
+  /// but not accidental-tap-prone).
+  Future<void> _recallTicket(String kitchenTicketId) async {
+    HapticFeedback.mediumImpact();
+    await ref.read(kitchenRepositoryProvider).recallTicket(kitchenTicketId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Ticket recalled'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -503,7 +520,9 @@ class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
     final urgency = _getUrgency(ticket);
     final urgColor = _urgencyColor(urgency);
 
-    return Container(
+    return GestureDetector(
+      onLongPress: () => _recallTicket(ticket.id),
+      child: Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1D1F26),
         borderRadius: BorderRadius.circular(12),
@@ -747,6 +766,7 @@ class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -786,9 +806,10 @@ class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
       child: Row(
         children: [
           _buildFooterStat(
-              const Color(0xFF22C55E), 'Avg Ticket Time: --:--'),
+              const Color(0xFF22C55E), 'Tap READY = bump'),
           const SizedBox(width: 32),
-          _buildFooterStat(const Color(0xFF3B82F6), 'Offline Mode: Active'),
+          _buildFooterStat(
+              const Color(0xFF3B82F6), 'Long-press card = recall'),
           const Spacer(),
           const Text(
             'GASTROCORE ENGINE V4.2.0',
