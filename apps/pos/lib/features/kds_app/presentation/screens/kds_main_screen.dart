@@ -788,10 +788,12 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
         final state = key != null ? gangStates[key] : null;
         final status = state?.status ?? GangOrderStatus.pending;
 
-        // Gang header row — carries status chip + optional FIRE button
+        // Gang header row — carries status chip + optional FIRE button.
+        // firedAt drives the in-group timer once the gang is firing.
         widgets.add(_buildGangHeader(
           gang,
           status: status,
+          firedAt: state?.firedAt,
           largeFont: largeFont,
           onFire: (gang != null && status == GangOrderStatus.pending)
               ? () => _fireGang(ticket.ticketId, gang.id)
@@ -854,12 +856,15 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
   ///
   /// Color and trailing widget vary by [status]:
   ///   - pending        → gray header + colored FIRE button (if [onFire] set)
-  ///   - fired / inPrep → gang color + "FIRED" chip
+  ///   - fired / inPrep → gang color + "FIRED" chip + MM:SS timer (5 min amber,
+  ///                      10 min red — the hold-time tells the cook if this
+  ///                      gang is falling behind the ticket's target pace)
   ///   - ready          → green + "READY" chip
   ///   - served         → dim + "SERVED" chip
   Widget _buildGangHeader(
     GangTemplateEntity? gang, {
     required GangOrderStatus status,
+    required DateTime? firedAt,
     required bool largeFont,
     VoidCallback? onFire,
   }) {
@@ -874,6 +879,10 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
       GangOrderStatus.ready => AppColors.green,
       GangOrderStatus.served => AppColors.textDim,
     };
+
+    final bool showTimer = firedAt != null &&
+        (status == GangOrderStatus.fired ||
+            status == GangOrderStatus.inPrep);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6, top: 4),
@@ -904,6 +913,10 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
               color: headerColor.withValues(alpha: 0.25),
             ),
           ),
+          if (showTimer) ...[
+            const SizedBox(width: 8),
+            _buildGangFiredTimer(firedAt, largeFont: largeFont),
+          ],
           const SizedBox(width: 8),
           _buildGangStatusTrailing(
             status: status,
@@ -912,6 +925,47 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             onFire: onFire,
           ),
         ],
+      ),
+    );
+  }
+
+  /// Per-gang fired-time readout.
+  ///
+  /// Color thresholds surface hold-time drift to the cook at a glance:
+  ///   < 5 min  → text-primary (on track)
+  ///   5–9 min  → amber (watch)
+  ///   ≥ 10 min → red (pushing back the course)
+  ///
+  /// Re-rendered by the screen's 1-second clock tick.
+  Widget _buildGangFiredTimer(DateTime firedAt, {required bool largeFont}) {
+    final elapsed = DateTime.now().difference(firedAt);
+    final minutes = elapsed.inMinutes;
+    final mm = minutes.toString().padLeft(2, '0');
+    final ss = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
+
+    final Color color;
+    if (minutes >= 10) {
+      color = AppColors.red;
+    } else if (minutes >= 5) {
+      color = const Color(0xFFFBBF24); // amber
+    } else {
+      color = AppColors.textPrimary;
+    }
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: largeFont ? 6 : 4,
+        vertical: largeFont ? 2 : 1,
+      ),
+      child: Text(
+        '$mm:$ss',
+        style: TextStyle(
+          fontSize: largeFont ? 11 : 9,
+          fontWeight: FontWeight.w900,
+          color: color,
+          fontFeatures: const [FontFeature.tabularFigures()],
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
