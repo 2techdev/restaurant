@@ -735,7 +735,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
 
   Widget _buildGangHeader(GangTemplateEntity? gang, {required bool largeFont}) {
     final color = gang?.flutterColor ?? AppColors.textSecondary;
-    final name = gang?.name ?? 'Andere';
+    final name = gang?.fallbackLabel ?? 'Andere';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6, top: 4),

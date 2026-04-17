@@ -17,6 +17,8 @@ import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dar
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/modifier_dialog.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/providers/waiter_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -48,7 +50,7 @@ class _WaiterMenuScreenState extends ConsumerState<WaiterMenuScreen> {
     return Column(
       children: [
         // ── Course selector ───────────────────────────────────────────────
-        const _CourseSelector(),
+        const CourseSelector(),
         // ── Allergen chips ────────────────────────────────────────────────
         const _AllergenChips(),
         // ── Search bar ────────────────────────────────────────────────────
@@ -75,76 +77,121 @@ class _WaiterMenuScreenState extends ConsumerState<WaiterMenuScreen> {
 // Course selector (sticky — applies to every quick-added item)
 // ---------------------------------------------------------------------------
 
-class _CourseSelector extends ConsumerWidget {
-  const _CourseSelector();
-
-  static const List<(int, String, IconData)> _courses = [
-    (1, 'Gang 1', Icons.looks_one_outlined),
-    (2, 'Gang 2', Icons.looks_two_outlined),
-    (3, 'Gang 3', Icons.looks_3_outlined),
-  ];
+/// Renders one tappable chip per Gang slot. Slot count and labels come from
+/// [RestaurantSettings] (`maxGangs` + `gangLabels`); when `gangsEnabled=false`
+/// the selector renders as a zero-size widget so the waiter sends flat,
+/// un-paced orders.
+///
+/// Public so widget tests can mount it in isolation (see
+/// `waiter_course_selector_test.dart`).
+class CourseSelector extends ConsumerWidget {
+  const CourseSelector({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(restaurantSettingsProvider).valueOrNull ??
+        const RestaurantSettings();
+    if (!settings.gangsEnabled) return const SizedBox.shrink();
+
+    final labels = settings.effectiveGangLabels;
     final current = ref.watch(waiterCurrentCourseProvider);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
       child: Row(
+        key: const Key('waiter.courseSelector'),
         children: [
-          for (final (num, label, icon) in _courses) ...[
+          for (var i = 0; i < labels.length; i++) ...[
             Expanded(
-              child: GestureDetector(
+              child: _CourseChip(
+                slot: i + 1,
+                label: labels[i],
+                selected: current == (i + 1),
                 onTap: () {
                   HapticFeedback.selectionClick();
-                  ref.read(waiterCurrentCourseProvider.notifier).state = num;
+                  ref.read(waiterCurrentCourseProvider.notifier).state = i + 1;
                 },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: current == num
-                        ? AppColors.accentDim
-                        : AppColors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: current == num
-                          ? AppColors.primary
-                          : Colors.transparent,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        icon,
-                        size: 14,
-                        color: current == num
-                            ? AppColors.primary
-                            : AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: current == num
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                          color: current == num
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
+              ),
+            ),
+            if (i != labels.length - 1) const SizedBox(width: 6),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CourseChip extends StatelessWidget {
+  const _CourseChip({
+    required this.slot,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int slot;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        height: 36,
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.accentDim
+              : AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.primary : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 16,
+              height: 16,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected
+                    ? AppColors.primary
+                    : AppColors.textSecondary.withValues(alpha: 0.25),
+              ),
+              child: Text(
+                '$slot',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: selected
+                      ? AppColors.surfaceDim
+                      : AppColors.textSecondary,
                 ),
               ),
             ),
-            if (num != _courses.last.$1) const SizedBox(width: 6),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight:
+                      selected ? FontWeight.w800 : FontWeight.w600,
+                  color: selected
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
           ],
-        ],
+        ),
       ),
     );
   }

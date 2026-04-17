@@ -567,7 +567,7 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
                         item: item,
                         isEditable: isOrdering,
                         formatCHF: _formatCHF,
-                        gangLabel: gang?.name,
+                        gangLabel: gang?.fallbackLabel,
                         gangColor: gang?.flutterColor,
                         onIncrement: isOrdering
                             ? () => ref

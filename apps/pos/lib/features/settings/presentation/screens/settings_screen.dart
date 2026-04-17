@@ -566,13 +566,14 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
 
     final notifier =
         ref.read(restaurantSettingsProvider.notifier);
-    await notifier.save(RestaurantSettings(
+    // Preserve gang-related config + logo that this form doesn't edit.
+    final current = ref.read(restaurantSettingsProvider).valueOrNull ??
+        const RestaurantSettings();
+    await notifier.save(current.copyWith(
       name: _nameCtrl.text.trim(),
       address: _addressCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
       mwstNr: _mwstCtrl.text.trim(),
-      logoPath:
-          ref.read(restaurantSettingsProvider).valueOrNull?.logoPath,
       serviceChargeEnabled: _serviceChargeEnabled,
       serviceChargePercent: parsedPercent,
     ));

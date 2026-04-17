@@ -261,16 +261,12 @@ final waiterSearchQueryProvider = StateProvider<String>((ref) => '');
 // ---------------------------------------------------------------------------
 
 /// The gang (course group) number every new item is tagged with until the
-/// waiter changes it. Pilot uses a fixed 3-gang model: 1, 2, or 3.
+/// waiter changes it. Valid values are 1..[RestaurantSettings.clampedMaxGangs]
+/// when `gangsEnabled` is true; irrelevant (but still 1) when disabled.
 ///
 /// Persists across quick-add taps so a waiter can pick "Gang 2" once and
 /// tap 5 dishes in a row. The kitchen fires each gang as a unit.
 final waiterCurrentCourseProvider = StateProvider<int>((ref) => 1);
-
-/// Maximum number of gangs (courses) supported in the fine-dining pilot.
-///
-/// Pinned to 3 so UI and kitchen workflows can rely on a known bound.
-const int kMaxGangs = 3;
 
 /// Allergen / dietary flags the waiter has currently toggled on.
 ///

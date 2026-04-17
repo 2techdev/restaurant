@@ -28,6 +28,22 @@ String? validateMwstNr(String value) {
   return null;
 }
 
+/// Allowed range for [RestaurantSettings.maxGangs].
+const int kMinGangsSetting = 1;
+const int kMaxGangsSetting = 5;
+
+/// Default labels when the restaurant hasn't overridden them.
+///
+/// Length is always [kMaxGangsSetting]; [RestaurantSettings.effectiveGangLabels]
+/// trims/extends the stored override to match [RestaurantSettings.maxGangs].
+const List<String> kDefaultGangLabels = [
+  'Gang 1',
+  'Gang 2',
+  'Gang 3',
+  'Gang 4',
+  'Gang 5',
+];
+
 class RestaurantSettings {
   const RestaurantSettings({
     this.name = '',
@@ -37,6 +53,9 @@ class RestaurantSettings {
     this.logoPath,
     this.serviceChargeEnabled = false,
     this.serviceChargePercent = 10.0,
+    this.gangsEnabled = true,
+    this.maxGangs = 3,
+    this.gangLabels = const [],
   });
 
   /// Restaurant display name shown on receipts and the POS header.
@@ -62,6 +81,41 @@ class RestaurantSettings {
   /// Ignored when [serviceChargeEnabled] is `false`.
   final double serviceChargePercent;
 
+  /// Master toggle for the multi-Gang (course) ordering flow.
+  ///
+  /// When `false`, the waiter course selector is hidden, items are sent to
+  /// the kitchen without a gang assignment, and [fireGang] is never called.
+  /// Use this for casual/quick-service venues that don't pace courses.
+  final bool gangsEnabled;
+
+  /// How many gang slots the restaurant uses. Clamped to
+  /// [kMinGangsSetting]..[kMaxGangsSetting] via [clampedMaxGangs].
+  final int maxGangs;
+
+  /// Optional per-restaurant labels ("Entrée", "Plat", …). When empty, the
+  /// UI falls back to [kDefaultGangLabels]. Length may exceed [maxGangs];
+  /// [effectiveGangLabels] trims/extends to the active gang count.
+  final List<String> gangLabels;
+
+  /// [maxGangs] forced into the valid [kMinGangsSetting]..[kMaxGangsSetting]
+  /// range — the UI should always use this instead of reading [maxGangs]
+  /// directly, so a bad stored value never crashes rendering.
+  int get clampedMaxGangs =>
+      maxGangs < kMinGangsSetting
+          ? kMinGangsSetting
+          : (maxGangs > kMaxGangsSetting ? kMaxGangsSetting : maxGangs);
+
+  /// Returns the label list sized to [clampedMaxGangs]. Missing entries fall
+  /// back to [kDefaultGangLabels]; entries that are blank after trimming also
+  /// fall back, so a half-edited override never renders an empty chip.
+  List<String> get effectiveGangLabels {
+    final n = clampedMaxGangs;
+    return List<String>.generate(n, (i) {
+      final override = i < gangLabels.length ? gangLabels[i].trim() : '';
+      return override.isNotEmpty ? override : kDefaultGangLabels[i];
+    });
+  }
+
   RestaurantSettings copyWith({
     String? name,
     String? address,
@@ -71,6 +125,9 @@ class RestaurantSettings {
     bool clearLogo = false,
     bool? serviceChargeEnabled,
     double? serviceChargePercent,
+    bool? gangsEnabled,
+    int? maxGangs,
+    List<String>? gangLabels,
   }) {
     return RestaurantSettings(
       name: name ?? this.name,
@@ -80,6 +137,9 @@ class RestaurantSettings {
       logoPath: clearLogo ? null : (logoPath ?? this.logoPath),
       serviceChargeEnabled: serviceChargeEnabled ?? this.serviceChargeEnabled,
       serviceChargePercent: serviceChargePercent ?? this.serviceChargePercent,
+      gangsEnabled: gangsEnabled ?? this.gangsEnabled,
+      maxGangs: maxGangs ?? this.maxGangs,
+      gangLabels: gangLabels ?? this.gangLabels,
     );
   }
 
@@ -91,6 +151,9 @@ class RestaurantSettings {
         'logoPath': logoPath,
         'serviceChargeEnabled': serviceChargeEnabled,
         'serviceChargePercent': serviceChargePercent,
+        'gangsEnabled': gangsEnabled,
+        'maxGangs': maxGangs,
+        'gangLabels': gangLabels,
       };
 
   factory RestaurantSettings.fromJson(Map<String, dynamic> json) =>
@@ -104,6 +167,12 @@ class RestaurantSettings {
             (json['serviceChargeEnabled'] as bool?) ?? false,
         serviceChargePercent:
             (json['serviceChargePercent'] as num?)?.toDouble() ?? 10.0,
+        gangsEnabled: (json['gangsEnabled'] as bool?) ?? true,
+        maxGangs: (json['maxGangs'] as num?)?.toInt() ?? 3,
+        gangLabels: (json['gangLabels'] as List?)
+                ?.whereType<String>()
+                .toList(growable: false) ??
+            const [],
       );
 
   String toJsonString() => jsonEncode(toJson());
@@ -112,16 +181,26 @@ class RestaurantSettings {
       RestaurantSettings.fromJson(jsonDecode(s) as Map<String, dynamic>);
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is RestaurantSettings &&
-          name == other.name &&
-          address == other.address &&
-          phone == other.phone &&
-          mwstNr == other.mwstNr &&
-          logoPath == other.logoPath &&
-          serviceChargeEnabled == other.serviceChargeEnabled &&
-          serviceChargePercent == other.serviceChargePercent;
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! RestaurantSettings) return false;
+    if (name != other.name ||
+        address != other.address ||
+        phone != other.phone ||
+        mwstNr != other.mwstNr ||
+        logoPath != other.logoPath ||
+        serviceChargeEnabled != other.serviceChargeEnabled ||
+        serviceChargePercent != other.serviceChargePercent ||
+        gangsEnabled != other.gangsEnabled ||
+        maxGangs != other.maxGangs ||
+        gangLabels.length != other.gangLabels.length) {
+      return false;
+    }
+    for (var i = 0; i < gangLabels.length; i++) {
+      if (gangLabels[i] != other.gangLabels[i]) return false;
+    }
+    return true;
+  }
 
   @override
   int get hashCode => Object.hash(
@@ -132,5 +211,8 @@ class RestaurantSettings {
         logoPath,
         serviceChargeEnabled,
         serviceChargePercent,
+        gangsEnabled,
+        maxGangs,
+        Object.hashAll(gangLabels),
       );
 }

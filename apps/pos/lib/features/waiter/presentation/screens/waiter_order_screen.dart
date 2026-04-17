@@ -16,6 +16,7 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/features/tables/domain/entities/table_entity.dart';
 import 'package:gastrocore_pos/features/waiter/domain/entities/service_call_entity.dart';
@@ -499,17 +500,22 @@ class _OrderTab extends ConsumerWidget {
       );
     }
 
-    // Group items by gang number so fine-dining service reads as
-    // Gang 1 / Gang 2 / Gang 3 blocks.
+    final settings = ref.watch(restaurantSettingsProvider).valueOrNull ??
+        const RestaurantSettings();
+    final gangsEnabled = settings.gangsEnabled;
+    final gangLabels = settings.effectiveGangLabels;
+
+    // Group items by gang number so fine-dining service reads as per-gang
+    // blocks. When gangs are disabled, we render a single flat list instead.
     final grouped = <int, List<OrderItemEntity>>{};
     for (final item in ticket!.items) {
-      grouped.putIfAbsent(item.course, () => []).add(item);
+      final key = gangsEnabled ? item.course : 0;
+      grouped.putIfAbsent(key, () => []).add(item);
     }
     final gangNumbers = grouped.keys.toList()..sort();
 
     return Column(
       children: [
-        // Items list (grouped by gang)
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
@@ -522,17 +528,21 @@ class _OrderTab extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _CourseHeader(
-                    courseNumber: gangNum,
-                    itemCount: items.length,
-                    hasUnsent: hasUnsent,
-                    progress: progress,
-                    onFire: hasUnsent
-                        ? () => ref
-                            .read(waiterActiveTicketProvider.notifier)
-                            .fireGang(gangNum)
-                        : null,
-                  ),
+                  if (gangsEnabled)
+                    _CourseHeader(
+                      courseNumber: gangNum,
+                      label: (gangNum >= 1 && gangNum <= gangLabels.length)
+                          ? gangLabels[gangNum - 1]
+                          : 'Gang $gangNum',
+                      itemCount: items.length,
+                      hasUnsent: hasUnsent,
+                      progress: progress,
+                      onFire: hasUnsent
+                          ? () => ref
+                              .read(waiterActiveTicketProvider.notifier)
+                              .fireGang(gangNum)
+                          : null,
+                    ),
                   for (final item in items)
                     _OrderItemRow(
                       item: item,
@@ -545,7 +555,6 @@ class _OrderTab extends ConsumerWidget {
             },
           ),
         ),
-        // Totals summary
         _TotalsSummary(ticket: ticket!),
       ],
     );
@@ -621,6 +630,9 @@ class _GangProgress {
 
 class _CourseHeader extends StatelessWidget {
   final int courseNumber;
+
+  /// Restaurant-configured label (e.g. "Entrée"). Falls back to "Gang N".
+  final String label;
   final int itemCount;
 
   /// `true` if any item in this gang is still unsent. Drives the
@@ -636,13 +648,14 @@ class _CourseHeader extends StatelessWidget {
 
   const _CourseHeader({
     required this.courseNumber,
+    required this.label,
     required this.itemCount,
     this.hasUnsent = false,
     this.progress,
     this.onFire,
   });
 
-  String get _label => 'Gang $courseNumber';
+  String get _label => label;
 
   @override
   Widget build(BuildContext context) {
@@ -709,7 +722,7 @@ class _CourseHeader extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.local_fire_department_outlined, size: 14),
                 label: Text(
-                  'Fire Gang $courseNumber',
+                  'Fire $label',
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
