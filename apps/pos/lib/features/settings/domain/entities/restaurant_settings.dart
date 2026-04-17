@@ -35,6 +35,8 @@ class RestaurantSettings {
     this.phone = '',
     this.mwstNr = '',
     this.logoPath,
+    this.serviceChargeEnabled = false,
+    this.serviceChargePercent = 10.0,
   });
 
   /// Restaurant display name shown on receipts and the POS header.
@@ -52,6 +54,18 @@ class RestaurantSettings {
   /// Absolute path to the logo image file on device storage.
   final String? logoPath;
 
+  /// Whether a service charge line should be added to every dine-in ticket.
+  ///
+  /// Switzerland does not legally require a service charge (unlike, e.g.,
+  /// France), but fine-dining restaurants commonly add one. When off the
+  /// ticket is unaffected; when on, a separate line at
+  /// [serviceChargePercent]% of the subtotal is applied and printed
+  /// separately on the receipt as required by FiscalDE/MwSt transparency.
+  final bool serviceChargeEnabled;
+
+  /// Service charge rate applied when [serviceChargeEnabled] is true.
+  final double serviceChargePercent;
+
   RestaurantSettings copyWith({
     String? name,
     String? address,
@@ -59,6 +73,8 @@ class RestaurantSettings {
     String? mwstNr,
     String? logoPath,
     bool clearLogo = false,
+    bool? serviceChargeEnabled,
+    double? serviceChargePercent,
   }) {
     return RestaurantSettings(
       name: name ?? this.name,
@@ -66,6 +82,10 @@ class RestaurantSettings {
       phone: phone ?? this.phone,
       mwstNr: mwstNr ?? this.mwstNr,
       logoPath: clearLogo ? null : (logoPath ?? this.logoPath),
+      serviceChargeEnabled:
+          serviceChargeEnabled ?? this.serviceChargeEnabled,
+      serviceChargePercent:
+          serviceChargePercent ?? this.serviceChargePercent,
     );
   }
 
@@ -75,6 +95,8 @@ class RestaurantSettings {
         'phone': phone,
         'mwstNr': mwstNr,
         'logoPath': logoPath,
+        'serviceChargeEnabled': serviceChargeEnabled,
+        'serviceChargePercent': serviceChargePercent,
       };
 
   factory RestaurantSettings.fromJson(Map<String, dynamic> json) =>
@@ -84,6 +106,10 @@ class RestaurantSettings {
         phone: (json['phone'] as String?) ?? '',
         mwstNr: (json['mwstNr'] as String?) ?? '',
         logoPath: json['logoPath'] as String?,
+        serviceChargeEnabled:
+            (json['serviceChargeEnabled'] as bool?) ?? false,
+        serviceChargePercent:
+            (json['serviceChargePercent'] as num?)?.toDouble() ?? 10.0,
       );
 
   String toJsonString() => jsonEncode(toJson());
@@ -99,9 +125,18 @@ class RestaurantSettings {
           address == other.address &&
           phone == other.phone &&
           mwstNr == other.mwstNr &&
-          logoPath == other.logoPath;
+          logoPath == other.logoPath &&
+          serviceChargeEnabled == other.serviceChargeEnabled &&
+          serviceChargePercent == other.serviceChargePercent;
 
   @override
-  int get hashCode =>
-      Object.hash(name, address, phone, mwstNr, logoPath);
+  int get hashCode => Object.hash(
+        name,
+        address,
+        phone,
+        mwstNr,
+        logoPath,
+        serviceChargeEnabled,
+        serviceChargePercent,
+      );
 }
