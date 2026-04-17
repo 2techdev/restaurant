@@ -165,6 +165,73 @@ class WaiterOrderService {
     return _orderRepo.getTicketById(ticketId);
   }
 
+  /// Fire a single gang (course) to the kitchen.
+  ///
+  /// Only items in [gang] that are still unsent are pushed. Kitchen receives
+  /// a single gang-tagged kitchen ticket, so the expo station can plate and
+  /// send them out together.
+  ///
+  /// Returns the refreshed ticket. No-op if all items in the gang are
+  /// already fired.
+  Future<TicketEntity?> fireGang({
+    required String ticketId,
+    required int gang,
+    required String waiterName,
+  }) async {
+    final ticket = await _orderRepo.getTicketById(ticketId);
+    if (ticket == null) return null;
+
+    final target = ticket.items
+        .where((i) => i.course == gang && !i.sentToKitchen)
+        .toList();
+    if (target.isEmpty) return ticket;
+
+    for (final item in target) {
+      await _orderRepo.updateItemStatus(item.id, OrderItemStatus.sent);
+    }
+
+    // Bump ticket to "sent" once any items are in the kitchen pipeline.
+    if (ticket.status == TicketStatus.draft) {
+      await _orderRepo.updateTicketStatus(ticketId, TicketStatus.sent);
+    }
+
+    await _kitchenRepo.createTicketFromOrder(
+      ticket: ticket,
+      items: target,
+      waiterName: waiterName,
+    );
+
+    return _orderRepo.getTicketById(ticketId);
+  }
+
+  /// Move a draft ticket to a different table.
+  ///
+  /// Frees the old table (if it has no other open tickets) and claims the
+  /// new one. Intended for "customer moved" or "we merged tables" flows.
+  ///
+  /// Returns the refreshed ticket, or `null` if the ticket is closed.
+  Future<TicketEntity?> transferToTable({
+    required String ticketId,
+    required String newTableId,
+  }) async {
+    final ticket = await _orderRepo.getTicketById(ticketId);
+    if (ticket == null || !ticket.isOpen) return null;
+    if (ticket.tableId == newTableId) return ticket;
+
+    final oldTableId = ticket.tableId;
+    await _orderRepo.updateTicketTable(ticketId, newTableId);
+    await _tableRepo.updateTableStatus(newTableId, TableStatus.occupied);
+
+    if (oldTableId != null) {
+      final remaining = await _orderRepo.getTicketsByTable(oldTableId);
+      if (remaining.isEmpty) {
+        await _tableRepo.updateTableStatus(oldTableId, TableStatus.available);
+      }
+    }
+
+    return _orderRepo.getTicketById(ticketId);
+  }
+
   // =========================================================================
   // Status helpers
   // =========================================================================

@@ -35,6 +35,8 @@ class RestaurantSettings {
     this.phone = '',
     this.mwstNr = '',
     this.logoPath,
+    this.serviceChargeEnabled = false,
+    this.serviceChargePercent = 10.0,
   });
 
   /// Restaurant display name shown on receipts and the POS header.
@@ -52,6 +54,14 @@ class RestaurantSettings {
   /// Absolute path to the logo image file on device storage.
   final String? logoPath;
 
+  /// When `true`, a service charge is added as a separate line on every
+  /// order summary (Waiter + POS) and printed receipt.
+  final bool serviceChargeEnabled;
+
+  /// Service charge rate as a percentage of the pre-tax subtotal.
+  /// Ignored when [serviceChargeEnabled] is `false`.
+  final double serviceChargePercent;
+
   RestaurantSettings copyWith({
     String? name,
     String? address,
@@ -59,6 +69,8 @@ class RestaurantSettings {
     String? mwstNr,
     String? logoPath,
     bool clearLogo = false,
+    bool? serviceChargeEnabled,
+    double? serviceChargePercent,
   }) {
     return RestaurantSettings(
       name: name ?? this.name,
@@ -66,6 +78,8 @@ class RestaurantSettings {
       phone: phone ?? this.phone,
       mwstNr: mwstNr ?? this.mwstNr,
       logoPath: clearLogo ? null : (logoPath ?? this.logoPath),
+      serviceChargeEnabled: serviceChargeEnabled ?? this.serviceChargeEnabled,
+      serviceChargePercent: serviceChargePercent ?? this.serviceChargePercent,
     );
   }
 
@@ -75,6 +89,8 @@ class RestaurantSettings {
         'phone': phone,
         'mwstNr': mwstNr,
         'logoPath': logoPath,
+        'serviceChargeEnabled': serviceChargeEnabled,
+        'serviceChargePercent': serviceChargePercent,
       };
 
   factory RestaurantSettings.fromJson(Map<String, dynamic> json) =>
@@ -84,6 +100,10 @@ class RestaurantSettings {
         phone: (json['phone'] as String?) ?? '',
         mwstNr: (json['mwstNr'] as String?) ?? '',
         logoPath: json['logoPath'] as String?,
+        serviceChargeEnabled:
+            (json['serviceChargeEnabled'] as bool?) ?? false,
+        serviceChargePercent:
+            (json['serviceChargePercent'] as num?)?.toDouble() ?? 10.0,
       );
 
   String toJsonString() => jsonEncode(toJson());
@@ -99,9 +119,18 @@ class RestaurantSettings {
           address == other.address &&
           phone == other.phone &&
           mwstNr == other.mwstNr &&
-          logoPath == other.logoPath;
+          logoPath == other.logoPath &&
+          serviceChargeEnabled == other.serviceChargeEnabled &&
+          serviceChargePercent == other.serviceChargePercent;
 
   @override
-  int get hashCode =>
-      Object.hash(name, address, phone, mwstNr, logoPath);
+  int get hashCode => Object.hash(
+        name,
+        address,
+        phone,
+        mwstNr,
+        logoPath,
+        serviceChargeEnabled,
+        serviceChargePercent,
+      );
 }

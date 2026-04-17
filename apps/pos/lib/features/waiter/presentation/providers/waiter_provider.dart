@@ -133,6 +133,33 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
     state = updated;
   }
 
+  /// Fire a single gang (1..3) to the kitchen.
+  ///
+  /// Unsent items in the gang are pushed as a unit so the expo station
+  /// plates them together.
+  Future<void> fireGang(int gang) async {
+    if (state == null) return;
+    final user = _ref.read(currentUserProvider);
+    final updated = await _svc.fireGang(
+      ticketId: state!.id,
+      gang: gang,
+      waiterName: user?.name ?? '',
+    );
+    state = updated;
+  }
+
+  /// Move the current ticket to another table.
+  Future<void> transferToTable(RestaurantTableEntity newTable) async {
+    if (state == null) return;
+    final updated = await _svc.transferToTable(
+      ticketId: state!.id,
+      newTableId: newTable.id,
+    );
+    state = updated;
+    // Keep the session's selected table in sync with the ticket.
+    _ref.read(waiterSelectedTableProvider.notifier).state = newTable;
+  }
+
   /// Mark the current order as served.
   Future<void> markServed() async {
     if (state == null) return;
@@ -210,12 +237,17 @@ final waiterSearchQueryProvider = StateProvider<String>((ref) => '');
 // Course / allergen quick-entry state (fine dining)
 // ---------------------------------------------------------------------------
 
-/// The course number every new item is tagged with until the waiter
-/// changes it (1 = starter, 2 = main, 3 = dessert, 4 = extras).
+/// The gang (course group) number every new item is tagged with until the
+/// waiter changes it. Pilot uses a fixed 3-gang model: 1, 2, or 3.
 ///
-/// Persists across quick-add taps so a waiter can pick "Main" once and
-/// tap 5 dishes in a row.
+/// Persists across quick-add taps so a waiter can pick "Gang 2" once and
+/// tap 5 dishes in a row. The kitchen fires each gang as a unit.
 final waiterCurrentCourseProvider = StateProvider<int>((ref) => 1);
+
+/// Maximum number of gangs (courses) supported in the fine-dining pilot.
+///
+/// Pinned to 3 so UI and kitchen workflows can rely on a known bound.
+const int kMaxGangs = 3;
 
 /// Allergen / dietary flags the waiter has currently toggled on.
 ///

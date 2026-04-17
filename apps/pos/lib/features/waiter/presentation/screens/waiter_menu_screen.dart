@@ -79,10 +79,9 @@ class _CourseSelector extends ConsumerWidget {
   const _CourseSelector();
 
   static const List<(int, String, IconData)> _courses = [
-    (1, 'Starter', Icons.ramen_dining_outlined),
-    (2, 'Main', Icons.restaurant_outlined),
-    (3, 'Dessert', Icons.icecream_outlined),
-    (4, 'Extras', Icons.more_horiz),
+    (1, 'Gang 1', Icons.looks_one_outlined),
+    (2, 'Gang 2', Icons.looks_two_outlined),
+    (3, 'Gang 3', Icons.looks_3_outlined),
   ];
 
   @override

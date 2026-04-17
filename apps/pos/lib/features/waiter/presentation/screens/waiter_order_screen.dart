@@ -16,6 +16,8 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
+import 'package:gastrocore_pos/features/tables/domain/entities/table_entity.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/providers/waiter_provider.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/screens/waiter_menu_screen.dart';
 import 'package:gastrocore_pos/features/waiter/router/waiter_router.dart';
@@ -127,8 +129,28 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
           // Quick order status badge
           if (ticket != null)
             Padding(
-              padding: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.only(right: 4),
               child: _StatusChip(status: ticket.status),
+            ),
+          if (ticket != null)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
+              onSelected: (key) {
+                if (key == 'transfer') _openTransferSheet(ticket);
+              },
+              itemBuilder: (ctx) => const [
+                PopupMenuItem<String>(
+                  value: 'transfer',
+                  child: Row(
+                    children: [
+                      Icon(Icons.swap_horiz_outlined,
+                          size: 18, color: AppColors.textPrimary),
+                      SizedBox(width: 8),
+                      Text('Move to another table'),
+                    ],
+                  ),
+                ),
+              ],
             ),
         ],
         bottom: TabBar(
@@ -240,6 +262,132 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
       );
     }
   }
+
+  Future<void> _openTransferSheet(TicketEntity ticket) async {
+    final tables = ref.read(waiterAllTablesProvider).valueOrNull ?? const [];
+    final candidates = tables
+        .where((t) => t.id != ticket.tableId)
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+
+    final selected = await showModalBottomSheet<RestaurantTableEntity>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Move order to another table',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (candidates.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Text(
+                      'No other tables available',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textDim),
+                    ),
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(ctx).size.height * 0.55,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: candidates.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 4),
+                      itemBuilder: (_, i) {
+                        final t = candidates[i];
+                        final isOccupied = t.status == TableStatus.occupied;
+                        return ListTile(
+                          leading: Icon(
+                            Icons.table_restaurant_outlined,
+                            color: isOccupied
+                                ? AppColors.orange
+                                : AppColors.primary,
+                          ),
+                          title: Text(
+                            t.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            isOccupied ? 'Occupied' : 'Available',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isOccupied
+                                  ? AppColors.orange
+                                  : AppColors.textDim,
+                            ),
+                          ),
+                          onTap: () => Navigator.of(ctx).pop(t),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected == null || !mounted) return;
+
+    if (selected.status == TableStatus.occupied) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Move to occupied table?'),
+          content: Text(
+            '${selected.name} already has an active order. Moving this '
+            'order there will merge it visually but keep tickets separate.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Move anyway'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true || !mounted) return;
+    }
+
+    await ref
+        .read(waiterActiveTicketProvider.notifier)
+        .transferToTable(selected);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Moved to ${selected.name}'),
+          backgroundColor: AppColors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      // Navigate the screen to track the new table so subsequent rebuilds
+      // key off the correct tableId.
+      context.go(WaiterRoutes.orderFor(selected.id));
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -278,28 +426,38 @@ class _OrderTab extends ConsumerWidget {
       );
     }
 
-    // Group items by course number so fine-dining service reads as
-    // Starter / Main / Dessert blocks.
+    // Group items by gang number so fine-dining service reads as
+    // Gang 1 / Gang 2 / Gang 3 blocks.
     final grouped = <int, List<OrderItemEntity>>{};
     for (final item in ticket!.items) {
       grouped.putIfAbsent(item.course, () => []).add(item);
     }
-    final courseNumbers = grouped.keys.toList()..sort();
+    final gangNumbers = grouped.keys.toList()..sort();
 
     return Column(
       children: [
-        // Items list (grouped by course)
+        // Items list (grouped by gang)
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
-            itemCount: courseNumbers.length,
+            itemCount: gangNumbers.length,
             itemBuilder: (context, index) {
-              final courseNum = courseNumbers[index];
-              final items = grouped[courseNum]!;
+              final gangNum = gangNumbers[index];
+              final items = grouped[gangNum]!;
+              final hasUnsent = items.any((i) => !i.sentToKitchen);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _CourseHeader(courseNumber: courseNum, itemCount: items.length),
+                  _CourseHeader(
+                    courseNumber: gangNum,
+                    itemCount: items.length,
+                    hasUnsent: hasUnsent,
+                    onFire: hasUnsent
+                        ? () => ref
+                            .read(waiterActiveTicketProvider.notifier)
+                            .fireGang(gangNum)
+                        : null,
+                  ),
                   for (final item in items)
                     _OrderItemRow(
                       item: item,
@@ -327,22 +485,22 @@ class _CourseHeader extends StatelessWidget {
   final int courseNumber;
   final int itemCount;
 
-  const _CourseHeader({required this.courseNumber, required this.itemCount});
+  /// `true` if any item in this gang is still unsent. Drives the
+  /// Fire-this-gang CTA visibility.
+  final bool hasUnsent;
 
-  String get _label {
-    switch (courseNumber) {
-      case 1:
-        return 'Starter';
-      case 2:
-        return 'Main';
-      case 3:
-        return 'Dessert';
-      case 4:
-        return 'Extras';
-      default:
-        return 'Course $courseNumber';
-    }
-  }
+  /// Tapped by the waiter to push just this gang to the kitchen.
+  /// `null` disables the button (all items in the gang already fired).
+  final VoidCallback? onFire;
+
+  const _CourseHeader({
+    required this.courseNumber,
+    required this.itemCount,
+    this.hasUnsent = false,
+    this.onFire,
+  });
+
+  String get _label => 'Gang $courseNumber';
 
   @override
   Widget build(BuildContext context) {
@@ -389,10 +547,51 @@ class _CourseHeader extends StatelessWidget {
           ),
           const Expanded(
             child: Padding(
-              padding: EdgeInsets.only(left: 10),
+              padding: EdgeInsets.symmetric(horizontal: 10),
               child: Divider(color: AppColors.outlineVariant, height: 1),
             ),
           ),
+          if (hasUnsent)
+            SizedBox(
+              height: 28,
+              child: TextButton.icon(
+                onPressed: onFire,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: const BorderSide(color: AppColors.primary, width: 1),
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+                icon: const Icon(Icons.local_fire_department_outlined, size: 14),
+                label: Text(
+                  'Fire Gang $courseNumber',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text(
+                'Fired',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDim,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -571,15 +770,37 @@ class _StatusPill extends StatelessWidget {
 // Totals summary
 // ---------------------------------------------------------------------------
 
-class _TotalsSummary extends StatelessWidget {
+class _TotalsSummary extends ConsumerWidget {
   final TicketEntity ticket;
 
   const _TotalsSummary({required this.ticket});
 
   String _fmt(int cents) => 'CHF ${(cents / 100).toStringAsFixed(2)}';
 
+  /// Compute the service charge in cents from the current tax-inclusive
+  /// subtotal. Returns `0` when the toggle is off.
+  int _computeServiceCharge({
+    required bool enabled,
+    required double percent,
+    required int subtotalCents,
+  }) {
+    if (!enabled || percent <= 0 || subtotalCents <= 0) return 0;
+    return (subtotalCents * percent / 100).round();
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings =
+        ref.watch(restaurantSettingsProvider).valueOrNull;
+    final serviceChargeEnabled = settings?.serviceChargeEnabled ?? false;
+    final serviceChargePercent = settings?.serviceChargePercent ?? 0;
+    final serviceCharge = _computeServiceCharge(
+      enabled: serviceChargeEnabled,
+      percent: serviceChargePercent,
+      subtotalCents: ticket.subtotal,
+    );
+    final displayTotal = ticket.total + serviceCharge;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       color: AppColors.surfaceContainerLow,
@@ -591,10 +812,19 @@ class _TotalsSummary extends StatelessWidget {
               label: 'VAT',
               value: _fmt(ticket.taxAmount),
               valueColor: AppColors.textSecondary),
+          if (serviceChargeEnabled && serviceCharge > 0) ...[
+            const SizedBox(height: 4),
+            _TotalRow(
+              label:
+                  'Service charge (${serviceChargePercent.toStringAsFixed(serviceChargePercent.truncateToDouble() == serviceChargePercent ? 0 : 1)}%)',
+              value: _fmt(serviceCharge),
+              valueColor: AppColors.textSecondary,
+            ),
+          ],
           const Divider(color: AppColors.outlineVariant, height: 20),
           _TotalRow(
             label: 'Total',
-            value: _fmt(ticket.total),
+            value: _fmt(displayTotal),
             labelStyle: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,

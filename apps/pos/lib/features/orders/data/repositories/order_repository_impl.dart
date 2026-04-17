@@ -193,6 +193,20 @@ class OrderRepositoryImpl {
         .write(companion);
   }
 
+  /// Reassign a ticket to a different table.
+  ///
+  /// Used by the waiter table-transfer flow. The caller is responsible for
+  /// updating old/new table statuses — this method only rewrites the ticket
+  /// row itself.
+  Future<void> updateTicketTable(String id, String newTableId) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
+      TicketsCompanion(
+        tableId: Value(newTableId),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   // =========================================================================
   // Order items
   // =========================================================================

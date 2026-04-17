@@ -43,17 +43,22 @@ Future<({AppDatabase db, WaiterOrderService svc})> _setup() async {
 }
 
 /// Insert a minimal table row and return its id.
-Future<String> _createTable(AppDatabase db) async {
+Future<String> _createTable(AppDatabase db, {String name = 'T1'}) async {
   final tableRepo = TableRepositoryImpl(db);
-  final floor = await tableRepo.createFloor(
-    tenantId: _tenantId,
-    name: 'Main Hall',
-    displayOrder: 0,
-  );
+  // Reuse existing floor if present (multi-table tests).
+  final existingFloors = await tableRepo.getFloors(_tenantId);
+  final floorId = existingFloors.isEmpty
+      ? (await tableRepo.createFloor(
+          tenantId: _tenantId,
+          name: 'Main Hall',
+          displayOrder: 0,
+        ))
+          .id
+      : existingFloors.first.id;
   final table = await tableRepo.createTable(
     tenantId: _tenantId,
-    floorId: floor.id,
-    name: 'T1',
+    floorId: floorId,
+    name: name,
     capacity: 4,
     posX: 0,
     posY: 0,
@@ -514,6 +519,178 @@ void main() {
       final item = updated!.items.first;
       final expectedTax = (1000 * 3.8 / 103.8).round();
       expect(item.taxAmount, expectedTax);
+    });
+  });
+
+  group('WaiterOrderService.fireGang', () {
+    test('fires only the requested gang, leaves other gangs unsent',
+        () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      final ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+      );
+
+      await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(name: 'Bruschetta'),
+        course: 1,
+      );
+      await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(name: 'Risotto'),
+        course: 2,
+      );
+
+      final afterFire = await svc.fireGang(
+        ticketId: ticket.id,
+        gang: 1,
+        waiterName: _waiterName,
+      );
+
+      expect(afterFire, isNotNull);
+      final byName = {for (final i in afterFire!.items) i.productName: i};
+      expect(byName['Bruschetta']!.sentToKitchen, isTrue);
+      expect(byName['Risotto']!.sentToKitchen, isFalse);
+    });
+
+    test('bumps draft ticket to sent status when any gang is fired',
+        () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      final ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+      );
+      await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(),
+        course: 2,
+      );
+
+      final after = await svc.fireGang(
+        ticketId: ticket.id,
+        gang: 2,
+        waiterName: _waiterName,
+      );
+      expect(after!.status, TicketStatus.sent);
+    });
+
+    test('no-op when the gang has no unsent items', () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      final ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+      );
+      await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(),
+        course: 1,
+      );
+      await svc.fireGang(
+        ticketId: ticket.id,
+        gang: 1,
+        waiterName: _waiterName,
+      );
+
+      // Second call: all items in the gang already sent.
+      final second = await svc.fireGang(
+        ticketId: ticket.id,
+        gang: 1,
+        waiterName: _waiterName,
+      );
+      expect(second!.items.every((i) => i.sentToKitchen), isTrue);
+    });
+  });
+
+  group('WaiterOrderService.transferToTable', () {
+    test('rewrites ticket tableId and claims the new table', () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final fromTableId = await _createTable(db, name: 'T1');
+      final toTableId = await _createTable(db, name: 'T2');
+      final ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: fromTableId,
+        deviceId: _deviceId,
+      );
+
+      final moved = await svc.transferToTable(
+        ticketId: ticket.id,
+        newTableId: toTableId,
+      );
+
+      expect(moved, isNotNull);
+      expect(moved!.tableId, toTableId);
+
+      final tables = await TableRepositoryImpl(db).getAllTables(_tenantId);
+      final newTable = tables.firstWhere((t) => t.id == toTableId);
+      expect(newTable.status, TableStatus.occupied);
+    });
+
+    test('releases the old table when it has no remaining tickets',
+        () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final fromTableId = await _createTable(db, name: 'T1');
+      final toTableId = await _createTable(db, name: 'T2');
+      final ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: fromTableId,
+        deviceId: _deviceId,
+      );
+
+      await svc.transferToTable(
+        ticketId: ticket.id,
+        newTableId: toTableId,
+      );
+
+      final tables = await TableRepositoryImpl(db).getAllTables(_tenantId);
+      final oldTable = tables.firstWhere((t) => t.id == fromTableId);
+      expect(oldTable.status, TableStatus.available);
+    });
+
+    test('no-op when already on the target table', () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      final ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+      );
+
+      final moved = await svc.transferToTable(
+        ticketId: ticket.id,
+        newTableId: tableId,
+      );
+      expect(moved!.tableId, tableId);
     });
   });
 
