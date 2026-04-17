@@ -1,0 +1,34 @@
+name: gastrocore_printers
+description: "ESC/POS printer integration for GastroCore — kitchen, bar, and receipt printers. Network (TCP/IP) first, USB future."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  gastrocore_models:
+    path: ../gastrocore_models
+
+  # ESC/POS command generation — pure Dart, generates byte streams
+  # for text, tables, barcodes, QR codes, images, cut commands etc.
+  esc_pos_utils_plus: ^2.0.4
+
+  # Network (TCP/IP) printer driver — wraps esc_pos_utils_plus.
+  # Opens Socket to printer:port, writes bytes, returns PosPrintResult.
+  esc_pos_printer_plus: ^0.1.1
+
+  # Image handling (logo) — already a transitive dep of esc_pos_utils_plus
+  # but we use Image.fromBytes directly.
+  image: ^4.2.0
+
+  # JSON + equality for PrinterConfig serialization.
+  meta: ^1.15.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^5.0.0
