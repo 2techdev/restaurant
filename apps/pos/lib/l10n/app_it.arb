@@ -42,6 +42,10 @@
   "@tableGuest": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "gangLabel": "Gang {number}",
+  "@gangLabel": {
+    "placeholders": { "number": { "type": "int" } }
+  },
   "tableNewTable": "Nuovo tavolo",
   "tableFloor": "Zona",
   "tableCapacity": "Capacità",

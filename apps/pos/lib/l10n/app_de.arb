@@ -106,6 +106,12 @@
   "tableTransfer": "Umbuchen",
   "@tableTransfer": { "description": "Table: Transfer" },
 
+  "gangLabel": "Gang {number}",
+  "@gangLabel": {
+    "description": "Course (Gang) label with its 1-based index. Fixed 'Gang N' across all locales — product decision 2026-04-17.",
+    "placeholders": { "number": { "type": "int" } }
+  },
+
   "tableGuest": "{count,plural, one{1 Gast} other{{count} Gäste}}",
   "@tableGuest": {
     "description": "Table: Guest count",

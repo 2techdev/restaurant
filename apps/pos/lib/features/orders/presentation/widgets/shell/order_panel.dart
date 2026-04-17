@@ -17,6 +17,7 @@ import 'package:gastrocore_pos/core/theme/app_tokens.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/l10n/app_localizations.dart';
 
 /// The currently-focused Gang — new items are added to this Gang by default.
 final activeGangProvider = StateProvider<int>((ref) => 1);
@@ -219,7 +220,7 @@ class _GangChipRow extends StatelessWidget {
           for (final g in kGangNumbers) ...[
             Expanded(
               child: _GangChip(
-                label: 'Gang $g',
+                label: AppLocalizations.of(context).gangLabel(g),
                 selected: g == activeGang,
                 onTap: () => onSelect(g),
               ),
@@ -307,6 +308,7 @@ class _GangGroupedList extends ConsumerWidget {
 
   Future<void> _fireGang(BuildContext ctx, WidgetRef ref, int gang) async {
     final messenger = ScaffoldMessenger.of(ctx);
+    final label = AppLocalizations.of(ctx).gangLabel(gang);
     try {
       await ref.read(currentTicketProvider.notifier).fireGang(gang);
       // Clear the "held" mark when fired — the gang is now on its way.
@@ -316,14 +318,14 @@ class _GangGroupedList extends ConsumerWidget {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Gang $gang mutfağa gönderildi.'),
+          content: Text('$label mutfağa gönderildi.'),
           duration: const Duration(seconds: 2),
         ),
       );
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Gang $gang gönderilemedi: $e'),
+          content: Text('$label gönderilemedi: $e'),
           backgroundColor: AppColors.red,
         ),
       );
@@ -340,12 +342,13 @@ class _GangGroupedList extends ConsumerWidget {
       next.remove(gang);
     }
     ref.read(heldGangsProvider.notifier).state = next;
+    final label = AppLocalizations.of(ctx).gangLabel(gang);
     ScaffoldMessenger.of(ctx).showSnackBar(
       SnackBar(
         content: Text(
           willHold
-              ? 'Gang $gang beklemeye alındı.'
-              : 'Gang $gang beklemeden çıkarıldı.',
+              ? '$label beklemeye alındı.'
+              : '$label beklemeden çıkarıldı.',
         ),
         duration: const Duration(seconds: 2),
       ),
@@ -385,7 +388,7 @@ class _GangSection extends StatelessWidget {
             child: Row(
               children: [
                 Text(
-                  'Gang $gang',
+                  AppLocalizations.of(context).gangLabel(gang),
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,

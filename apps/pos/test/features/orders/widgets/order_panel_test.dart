@@ -14,10 +14,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:gastrocore_pos/core/pos_mode/pos_mode.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/order_panel.dart';
+import 'package:gastrocore_pos/l10n/app_localizations.dart';
 
 Widget _harness() {
   return const ProviderScope(
     child: MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(body: OrderPanel()),
     ),
   );

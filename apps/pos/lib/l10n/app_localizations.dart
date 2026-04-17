@@ -312,6 +312,12 @@ abstract class AppLocalizations {
   /// **'Umbuchen'**
   String get tableTransfer;
 
+  /// Course (Gang) label with its 1-based index. Fixed 'Gang N' across all locales — product decision 2026-04-17.
+  ///
+  /// In de, this message translates to:
+  /// **'Gang {number}'**
+  String gangLabel(int number);
+
   /// Table: Guest count
   ///
   /// In de, this message translates to:
