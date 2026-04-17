@@ -1,15 +1,14 @@
 # Waiter Device Smoke-Test Checklist — Waiter App (Sprint 2)
 
-**Target form factor:** 7–10" tablet in portrait, used by a single waiter on
-the floor.
-**Build:** `flutter build apk --release` (Android) or `flutter build ios
---release` (iOS) — use the default flavor unless a hardware-specific one has
-been configured by the time this runs.
+**Target form factor:** Android tablet, 7–10" screen, portrait, used by a
+single waiter on the floor.
+**Build:** `flutter build apk --release` → `build/app/outputs/flutter-apk/
+app-release.apk` (rename to `app-pos-release.apk` for distribution).
 **Tester role:** waiter for the fine-dining pilot (Swiss 4-top / 6-top service).
 
 This is the physical-device smoke test for Sprint 2. The items below cover
 the golden paths that are most at risk of breaking on a real device versus the
-desktop dev emulator: thermal printer, external peripherals, offline
+desktop dev emulator: thermal printer, Bluetooth/TCP peripherals, offline
 connectivity, and touch interaction on a 7–10" screen.
 
 Run the full pass **once per release candidate**. Record pass/fail beside each
@@ -19,15 +18,17 @@ item with a short note. Anything red blocks the pilot deploy.
 
 ## Prerequisites
 
-- **Device choice is still open.** The pilot has not yet committed to a
-  specific tablet (Android generic tablet / iPad / a dedicated POS tablet are
-  all on the table). This checklist is deliberately hardware-agnostic — any
-  step that depends on a specific peripheral is marked `(if available)` and
-  can be filled in as **N/A** with a follow-up ticket once hardware arrives.
-- A working Wi-Fi network the device can join, plus a way to disable
-  connectivity at will (airplane mode / router toggle) for the offline tests.
-- The seeded pilot tenant on the backend, with at least one waiter user and
-  a small product catalog mapped to 2–3 kitchen gangs.
+- **Target device: Android tablet** — 7–10" screen, **Android 10+** (API 29+),
+  USB debugging enabled in Developer Options, "Install unknown apps" allowed
+  for the Files app if sideloading. iOS is **out of scope** for the pilot
+  (confirmed 2026-04-18).
+- **Recommended test devices** (mainstream, no dedicated POS hardware
+  required): Samsung Galaxy Tab A8, Lenovo Tab M10, Huawei MatePad, or any
+  comparable mid-range Android tablet in the same size class.
+- Working Wi-Fi network the device can join, plus a way to disable
+  connectivity at will (airplane mode) for the offline tests.
+- Seeded pilot tenant on the backend, with at least one waiter user and a
+  small product catalog mapped to 2–3 kitchen gangs.
 
 ---
 
@@ -35,10 +36,10 @@ item with a short note. Anything red blocks the pilot deploy.
 
 | # | Step | Expected | Result |
 |---|------|----------|--------|
-| 0.1 | Install the build on the device: **Android** — enable ADB, `adb install -r build/app/outputs/flutter-apk/app-release.apk`; **iOS** — distribute the IPA via TestFlight and accept the invite | App installs without signature conflict | ☐ |
-| 0.2 | Open the app from the launcher / home screen | Cold-start under 4 s, no white flash | ☐ |
+| 0.1 | Install the build: **ADB** — `adb install -r app-pos-release.apk`, or **sideload** — copy the APK to the tablet, open it from Files, tap to install (accept the "Install unknown apps" prompt for Files if prompted) | App installs without signature conflict | ☐ |
+| 0.2 | Open the app from the launcher | Cold-start under 4 s, no white flash | ☐ |
 | 0.3 | Log in as the seeded waiter user | Lands on waiter home (tables grid) | ☐ |
-| 0.4 | Rotate the device | Portrait only — orientation locked | ☐ |
+| 0.4 | Rotate the tablet | Portrait only — orientation locked | ☐ |
 
 ## 1. Table → ticket → quick-add (golden path)
 
@@ -87,37 +88,44 @@ item with a short note. Anything red blocks the pilot deploy.
 
 ## 6. Thermal printer (if available)
 
-Connection path depends on the chosen printer — Bluetooth (most generic
-tablets), TCP/LAN (counter-mount printers), or USB-OTG (only on Android
-tablets with the right port/cable).
+Mainstream Android tablets use either **Bluetooth** (pair the ESC/POS printer
+in Android Settings first) or **TCP/IP** (static LAN IP for a counter-mount
+printer). USB-OTG is not assumed on generic tablets.
 
 | # | Step | Expected | Result |
 |---|------|----------|--------|
-| 6.1 | Pair / connect the ESC/POS thermal printer (Bluetooth, TCP, or USB-OTG) | OS grants the connection; device appears in Settings → Printer | ☐ |
+| 6.1 | Connect the ESC/POS printer: **Bluetooth** — pair in Android Settings → Bluetooth, then select in app Settings → Printer; **TCP/IP** — enter the printer's LAN IP and port in Settings → Printer | Android grants the connection; the printer shows as "connected" in Settings → Printer | ☐ |
 | 6.2 | From Settings → Printer, run "Test print" | Page prints with the logo + "GastroCore test" header | ☐ |
 | 6.3 | Fire Gang 1 with a printer-bound kitchen station | Kitchen ticket prints with items + gang number + seat numbers | ☐ |
 | 6.4 | Finalize the ticket in cash | Receipt prints with tax breakdown, MWST lines, tenant logo | ☐ |
 
-If no printer is available at the pilot site (or the chosen tablet doesn't
-support the intended connection path), mark 6.x as **N/A** and log a
+If no printer is available at the pilot site, mark 6.x as **N/A** and log a
 follow-up to retest once hardware arrives.
 
-## 7. Camera / QR (if present)
+## 7. Camera / QR
+
+Android camera2 API path — all three recommended test tablets (Tab A8, Tab
+M10, MatePad) have rear cameras, so this section should be exercised.
 
 | # | Step | Expected | Result |
 |---|------|----------|--------|
-| 7.1 | From the tables screen, scan a table QR code | Opens that table's ticket directly | ☐ |
-| 7.2 | From Settings → Activation, scan a license QR | Tier lifts from Free to the scanned tier | ☐ |
+| 7.1 | First launch of a camera screen — Android prompts for CAMERA permission | Permission dialog appears; granting it reveals the preview | ☐ |
+| 7.2 | From the tables screen, scan a table QR code | Opens that table's ticket directly | ☐ |
+| 7.3 | From Settings → Activation, scan a license QR | Tier lifts from Free to the scanned tier | ☐ |
 
-If the chosen device has no rear camera (some dedicated POS tablets), mark
-these **N/A** and note the model on the row.
+## 8. Endurance (2 h)
 
-## 8. Battery & thermals (endurance)
+Combines battery drain, screen-timeout behavior, and offline-queue resilience
+— the three things that break between "demo on desk" and "real floor shift".
 
 | # | Step | Expected | Result |
 |---|------|----------|--------|
-| 8.1 | Leave the app open on the tables screen for 2 h at 50% brightness | Battery drain ≤ 20 %, chassis warm not hot | ☐ |
-| 8.2 | After 2 h, run steps 1.1 → 1.5 again | No visible lag, no dropped gestures | ☐ |
+| 8.1 | Start with battery at 100 %, brightness 50 %, screen timeout set to 5 min in Android Settings → Display | Baseline captured | ☐ |
+| 8.2 | Leave the app on the tables screen for 2 h. Let the screen time out; wake it with the power button every ~15 min; add one item to a live ticket each wake | App resumes instantly, no re-login required, added items persist across sleeps | ☐ |
+| 8.3 | Around minute 60, turn airplane mode on for 15 min, add 3 items, fire a gang | Offline banner appears; outbox pill grows to 4 pending | ☐ |
+| 8.4 | Turn airplane mode off | Banner clears; pending count drains to 0 within ~10 s | ☐ |
+| 8.5 | At minute 120, check battery and temperature | Battery drain ≤ 30 % from start; chassis warm, not hot | ☐ |
+| 8.6 | Re-run steps 1.1 → 1.5 | No visible lag, no dropped gestures | ☐ |
 
 ---
 
@@ -126,7 +134,7 @@ these **N/A** and note the model on the row.
 Paste into the pilot-rollout issue:
 
 ```
-Device: <make/model> · <OS version> · build <git-sha>
+Device: <make/model> · Android <version> · APK <git-sha>
 Tested by: <name> · <date>
 Environment: <pilot tenant name>
 
@@ -137,8 +145,8 @@ Section 3: PASS
 Section 4: PASS
 Section 5: PASS
 Section 6: N/A (no printer on site yet)
-Section 7: N/A (no rear camera on this model)
-Section 8: PASS (17 % drain / 2 h)
+Section 7: PASS
+Section 8: PASS (22 % drain / 2 h, reconnect drain 8 s)
 
 Blockers: <none | list>
 Follow-ups: <tickets filed>
