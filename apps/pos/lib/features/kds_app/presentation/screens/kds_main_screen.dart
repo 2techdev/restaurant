@@ -1139,7 +1139,10 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     VoidCallback? onRecall,
   }) {
     final baseColor = gang?.flutterColor ?? AppColors.textSecondary;
-    final name = gang?.name ?? 'Andere';
+    // Fixed-label policy (2026-04-17): always display "GANG N" derived from
+    // sortOrder. We intentionally ignore gang.name so a future backoffice
+    // rename can't accidentally surface custom strings on the cook line.
+    final name = gang != null ? 'Gang ${gang.sortOrder}' : 'Andere';
 
     // Resolve header foreground based on lifecycle status.
     final Color headerColor = switch (status) {

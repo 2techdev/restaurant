@@ -265,7 +265,7 @@ class SeedData {
       GangTemplatesCompanion(
         id: const Value('gang-1'),
         tenantId: Value(_tenantId),
-        name: const Value('Vorspeise'),
+        name: const Value('Gang 1'),
         sortOrder: const Value(1),
         color: const Value('#90ABFF'),
         isDefault: const Value(true),
@@ -278,7 +278,7 @@ class SeedData {
       GangTemplatesCompanion(
         id: const Value('gang-2'),
         tenantId: Value(_tenantId),
-        name: const Value('Hauptgang'),
+        name: const Value('Gang 2'),
         sortOrder: const Value(2),
         color: const Value('#69F6B8'),
         isDefault: const Value(true),
@@ -291,7 +291,7 @@ class SeedData {
       GangTemplatesCompanion(
         id: const Value('gang-3'),
         tenantId: Value(_tenantId),
-        name: const Value('Dessert'),
+        name: const Value('Gang 3'),
         sortOrder: const Value(3),
         color: const Value('#BF5AF2'),
         isDefault: const Value(true),
