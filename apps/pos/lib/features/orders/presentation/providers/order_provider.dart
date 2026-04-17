@@ -285,6 +285,55 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     return state;
   }
 
+  /// Fire a single Gang (course) — send only that Gang's unsent items
+  /// to the kitchen as its own KDS ticket.
+  ///
+  /// This is the Hold & Fire flow for fine-dining service: each course is
+  /// dispatched to the kitchen at its own pace so the expo line stays in
+  /// tempo with the dining room. Filters by [OrderItemEntity.course] and
+  /// reuses the same pipeline as [sendToKitchen] — marks items as sent,
+  /// emits a KDS ticket, and refreshes state from DB.
+  ///
+  /// No-op when: ticket is null, or the Gang has no unsent items.
+  Future<void> fireGang(int gang) async {
+    if (state == null) return;
+
+    final repo = _ref.read(orderRepositoryProvider);
+    final kitchenRepo = _ref.read(kitchenRepositoryProvider);
+    final currentUser = _ref.read(currentUserProvider);
+
+    // Persist draft before firing so the KDS ticket references a real row.
+    if (state!.status == TicketStatus.draft) {
+      final saved = await repo.createTicket(
+        state!.copyWith(status: TicketStatus.open),
+      );
+      state = saved;
+    }
+
+    final unsentForGang = state!.items
+        .where((item) => !item.sentToKitchen && item.course == gang)
+        .toList();
+    if (unsentForGang.isEmpty) return;
+
+    for (final item in unsentForGang) {
+      await repo.updateItemStatus(item.id, OrderItemStatus.sent);
+    }
+
+    // Only advance the ticket status if it hasn't already been past 'sent'.
+    if (state!.status == TicketStatus.draft ||
+        state!.status == TicketStatus.open) {
+      await repo.updateTicketStatus(state!.id, TicketStatus.sent);
+    }
+
+    await kitchenRepo.createTicketFromOrder(
+      ticket: state!,
+      items: unsentForGang,
+      waiterName: currentUser?.name,
+    );
+
+    state = await repo.getTicketById(state!.id);
+  }
+
   /// Mark all un-sent items as "sent" and persist to the database.
   ///
   /// Also creates a [KitchenTicket] row (with items) so the KDS screen

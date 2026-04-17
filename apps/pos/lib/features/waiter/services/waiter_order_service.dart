@@ -77,12 +77,17 @@ class WaiterOrderService {
   ///
   /// Returns the updated [TicketEntity] after the item is persisted,
   /// or `null` if the ticket is closed / not found.
+  ///
+  /// [course] tags the item with a Gang number (1..kMaxGangs) so the
+  /// fine-dining Hold & Fire flow can dispatch each course independently.
+  /// Defaults to 1 to match single-course waiter flows.
   Future<TicketEntity?> addItemToTicket({
     required String ticketId,
     required ProductEntity product,
     double quantity = 1,
     List<OrderItemModifierEntity> modifiers = const [],
     String? notes,
+    int course = 1,
   }) async {
     final ticket = await _orderRepo.getTicketById(ticketId);
     if (ticket == null || !ticket.isOpen) return null;
@@ -110,6 +115,7 @@ class WaiterOrderService {
       subtotal: subtotal,
       taxAmount: taxAmount,
       notes: notes,
+      course: course,
       modifiers: reKeyedModifiers,
       taxGroup: product.taxGroup,
     );
@@ -155,6 +161,43 @@ class WaiterOrderService {
         waiterName: waiterName,
       );
     }
+
+    return _orderRepo.getTicketById(ticketId);
+  }
+
+  /// Fire a single Gang (course) — scope the kitchen dispatch to items
+  /// tagged with [OrderItemEntity.course] == [gang].
+  ///
+  /// This mirrors the fine-dining [CurrentTicketNotifier.fireGang] flow so
+  /// the waiter tablet and the POS shell have one canonical Hold & Fire
+  /// pattern. Returns the refreshed ticket. Idempotent.
+  Future<TicketEntity?> fireGang({
+    required String ticketId,
+    required int gang,
+    required String waiterName,
+  }) async {
+    final ticket = await _orderRepo.getTicketById(ticketId);
+    if (ticket == null) return null;
+
+    final unsentForGang = ticket.items
+        .where((i) => !i.sentToKitchen && i.course == gang)
+        .toList();
+    if (unsentForGang.isEmpty) return ticket;
+
+    for (final item in unsentForGang) {
+      await _orderRepo.updateItemStatus(item.id, OrderItemStatus.sent);
+    }
+
+    if (ticket.status == TicketStatus.draft ||
+        ticket.status == TicketStatus.open) {
+      await _orderRepo.updateTicketStatus(ticketId, TicketStatus.sent);
+    }
+
+    await _kitchenRepo.createTicketFromOrder(
+      ticket: ticket,
+      items: unsentForGang,
+      waiterName: waiterName,
+    );
 
     return _orderRepo.getTicketById(ticketId);
   }

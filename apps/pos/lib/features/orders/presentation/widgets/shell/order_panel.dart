@@ -21,6 +21,12 @@ import 'package:gastrocore_pos/features/orders/presentation/providers/order_prov
 /// The currently-focused Gang — new items are added to this Gang by default.
 final activeGangProvider = StateProvider<int>((ref) => 1);
 
+/// Client-side "hold" state for Gangs. A Gang in this set is visibly marked
+/// as on hold so the operator knows not to fire it yet. v1 does not block
+/// the fire action — it's a soft signal. Persistence is intentionally
+/// per-session; a reload returns to a clean state.
+final heldGangsProvider = StateProvider<Set<int>>((ref) => <int>{});
+
 class OrderPanel extends ConsumerWidget {
   const OrderPanel({super.key});
 
@@ -228,6 +234,7 @@ class _GangGroupedList extends ConsumerWidget {
       final gang = item.course.clamp(1, kMaxGangs);
       byGang.putIfAbsent(gang, () => []).add(item);
     }
+    final held = ref.watch(heldGangsProvider);
 
     // Render every slot even when empty so the operator sees the structure.
     return ListView(
@@ -237,6 +244,7 @@ class _GangGroupedList extends ConsumerWidget {
           _GangSection(
             gang: g,
             items: byGang[g] ?? const [],
+            isHeld: held.contains(g),
             onFire: () => _fireGang(context, ref, g),
             onHold: () => _holdGang(context, ref, g),
           ),
@@ -244,20 +252,48 @@ class _GangGroupedList extends ConsumerWidget {
     );
   }
 
-  void _fireGang(BuildContext ctx, WidgetRef ref, int gang) {
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      SnackBar(
-        content: Text('Gang $gang mutfağa gönderildi (simülasyon).'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    // TODO(sprint 2): integrate with kitchen provider + printer service.
+  Future<void> _fireGang(BuildContext ctx, WidgetRef ref, int gang) async {
+    final messenger = ScaffoldMessenger.of(ctx);
+    try {
+      await ref.read(currentTicketProvider.notifier).fireGang(gang);
+      // Clear the "held" mark when fired — the gang is now on its way.
+      final held = ref.read(heldGangsProvider);
+      if (held.contains(gang)) {
+        ref.read(heldGangsProvider.notifier).state = {...held}..remove(gang);
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Gang $gang mutfağa gönderildi.'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Gang $gang gönderilemedi: $e'),
+          backgroundColor: AppColors.red,
+        ),
+      );
+    }
   }
 
   void _holdGang(BuildContext ctx, WidgetRef ref, int gang) {
+    final held = ref.read(heldGangsProvider);
+    final next = {...held};
+    final willHold = !next.contains(gang);
+    if (willHold) {
+      next.add(gang);
+    } else {
+      next.remove(gang);
+    }
+    ref.read(heldGangsProvider.notifier).state = next;
     ScaffoldMessenger.of(ctx).showSnackBar(
       SnackBar(
-        content: Text('Gang $gang bekletiliyor.'),
+        content: Text(
+          willHold
+              ? 'Gang $gang beklemeye alındı.'
+              : 'Gang $gang beklemeden çıkarıldı.',
+        ),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -268,18 +304,21 @@ class _GangSection extends StatelessWidget {
   const _GangSection({
     required this.gang,
     required this.items,
+    required this.isHeld,
     required this.onFire,
     required this.onHold,
   });
 
   final int gang;
   final List<OrderItemEntity> items;
+  final bool isHeld;
   final VoidCallback onFire;
   final VoidCallback onHold;
 
   @override
   Widget build(BuildContext context) {
     final allSent = items.isNotEmpty && items.every((i) => i.sentToKitchen);
+    final hasUnsent = items.any((i) => !i.sentToKitchen);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppTokens.space12),
       child: Column(
@@ -308,19 +347,27 @@ class _GangSection extends StatelessWidget {
                     color: AppColors.green,
                   ),
                 ],
+                if (isHeld) ...[
+                  const SizedBox(width: AppTokens.space8),
+                  const _StatusBadge(
+                    label: 'Beklemede',
+                    color: AppColors.orange,
+                  ),
+                ],
                 const Spacer(),
                 if (items.isNotEmpty) ...[
                   _SmallButton(
-                    label: 'Bekle',
+                    label: isHeld ? 'Devam' : 'Bekle',
                     onTap: onHold,
                     tone: _SmallButtonTone.neutral,
                   ),
                   const SizedBox(width: AppTokens.space4),
-                  _SmallButton(
-                    label: 'Gönder',
-                    onTap: onFire,
-                    tone: _SmallButtonTone.primary,
-                  ),
+                  if (hasUnsent)
+                    _SmallButton(
+                      label: 'Gönder',
+                      onTap: onFire,
+                      tone: _SmallButtonTone.primary,
+                    ),
                 ],
               ],
             ),
