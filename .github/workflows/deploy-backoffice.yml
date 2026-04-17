@@ -1,0 +1,87 @@
+name: Deploy Backoffice
+
+# Builds the Flutter web backoffice (apps/dashboard) and publishes it to
+# Cloudflare Pages at admin.2tech.ch. Mirrors deploy-online.yml so the same
+# pattern is used for both web frontends.
+#
+# Required repo secrets:
+#   CF_API_TOKEN           — Cloudflare API token with Pages:Edit
+#   CF_ACCOUNT_ID          — Cloudflare account ID
+#   CF_PAGES_PROJECT       — Cloudflare Pages project name (e.g. gastrocore-backoffice)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/dashboard/**"
+      - "packages/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: deploy-backoffice-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Flutter Web (dashboard)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.4"
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-dashboard-${{ hashFiles('apps/dashboard/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-dashboard-
+
+      - name: Install dependencies
+        working-directory: apps/dashboard
+        run: flutter pub get
+
+      - name: Flutter build web (release)
+        working-directory: apps/dashboard
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: production
+          SENTRY_RELEASE: ${{ github.sha }}
+        run: |
+          flutter build web --release \
+            --dart-define=SENTRY_DSN=$SENTRY_DSN \
+            --dart-define=SENTRY_ENVIRONMENT=$SENTRY_ENVIRONMENT \
+            --dart-define=SENTRY_RELEASE=$SENTRY_RELEASE
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backoffice-web
+          path: apps/dashboard/build/web/
+          retention-days: 14
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backoffice-web
+          path: ./dist
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy ./dist --project-name=${{ secrets.CF_PAGES_PROJECT }} --branch=main
