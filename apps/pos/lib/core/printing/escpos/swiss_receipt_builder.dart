@@ -154,6 +154,21 @@ class SwissReceiptBuilder {
       );
     }
 
+    // Service charge — printed between Rabatt and TOTAL so the printed
+    // pipeline reads Discount → Service → Tax, matching the SambaPOS-3
+    // calculation order. MWST is extracted from (net + service) in the
+    // breakdown section below, not here.
+    if (data.serviceChargeAmount > 0) {
+      final label = data.serviceChargePercent != null
+          ? 'Service ${data.serviceChargePercent!.toStringAsFixed(
+              data.serviceChargePercent! == data.serviceChargePercent!
+                      .truncateToDouble()
+                  ? 0
+                  : 1)}%'
+          : 'Service';
+      b.twoColumnLine(label, _chf(data.serviceChargeAmount), width: _w);
+    }
+
     // TOTAL — 2× büyük font
     b.newLine().boldOn().textSizeDouble().alignLeft();
     b.twoColumnLine('TOTAL', _chf(data.total), width: _w ~/ 2);
