@@ -103,7 +103,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -214,6 +214,14 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(modifierGroups, modifierGroups.freeTagging);
         await m.addColumn(modifierGroups, modifierGroups.columnCount);
         await m.addColumn(modifierGroups, modifierGroups.prefix);
+      }
+      if (from < 12) {
+        // v12: per-application Order Tag richness — quantity multiplier
+        // (askQuantity) and free-form note (freeTagging) on each applied
+        // modifier. Additive & non-breaking: existing rows default to
+        // quantity=1, note=NULL.
+        await m.addColumn(orderItemModifiers, orderItemModifiers.quantity);
+        await m.addColumn(orderItemModifiers, orderItemModifiers.note);
       }
     },
     onCreate: (m) async {

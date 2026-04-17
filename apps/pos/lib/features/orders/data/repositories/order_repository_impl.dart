@@ -42,6 +42,8 @@ class OrderRepositoryImpl {
                   modifierId: Value(mod.modifierId),
                   modifierName: Value(mod.modifierName),
                   priceDelta: Value(mod.priceDelta),
+                  quantity: Value(mod.quantity),
+                  note: Value(mod.note),
                   createdAt: Value(DateTime.now()),
                 ),
               );
@@ -224,6 +226,8 @@ class OrderRepositoryImpl {
                 modifierId: Value(mod.modifierId),
                 modifierName: Value(mod.modifierName),
                 priceDelta: Value(mod.priceDelta),
+                quantity: Value(mod.quantity),
+                note: Value(mod.note),
                 createdAt: Value(DateTime.now()),
               ),
             );
@@ -266,7 +270,9 @@ class OrderRepositoryImpl {
     final modsQuery = _db.select(_db.orderItemModifiers)
       ..where((m) => m.orderItemId.equals(orderItemId));
     final mods = await modsQuery.get();
-    final modifierTotal = mods.fold<int>(0, (s, m) => s + m.priceDelta);
+    // Effective delta = priceDelta * quantity so askQuantity modifiers price right.
+    final modifierTotal =
+        mods.fold<int>(0, (s, m) => s + m.priceDelta * m.quantity);
     final newSubtotal = ((item.unitPrice + modifierTotal) * newQty);
 
     await _db.transaction(() async {
@@ -447,6 +453,8 @@ class OrderRepositoryImpl {
               modifierId: m.modifierId,
               modifierName: m.modifierName,
               priceDelta: m.priceDelta,
+              quantity: m.quantity,
+              note: m.note,
             ),
           );
     }
