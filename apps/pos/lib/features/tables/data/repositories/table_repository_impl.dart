@@ -247,13 +247,79 @@ class TableRepositoryImpl {
     ));
   }
 
-  /// Clear a table: set status back to available and remove the linked order.
+  /// Clear a table: set status back to available, remove the linked
+  /// order, and drop any concurrent state flags (bill-requested, VIP,
+  /// reservation-soon, etc.) since the party has left.
   Future<void> clearTable(String tableId) async {
     await (_db.update(_db.restaurantTables)
           ..where((t) => t.id.equals(tableId)))
         .write(RestaurantTablesCompanion(
       currentOrderId: const Value(null),
       status: const Value('available'),
+      flags: const Value(''),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  // =========================================================================
+  // Tables – State flags (orthogonal to TableStatus)
+  // =========================================================================
+
+  /// Toggle [flag] on [tableId]. When [enabled] is true the flag is
+  /// added to the existing set; when false it is removed. Idempotent
+  /// — setting a flag that is already present is a no-op write.
+  ///
+  /// Runs as a transactional read-modify-write so concurrent flag
+  /// updates don't clobber each other.
+  Future<void> setTableFlag({
+    required String tableId,
+    required TableFlag flag,
+    required bool enabled,
+  }) async {
+    await _db.transaction(() async {
+      final row = await (_db.select(_db.restaurantTables)
+            ..where((t) => t.id.equals(tableId)))
+          .getSingleOrNull();
+      if (row == null) return;
+
+      final current = decodeTableFlags(row.flags);
+      final next = <TableFlag>{...current};
+      if (enabled) {
+        next.add(flag);
+      } else {
+        next.remove(flag);
+      }
+      if (current.length == next.length && current.containsAll(next)) return;
+
+      await (_db.update(_db.restaurantTables)
+            ..where((t) => t.id.equals(tableId)))
+          .write(RestaurantTablesCompanion(
+        flags: Value(encodeTableFlags(next)),
+        updatedAt: Value(DateTime.now()),
+      ));
+    });
+  }
+
+  /// Replace the entire flag set on [tableId] in one write. Useful
+  /// when applying a remote sync payload.
+  Future<void> setTableFlags({
+    required String tableId,
+    required Set<TableFlag> flags,
+  }) async {
+    await (_db.update(_db.restaurantTables)
+          ..where((t) => t.id.equals(tableId)))
+        .write(RestaurantTablesCompanion(
+      flags: Value(encodeTableFlags(flags)),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Clear every flag on [tableId] without touching [TableStatus].
+  Future<void> clearTableFlags(String tableId) async {
+    await (_db.update(_db.restaurantTables)
+          ..where((t) => t.id.equals(tableId)))
+        .write(RestaurantTablesCompanion(
+      flags: const Value(''),
       updatedAt: Value(DateTime.now()),
     ));
   }
@@ -410,6 +476,7 @@ class TableRepositoryImpl {
       height: row.height,
       status: _parseTableStatus(row.status),
       currentOrderId: row.currentOrderId,
+      flags: decodeTableFlags(row.flags),
     );
   }
 

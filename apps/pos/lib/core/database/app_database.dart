@@ -103,7 +103,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -201,6 +201,11 @@ class AppDatabase extends _$AppDatabase {
       if (from < 9) {
         // v9: first-class seat number on order items for seat-based split.
         await m.addColumn(orderItems, orderItems.seatNumber);
+      }
+      if (from < 10) {
+        // v10: orthogonal state flags on restaurant tables so one tile can
+        // be `occupied` AND `billRequested` AND `vip` simultaneously.
+        await m.addColumn(restaurantTables, restaurantTables.flags);
       }
     },
     onCreate: (m) async {

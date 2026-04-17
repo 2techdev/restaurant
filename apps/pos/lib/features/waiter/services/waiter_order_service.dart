@@ -221,8 +221,21 @@ class WaiterOrderService {
   }
 
   /// Request the bill for a table (signals POS to handle payment).
+  ///
+  /// Mirrors the signal onto the table's state-flag set so the floor
+  /// plan can surface a "bill requested" badge alongside the
+  /// occupied-status tile colour — SambaPOS-style orthogonal state.
   Future<void> requestBill(String ticketId) async {
     await _orderRepo.updateTicketStatus(ticketId, TicketStatus.billRequested);
+    final ticket = await _orderRepo.getTicketById(ticketId);
+    final tableId = ticket?.tableId;
+    if (tableId != null) {
+      await _tableRepo.setTableFlag(
+        tableId: tableId,
+        flag: TableFlag.billRequested,
+        enabled: true,
+      );
+    }
   }
 
   // =========================================================================

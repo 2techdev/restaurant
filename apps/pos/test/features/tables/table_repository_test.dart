@@ -518,4 +518,181 @@ void main() {
       await db.close();
     });
   });
+
+  // =========================================================================
+  // State flags (orthogonal to TableStatus) — S3.2
+  // =========================================================================
+
+  group('TableFlag codec', () {
+    test('decode empty / null returns empty set', () {
+      expect(decodeTableFlags(null), isEmpty);
+      expect(decodeTableFlags(''), isEmpty);
+    });
+
+    test('round-trip preserves flag set', () {
+      const flags = {TableFlag.billRequested, TableFlag.vip};
+      final encoded = encodeTableFlags(flags);
+      expect(decodeTableFlags(encoded), flags);
+    });
+
+    test('encoding is deterministic (enum declaration order)', () {
+      // Independent of insertion order the CSV must be stable so
+      // sync payloads diff cleanly.
+      final a = encodeTableFlags({TableFlag.vip, TableFlag.billRequested});
+      final b = encodeTableFlags({TableFlag.billRequested, TableFlag.vip});
+      expect(a, b);
+      // billRequested declares before vip → it comes first in the CSV.
+      expect(a.indexOf('billRequested'), lessThan(a.indexOf('vip')));
+    });
+
+    test('decode silently drops unknown tokens', () {
+      final flags = decodeTableFlags('billRequested,ghostFlag,vip');
+      expect(flags, {TableFlag.billRequested, TableFlag.vip});
+    });
+  });
+
+  group('setTableFlag', () {
+    test('adds a flag without touching TableStatus', () async {
+      final db = await _openDb();
+      final repo = TableRepositoryImpl(db);
+
+      await _seedFloor(db);
+      await _seedTable(db, id: 't1', status: 'occupied');
+
+      await repo.setTableFlag(
+        tableId: 't1',
+        flag: TableFlag.billRequested,
+        enabled: true,
+      );
+
+      final tables = await repo.getAllTables(_tenantId);
+      final t1 = tables.firstWhere((t) => t.id == 't1');
+      expect(t1.status, TableStatus.occupied);
+      expect(t1.flags, {TableFlag.billRequested});
+      expect(t1.hasFlag(TableFlag.billRequested), true);
+
+      await db.close();
+    });
+
+    test('stacks multiple flags simultaneously', () async {
+      final db = await _openDb();
+      final repo = TableRepositoryImpl(db);
+
+      await _seedFloor(db);
+      await _seedTable(db, id: 't1', status: 'occupied');
+
+      await repo.setTableFlag(
+        tableId: 't1',
+        flag: TableFlag.billRequested,
+        enabled: true,
+      );
+      await repo.setTableFlag(
+        tableId: 't1',
+        flag: TableFlag.vip,
+        enabled: true,
+      );
+
+      final tables = await repo.getAllTables(_tenantId);
+      final t1 = tables.firstWhere((t) => t.id == 't1');
+      // SambaPOS parity: Occupied + BillRequested + VIP coexist.
+      expect(t1.status, TableStatus.occupied);
+      expect(t1.flags, {TableFlag.billRequested, TableFlag.vip});
+
+      await db.close();
+    });
+
+    test('removes a flag without clearing the others', () async {
+      final db = await _openDb();
+      final repo = TableRepositoryImpl(db);
+
+      await _seedFloor(db);
+      await _seedTable(db, id: 't1', status: 'occupied');
+      await repo.setTableFlags(
+        tableId: 't1',
+        flags: {TableFlag.billRequested, TableFlag.vip},
+      );
+
+      await repo.setTableFlag(
+        tableId: 't1',
+        flag: TableFlag.billRequested,
+        enabled: false,
+      );
+
+      final tables = await repo.getAllTables(_tenantId);
+      final t1 = tables.firstWhere((t) => t.id == 't1');
+      expect(t1.flags, {TableFlag.vip});
+
+      await db.close();
+    });
+
+    test('setting an already-present flag is idempotent', () async {
+      final db = await _openDb();
+      final repo = TableRepositoryImpl(db);
+
+      await _seedFloor(db);
+      await _seedTable(db, id: 't1');
+      await repo.setTableFlag(
+        tableId: 't1',
+        flag: TableFlag.vip,
+        enabled: true,
+      );
+      // Call twice — must still be a single flag.
+      await repo.setTableFlag(
+        tableId: 't1',
+        flag: TableFlag.vip,
+        enabled: true,
+      );
+
+      final tables = await repo.getAllTables(_tenantId);
+      expect(tables.first.flags, {TableFlag.vip});
+
+      await db.close();
+    });
+  });
+
+  group('clearTable + clearTableFlags', () {
+    test('clearTable resets status AND drops every flag', () async {
+      final db = await _openDb();
+      final repo = TableRepositoryImpl(db);
+
+      await _seedFloor(db);
+      await _seedTable(db, id: 't1', status: 'occupied');
+      await repo.setTableFlags(
+        tableId: 't1',
+        flags: {TableFlag.billRequested, TableFlag.vip},
+      );
+
+      await repo.clearTable('t1');
+
+      final tables = await repo.getAllTables(_tenantId);
+      final t1 = tables.firstWhere((t) => t.id == 't1');
+      expect(t1.status, TableStatus.available);
+      expect(t1.flags, isEmpty);
+
+      await db.close();
+    });
+
+    test('clearTableFlags preserves status', () async {
+      final db = await _openDb();
+      final repo = TableRepositoryImpl(db);
+
+      await _seedFloor(db);
+      await _seedTable(db, id: 't1', status: 'occupied');
+      await repo.setTableFlags(
+        tableId: 't1',
+        flags: {TableFlag.billRequested},
+      );
+
+      await repo.clearTableFlags('t1');
+
+      final tables = await repo.getAllTables(_tenantId);
+      final t1 = tables.firstWhere((t) => t.id == 't1');
+      // Status untouched — the guests are still there, just the
+      // bill-requested signal has been acknowledged.
+      expect(t1.status, TableStatus.occupied);
+      expect(t1.flags, isEmpty);
+
+      await db.close();
+    });
+  });
 }
