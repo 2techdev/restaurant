@@ -8,3 +8,6 @@ export 'src/models/printer_status.dart';
 export 'src/models/printer_target.dart';
 export 'src/models/receipt_data.dart';
 export 'src/models/kitchen_ticket_data.dart';
+
+export 'src/templates/receipt_template.dart';
+export 'src/templates/kitchen_ticket_template.dart';
