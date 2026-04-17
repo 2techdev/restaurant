@@ -33,6 +33,7 @@ import 'tables/products.dart';
 import 'tables/receipts.dart';
 import 'tables/restaurant_tables.dart';
 import 'tables/shifts.dart';
+import 'tables/service_calls.dart';
 import 'tables/sync_metadata.dart';
 import 'tables/sync_queue.dart';
 import 'tables/tax_profiles.dart';
@@ -96,6 +97,7 @@ part 'app_database.g.dart';
     ManagerPins,
     GangTemplates,
     OrderGangStates,
+    ServiceCalls,
   ],
   daos: [AuditLogDao, InventoryDao, SyncEventDao],
 )
@@ -103,7 +105,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -197,6 +199,18 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(categories, categories.defaultGangId);
         await m.addColumn(orderItems, orderItems.gangId);
         await m.addColumn(kitchenTicketItems, kitchenTicketItems.gangId);
+      }
+      if (from < 9) {
+        // v9: waiter upgrades —
+        // (a) seat column on order_items for split-by-seat billing foundation,
+        // (b) service_calls table for waiter → boss/KDS service requests.
+        await m.addColumn(orderItems, orderItems.seat);
+        await m.createTable(serviceCalls);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_service_calls_tenant_status '
+          'ON service_calls (tenant_id, status) '
+          'WHERE is_deleted = 0',
+        );
       }
     },
     onCreate: (m) async {

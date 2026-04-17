@@ -204,6 +204,26 @@ class WaiterOrderService {
     return _orderRepo.getTicketById(ticketId);
   }
 
+  /// Update the cover (guest) count on a ticket.
+  ///
+  /// Clamps to `[1, 99]` so the UI cannot persist nonsensical values.
+  /// Returns the refreshed ticket, or `null` if the ticket is closed.
+  Future<TicketEntity?> updateGuestCount({
+    required String ticketId,
+    required int guestCount,
+  }) async {
+    final ticket = await _orderRepo.getTicketById(ticketId);
+    if (ticket == null || !ticket.isOpen) return null;
+    final clamped = guestCount < 1
+        ? 1
+        : guestCount > 99
+            ? 99
+            : guestCount;
+    if (clamped == ticket.guestCount) return ticket;
+    await _orderRepo.updateTicketGuestCount(ticketId, clamped);
+    return _orderRepo.getTicketById(ticketId);
+  }
+
   /// Move a draft ticket to a different table.
   ///
   /// Frees the old table (if it has no other open tickets) and claims the

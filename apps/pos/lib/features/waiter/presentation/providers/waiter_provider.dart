@@ -7,6 +7,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
+import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_provider.dart';
 import 'package:gastrocore_pos/features/menu/data/repositories/menu_repository_impl.dart';
@@ -18,6 +19,8 @@ import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dar
 import 'package:gastrocore_pos/features/tables/data/repositories/table_repository_impl.dart';
 import 'package:gastrocore_pos/features/tables/domain/entities/table_entity.dart';
 import 'package:gastrocore_pos/features/tables/presentation/providers/table_provider.dart';
+import 'package:gastrocore_pos/features/waiter/data/repositories/service_call_repository_impl.dart';
+import 'package:gastrocore_pos/features/waiter/domain/entities/service_call_entity.dart';
 import 'package:gastrocore_pos/features/waiter/services/waiter_order_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -69,7 +72,14 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
   WaiterOrderService get _svc => _ref.read(waiterOrderServiceProvider);
 
   /// Start a new order for [table], claiming the table.
-  Future<void> startOrder(RestaurantTableEntity table) async {
+  ///
+  /// [guestCount] is the initial cover count — pass the value the waiter
+  /// picked at the table-select step. Defaults to the service default so
+  /// existing callers keep working.
+  Future<void> startOrder(
+    RestaurantTableEntity table, {
+    int? guestCount,
+  }) async {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
 
@@ -81,8 +91,21 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
       waiterName: user.name,
       tableId: table.id,
       deviceId: _deviceId,
+      guestCount: guestCount ?? 2,
     );
     state = ticket;
+  }
+
+  /// Update the cover count on the active ticket.
+  ///
+  /// No-op if there is no active ticket or the ticket is closed.
+  Future<void> updateGuestCount(int guestCount) async {
+    if (state == null) return;
+    final updated = await _svc.updateGuestCount(
+      ticketId: state!.id,
+      guestCount: guestCount,
+    );
+    if (updated != null) state = updated;
   }
 
   /// Load an existing open ticket as the active ticket.
@@ -265,3 +288,58 @@ final waiterSearchResultsProvider =
   final tenantId = ref.watch(tenantIdProvider);
   return repo.searchProducts(tenantId, query);
 });
+
+// ---------------------------------------------------------------------------
+// Service calls (waiter → boss/KDS dashboards)
+// ---------------------------------------------------------------------------
+
+final serviceCallRepositoryProvider =
+    Provider<ServiceCallRepositoryImpl>((ref) {
+  return ServiceCallRepositoryImpl(ref.watch(databaseProvider));
+});
+
+/// Active (non-resolved) calls for the current waiter, live.
+final waiterActiveServiceCallsProvider =
+    StreamProvider<List<ServiceCallEntity>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return Stream.value(const []);
+  final tenantId = ref.watch(tenantIdProvider);
+  final repo = ref.watch(serviceCallRepositoryProvider);
+  return repo
+      .watchActive(tenantId)
+      .map((calls) => calls.where((c) => c.waiterId == user.id).toList());
+});
+
+/// Raise a new service call from the waiter UI.
+///
+/// Looks up the active session (selected table + ticket) so the call is
+/// routed with enough context for the dashboard operator to respond.
+/// Accepts a [WidgetRef] so it can be called straight from a widget's
+/// event handler.
+Future<ServiceCallEntity?> raiseServiceCall(
+  WidgetRef ref, {
+  required ServiceCallKind kind,
+  String? note,
+}) async {
+  final user = ref.read(currentUserProvider);
+  if (user == null) return null;
+  final tenantId = ref.read(tenantIdProvider);
+  final deviceId = ref.read(deviceIdProvider);
+  final table = ref.read(waiterSelectedTableProvider);
+  final ticket = ref.read(waiterActiveTicketProvider);
+
+  final entity = ServiceCallEntity(
+    id: IdGenerator.generateId(),
+    tenantId: tenantId,
+    tableId: table?.id,
+    ticketId: ticket?.id,
+    waiterId: user.id,
+    waiterName: user.name,
+    kind: kind,
+    note: note,
+    createdAt: DateTime.now(),
+  );
+  return ref
+      .read(serviceCallRepositoryProvider)
+      .create(entity, deviceId: deviceId);
+}

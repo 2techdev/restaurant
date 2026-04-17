@@ -207,6 +207,19 @@ class OrderRepositoryImpl {
     );
   }
 
+  /// Persist a new guest (cover) count on a ticket.
+  ///
+  /// Clamped to `>= 1` at the caller; this method only writes. The waiter
+  /// uses this when seat count is corrected mid-service.
+  Future<void> updateTicketGuestCount(String id, int guestCount) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
+      TicketsCompanion(
+        guestCount: Value(guestCount),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   // =========================================================================
   // Order items
   // =========================================================================
@@ -530,6 +543,7 @@ class OrderRepositoryImpl {
       sentToKitchen: row.sentToKitchen,
       notes: row.notes,
       course: row.course,
+      seat: row.seat,
       gangId: row.gangId,
       modifiers: modifiers,
     );
@@ -551,6 +565,7 @@ class OrderRepositoryImpl {
       sentToKitchen: Value(entity.sentToKitchen),
       notes: Value(entity.notes),
       course: Value(entity.course),
+      seat: Value(entity.seat),
       gangId: Value(entity.gangId),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),

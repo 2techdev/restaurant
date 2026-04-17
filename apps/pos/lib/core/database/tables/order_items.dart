@@ -17,6 +17,12 @@ class OrderItems extends Table {
   TextColumn get notes => text().nullable()();
   IntColumn get course => integer().withDefault(const Constant(1))();
 
+  /// Seat number this line is assigned to, used by split-by-seat billing.
+  ///
+  /// `0` (default) means "shared / unassigned"; seats are 1-indexed up to the
+  /// ticket's current guest count. Waiter can edit per-item.
+  IntColumn get seat => integer().withDefault(const Constant(0))();
+
   /// Gang (course group) assigned to this order line.
   /// References gang_templates.id. Null = no Gang assigned.
   /// Waiter can override per-item at order time.
