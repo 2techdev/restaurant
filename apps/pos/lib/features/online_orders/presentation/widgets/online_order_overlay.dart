@@ -1,6 +1,6 @@
 /// Overlay notification for incoming online orders.
 ///
-/// Sits inside a [Stack] on the [OrderCenterScreen].  When a new online order
+/// Sits inside a [Stack] on the order-centre shell. When a new online order
 /// arrives it slides in from the bottom-right corner, showing the order
 /// summary and two action buttons: "Annehmen" (Accept) and "Ablehnen" (Reject).
 ///

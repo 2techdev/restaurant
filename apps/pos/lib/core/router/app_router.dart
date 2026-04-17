@@ -17,7 +17,6 @@ import 'package:gastrocore_pos/features/brand_auth/presentation/screens/register
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_open_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/z_report_screen.dart';
 import 'package:gastrocore_pos/features/home/presentation/screens/home_screen.dart';
-import 'package:gastrocore_pos/features/orders/presentation/screens/order_center_screen.dart';
 import 'package:gastrocore_pos/features/orders/presentation/shells/pos_shell_router.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/screens/kitchen_display_screen.dart';
 import 'package:gastrocore_pos/features/payments/presentation/screens/payment_screen.dart';
@@ -62,12 +61,6 @@ abstract final class AppRoutes {
   static const String shiftOpen = '/shift-open';
   static const String home = '/home';
   static const String orderCenter = '/order-center';
-
-  /// Legacy Ongoing / Tables / Menu three-tab screen. Kept as an escape
-  /// hatch while the new [PosShellRouter] is the default for /order-center.
-  /// Remove once the fine-dining shell has covered everything the legacy
-  /// tabs exposed (tracked in Obsidian: Restaurant - POS - Redesign Plan).
-  static const String orderCenterLegacy = '/order-center-legacy';
   static const String kitchen = '/kitchen';
   static const String payment = '/payment/:ticketId';
   static const String shiftClose = '/shift-close';
@@ -218,10 +211,6 @@ GoRouter createAppRouter({
         GoRoute(
           path: AppRoutes.orderCenter,
           builder: (context, state) => const PosShellRouter(),
-        ),
-        GoRoute(
-          path: AppRoutes.orderCenterLegacy,
-          builder: (context, state) => const OrderCenterScreen(),
         ),
         GoRoute(
           path: AppRoutes.pos,

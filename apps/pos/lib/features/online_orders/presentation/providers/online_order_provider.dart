@@ -67,7 +67,7 @@ final _onlineAlertPlayerProvider = Provider<AudioPlayer>((ref) {
 /// Starts and manages the [PosWsClient] for this screen.
 ///
 /// auto-disposed when the last listener is removed. Mount it
-/// inside [OrderCenterScreen] to keep the connection alive while on that screen.
+/// inside the order-centre shell to keep the connection alive while on that screen.
 final posWsClientProvider = Provider.autoDispose<PosWsClient>((ref) {
   final baseUrl = ref.watch(syncServerUrlProvider);
   final tenantId = ref.watch(tenantIdProvider);
