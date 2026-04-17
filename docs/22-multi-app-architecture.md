@@ -37,7 +37,7 @@ graph TB
     end
 
     subgraph "Layer 2 — Mobile Apps (Flutter)"
-        PATRON["Patron App<br/>(Owner Mobile)"]
+        BOSS["Boss App<br/>(Owner Mobile)"]
         CUSTOMER["Customer App<br/>(B2C Mobile)"]
     end
 
@@ -58,7 +58,7 @@ graph TB
     KIOSK -->|LAN or Cloud| API
 
     POS <-->|Cloud Sync| API
-    PATRON -->|REST + Push| API
+    BOSS -->|REST + Push| API
     CUSTOMER -->|REST + Push| API
     WEB_ORDER -->|REST| API
     DASHBOARD -->|REST| API
@@ -75,7 +75,7 @@ graph TB
 |---|-----|-------------|----------|---------------|-------------|----------------|----------------|---------------|
 | 1 | **POS** | `apps/pos/` | Android (Flutter) | 10" tablet | Cashier, Manager | Full offline | Phase 1 (done) | 60% (source of shared code) |
 | 2 | **Waiter** | `apps/waiter/` | Android (Flutter) | Phone / 6" handheld | Waiter | Full offline | Phase 3 | 75% |
-| 3 | **Patron** | `apps/patron/` | iOS + Android (Flutter) | Phone | Owner, Manager | Online only | Phase 5 | 40% |
+| 3 | **Boss** | `apps/boss/` | iOS + Android (Flutter) | Phone | Owner, Manager | Online only | Phase 5 | 40% |
 | 4 | **KDS** | `apps/kds/` | Android (Flutter) | 10-15" tablet | Kitchen staff | LAN offline-safe | Phase 2 | 65% |
 | 5 | **ODS** | `apps/ods/` | Android / Web (Flutter) | TV / large screen | Customers (passive) | LAN offline-safe | Phase 8 | 30% |
 | 6 | **Kiosk** | `apps/kiosk/` | Android (Flutter) | 15"+ touch terminal | Customer (self-service) | Online required | Phase 9 | 55% |
@@ -206,7 +206,7 @@ gastrocore/
 ├── apps/
 │   ├── pos/                         # Main POS (EXISTING — 87 files, 25,410 lines)
 │   ├── waiter/                      # Waiter handheld
-│   ├── patron/                      # Owner dashboard mobile
+│   ├── boss/                      # Owner dashboard mobile
 │   ├── kds/                         # Kitchen display
 │   ├── ods/                         # Order status display
 │   ├── kiosk/                       # Self-order kiosk
@@ -237,7 +237,7 @@ gastrocore/
 
 1. **core_models is pure Dart.** No Flutter, no Drift, no platform dependencies. Any Dart program (including the Go backend code generators) can depend on it.
 
-2. **core_database depends only on core_models + Drift.** Apps that do not need a local SQLite database (Patron, Customer, Web) do not import this package.
+2. **core_database depends only on core_models + Drift.** Apps that do not need a local SQLite database (Boss, Customer, Web) do not import this package.
 
 3. **core_theme owns all visual tokens.** No app defines its own colors or text styles. Theme variants (e.g., KDS high-contrast mode, Kiosk large-touch mode) are exposed as named constructors or theme extensions within core_theme.
 
@@ -290,7 +290,7 @@ graph LR
     end
 
     subgraph "Mobile Apps"
-        PATRON["Patron App"]
+        BOSS["Boss App"]
         CUSTOMER["Customer App"]
     end
 
@@ -329,9 +329,9 @@ graph LR
     KIOSK --> SYNC
     KIOSK --> AUTH
 
-    PATRON --> MODELS
-    PATRON --> THEME
-    PATRON --> AUTH
+    BOSS --> MODELS
+    BOSS --> THEME
+    BOSS --> AUTH
 
     CUSTOMER --> MODELS
     CUSTOMER --> THEME
@@ -355,7 +355,7 @@ graph LR
 | KDS | Yes | Yes | Yes | Yes (LAN only) | No | Yes (PIN) |
 | ODS | Yes | No | Yes | Yes (LAN only) | No | No |
 | Kiosk | Yes | Yes | Yes | Yes (LAN or Cloud) | Yes (receipt) | Yes (device) |
-| Patron | Yes | No | Yes | No | No | Yes (JWT) |
+| Boss | Yes | No | Yes | No | No | Yes (JWT) |
 | Customer | Yes | No | Yes | No | No | Yes (JWT) |
 | Web Ordering | Yes | No | Yes | No | No | Yes (JWT) |
 | Dashboard | Yes | No | Yes | No | No | Yes (JWT) |
@@ -458,14 +458,14 @@ If no LAN: → Cloud sync → Cloud pushes to POS primary
 
 ---
 
-### 5.3 Patron / Owner App (Mobile)
+### 5.3 Boss / Owner App (Mobile)
 
 **Target user:** Restaurant owner or manager who wants to monitor business performance remotely.
 **Use case:** Real-time dashboard showing today's sales, order count, revenue, staff performance, and alerts.
 
 | Attribute | Detail |
 |-----------|--------|
-| **Package path** | `apps/patron/` |
+| **Package path** | `apps/boss/` |
 | **Platform** | iOS + Android (Flutter) |
 | **Target device** | Phone |
 | **Status** | Not started |
@@ -989,7 +989,7 @@ graph TB
     end
 
     subgraph "Cloud-Connected Apps"
-        PATRON["Patron<br/>(Owner)"]
+        BOSS["Boss<br/>(Owner)"]
         CUSTOMER["Customer<br/>(B2C)"]
         WEB_ORDER["Web<br/>Ordering"]
         DASHBOARD["Dashboard<br/>(Admin)"]
@@ -998,13 +998,13 @@ graph TB
     POS <-->|"HTTPS REST<br/>batched sync"| API
     KIOSK -->|"HTTPS REST<br/>fallback if no LAN"| API
 
-    PATRON <-->|"REST +<br/>Push"| API
+    BOSS <-->|"REST +<br/>Push"| API
     CUSTOMER <-->|"REST +<br/>Push"| API
     WEB_ORDER <-->|REST| API
     DASHBOARD <-->|REST| API
 
     API -->|"FCM/APNs"| PUSH
-    PUSH -.->|push| PATRON
+    PUSH -.->|push| BOSS
     PUSH -.->|push| CUSTOMER
 ```
 
@@ -1017,7 +1017,7 @@ graph TB
 | POS -> ODS | WebSocket (LAN) | POS pushes to ODS | <50ms | ODS is read-only, receives order status |
 | POS <-> Cloud | HTTPS REST | Bidirectional (batched) | 100-500ms | Outbox/inbox pattern; batches of 50 records |
 | Kiosk <-> POS | WebSocket (LAN) or REST (Cloud) | Bidirectional | <50ms (LAN) | Prefers LAN if available; falls back to cloud |
-| Cloud -> Patron | REST + FCM/APNs | Cloud pushes | 1-5s | Push notifications for alerts; REST for data |
+| Cloud -> Boss | REST + FCM/APNs | Cloud pushes | 1-5s | Push notifications for alerts; REST for data |
 | Cloud -> Customer | REST + FCM/APNs | Cloud pushes | 1-5s | Order status updates via push |
 | Cloud <-> Web Ordering | REST | Bidirectional | 100-300ms | Standard REST API |
 | Cloud <-> Dashboard | REST | Bidirectional | 100-300ms | Standard REST API |
@@ -1083,7 +1083,7 @@ gantt
     Web Dashboard                      :p4, after p3, 7w
 
     section Phase 5
-    Patron App                         :p5, after p4, 4w
+    Boss App                         :p5, after p4, 4w
 
     section Phase 6
     Web Ordering                       :p6, after p4, 7w
@@ -1106,7 +1106,7 @@ gantt
 | **Phase 2** | Shared Package Extraction + KDS | 3-4 weeks | Phase 1 complete | 6 shared packages; standalone KDS app |
 | **Phase 3** | Waiter App | 4-6 weeks | Phase 2 (shared packages) | Phone-optimized order-taking app |
 | **Phase 4** | Web Dashboard | 6-8 weeks | Phase 2 (shared packages), Cloud API expansion | Full admin panel with menu CRUD, reports |
-| **Phase 5** | Patron App | 3-4 weeks | Phase 4 (cloud APIs for reporting exist) | Owner mobile dashboard |
+| **Phase 5** | Boss App | 3-4 weeks | Phase 4 (cloud APIs for reporting exist) | Owner mobile dashboard |
 | **Phase 6** | Web Ordering | 6-8 weeks | Phase 4 (menu API, cloud order processing) | Online ordering website with QR support |
 | **Phase 7** | Customer Mobile App | 6-8 weeks | Phase 6 (ordering API exists) | iOS + Android customer app |
 | **Phase 8** | ODS App | 2-3 weeks | Phase 2 (sync infrastructure) | Order status display for fast-food |
@@ -1118,7 +1118,7 @@ gantt
 
 **Phase 3 (Waiter) follows** because it shares the most code with POS (same order engine, same sync, same database) and is the highest-value addition for full-service restaurants.
 
-**Phase 4 (Dashboard) before Phase 5 (Patron)** because the dashboard creates the cloud APIs and admin infrastructure that the Patron app and Web Ordering both depend on.
+**Phase 4 (Dashboard) before Phase 5 (Boss)** because the dashboard creates the cloud APIs and admin infrastructure that the Boss app and Web Ordering both depend on.
 
 **Phase 8 (ODS) and Phase 9 (Kiosk) are last** because they serve niche segments (fast-food, QSR) and can reuse all infrastructure built in earlier phases.
 
@@ -1129,7 +1129,7 @@ gantt
 | Phase 2: Package Extraction + KDS | 3-4 | 3-4 |
 | Phase 3: Waiter | 4-6 | 7-10 |
 | Phase 4: Dashboard | 6-8 | 13-18 |
-| Phase 5: Patron | 3-4 | 16-22 |
+| Phase 5: Boss | 3-4 | 16-22 |
 | Phase 6: Web Ordering | 6-8 | 22-30 |
 | Phase 7: Customer App | 6-8 | 28-38 |
 | Phase 8: ODS | 2-3 | 30-41 |
@@ -1252,7 +1252,7 @@ graph LR
 
     subgraph "CD Steps"
         BUILD_APK["Build APKs<br/>(POS, Waiter, KDS,<br/>ODS, Kiosk)"]
-        BUILD_IOS["Build iOS<br/>(Patron, Customer)"]
+        BUILD_IOS["Build iOS<br/>(Boss, Customer)"]
         BUILD_WEB["Build Web<br/>(Dashboard, Ordering)"]
         DEPLOY_WEB["Deploy Web<br/>(Cloud hosting)"]
         DIST_MOBILE["Distribute Mobile<br/>(Firebase App Distribution<br/>/ Play Store / App Store)"]
@@ -1274,7 +1274,7 @@ graph LR
 
 **CD (on version tag):**
 1. Build release APKs for Android apps (POS, Waiter, KDS, ODS, Kiosk)
-2. Build release iOS apps (Patron, Customer)
+2. Build release iOS apps (Boss, Customer)
 3. Build web apps (Dashboard, Ordering)
 4. Deploy web apps to cloud hosting (e.g., Firebase Hosting, Cloudflare Pages)
 5. Distribute mobile apps via Firebase App Distribution (internal) or Play Store / App Store (production)
@@ -1288,7 +1288,7 @@ graph LR
 | KDS | `flutter build apk` | APK | MDM / sideload to kitchen tablets |
 | ODS | `flutter build apk` or `flutter build web` | APK or Web | Sideload or URL on display device |
 | Kiosk | `flutter build apk` | APK | MDM / sideload to kiosk terminals |
-| Patron | `flutter build apk` + `flutter build ios` | APK + IPA | Play Store + App Store |
+| Boss | `flutter build apk` + `flutter build ios` | APK + IPA | Play Store + App Store |
 | Customer | `flutter build apk` + `flutter build ios` | APK + IPA | Play Store + App Store |
 | Web Ordering | `flutter build web` | Static files | Cloud hosting (CDN) |
 | Dashboard | `flutter build web` | Static files | Cloud hosting (CDN) |
@@ -1329,7 +1329,7 @@ App-specific settings (e.g., kiosk timeout, KDS station defaults) are stored in 
 | Melos workspace complexity as app count grows | Low | Medium | Keep package count minimal (6 shared packages); avoid micro-packages |
 | KDS extraction breaks existing POS kitchen screen | Medium | Low | Step-by-step extraction with regression tests at each step |
 | Sync conflicts between Waiter and POS | High | Medium | Conflict resolution is well-defined in sync engine (doc 10); vector clocks on critical entities |
-| App Store review delays for Patron / Customer | Medium | Medium | Build in 2-week buffer for App Store review cycles; use TestFlight / Firebase App Distribution for early testing |
+| App Store review delays for Boss / Customer | Medium | Medium | Build in 2-week buffer for App Store review cycles; use TestFlight / Firebase App Distribution for early testing |
 
 ## Appendix C: Cross-References
 
