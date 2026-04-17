@@ -155,6 +155,11 @@ type CORSConfig struct {
 // CORS returns a Middleware that adds CORS headers, allowing only the configured
 // origins. Unlisted origins are served without Access-Control-Allow-Origin so
 // browsers will block cross-origin fetches from unknown sources.
+//
+// Native app origins (Android WebView, iOS WKWebView, Flutter) are always
+// allowed: they don't set an Origin header (or set "null"/"file://") and aren't
+// subject to browser CORS enforcement anyway, so echoing back the origin is
+// safe and avoids false rejections during preflight.
 func CORS(cfg CORSConfig) Middleware {
 	origins := cfg.AllowedOrigins
 	if len(origins) == 0 {
@@ -171,7 +176,15 @@ func CORS(cfg CORSConfig) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			if origin != "" && allowed[origin] {
+			switch {
+			case origin == "":
+				// No Origin — typical of native HTTP clients (Flutter/Android APK).
+				// Do not set ACAO; request is served normally (not a browser).
+			case allowed[origin]:
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Vary", "Origin")
+			case isNativeAppOrigin(origin):
+				// Android WebView / iOS WKWebView / file://… — echo back so preflight passes.
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Vary", "Origin")
 			}
@@ -187,6 +200,27 @@ func CORS(cfg CORSConfig) Middleware {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// isNativeAppOrigin recognises Origin values sent by mobile WebView / native
+// HTTP stacks that don't map to a real browser origin.
+func isNativeAppOrigin(origin string) bool {
+	if origin == "null" {
+		return true
+	}
+	nativePrefixes := []string{
+		"file://",
+		"capacitor://",
+		"ionic://",
+		"http://localhost",
+		"https://localhost",
+	}
+	for _, p := range nativePrefixes {
+		if strings.HasPrefix(origin, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // SecurityHeaders returns a Middleware that sets conservative security response
