@@ -52,11 +52,11 @@ class GangRepository {
 
   /// Seed Swiss default Gangs for a tenant if none exist yet.
   ///
-  /// Called once on first launch. Gangs are:
+  /// Called once on first launch. Policy: **max 3 courses** (beverages are a
+  /// bar-station concern, not a KDS course). Gangs are:
   ///   Gang 1 = Vorspeise  (#90ABFF — primary blue)
   ///   Gang 2 = Hauptgang  (#69F6B8 — green)
   ///   Gang 3 = Dessert    (#BF5AF2 — purple)
-  ///   Gang 4 = Getränke   (#FF9F0A — orange)
   Future<void> seedDefaultGangs(String tenantId) async {
     final existing = await getGangTemplates(tenantId);
     if (existing.isNotEmpty) return;
@@ -95,19 +95,6 @@ class GangRepository {
         name: const Value('Dessert'),
         sortOrder: const Value(3),
         color: const Value('#BF5AF2'),
-        isDefault: const Value(true),
-        isActive: const Value(true),
-        createdAt: Value(now),
-        updatedAt: Value(now),
-        syncStatus: const Value(0),
-        isDeleted: const Value(false),
-      ),
-      GangTemplatesCompanion(
-        id: const Value('gang-4'),
-        tenantId: Value(tenantId),
-        name: const Value('Getränke'),
-        sortOrder: const Value(4),
-        color: const Value('#FF9F0A'),
         isDefault: const Value(true),
         isActive: const Value(true),
         createdAt: Value(now),

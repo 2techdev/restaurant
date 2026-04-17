@@ -40,6 +40,24 @@ final gangTemplateMapProvider =
 });
 
 // ---------------------------------------------------------------------------
+// Order gang states (per-ticket)
+// ---------------------------------------------------------------------------
+
+/// Streams the per-Gang lifecycle states (pending / fired / in_prep / ready /
+/// served) for a specific order ticket. Used by the KDS card to decide whether
+/// a Gang group is on HOLD (pending → show FIRE button + dim items), actively
+/// cooking (fired / in_prep → full color) or done (ready → green accent).
+///
+/// Returns a map of `gangTemplateId → OrderGangStateEntity` for O(1) lookup.
+final orderGangStatesProvider = StreamProvider.family<
+    Map<String, OrderGangStateEntity>, String>((ref, ticketId) {
+  final repo = ref.watch(gangRepositoryProvider);
+  return repo.watchOrderGangStates(ticketId).map(
+        (states) => {for (final s in states) s.gangTemplateId: s},
+      );
+});
+
+// ---------------------------------------------------------------------------
 // Seed notifier
 // ---------------------------------------------------------------------------
 

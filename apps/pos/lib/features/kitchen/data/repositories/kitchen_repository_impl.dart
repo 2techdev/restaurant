@@ -266,6 +266,36 @@ class KitchenRepositoryImpl {
           gangId: item.gangId,
         ));
       }
+
+      // Ensure an OrderGangState row exists for every gang referenced by the
+      // items on this ticket. Each row starts in 'pending' (HOLD) and flips to
+      // 'fired' when the waiter hits FIRE on the KDS card.
+      //
+      // insertOrIgnore means re-sends of the same order don't duplicate rows;
+      // an already-fired gang keeps its state.
+      final gangIds = items
+          .map((i) => i.gangId)
+          .whereType<String>()
+          .toSet();
+      for (final gangTemplateId in gangIds) {
+        // Deterministic id so a re-send of the same order doesn't duplicate
+        // the row (primary key collision → insertOrIgnore drops the write).
+        final gangStateId = 'ogs_${ticket.id}_$gangTemplateId';
+        await _db.into(_db.orderGangStates).insert(
+              OrderGangStatesCompanion(
+                id: Value(gangStateId),
+                tenantId: Value(ticket.tenantId),
+                ticketId: Value(ticket.id),
+                gangTemplateId: Value(gangTemplateId),
+                status: const Value('pending'),
+                createdAt: Value(now),
+                updatedAt: Value(now),
+                syncStatus: const Value(0),
+                isDeleted: const Value(false),
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
+      }
     });
 
     return KitchenTicketEntity(

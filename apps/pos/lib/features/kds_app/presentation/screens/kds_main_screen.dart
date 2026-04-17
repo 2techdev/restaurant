@@ -224,6 +224,15 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     await repo.recallTicket(id);
   }
 
+  /// FIRE a Gang — waiter releases the course so the kitchen starts preparing.
+  /// Changes that Gang's items on the card from HOLD (dim) to active.
+  Future<void> _fireGang(String ticketId, String gangTemplateId) async {
+    HapticFeedback.mediumImpact();
+    await ref
+        .read(gangRepositoryProvider)
+        .fireGang(ticketId, gangTemplateId);
+  }
+
   // -------------------------------------------------------------------------
   // New-ticket detection + sound alert
   // -------------------------------------------------------------------------
@@ -647,14 +656,25 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
               ),
             ),
 
-            // Items list — grouped by Gang when Gang data is present
+            // Items list — grouped by Gang, with per-Gang hold/fire/ready state.
+            // Consumer scopes gang-state rebuilds to this section so the whole
+            // grid doesn't re-render when a single card's state flips.
             Expanded(
-              child: _buildGangGroupedItems(
-                ticket,
-                gangMap: gangMap,
-                largeFont: largeFont,
-                itemSize: itemSize,
-                modSize: modSize,
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final statesAsync =
+                      ref.watch(orderGangStatesProvider(ticket.ticketId));
+                  final gangStates = statesAsync.valueOrNull ??
+                      const <String, OrderGangStateEntity>{};
+                  return _buildGangGroupedItems(
+                    ticket,
+                    gangMap: gangMap,
+                    gangStates: gangStates,
+                    largeFont: largeFont,
+                    itemSize: itemSize,
+                    modSize: modSize,
+                  );
+                },
               ),
             ),
 
@@ -701,39 +721,57 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
 
   /// Builds the items list for a ticket card, grouped by Gang when available.
   ///
-  /// Items without a gangId are placed in an "Ungrouped" section.
-  /// Each Gang group shows a colored header row with the Gang name.
+  /// Policy: **max 3 courses** (sortOrder ≤ 3). Items in Gangs with sortOrder
+  /// beyond 3 or without a known Gang fall into an "Andere" (ungrouped) block.
+  ///
+  /// Per-Gang lifecycle (from [gangStates]) drives the visual treatment:
+  ///   - pending (HOLD) → dim/gray group, FIRE button on header
+  ///   - fired / in_prep → full gang color, "FIRED" chip
+  ///   - ready           → green accent, "READY" chip
+  ///   - served          → muted (items are about to leave the card)
   Widget _buildGangGroupedItems(
     KitchenTicketEntity ticket, {
     required Map<String, GangTemplateEntity> gangMap,
+    required Map<String, OrderGangStateEntity> gangStates,
     required bool largeFont,
     required double itemSize,
     required double modSize,
   }) {
     final items = ticket.items;
-    final hasGangs = gangMap.isNotEmpty &&
-        items.any((i) => i.gangId != null && gangMap.containsKey(i.gangId));
 
-    // Build a list of widgets: gang header + items per group
+    // Only render gangs within the 3-course cap. Anything beyond sortOrder 3
+    // is treated as ungrouped so the kitchen card stays focused on the meal.
+    bool isRenderableGang(String? gangId) {
+      if (gangId == null) return false;
+      final g = gangMap[gangId];
+      return g != null && g.sortOrder <= 3;
+    }
+
+    final hasGangs = gangMap.isNotEmpty &&
+        items.any((i) => isRenderableGang(i.gangId));
+
     final widgets = <Widget>[];
 
     if (!hasGangs) {
       // No gang data — flat list (legacy / simple mode)
       for (final item in items) {
-        widgets.add(_buildItemRow(item,
-            largeFont: largeFont, itemSize: itemSize, modSize: modSize));
+        widgets.add(_buildItemRow(
+          item,
+          largeFont: largeFont,
+          itemSize: itemSize,
+          modSize: modSize,
+          gangStatus: null,
+        ));
       }
     } else {
-      // Group items by gangId (preserving sort order via LinkedHashMap)
+      // Group items by gangId (null bucket = ungrouped / out-of-cap)
       final grouped = <String?, List<KitchenTicketItemEntity>>{};
       for (final item in items) {
-        final key = (item.gangId != null && gangMap.containsKey(item.gangId))
-            ? item.gangId
-            : null;
+        final key = isRenderableGang(item.gangId) ? item.gangId : null;
         grouped.putIfAbsent(key, () => []).add(item);
       }
 
-      // Sort groups: known gangs by sortOrder, then null (ungrouped)
+      // Sort groups: known gangs by sortOrder, then null (ungrouped) last
       final sortedKeys = grouped.keys.toList()
         ..sort((a, b) {
           if (a == null && b == null) return 0;
@@ -747,14 +785,28 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
       for (final key in sortedKeys) {
         final groupItems = grouped[key]!;
         final gang = key != null ? gangMap[key] : null;
+        final state = key != null ? gangStates[key] : null;
+        final status = state?.status ?? GangOrderStatus.pending;
 
-        // Gang header row
-        widgets.add(_buildGangHeader(gang, largeFont: largeFont));
+        // Gang header row — carries status chip + optional FIRE button
+        widgets.add(_buildGangHeader(
+          gang,
+          status: status,
+          largeFont: largeFont,
+          onFire: (gang != null && status == GangOrderStatus.pending)
+              ? () => _fireGang(ticket.ticketId, gang.id)
+              : null,
+        ));
 
-        // Items in this group
+        // Items in this group — dimmed when Gang is still on HOLD
         for (final item in groupItems) {
-          widgets.add(_buildItemRow(item,
-              largeFont: largeFont, itemSize: itemSize, modSize: modSize));
+          widgets.add(_buildItemRow(
+            item,
+            largeFont: largeFont,
+            itemSize: itemSize,
+            modSize: modSize,
+            gangStatus: gang != null ? status : null,
+          ));
         }
 
         widgets.add(const SizedBox(height: 4));
@@ -798,9 +850,30 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     );
   }
 
-  Widget _buildGangHeader(GangTemplateEntity? gang, {required bool largeFont}) {
-    final color = gang?.flutterColor ?? AppColors.textSecondary;
+  /// Gang header row.
+  ///
+  /// Color and trailing widget vary by [status]:
+  ///   - pending        → gray header + colored FIRE button (if [onFire] set)
+  ///   - fired / inPrep → gang color + "FIRED" chip
+  ///   - ready          → green + "READY" chip
+  ///   - served         → dim + "SERVED" chip
+  Widget _buildGangHeader(
+    GangTemplateEntity? gang, {
+    required GangOrderStatus status,
+    required bool largeFont,
+    VoidCallback? onFire,
+  }) {
+    final baseColor = gang?.flutterColor ?? AppColors.textSecondary;
     final name = gang?.name ?? 'Andere';
+
+    // Resolve header foreground based on lifecycle status.
+    final Color headerColor = switch (status) {
+      GangOrderStatus.pending => AppColors.textDim,
+      GangOrderStatus.fired => baseColor,
+      GangOrderStatus.inPrep => baseColor,
+      GangOrderStatus.ready => AppColors.green,
+      GangOrderStatus.served => AppColors.textDim,
+    };
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6, top: 4),
@@ -811,7 +884,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             height: 6,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color,
+              color: headerColor,
             ),
           ),
           const SizedBox(width: 6),
@@ -820,15 +893,120 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             style: TextStyle(
               fontSize: largeFont ? 11 : 9,
               fontWeight: FontWeight.w800,
-              color: color,
+              color: headerColor,
               letterSpacing: 1.5,
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Container(height: 1, color: color.withValues(alpha: 0.25)),
+            child: Container(
+              height: 1,
+              color: headerColor.withValues(alpha: 0.25),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _buildGangStatusTrailing(
+            status: status,
+            baseColor: baseColor,
+            largeFont: largeFont,
+            onFire: onFire,
           ),
         ],
+      ),
+    );
+  }
+
+  /// Trailing widget on the Gang header: FIRE button when pending, otherwise
+  /// a status chip (FIRED / READY / SERVED).
+  Widget _buildGangStatusTrailing({
+    required GangOrderStatus status,
+    required Color baseColor,
+    required bool largeFont,
+    VoidCallback? onFire,
+  }) {
+    if (status == GangOrderStatus.pending && onFire != null) {
+      return GestureDetector(
+        onTap: onFire,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: largeFont ? 10 : 8,
+            vertical: largeFont ? 5 : 3,
+          ),
+          decoration: BoxDecoration(
+            color: baseColor,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.local_fire_department,
+                size: largeFont ? 14 : 12,
+                color: AppColors.onGreen,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'FIRE',
+                style: TextStyle(
+                  fontSize: largeFont ? 11 : 9,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.onGreen,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Non-pending states → status chip only.
+    final (String label, Color bg, Color fg) = switch (status) {
+      GangOrderStatus.pending => (
+        'HOLD',
+        AppColors.surfaceContainerHigh,
+        AppColors.textDim,
+      ),
+      GangOrderStatus.fired => (
+        'FIRED',
+        baseColor.withValues(alpha: 0.18),
+        baseColor,
+      ),
+      GangOrderStatus.inPrep => (
+        'IN PREP',
+        baseColor.withValues(alpha: 0.18),
+        baseColor,
+      ),
+      GangOrderStatus.ready => (
+        'READY',
+        AppColors.greenDim,
+        AppColors.green,
+      ),
+      GangOrderStatus.served => (
+        'SERVED',
+        AppColors.surfaceContainerHigh,
+        AppColors.textDim,
+      ),
+    };
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: largeFont ? 8 : 6,
+        vertical: largeFont ? 4 : 2,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: largeFont ? 10 : 8,
+          fontWeight: FontWeight.w900,
+          color: fg,
+          letterSpacing: 1.5,
+        ),
       ),
     );
   }
@@ -838,6 +1016,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     required bool largeFont,
     required double itemSize,
     required double modSize,
+    required GangOrderStatus? gangStatus,
   }) {
     final mods = item.modifiersText
             ?.split(',')
@@ -846,7 +1025,16 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             .toList() ??
         const [];
 
-    return Padding(
+    // Items in a pending (HOLD) gang are rendered gray so the cook sees at a
+    // glance that they're not to be started yet. Alert notes (allergy/VIP)
+    // still use their full red treatment — safety trumps hold styling.
+    final bool isHeld = gangStatus == GangOrderStatus.pending;
+    final Color primaryText =
+        isHeld ? AppColors.textDim : AppColors.textPrimary;
+    final Color secondaryText =
+        isHeld ? AppColors.textDim : AppColors.textSecondary;
+
+    Widget row = Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -882,7 +1070,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                   style: TextStyle(
                     fontSize: itemSize,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: primaryText,
                     height: 1.3,
                   ),
                 ),
@@ -892,7 +1080,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                     child: Text(
                       '\u2022 $mod',
                       style: TextStyle(
-                          fontSize: modSize, color: AppColors.textSecondary),
+                          fontSize: modSize, color: secondaryText),
                     ),
                   ),
                 ),
@@ -921,7 +1109,9 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                             '\u26A0 ${item.notes}',
                             style: TextStyle(
                               fontSize: modSize,
-                              color: AppColors.orange,
+                              color: isHeld
+                                  ? AppColors.textDim
+                                  : AppColors.orange,
                               fontStyle: FontStyle.italic,
                             ),
                           ),
@@ -932,6 +1122,9 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
         ],
       ),
     );
+
+    // Reinforce the HOLD treatment with a slight opacity fade.
+    return isHeld ? Opacity(opacity: 0.55, child: row) : row;
   }
 
   // -------------------------------------------------------------------------
