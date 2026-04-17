@@ -116,12 +116,16 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
   }
 
   /// Add a product to the active ticket.
+  ///
+  /// [seat] tags the line for split-by-seat billing. `0` (default) = shared;
+  /// 1..ticket.guestCount identifies a specific cover.
   Future<void> addProduct(
     ProductEntity product, {
     double quantity = 1,
     List<OrderItemModifierEntity> modifiers = const [],
     String? notes,
     int course = 1,
+    int seat = 0,
   }) async {
     if (state == null) return;
     final updated = await _svc.addItemToTicket(
@@ -131,6 +135,7 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
       modifiers: modifiers,
       notes: notes,
       course: course,
+      seat: seat,
     );
     state = updated;
   }
@@ -267,6 +272,14 @@ final waiterSearchQueryProvider = StateProvider<String>((ref) => '');
 /// Persists across quick-add taps so a waiter can pick "Gang 2" once and
 /// tap 5 dishes in a row. The kitchen fires each gang as a unit.
 final waiterCurrentCourseProvider = StateProvider<int>((ref) => 1);
+
+/// The seat (cover) number every new item is tagged with until the waiter
+/// changes it. `0` = shared / unassigned; 1..ticket.guestCount identifies a
+/// specific cover for split-by-seat billing.
+///
+/// Persists across quick-add taps so a waiter can pick "Seat 2" once and
+/// tap every dish for that guest in a row.
+final waiterCurrentSeatProvider = StateProvider<int>((ref) => 0);
 
 /// Allergen / dietary flags the waiter has currently toggled on.
 ///

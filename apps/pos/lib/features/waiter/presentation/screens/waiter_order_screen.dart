@@ -842,15 +842,26 @@ class _OrderItemRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.productName,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isSent
-                          ? AppColors.textSecondary
-                          : AppColors.textPrimary,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          item.productName,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isSent
+                                ? AppColors.textSecondary
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (item.seat > 0) ...[
+                        const SizedBox(width: 6),
+                        _SeatBadge(seat: item.seat),
+                      ],
+                    ],
                   ),
                   if (item.notes != null && item.notes!.isNotEmpty)
                     Text(
@@ -945,6 +956,42 @@ class _StatusPill extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: _color,
         ),
+      ),
+    );
+  }
+}
+
+/// Compact "Seat N" pill rendered next to an item's name when the line is
+/// tagged to a specific cover. Hidden for seat==0 (shared) since that is the
+/// default for any un-tagged line.
+class _SeatBadge extends StatelessWidget {
+  const _SeatBadge({required this.seat});
+
+  final int seat;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: AppColors.accentDim,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.event_seat_outlined,
+              size: 9, color: AppColors.primary),
+          const SizedBox(width: 2),
+          Text(
+            '$seat',
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
       ),
     );
   }

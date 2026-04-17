@@ -307,6 +307,66 @@ void main() {
     });
   });
 
+  group('WaiterOrderService.addItemToTicket (seat)', () {
+    test('defaults to seat 0 (shared) when not specified', () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      final ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+      );
+
+      final updated = await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(),
+      );
+
+      expect(updated!.items.first.seat, 0,
+          reason: 'default seat must be 0 (shared / unassigned)');
+    });
+
+    test('persists explicit seat number on the order item', () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      final ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+        guestCount: 3,
+      );
+
+      await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(name: 'Seat-1 Pasta'),
+        seat: 1,
+      );
+      await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(name: 'Seat-2 Pizza'),
+        seat: 2,
+      );
+      final after = await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(name: 'Shared Water'),
+        seat: 0,
+      );
+
+      final bySeat = {for (final i in after!.items) i.productName: i.seat};
+      expect(bySeat['Seat-1 Pasta'], 1);
+      expect(bySeat['Seat-2 Pizza'], 2);
+      expect(bySeat['Shared Water'], 0);
+    });
+  });
+
   group('WaiterOrderService.removeItemFromTicket', () {
     test('removes item and updates totals', () async {
       final (:db, :svc) = await _setup();

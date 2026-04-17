@@ -88,6 +88,7 @@ class WaiterOrderService {
     List<OrderItemModifierEntity> modifiers = const [],
     String? notes,
     int course = 1,
+    int seat = 0,
   }) async {
     final ticket = await _orderRepo.getTicketById(ticketId);
     if (ticket == null || !ticket.isOpen) return null;
@@ -116,6 +117,7 @@ class WaiterOrderService {
       taxAmount: taxAmount,
       notes: notes,
       course: course,
+      seat: seat,
       modifiers: reKeyedModifiers,
       taxGroup: product.taxGroup,
     );
