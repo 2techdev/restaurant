@@ -35,6 +35,7 @@ import (
 	"github.com/gastrocore/server/internal/shared/middleware"
 	"github.com/gastrocore/server/internal/stores"
 	gosync "github.com/gastrocore/server/internal/sync"
+	"github.com/gastrocore/server/internal/tables"
 )
 
 const version = "0.1.0"
@@ -104,6 +105,7 @@ func main() {
 	reservationsModule := reservations.NewModule(db, syncModule.SyncHub())
 	inventoryModule := inventory.NewModule(db)
 	posModule := pos.NewModule(db, posHub)
+	tablesModule := tables.NewModule(db, cfg)
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -167,6 +169,7 @@ func main() {
 	reservationsModule.RegisterRoutes(mux)
 	inventoryModule.RegisterRoutes(mux)
 	posModule.RegisterRoutes(mux)
+	tablesModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain

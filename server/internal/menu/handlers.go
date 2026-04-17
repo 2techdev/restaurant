@@ -210,7 +210,7 @@ func (m *Module) handleListProducts(w http.ResponseWriter, r *http.Request) {
 			       price, cost_price, tax_group,
 			       COALESCE(image_path,''), COALESCE(barcode,''),
 			       is_active, display_order, prep_time_minutes,
-			       COALESCE(printer_group,'kitchen'), created_at, updated_at
+			       COALESCE(printer_group,'kitchen'), default_gang, created_at, updated_at
 			FROM products
 			WHERE tenant_id=$1 AND category_id=$2 AND is_deleted=false
 			ORDER BY display_order ASC, name ASC
@@ -221,7 +221,7 @@ func (m *Module) handleListProducts(w http.ResponseWriter, r *http.Request) {
 			       price, cost_price, tax_group,
 			       COALESCE(image_path,''), COALESCE(barcode,''),
 			       is_active, display_order, prep_time_minutes,
-			       COALESCE(printer_group,'kitchen'), created_at, updated_at
+			       COALESCE(printer_group,'kitchen'), default_gang, created_at, updated_at
 			FROM products
 			WHERE tenant_id=$1 AND is_deleted=false
 			ORDER BY display_order ASC, name ASC
@@ -239,12 +239,13 @@ func (m *Module) handleListProducts(w http.ResponseWriter, r *http.Request) {
 		var p Product
 		var desc, imagePath, barcode string
 		var prepTime sql.NullInt64
+		var defaultGang sql.NullInt16
 		if err := rows.Scan(
 			&p.ID, &p.TenantID, &p.CategoryID, &p.Name, &desc,
 			&p.Price, &p.CostPrice, &p.TaxGroup,
 			&imagePath, &barcode,
 			&p.IsActive, &p.DisplayOrder, &prepTime,
-			&p.PrinterGroup, &p.CreatedAt, &p.UpdatedAt,
+			&p.PrinterGroup, &defaultGang, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			continue
 		}
@@ -260,6 +261,10 @@ func (m *Module) handleListProducts(w http.ResponseWriter, r *http.Request) {
 		if prepTime.Valid {
 			v := int(prepTime.Int64)
 			p.PrepTimeMinutes = &v
+		}
+		if defaultGang.Valid {
+			v := int(defaultGang.Int16)
+			p.DefaultGang = &v
 		}
 		products = append(products, p)
 	}
@@ -288,6 +293,7 @@ func (m *Module) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 		DisplayOrder    int     `json:"display_order"`
 		PrepTimeMinutes *int    `json:"prep_time_minutes"`
 		PrinterGroup    string  `json:"printer_group"`
+		DefaultGang     *int    `json:"default_gang"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
@@ -303,6 +309,10 @@ func (m *Module) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	if req.PrinterGroup == "" {
 		req.PrinterGroup = "kitchen"
 	}
+	if req.DefaultGang != nil && (*req.DefaultGang < 1 || *req.DefaultGang > 3) {
+		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "default_gang must be 1, 2, or 3")
+		return
+	}
 
 	id := uuid.New()
 	now := time.Now().UTC()
@@ -311,13 +321,14 @@ func (m *Module) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 		INSERT INTO products (
 			id, tenant_id, category_id, name, description, price, cost_price,
 			tax_group, image_path, barcode, is_active, display_order,
-			prep_time_minutes, printer_group, created_at, updated_at, sync_status, is_deleted
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15,0,false)
+			prep_time_minutes, printer_group, default_gang, created_at, updated_at, sync_status, is_deleted
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16,0,false)
 	`, id, tenantID, req.CategoryID, req.Name,
 		nullableString(req.Description), req.Price, req.CostPrice,
 		req.TaxGroup, nullableString(req.ImagePath), nullableString(req.Barcode),
 		req.IsActive, req.DisplayOrder,
-		nullableInt(req.PrepTimeMinutes), req.PrinterGroup, now,
+		nullableInt(req.PrepTimeMinutes), req.PrinterGroup,
+		nullableInt(req.DefaultGang), now,
 	)
 	if err != nil {
 		slog.Error("menu: create product", "error", err)
@@ -340,6 +351,7 @@ func (m *Module) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 		DisplayOrder:    req.DisplayOrder,
 		PrepTimeMinutes: req.PrepTimeMinutes,
 		PrinterGroup:    req.PrinterGroup,
+		DefaultGang:     req.DefaultGang,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
@@ -367,9 +379,14 @@ func (m *Module) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 		DisplayOrder    int     `json:"display_order"`
 		PrepTimeMinutes *int    `json:"prep_time_minutes"`
 		CategoryID      string  `json:"category_id"`
+		DefaultGang     *int    `json:"default_gang"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
+		return
+	}
+	if req.DefaultGang != nil && (*req.DefaultGang < 1 || *req.DefaultGang > 3) {
+		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR", "default_gang must be 1, 2, or 3")
 		return
 	}
 
@@ -377,11 +394,12 @@ func (m *Module) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 		UPDATE products
 		SET name=$1, description=$2, price=$3, cost_price=$4, tax_group=$5,
 		    image_path=$6, is_active=$7, display_order=$8,
-		    prep_time_minutes=$9, category_id=$10, updated_at=NOW()
-		WHERE id=$11 AND tenant_id=$12 AND is_deleted=false
+		    prep_time_minutes=$9, category_id=$10, default_gang=$11, updated_at=NOW()
+		WHERE id=$12 AND tenant_id=$13 AND is_deleted=false
 	`, req.Name, nullableString(req.Description), req.Price, req.CostPrice, req.TaxGroup,
 		nullableString(req.ImagePath), req.IsActive, req.DisplayOrder,
 		nullableInt(req.PrepTimeMinutes), req.CategoryID,
+		nullableInt(req.DefaultGang),
 		id, tenantID,
 	)
 	if err != nil {

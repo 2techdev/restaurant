@@ -132,35 +132,91 @@ func Recover(next http.Handler) http.Handler {
 // allowedOrigins lists the permitted CORS origins for the GastroCore API.
 // POS Flutter apps communicate directly (no CORS needed); these cover web dashboards
 // and the online ordering widget.
-var allowedOrigins = map[string]bool{
-	"https://pos.2tech.ch":        true,
-	"https://www.pos.2tech.ch":    true,
-	"http://localhost:3000":        true,
-	"http://localhost:8080":        true,
-	"http://localhost:5173":        true,
-	"http://192.168.1.134:8080":   true,
-	"http://192.168.1.134:8090":   true,
+// defaultAllowedOrigins is the fallback origin allow-list used when no CORS
+// origins are provided via config (e.g. dev defaults).
+var defaultAllowedOrigins = []string{
+	"https://pos.2tech.ch",
+	"https://www.pos.2tech.ch",
+	"https://backoffice.gastrocore.ch",
+	"http://localhost:3000",
+	"http://localhost:8080",
+	"http://localhost:5173",
+	"http://192.168.1.134:8080",
+	"http://192.168.1.134:8090",
 }
 
-// CORS adds CORS headers, allowing only known origins.
-// Requests from unlisted origins are served without Access-Control-Allow-Origin,
-// so browsers will block cross-origin fetches from unknown sources.
-func CORS(next http.Handler) http.Handler {
+// CORSConfig controls CORS behavior for the CORS middleware.
+type CORSConfig struct {
+	// AllowedOrigins is the list of origins permitted for cross-origin requests.
+	// If empty, a conservative built-in dev/prod list is used.
+	AllowedOrigins []string
+}
+
+// CORS returns a Middleware that adds CORS headers, allowing only the configured
+// origins. Unlisted origins are served without Access-Control-Allow-Origin so
+// browsers will block cross-origin fetches from unknown sources.
+func CORS(cfg CORSConfig) Middleware {
+	origins := cfg.AllowedOrigins
+	if len(origins) == 0 {
+		origins = defaultAllowedOrigins
+	}
+	allowed := make(map[string]bool, len(origins))
+	for _, o := range origins {
+		o = strings.TrimSpace(o)
+		if o != "" {
+			allowed[o] = true
+		}
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			if origin != "" && allowed[origin] {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Vary", "Origin")
+			}
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-Device-ID")
+			w.Header().Set("Access-Control-Max-Age", "86400")
+
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// SecurityHeaders returns a Middleware that sets conservative security response
+// headers. When production is true, HSTS is emitted.
+func SecurityHeaders(production bool) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := w.Header()
+			h.Set("X-Content-Type-Options", "nosniff")
+			h.Set("X-Frame-Options", "DENY")
+			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+			if production {
+				h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// maxBodyBytes is the default request-body size limit (10 MiB) applied by
+// MaxBodySize. Keeps misbehaving or malicious clients from exhausting memory.
+const maxBodyBytes = 10 << 20
+
+// MaxBodySize caps request body size to a safe default to prevent abuse.
+func MaxBodySize(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		if origin != "" && allowedOrigins[origin] {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Vary", "Origin")
+		if r.Body != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 		}
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-Device-ID")
-		w.Header().Set("Access-Control-Max-Age", "86400")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
 		next.ServeHTTP(w, r)
 	})
 }

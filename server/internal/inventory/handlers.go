@@ -12,12 +12,17 @@ import (
 	"github.com/gastrocore/server/internal/shared/uuid"
 )
 
-// resolveTenant returns the tenant ID from JWT context or ?tenant_id= query param.
+// resolveTenant returns the tenant ID from JWT context or ?tenant_id= query
+// param. Returns empty string if neither yields a valid UUID, which callers
+// translate to 401 so Postgres never sees a malformed UUID (22P02 → 500).
 func resolveTenant(r *http.Request) string {
-	if t := middleware.GetTenantID(r.Context()); t != "" {
+	if t := middleware.GetTenantID(r.Context()); uuid.IsValid(t) {
 		return t
 	}
-	return r.URL.Query().Get("tenant_id")
+	if q := r.URL.Query().Get("tenant_id"); uuid.IsValid(q) {
+		return q
+	}
+	return ""
 }
 
 // ---------------------------------------------------------------------------
