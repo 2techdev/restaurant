@@ -69,15 +69,19 @@ String _formatElapsed(KitchenTicketEntity ticket) {
 // Allergy / VIP detection — fine-dining critical safety
 // ---------------------------------------------------------------------------
 
-/// Returns true if the note contains an allergy, VIP, or dietary alert keyword.
-/// Matches EN/DE/TR/FR variants so kitchen staff see the banner regardless of
-/// waiter input language.
-bool _isAlertNote(String? notes) {
+/// VIP marker — higher-urgency service guidance that benefits from a distinct
+/// (gold) banner vs. allergy red.
+bool _isVipNote(String? notes) {
+  if (notes == null || notes.isEmpty) return false;
+  return notes.toLowerCase().contains('vip');
+}
+
+/// Dietary / allergy alert — kitchen-safety critical, always red.
+bool _isAllergyNote(String? notes) {
   if (notes == null || notes.isEmpty) return false;
   final n = notes.toLowerCase();
   return n.contains('allerg') || // allergy/allergen/allergie/allergique
       n.contains('alerji') ||    // TR
-      n.contains('vip') ||
       n.contains('nut') ||       // nut/peanut/hazelnut
       n.contains('gluten') ||
       n.contains('lactose') ||
@@ -87,10 +91,36 @@ bool _isAlertNote(String? notes) {
       n.contains('vegan');
 }
 
+/// Any kitchen-critical alert (allergy OR VIP).
+bool _isAlertNote(String? notes) => _isAllergyNote(notes) || _isVipNote(notes);
+
+/// Alert category for banner color selection.
+enum _AlertKind { none, allergy, vip }
+
 /// Returns the first alert-bearing note text on the ticket, or null.
 String? _ticketAlertText(KitchenTicketEntity ticket) {
   for (final item in ticket.items) {
     if (_isAlertNote(item.notes)) return item.notes;
+  }
+  return null;
+}
+
+/// Returns the first (note, kind) pair in [items] whose note is an alert.
+/// Allergy wins over VIP when both are present in the same group — safety
+/// trumps service priority.
+({String text, _AlertKind kind})? _groupAlert(
+    Iterable<KitchenTicketItemEntity> items) {
+  String? vipFallback;
+  for (final item in items) {
+    if (_isAllergyNote(item.notes)) {
+      return (text: item.notes!, kind: _AlertKind.allergy);
+    }
+    if (_isVipNote(item.notes)) {
+      vipFallback ??= item.notes;
+    }
+  }
+  if (vipFallback != null) {
+    return (text: vipFallback, kind: _AlertKind.vip);
   }
   return null;
 }
@@ -800,6 +830,18 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
               : null,
         ));
 
+        // Per-gang alert banner — red for allergy, gold for VIP. Makes the
+        // alert impossible to miss when scrolling a packed ticket with
+        // multiple courses, where the ticket-top banner can be scrolled off.
+        final groupAlert = _groupAlert(groupItems);
+        if (groupAlert != null) {
+          widgets.add(_buildGangAlertBanner(
+            text: groupAlert.text,
+            kind: groupAlert.kind,
+            largeFont: largeFont,
+          ));
+        }
+
         // Items in this group — dimmed when Gang is still on HOLD
         for (final item in groupItems) {
           widgets.add(_buildItemRow(
@@ -848,6 +890,82 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Gang-scoped alert banner.
+  ///
+  /// Lives under the Gang header, above that Gang's items. Red for allergy
+  /// (kitchen safety), gold for VIP (service priority). Always visible even
+  /// when the ticket-top banner is scrolled out of view on dense cards.
+  Widget _buildGangAlertBanner({
+    required String text,
+    required _AlertKind kind,
+    required bool largeFont,
+  }) {
+    final (Color bg, Color fg, IconData icon, String tag) = switch (kind) {
+      _AlertKind.allergy => (
+        AppColors.red,
+        Colors.white,
+        Icons.warning_amber_rounded,
+        'ALLERGY',
+      ),
+      _AlertKind.vip => (
+        const Color(0xFFE0B24A), // gold
+        const Color(0xFF2A1A00),
+        Icons.star_rounded,
+        'VIP',
+      ),
+      _AlertKind.none => (
+        AppColors.red,
+        Colors.white,
+        Icons.warning_amber_rounded,
+        'ALERT',
+      ),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(
+          horizontal: largeFont ? 10 : 8,
+          vertical: largeFont ? 6 : 5,
+        ),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: largeFont ? 18 : 14, color: fg),
+            const SizedBox(width: 6),
+            Text(
+              tag,
+              style: TextStyle(
+                fontSize: largeFont ? 11 : 9,
+                fontWeight: FontWeight.w900,
+                color: fg,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text.toUpperCase(),
+                style: TextStyle(
+                  fontSize: largeFont ? 13 : 11,
+                  fontWeight: FontWeight.w800,
+                  color: fg,
+                  letterSpacing: 0.6,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
