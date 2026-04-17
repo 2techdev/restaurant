@@ -1,0 +1,44 @@
+name: gastrocore
+repository: https://github.com/2techdev/restaurant
+
+packages:
+  - apps/pos
+  - apps/dashboard
+  - apps/online
+  - packages/gastrocore_models
+  - packages/gastrocore_api
+  - packages/gastrocore_sync
+  - packages/gastrocore_ui
+
+command:
+  bootstrap:
+    runPubGetInParallel: true
+
+scripts:
+  analyze:
+    description: Run analyze across every workspace package.
+    run: melos exec -c 1 -- "flutter analyze --no-fatal-infos ."
+
+  analyze:dart:
+    description: Run dart analyze in pure-Dart packages only.
+    run: melos exec -c 1 --flutter=false -- "dart analyze ."
+
+  test:
+    description: Run tests in every package that has a test/ directory.
+    run: melos exec -c 1 --dir-exists=test -- "flutter test"
+
+  test:dart:
+    description: Run dart test in pure-Dart packages with tests.
+    run: melos exec -c 1 --flutter=false --dir-exists=test -- "dart test"
+
+  format:
+    description: Format every workspace package.
+    run: melos exec -c 1 -- "dart format ."
+
+  format:check:
+    description: Check formatting (CI).
+    run: melos exec -c 1 -- "dart format --set-exit-if-changed ."
+
+  clean:deep:
+    description: Remove build artifacts across all packages.
+    run: melos exec -c 4 -- "flutter clean"

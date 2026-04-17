@@ -1,0 +1,10 @@
+name: gastrocore_workspace
+description: Monorepo root — managed by melos. Not a publishable package.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dev_dependencies:
+  melos: ^6.2.0
