@@ -52,6 +52,32 @@ String _formatElapsed(KitchenTicketEntity ticket) {
 }
 
 // ---------------------------------------------------------------------------
+// Allergy / VIP detection — fine-dining critical safety
+// ---------------------------------------------------------------------------
+
+bool _isAlertNote(String? notes) {
+  if (notes == null || notes.isEmpty) return false;
+  final n = notes.toLowerCase();
+  return n.contains('allerg') ||
+      n.contains('alerji') ||
+      n.contains('vip') ||
+      n.contains('nut') ||
+      n.contains('gluten') ||
+      n.contains('lactose') ||
+      n.contains('laktoz') ||
+      n.contains('kosher') ||
+      n.contains('halal') ||
+      n.contains('vegan');
+}
+
+String? _ticketAlertText(KitchenTicketEntity ticket) {
+  for (final item in ticket.items) {
+    if (_isAlertNote(item.notes)) return item.notes;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Kitchen Display Screen
 // ---------------------------------------------------------------------------
 
@@ -493,6 +519,34 @@ class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
         children: [
           // Urgency border
           Container(height: 6, color: urgColor),
+          // Allergy / VIP banner — fine-dining kitchen safety
+          if (_ticketAlertText(ticket) != null)
+            Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: const Color(0xFFEF4444),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      size: 20, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _ticketAlertText(ticket)!.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // Header
           Container(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
@@ -620,14 +674,33 @@ class _KitchenDisplayScreenState extends ConsumerState<KitchenDisplayScreen> {
                             if (item.notes != null && item.notes!.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  '\u26A0 ${item.notes}',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFFFB923C),
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
+                                child: _isAlertNote(item.notes)
+                                    ? Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEF4444),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '\u26A0 ${item.notes}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.white,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      )
+                                    : Text(
+                                        '\u26A0 ${item.notes}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFFFB923C),
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
                               ),
                           ],
                         ),

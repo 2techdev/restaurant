@@ -66,6 +66,36 @@ String _formatElapsed(KitchenTicketEntity ticket) {
 }
 
 // ---------------------------------------------------------------------------
+// Allergy / VIP detection — fine-dining critical safety
+// ---------------------------------------------------------------------------
+
+/// Returns true if the note contains an allergy, VIP, or dietary alert keyword.
+/// Matches EN/DE/TR/FR variants so kitchen staff see the banner regardless of
+/// waiter input language.
+bool _isAlertNote(String? notes) {
+  if (notes == null || notes.isEmpty) return false;
+  final n = notes.toLowerCase();
+  return n.contains('allerg') || // allergy/allergen/allergie/allergique
+      n.contains('alerji') ||    // TR
+      n.contains('vip') ||
+      n.contains('nut') ||       // nut/peanut/hazelnut
+      n.contains('gluten') ||
+      n.contains('lactose') ||
+      n.contains('laktoz') ||    // TR
+      n.contains('kosher') ||
+      n.contains('halal') ||
+      n.contains('vegan');
+}
+
+/// Returns the first alert-bearing note text on the ticket, or null.
+String? _ticketAlertText(KitchenTicketEntity ticket) {
+  for (final item in ticket.items) {
+    if (_isAlertNote(item.notes)) return item.notes;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Beep WAV generator — no audio asset file required
 // ---------------------------------------------------------------------------
 
@@ -532,6 +562,10 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             // Urgency top-strip (green / yellow / red)
             Container(height: 5, color: borderColor),
 
+            // Allergy / VIP alert banner — kitchen safety first
+            if (_ticketAlertText(ticket) != null)
+              _buildAlertBanner(_ticketAlertText(ticket)!, largeFont: largeFont),
+
             // Header
             Container(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
@@ -733,6 +767,37 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     );
   }
 
+  Widget _buildAlertBanner(String text, {required bool largeFont}) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: largeFont ? 10 : 8,
+      ),
+      color: AppColors.red,
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded,
+              size: largeFont ? 22 : 18, color: Colors.white),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text.toUpperCase(),
+              style: TextStyle(
+                fontSize: largeFont ? 14 : 12,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 1.2,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGangHeader(GangTemplateEntity? gang, {required bool largeFont}) {
     final color = gang?.flutterColor ?? AppColors.textSecondary;
     final name = gang?.name ?? 'Andere';
@@ -834,14 +899,32 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                 if (item.notes != null && item.notes!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      '\u26A0 ${item.notes}',
-                      style: TextStyle(
-                        fontSize: modSize,
-                        color: AppColors.orange,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
+                    child: _isAlertNote(item.notes)
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.red,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '\u26A0 ${item.notes}',
+                              style: TextStyle(
+                                fontSize: modSize + 1,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            '\u26A0 ${item.notes}',
+                            style: TextStyle(
+                              fontSize: modSize,
+                              color: AppColors.orange,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
                   ),
               ],
             ),
