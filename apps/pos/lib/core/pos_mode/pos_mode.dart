@@ -96,11 +96,8 @@ final posModeProvider =
   return PosModeNotifier(prefs);
 });
 
-/// Maximum number of Gangs (courses) supported by the UI. Product decision
-/// 2026-04-17: pilot restaurant is capped at 3 (Vorspeise / Hauptgang /
-/// Dessert in Swiss-German). Raising this requires widening the Gang chip
-/// row and verifying printer routing.
-const int kMaxGangs = 3;
-
-/// Indexable Gang numbers (1-based) — `[1, 2, 3]`.
-const List<int> kGangNumbers = [1, 2, 3];
+/// Gang (course) cardinality is configured per-restaurant via
+/// `RestaurantSettings.maxGangs` (1..5) and can be disabled entirely via
+/// `gangsEnabled`. The former constants `kMaxGangs` / `kGangNumbers` were
+/// removed on 2026-04-17 when the model moved from a hardcoded 3 to a
+/// runtime setting — read `restaurantSettingsProvider` instead.

@@ -1,23 +1,54 @@
-/// Left-column order panel — groups ticket items by Gang (1, 2, 3).
+/// Left-column order panel — groups ticket items by Gang when the
+/// restaurant runs a coursed service.
 ///
-/// Fine-dining service is coursed: the cashier adds items tagged with a Gang
-/// number (Swiss-German for "course"). Each Gang has its own Fire/Hold
-/// controls so the kitchen receives courses in order, not all at once.
+/// Fine-dining concepts are coursed: the cashier adds items tagged with a
+/// Gang number (Swiss-German for "course") and each Gang has its own
+/// Fire/Hold controls so the kitchen receives courses in order, not all
+/// at once. Bistros and fast-food concepts turn this off via
+/// `RestaurantSettings.gangsEnabled=false` — the panel then shows a
+/// single flat list and hides Gang/Fire/Hold controls entirely.
 ///
-/// Product decision 2026-04-17: cap at [kMaxGangs] = 3. Ordering unassigned
-/// items (course = 0) land under a "Bağımsız" (unassigned) section at the top.
+/// Slot count and labels are configured per-restaurant via
+/// `RestaurantSettings.maxGangs` (1..[kGangsUpperBound]) and
+/// `RestaurantSettings.gangLabels`. Labels fall back to the l10n
+/// `gangLabel(n)` key when not overridden.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:gastrocore_pos/core/pos_mode/pos_mode.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
+
+/// Resolve the label for a 1-based Gang index: restaurant override first,
+/// then the localized default `gangLabel(n)`. Empty overrides fall
+/// through to l10n so a blank input never breaks the UI.
+String _resolveGangLabel(
+  BuildContext context,
+  RestaurantSettings? settings,
+  int oneBasedIndex,
+) {
+  final overrides = settings?.gangLabels ?? const <String>[];
+  final idx = oneBasedIndex - 1;
+  if (idx >= 0 && idx < overrides.length) {
+    final label = overrides[idx].trim();
+    if (label.isNotEmpty) return label;
+  }
+  return AppLocalizations.of(context).gangLabel(oneBasedIndex);
+}
+
+/// Build the 1-based slot indices to render, clamped to the configured
+/// `[1, maxGangs]` range (and the UI-wide upper bound).
+List<int> _gangSlots(RestaurantSettings? settings) {
+  final configured = (settings?.maxGangs ?? 3).clamp(1, kGangsUpperBound);
+  return [for (var i = 1; i <= configured; i++) i];
+}
 
 /// The currently-focused Gang — new items are added to this Gang by default.
 final activeGangProvider = StateProvider<int>((ref) => 1);
@@ -35,6 +66,9 @@ class OrderPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ticket = ref.watch(currentTicketProvider);
     final activeGang = ref.watch(activeGangProvider);
+    final settings = ref.watch(restaurantSettingsProvider).valueOrNull;
+    final gangsEnabled = settings?.gangsEnabled ?? true;
+    final slots = _gangSlots(settings);
 
     return Container(
       width: AppTokens.orderPanelWidth,
@@ -43,16 +77,25 @@ class OrderPanel extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _CoverHeader(ticket: ticket),
-          _GangChipRow(
-            activeGang: activeGang,
-            onSelect: (g) =>
-                ref.read(activeGangProvider.notifier).state = g,
-          ),
+          if (gangsEnabled)
+            _GangChipRow(
+              slots: slots,
+              activeGang: activeGang,
+              settings: settings,
+              onSelect: (g) =>
+                  ref.read(activeGangProvider.notifier).state = g,
+            ),
           const Divider(height: 1, color: AppColors.border),
           Expanded(
             child: ticket == null
                 ? const _EmptyTicketState()
-                : _GangGroupedList(ticket: ticket),
+                : gangsEnabled
+                    ? _GangGroupedList(
+                        ticket: ticket,
+                        slots: slots,
+                        settings: settings,
+                      )
+                    : _FlatItemList(ticket: ticket),
           ),
           const Divider(height: 1, color: AppColors.border),
           _TotalsFooter(ticket: ticket),
@@ -204,12 +247,20 @@ class _CoverStepper extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _GangChipRow extends StatelessWidget {
-  const _GangChipRow({required this.activeGang, required this.onSelect});
+  const _GangChipRow({
+    required this.slots,
+    required this.activeGang,
+    required this.settings,
+    required this.onSelect,
+  });
+  final List<int> slots;
   final int activeGang;
+  final RestaurantSettings? settings;
   final void Function(int) onSelect;
 
   @override
   Widget build(BuildContext context) {
+    final lastSlot = slots.isEmpty ? 0 : slots.last;
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppTokens.space12,
@@ -217,16 +268,15 @@ class _GangChipRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          for (final g in kGangNumbers) ...[
+          for (final g in slots) ...[
             Expanded(
               child: _GangChip(
-                label: AppLocalizations.of(context).gangLabel(g),
+                label: _resolveGangLabel(context, settings, g),
                 selected: g == activeGang,
                 onTap: () => onSelect(g),
               ),
             ),
-            if (g != kGangNumbers.last)
-              const SizedBox(width: AppTokens.space8),
+            if (g != lastSlot) const SizedBox(width: AppTokens.space8),
           ],
         ],
       ),
@@ -278,14 +328,21 @@ class _GangChip extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _GangGroupedList extends ConsumerWidget {
-  const _GangGroupedList({required this.ticket});
+  const _GangGroupedList({
+    required this.ticket,
+    required this.slots,
+    required this.settings,
+  });
   final TicketEntity ticket;
+  final List<int> slots;
+  final RestaurantSettings? settings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final maxSlot = slots.isEmpty ? 1 : slots.last;
     final byGang = <int, List<OrderItemEntity>>{};
     for (final item in ticket.items) {
-      final gang = item.course.clamp(1, kMaxGangs);
+      final gang = item.course.clamp(1, maxSlot);
       byGang.putIfAbsent(gang, () => []).add(item);
     }
     final held = ref.watch(heldGangsProvider);
@@ -294,9 +351,10 @@ class _GangGroupedList extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: AppTokens.space8),
       children: [
-        for (final g in kGangNumbers)
+        for (final g in slots)
           _GangSection(
             gang: g,
+            label: _resolveGangLabel(context, settings, g),
             items: byGang[g] ?? const [],
             isHeld: held.contains(g),
             onFire: () => _fireGang(context, ref, g),
@@ -308,7 +366,7 @@ class _GangGroupedList extends ConsumerWidget {
 
   Future<void> _fireGang(BuildContext ctx, WidgetRef ref, int gang) async {
     final messenger = ScaffoldMessenger.of(ctx);
-    final label = AppLocalizations.of(ctx).gangLabel(gang);
+    final label = _resolveGangLabel(ctx, settings, gang);
     try {
       await ref.read(currentTicketProvider.notifier).fireGang(gang);
       // Clear the "held" mark when fired — the gang is now on its way.
@@ -342,7 +400,7 @@ class _GangGroupedList extends ConsumerWidget {
       next.remove(gang);
     }
     ref.read(heldGangsProvider.notifier).state = next;
-    final label = AppLocalizations.of(ctx).gangLabel(gang);
+    final label = _resolveGangLabel(ctx, settings, gang);
     ScaffoldMessenger.of(ctx).showSnackBar(
       SnackBar(
         content: Text(
@@ -356,9 +414,38 @@ class _GangGroupedList extends ConsumerWidget {
   }
 }
 
+/// Flat (no-Gang) item list for bistro / fast-food concepts — no
+/// section headers, no Fire/Hold controls. Kept visually consistent
+/// with `_GangSection` rows so operators see the same item chrome.
+class _FlatItemList extends StatelessWidget {
+  const _FlatItemList({required this.ticket});
+  final TicketEntity ticket;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: AppTokens.space8),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.space12,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final item in ticket.items) _OrderItemRow(item: item),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _GangSection extends StatelessWidget {
   const _GangSection({
     required this.gang,
+    required this.label,
     required this.items,
     required this.isHeld,
     required this.onFire,
@@ -366,6 +453,7 @@ class _GangSection extends StatelessWidget {
   });
 
   final int gang;
+  final String label;
   final List<OrderItemEntity> items;
   final bool isHeld;
   final VoidCallback onFire;
@@ -388,7 +476,7 @@ class _GangSection extends StatelessWidget {
             child: Row(
               children: [
                 Text(
-                  AppLocalizations.of(context).gangLabel(gang),
+                  label,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,

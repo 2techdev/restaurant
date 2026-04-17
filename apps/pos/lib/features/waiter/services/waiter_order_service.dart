@@ -78,9 +78,9 @@ class WaiterOrderService {
   /// Returns the updated [TicketEntity] after the item is persisted,
   /// or `null` if the ticket is closed / not found.
   ///
-  /// [course] tags the item with a Gang number (1..kMaxGangs) so the
-  /// fine-dining Hold & Fire flow can dispatch each course independently.
-  /// Defaults to 1 to match single-course waiter flows.
+  /// [course] tags the item with a Gang number (1..`RestaurantSettings.maxGangs`)
+  /// so the fine-dining Hold & Fire flow can dispatch each course
+  /// independently. Defaults to 1 to match single-course waiter flows.
   Future<TicketEntity?> addItemToTicket({
     required String ticketId,
     required ProductEntity product,
