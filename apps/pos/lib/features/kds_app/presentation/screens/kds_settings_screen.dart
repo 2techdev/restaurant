@@ -255,6 +255,13 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
             maxLength: 4,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
+          const SizedBox(height: 12),
+          _linkTile(
+            icon: Icons.tune,
+            label: 'Manage Kitchen Stations',
+            subtitle: 'Add / rename / reorder cold, hot, dessert, bar…',
+            onTap: () => context.go(KdsRoutes.stationManage),
+          ),
 
           const SizedBox(height: 28),
 
@@ -419,6 +426,59 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _linkTile({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 22, color: AppColors.textSecondary),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
