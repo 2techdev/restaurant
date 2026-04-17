@@ -353,6 +353,18 @@ final waiterActiveServiceCallsProvider =
       .map((calls) => calls.where((c) => c.waiterId == user.id).toList());
 });
 
+/// All active (non-resolved) calls across the tenant, live.
+///
+/// This is the POS / manager view — the bell icon in the home-screen header
+/// listens to this so the person on the POS sees every open call, not just
+/// the ones they raised themselves.
+final activeServiceCallsProvider =
+    StreamProvider<List<ServiceCallEntity>>((ref) {
+  final tenantId = ref.watch(tenantIdProvider);
+  final repo = ref.watch(serviceCallRepositoryProvider);
+  return repo.watchActive(tenantId);
+});
+
 /// Raise a new service call from the waiter UI.
 ///
 /// Looks up the active session (selected table + ticket) so the call is

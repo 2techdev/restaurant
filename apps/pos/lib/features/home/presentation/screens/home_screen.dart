@@ -30,6 +30,7 @@ import 'package:gastrocore_pos/features/shifts/domain/entities/shift_entity.dart
 import 'package:gastrocore_pos/features/home/presentation/providers/dashboard_provider.dart';
 import 'package:gastrocore_pos/features/home/domain/entities/dashboard_summary.dart';
 import 'package:gastrocore_pos/features/sync/presentation/widgets/sync_status_widget.dart';
+import 'package:gastrocore_pos/features/waiter/presentation/widgets/service_call_bell.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
 import 'package:gastrocore_pos/shared/widgets/gc_sidebar.dart';
 
@@ -342,6 +343,8 @@ class _TopBar extends StatelessWidget {
             ],
           ),
           const SizedBox(width: 16),
+          const ServiceCallBell(),
+          const SizedBox(width: 12),
           const SyncStatusWidget(),
         ],
       ),
