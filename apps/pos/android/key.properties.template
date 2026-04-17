@@ -1,0 +1,30 @@
+# Release signing key for GastroCore Android APK builds.
+#
+# DO NOT commit this file filled in. The real `key.properties` is
+# git-ignored (see apps/pos/android/.gitignore or root .gitignore).
+#
+# Copy to `key.properties` and fill in the values AFTER running
+# `scripts/generate-keystore.sh` (or the Windows equivalent) to
+# produce `app/gastrocore-release.jks`.
+#
+# ---------------------------------------------------------------------------
+# Keystore generation (one-off, run from apps/pos/android):
+#
+#   keytool -genkey -v \
+#     -keystore app/gastrocore-release.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 \
+#     -alias gastrocore
+#
+# Store the .jks securely (1Password / Vault). Losing it means the
+# Play Store will reject future updates — the app is permanently
+# tied to its signing key.
+#
+# For CI builds, set secrets KEYSTORE_BASE64, STORE_PASSWORD,
+# KEY_PASSWORD, KEY_ALIAS — see .github/workflows/ci.yml step
+# "Create key.properties".
+# ---------------------------------------------------------------------------
+
+storePassword=CHANGE_ME_STORE_PASSWORD
+keyPassword=CHANGE_ME_KEY_PASSWORD
+keyAlias=gastrocore
+storeFile=gastrocore-release.jks
