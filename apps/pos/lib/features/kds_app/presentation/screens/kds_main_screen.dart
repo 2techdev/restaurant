@@ -23,7 +23,9 @@ import 'package:gastrocore_pos/features/gang/domain/entities/gang_template_entit
 import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
 import 'package:gastrocore_pos/features/kitchen/domain/entities/kitchen_ticket_entity.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_provider.dart';
+import 'package:gastrocore_pos/features/kds_app/data/kds_ws_client.dart';
 import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_providers.dart';
+import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_realtime_provider.dart';
 import 'package:gastrocore_pos/features/kds_app/router/kds_router.dart';
 
 // ---------------------------------------------------------------------------
@@ -205,6 +207,12 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     _keyFocus = FocusNode();
     _loadPrefs();
     _initBeepFile();
+    // Instantiate the WS client so it starts connecting on screen mount.
+    // The provider is tied to this widget's ref — the connection is torn down
+    // automatically when the screen is disposed.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(kdsWsClientProvider);
+    });
   }
 
   @override
@@ -355,6 +363,27 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     final lateThreshold = ref.watch(kdsLateThresholdProvider);
     final gangMap = ref.watch(gangTemplateMapProvider);
 
+    // Surface server-pushed ticket notifications. The Drift stream is the
+    // source of truth for the grid, so we only need to beep + flash a snack
+    // here — no DB writes.
+    ref.listen<KdsEvent?>(kdsLatestEventProvider, (prev, next) {
+      if (next == null || next == prev) return;
+      if (next.type == 'new_ticket') {
+        _onNewTicket();
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text(
+              'New ticket pushed from server'
+              '${next.orderNumber != null ? ' (#${next.orderNumber})' : ''}',
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+
     return KeyboardListener(
       focusNode: _keyFocus,
       autofocus: true,
@@ -495,6 +524,8 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
           const SizedBox(width: 16),
           _statChip('DONE TODAY', '$completed', AppColors.green), // #69F6B8
           const Spacer(),
+          _buildLiveIndicator(),
+          const SizedBox(width: 12),
           _topBarIcon(Icons.filter_list, 'Station filter',
               () => context.go(KdsRoutes.stationFilter)),
           const SizedBox(width: 8),
@@ -546,6 +577,64 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, size: 20, color: AppColors.textSecondary),
+        ),
+      ),
+    );
+  }
+
+  /// LIVE indicator — small coloured dot + label showing the WebSocket state.
+  ///   connected    → green + "LIVE"
+  ///   connecting   → amber + "LINK…"
+  ///   disconnected → red + "OFFLINE"
+  Widget _buildLiveIndicator() {
+    final wsState = ref.watch(kdsWsStateProvider);
+    final (Color color, String label, String tooltip) = switch (wsState) {
+      KdsWsState.connected => (
+        AppColors.green,
+        'LIVE',
+        'Real-time hub connected',
+      ),
+      KdsWsState.connecting => (
+        const Color(0xFFFBBF24),
+        'LINK',
+        'Connecting to real-time hub…',
+      ),
+      KdsWsState.disconnected => (
+        AppColors.red,
+        'OFFLINE',
+        'Real-time hub offline — falling back to LAN sync',
+      ),
+    };
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: color,
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
         ),
       ),
     );
