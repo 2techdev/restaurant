@@ -301,19 +301,9 @@ class SeedData {
         syncStatus: const Value(0),
         isDeleted: const Value(false),
       ),
-      GangTemplatesCompanion(
-        id: const Value('gang-4'),
-        tenantId: Value(_tenantId),
-        name: const Value('Getränke'),
-        sortOrder: const Value(4),
-        color: const Value('#FF9F0A'),
-        isDefault: const Value(true),
-        isActive: const Value(true),
-        createdAt: Value(now),
-        updatedAt: Value(now),
-        syncStatus: const Value(0),
-        isDeleted: const Value(false),
-      ),
+      // Drinks are NOT a gang — they route to the Bar station (printerGroup)
+      // and fire independently of course pacing. Gangs are pure course
+      // ordinals (1..3 default, up to kMaxGangs=5) — see RestaurantSettings.
     ];
     await db.batch((batch) {
       for (final g in gangs) {
@@ -454,7 +444,8 @@ class SeedData {
         icon: '\uD83E\uDD64', // 🥤
         color: '#4F8CFF',
         order: 4,
-        gangId: 'gang-4', // Getränke
+        // No gang — drinks fire independently via the Bar station.
+        gangId: null,
       ),
     ];
 

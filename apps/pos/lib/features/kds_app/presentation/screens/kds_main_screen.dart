@@ -31,6 +31,8 @@ import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_realt
 import 'package:gastrocore_pos/features/kds_app/router/kds_router.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
+import 'package:gastrocore_pos/features/stations/domain/entities/station_entity.dart';
+import 'package:gastrocore_pos/features/stations/presentation/providers/station_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Urgency helpers — green → yellow → red timer coding
@@ -483,6 +485,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
       body: Column(
         children: [
           _buildTopBar(tickets, completed),
+          _buildStationChipBar(tickets),
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
@@ -505,7 +508,6 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
   // -------------------------------------------------------------------------
 
   Widget _buildTopBar(List<KitchenTicketEntity> tickets, int completed) {
-    final stationFilter = ref.watch(kdsStationFilterProvider);
     final pending =
         tickets.where((t) => t.status == KitchenTicketStatus.pending).length;
     final cooking =
@@ -543,25 +545,6 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(width: 4),
-          if (stationFilter != null)
-            Container(
-              margin: const EdgeInsets.only(left: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.accentDim,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                stationFilter.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary, // #90ABFF for active items
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
           const SizedBox(width: 32),
           _statChip('PENDING', '$pending', AppColors.textPrimary),
           const SizedBox(width: 16),
@@ -571,9 +554,6 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
           const Spacer(),
           _buildLiveIndicator(),
           const SizedBox(width: 12),
-          _topBarIcon(Icons.filter_list, 'Station filter',
-              () => context.go(KdsRoutes.stationFilter)),
-          const SizedBox(width: 8),
           _topBarIcon(Icons.settings_outlined, 'Settings',
               () => context.go(KdsRoutes.settings)),
           const SizedBox(width: 8),
@@ -623,6 +603,171 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
           ),
           child: Icon(icon, size: 20, color: AppColors.textSecondary),
         ),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Station chip bar
+  //
+  // Sprint 3.2: replaces the old separate-route station-filter screen with an
+  // inline chip row. "All" chip clears the filter; a station chip sets the
+  // filter to that station's code (matching [KitchenTicket.printerGroup]).
+  // Counts shown on each chip are computed from the UNFILTERED active-ticket
+  // stream so the numbers stay honest even while a filter is active.
+  // -------------------------------------------------------------------------
+
+  Widget _buildStationChipBar(List<KitchenTicketEntity> _) {
+    final stationsAsync = ref.watch(stationsProvider);
+    final allTicketsAsync = ref.watch(activeKitchenTicketsProvider);
+    final filter = ref.watch(kdsStationFilterProvider);
+
+    final all = allTicketsAsync.valueOrNull ?? const <KitchenTicketEntity>[];
+    final countByCode = <String, int>{};
+    for (final t in all) {
+      countByCode[t.printerGroup] = (countByCode[t.printerGroup] ?? 0) + 1;
+    }
+
+    final stations = stationsAsync.valueOrNull ?? const <StationEntity>[];
+    final sorted = [...stations]..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    void select(String? code) =>
+        ref.read(kdsStationFilterProvider.notifier).state = code;
+
+    return Container(
+      height: 52,
+      color: AppColors.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _stationChip(
+            label: 'All',
+            icon: Icons.grid_view_rounded,
+            count: all.length,
+            selected: filter == null,
+            onTap: () => select(null),
+          ),
+          for (final s in sorted)
+            _stationChip(
+              label: s.name,
+              icon: s.iconData,
+              accent: s.accentColor,
+              count: countByCode[s.code] ?? 0,
+              selected: filter == s.code,
+              onTap: () => select(s.code),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stationChip({
+    required String label,
+    required IconData icon,
+    required int count,
+    required bool selected,
+    required VoidCallback onTap,
+    Color? accent,
+  }) {
+    final accentColor = accent ?? AppColors.primary;
+    final tint = selected ? accentColor : AppColors.textSecondary;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: selected
+                  ? accentColor.withValues(alpha: 0.15)
+                  : AppColors.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: selected
+                    ? accentColor.withValues(alpha: 0.6)
+                    : Colors.transparent,
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: tint),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? tint : AppColors.textPrimary,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                if (count > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? accentColor.withValues(alpha: 0.25)
+                          : AppColors.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: selected ? tint : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Station pill shown on the ticket card header. Resolves the station's
+  /// name + accent color from [stationByCodeProvider]; falls back to the raw
+  /// code in uppercase when no row matches (e.g. a ticket routed before the
+  /// station row was created).
+  Widget _buildStationBadge(String code) {
+    final byCode = ref.watch(stationByCodeProvider);
+    final station = byCode[code];
+    final accent = station?.accentColor ?? AppColors.textSecondary;
+    final label = (station?.name ?? code).toUpperCase();
+    final icon = station?.iconData ?? Icons.restaurant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: accent),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: accent,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -816,14 +961,21 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
                           ),
                         ),
                         const SizedBox(height: 3),
-                        Text(
-                          'Order ${ticket.orderNumber}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                            letterSpacing: 0.5,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Order ${ticket.orderNumber}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildStationBadge(ticket.printerGroup),
+                          ],
                         ),
                         if (ticket.waiterName != null) ...[
                           const SizedBox(height: 2),

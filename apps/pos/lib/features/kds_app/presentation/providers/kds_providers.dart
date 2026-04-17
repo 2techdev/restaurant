@@ -1,7 +1,6 @@
 /// Shared Riverpod providers for the KDS standalone app.
 ///
-/// These providers are shared between [KdsMainScreen],
-/// [KdsStationFilterScreen], and [KdsSettingsScreen].
+/// These providers are shared between [KdsMainScreen] and [KdsSettingsScreen].
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
