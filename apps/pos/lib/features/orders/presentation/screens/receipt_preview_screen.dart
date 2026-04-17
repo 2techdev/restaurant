@@ -14,6 +14,7 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/printing/models/print_models.dart';
 import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/features/orders/domain/calculations/calculation_pipeline.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 
@@ -77,40 +78,30 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
       );
     }).toList();
 
-    // MwSt breakdown: code → gross amount.
-    // We fold the service charge into each bucket proportionally so Swiss
-    // MWST is extracted from (subtotal + service) — the SambaPOS
-    // Discount → Service → Tax pipeline. Remainder cents land on the
-    // first bucket so the totals reconcile to ticket.total.
-    final breakdown = <String, int>{};
+    // Per-MwSt-bucket subtotal, feeding the SambaPOS-style pipeline
+    // (Discount → Service → Tax → Rounding). The pipeline apportions
+    // discount + service across buckets before extracting MwSt so the
+    // printed breakdown matches what the customer actually paid.
+    final subtotalByMwst = <String, int>{};
     for (final item in ticket.items) {
       final code = MwStCode.forProduct(
         taxGroup: item.taxGroup,
         isDineIn: isDineIn,
       ).code;
-      breakdown[code] = (breakdown[code] ?? 0) + item.subtotal;
+      subtotalByMwst[code] = (subtotalByMwst[code] ?? 0) + item.subtotal;
     }
-    final service = ticket.serviceFeeAmount;
-    if (service > 0 && breakdown.isNotEmpty) {
-      final itemsTotal =
-          ticket.items.fold<int>(0, (s, i) => s + i.subtotal);
-      if (itemsTotal > 0) {
-        final codes = breakdown.keys.toList()..sort();
-        int assigned = 0;
-        for (var i = 0; i < codes.length; i++) {
-          final code = codes[i];
-          final bucket = breakdown[code]!;
-          int addend;
-          if (i == codes.length - 1) {
-            addend = service - assigned; // absorb rounding remainder
-          } else {
-            addend = (bucket * service / itemsTotal).floor();
-            assigned += addend;
-          }
-          breakdown[code] = bucket + addend;
-        }
-      }
-    }
+    final pipeline = runCalculationPipeline(
+      PipelineInput(
+        subtotalByMwst: subtotalByMwst,
+        discountAmount: ticket.discountAmount,
+        serviceAmount: ticket.serviceFeeAmount,
+        // Receipt screen consumes TicketEntity.total which already
+        // embeds its own rounding policy — skip 5-Rappen here to
+        // avoid double-rounding the printed breakdown.
+        applyRounding: false,
+      ),
+    );
+    final breakdown = Map<String, int>.from(pipeline.taxableBaseByCode);
 
     final tenant = ref.read(tenantInfoProvider).valueOrNull;
     final restaurantName = tenant?.name ?? 'GastroCore Restaurant';
