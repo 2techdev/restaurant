@@ -75,6 +75,10 @@ class WaiterOrderService {
 
   /// Add a product to an existing open ticket.
   ///
+  /// [course] maps to the fine-dining course number (1=starter, 2=main, 3=dessert, etc.).
+  /// It is stored on the order item and later used by the kitchen to fire
+  /// grouped items together.
+  ///
   /// Returns the updated [TicketEntity] after the item is persisted,
   /// or `null` if the ticket is closed / not found.
   Future<TicketEntity?> addItemToTicket({
@@ -83,6 +87,7 @@ class WaiterOrderService {
     double quantity = 1,
     List<OrderItemModifierEntity> modifiers = const [],
     String? notes,
+    int course = 1,
   }) async {
     final ticket = await _orderRepo.getTicketById(ticketId);
     if (ticket == null || !ticket.isOpen) return null;
@@ -110,6 +115,7 @@ class WaiterOrderService {
       subtotal: subtotal,
       taxAmount: taxAmount,
       notes: notes,
+      course: course,
       modifiers: reKeyedModifiers,
       taxGroup: product.taxGroup,
     );

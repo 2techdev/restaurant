@@ -240,6 +240,68 @@ void main() {
     });
   });
 
+  group('WaiterOrderService.addItemToTicket (course)', () {
+    test('defaults to course 1 when not specified', () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      final ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+      );
+
+      final updated = await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(),
+      );
+
+      expect(updated!.items.first.course, 1);
+    });
+
+    test('persists explicit course number on the order item', () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      final ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+      );
+
+      // Starter
+      await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(name: 'Bruschetta'),
+        course: 1,
+      );
+      // Main
+      await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(name: 'Risotto'),
+        course: 2,
+      );
+      // Dessert
+      final after = await svc.addItemToTicket(
+        ticketId: ticket.id,
+        product: _makeProduct(name: 'Tiramisu'),
+        course: 3,
+      );
+
+      expect(after!.items.length, 3);
+      final byName = {for (final i in after.items) i.productName: i.course};
+      expect(byName['Bruschetta'], 1);
+      expect(byName['Risotto'], 2);
+      expect(byName['Tiramisu'], 3);
+    });
+  });
+
   group('WaiterOrderService.removeItemFromTicket', () {
     test('removes item and updates totals', () async {
       final (:db, :svc) = await _setup();

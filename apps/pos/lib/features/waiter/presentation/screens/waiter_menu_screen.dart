@@ -47,6 +47,10 @@ class _WaiterMenuScreenState extends ConsumerState<WaiterMenuScreen> {
 
     return Column(
       children: [
+        // ── Course selector ───────────────────────────────────────────────
+        const _CourseSelector(),
+        // ── Allergen chips ────────────────────────────────────────────────
+        const _AllergenChips(),
         // ── Search bar ────────────────────────────────────────────────────
         _SearchBar(controller: _searchController),
         // ── Category chips ────────────────────────────────────────────────
@@ -63,6 +67,167 @@ class _WaiterMenuScreenState extends ConsumerState<WaiterMenuScreen> {
               : _CategoryProductsGrid(),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Course selector (sticky — applies to every quick-added item)
+// ---------------------------------------------------------------------------
+
+class _CourseSelector extends ConsumerWidget {
+  const _CourseSelector();
+
+  static const List<(int, String, IconData)> _courses = [
+    (1, 'Starter', Icons.ramen_dining_outlined),
+    (2, 'Main', Icons.restaurant_outlined),
+    (3, 'Dessert', Icons.icecream_outlined),
+    (4, 'Extras', Icons.more_horiz),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(waiterCurrentCourseProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      child: Row(
+        children: [
+          for (final (num, label, icon) in _courses) ...[
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  ref.read(waiterCurrentCourseProvider.notifier).state = num;
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: current == num
+                        ? AppColors.accentDim
+                        : AppColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: current == num
+                          ? AppColors.primary
+                          : Colors.transparent,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        icon,
+                        size: 14,
+                        color: current == num
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: current == num
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: current == num
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (num != _courses.last.$1) const SizedBox(width: 6),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Allergen / dietary chips (flushed into the next item's notes)
+// ---------------------------------------------------------------------------
+
+class _AllergenChips extends ConsumerWidget {
+  const _AllergenChips();
+
+  static const List<(String, IconData)> _chips = [
+    ('No nuts', Icons.dangerous_outlined),
+    ('Gluten-free', Icons.no_food_outlined),
+    ('Lactose-free', Icons.no_drinks_outlined),
+    ('Vegan', Icons.eco_outlined),
+    ('Spicy', Icons.whatshot_outlined),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = ref.watch(waiterPendingAllergensProvider);
+
+    return SizedBox(
+      height: 34,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        itemCount: _chips.length,
+        itemBuilder: (context, index) {
+          final (label, icon) = _chips[index];
+          final isOn = active.contains(label);
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              final next = Set<String>.from(active);
+              if (isOn) {
+                next.remove(label);
+              } else {
+                next.add(label);
+              }
+              ref.read(waiterPendingAllergensProvider.notifier).state = next;
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: isOn
+                    ? AppColors.yellow.withValues(alpha: 0.2)
+                    : AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isOn ? AppColors.yellow : Colors.transparent,
+                  width: 1.2,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 12,
+                    color: isOn ? AppColors.yellow : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isOn ? FontWeight.w800 : FontWeight.w600,
+                      color:
+                          isOn ? AppColors.yellow : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -291,7 +456,13 @@ class _ProductTile extends ConsumerWidget {
           ? null
           : () {
               HapticFeedback.lightImpact();
-              ref.read(waiterActiveTicketProvider.notifier).addProduct(product);
+              final course = ref.read(waiterCurrentCourseProvider);
+              final allergens = _flushPendingAllergens(ref);
+              ref.read(waiterActiveTicketProvider.notifier).addProduct(
+                    product,
+                    course: course,
+                    notes: allergens,
+                  );
               _showAddedFeedback(context);
             },
       // Long press = modifier dialog (if modifiers exist) or quantity sheet.
@@ -404,11 +575,18 @@ class _ProductTile extends ConsumerWidget {
       }
       if (context.mounted) {
         HapticFeedback.lightImpact();
+        final course = ref.read(waiterCurrentCourseProvider);
+        final allergens = _flushPendingAllergens(ref);
+        final combinedNotes = _mergeNotes(
+          result.notes.isNotEmpty ? result.notes : null,
+          allergens,
+        );
         ref.read(waiterActiveTicketProvider.notifier).addProduct(
               product,
               quantity: result.quantity.toDouble(),
               modifiers: orderModifiers,
-              notes: result.notes.isNotEmpty ? result.notes : null,
+              notes: combinedNotes,
+              course: course,
             );
         _showAddedFeedback(context);
       }
@@ -496,9 +674,17 @@ class _ProductTile extends ConsumerWidget {
                       onPressed: () {
                         Navigator.of(ctx).pop();
                         HapticFeedback.lightImpact();
+                        final course =
+                            ref.read(waiterCurrentCourseProvider);
+                        final allergens = _flushPendingAllergens(ref);
                         ref
                             .read(waiterActiveTicketProvider.notifier)
-                            .addProduct(product, quantity: qty.toDouble());
+                            .addProduct(
+                              product,
+                              quantity: qty.toDouble(),
+                              course: course,
+                              notes: allergens,
+                            );
                       },
                       child: Text(
                         'Add $qty × ${product.name}',
@@ -515,6 +701,25 @@ class _ProductTile extends ConsumerWidget {
       },
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Pending-allergen helpers — consume-and-clear so flags never leak to the
+// next item the waiter taps.
+// ---------------------------------------------------------------------------
+
+String? _flushPendingAllergens(WidgetRef ref) {
+  final set = ref.read(waiterPendingAllergensProvider);
+  if (set.isEmpty) return null;
+  final note = set.join(', ');
+  ref.read(waiterPendingAllergensProvider.notifier).state = <String>{};
+  return note;
+}
+
+String? _mergeNotes(String? userNote, String? allergenNote) {
+  if (userNote == null || userNote.isEmpty) return allergenNote;
+  if (allergenNote == null || allergenNote.isEmpty) return userNote;
+  return '$allergenNote • $userNote';
 }
 
 class _QtyButton extends StatelessWidget {

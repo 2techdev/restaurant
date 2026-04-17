@@ -98,6 +98,7 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
     double quantity = 1,
     List<OrderItemModifierEntity> modifiers = const [],
     String? notes,
+    int course = 1,
   }) async {
     if (state == null) return;
     final updated = await _svc.addItemToTicket(
@@ -106,6 +107,7 @@ class WaiterActiveTicketNotifier extends StateNotifier<TicketEntity?> {
       quantity: quantity,
       modifiers: modifiers,
       notes: notes,
+      course: course,
     );
     state = updated;
   }
@@ -203,6 +205,24 @@ final waiterProductsProvider = FutureProvider<List<ProductEntity>>((ref) async {
 
 /// Search query for product lookup.
 final waiterSearchQueryProvider = StateProvider<String>((ref) => '');
+
+// ---------------------------------------------------------------------------
+// Course / allergen quick-entry state (fine dining)
+// ---------------------------------------------------------------------------
+
+/// The course number every new item is tagged with until the waiter
+/// changes it (1 = starter, 2 = main, 3 = dessert, 4 = extras).
+///
+/// Persists across quick-add taps so a waiter can pick "Main" once and
+/// tap 5 dishes in a row.
+final waiterCurrentCourseProvider = StateProvider<int>((ref) => 1);
+
+/// Allergen / dietary flags the waiter has currently toggled on.
+///
+/// These are flushed into the next added item's `notes` field and then
+/// cleared, so they never silently stick to unrelated items.
+final waiterPendingAllergensProvider =
+    StateProvider<Set<String>>((ref) => <String>{});
 
 /// Products filtered by the current search query (across all categories).
 final waiterSearchResultsProvider =

@@ -278,19 +278,36 @@ class _OrderTab extends ConsumerWidget {
       );
     }
 
+    // Group items by course number so fine-dining service reads as
+    // Starter / Main / Dessert blocks.
+    final grouped = <int, List<OrderItemEntity>>{};
+    for (final item in ticket!.items) {
+      grouped.putIfAbsent(item.course, () => []).add(item);
+    }
+    final courseNumbers = grouped.keys.toList()..sort();
+
     return Column(
       children: [
-        // Items list
+        // Items list (grouped by course)
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
-            itemCount: ticket!.items.length,
+            itemCount: courseNumbers.length,
             itemBuilder: (context, index) {
-              return _OrderItemRow(
-                item: ticket!.items[index],
-                onRemove: () => ref
-                    .read(waiterActiveTicketProvider.notifier)
-                    .removeItem(ticket!.items[index].id),
+              final courseNum = courseNumbers[index];
+              final items = grouped[courseNum]!;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _CourseHeader(courseNumber: courseNum, itemCount: items.length),
+                  for (final item in items)
+                    _OrderItemRow(
+                      item: item,
+                      onRemove: () => ref
+                          .read(waiterActiveTicketProvider.notifier)
+                          .removeItem(item.id),
+                    ),
+                ],
               );
             },
           ),
@@ -298,6 +315,86 @@ class _OrderTab extends ConsumerWidget {
         // Totals summary
         _TotalsSummary(ticket: ticket!),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Course header
+// ---------------------------------------------------------------------------
+
+class _CourseHeader extends StatelessWidget {
+  final int courseNumber;
+  final int itemCount;
+
+  const _CourseHeader({required this.courseNumber, required this.itemCount});
+
+  String get _label {
+    switch (courseNumber) {
+      case 1:
+        return 'Starter';
+      case 2:
+        return 'Main';
+      case 3:
+        return 'Dessert';
+      case 4:
+        return 'Extras';
+      default:
+        return 'Course $courseNumber';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            decoration: const BoxDecoration(
+              color: AppColors.accentDim,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '$courseNumber',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '· $itemCount',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textDim,
+            ),
+          ),
+          const Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: 10),
+              child: Divider(color: AppColors.outlineVariant, height: 1),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
