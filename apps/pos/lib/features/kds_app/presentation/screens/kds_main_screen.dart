@@ -35,35 +35,66 @@ import 'package:gastrocore_pos/features/stations/domain/entities/station_entity.
 import 'package:gastrocore_pos/features/stations/presentation/providers/station_provider.dart';
 
 // ---------------------------------------------------------------------------
-// Urgency helpers — green → yellow → red timer coding
+// Urgency helpers — green → amber → red timer coding
+//
+// Two independent signals roll up into a single urgency tier:
+//   1. Age: elapsed time since the ticket was sent to the kitchen.
+//   2. Status: whether the kitchen has picked the ticket up (preparing).
+//
+// Tiers (amber wins over green; red wins over amber):
+//   fresh        age <  kTicketWatchThresholdMin AND status == pending
+//   inProgress   age <  kTicketWatchThresholdMin AND status == preparing
+//   watch        age >= kTicketWatchThresholdMin AND age < lateThresholdMin
+//                (regardless of status — pending for this long is a signal)
+//   late         age >= lateThresholdMin
+//
+// The watch tier (5 min by default) is the Sprint 3.4 addition: previously
+// a pending ticket stayed green until the late threshold, which let slow
+// orders hide in the grid. Five minutes is the point at which a ticket
+// sitting un-acknowledged is a real problem worth flagging amber.
 // ---------------------------------------------------------------------------
 
-enum _Urgency { fresh, inProgress, late }
+/// Age at which a ticket flips from fresh (green) to watch (amber).
+const int kTicketWatchThresholdMin = 5;
 
-_Urgency _getUrgency(KitchenTicketEntity ticket, int lateThresholdMin) {
-  final elapsed = DateTime.now().difference(ticket.sentAt);
-  if (elapsed.inMinutes >= lateThresholdMin) return _Urgency.late;
-  if (ticket.status == KitchenTicketStatus.preparing) return _Urgency.inProgress;
-  return _Urgency.fresh;
+@visibleForTesting
+enum TicketUrgency { fresh, inProgress, watch, late }
+
+@visibleForTesting
+TicketUrgency getTicketUrgency(
+  KitchenTicketEntity ticket,
+  int lateThresholdMin, {
+  DateTime? now,
+}) {
+  final elapsed = (now ?? DateTime.now()).difference(ticket.sentAt);
+  if (elapsed.inMinutes >= lateThresholdMin) return TicketUrgency.late;
+  if (elapsed.inMinutes >= kTicketWatchThresholdMin) return TicketUrgency.watch;
+  if (ticket.status == KitchenTicketStatus.preparing) {
+    return TicketUrgency.inProgress;
+  }
+  return TicketUrgency.fresh;
 }
 
-// Green (#69F6B8) = ready/sent/fresh  •  Yellow = cooking  •  Red (#FF6F7E) = overdue
-Color _urgencyBorderColor(_Urgency u) => switch (u) {
-      _Urgency.fresh => AppColors.green,           // #69F6B8
-      _Urgency.inProgress => const Color(0xFFFBBF24), // amber
-      _Urgency.late => AppColors.red,              // #FF6F7E
+// Green (#69F6B8) = fresh  •  Amber (#FBBF24) = cooking / watch  •  Red (#FF6F7E) = overdue
+Color _urgencyBorderColor(TicketUrgency u) => switch (u) {
+      TicketUrgency.fresh => AppColors.green,          // #69F6B8
+      TicketUrgency.inProgress => const Color(0xFFFBBF24),
+      TicketUrgency.watch => const Color(0xFFFBBF24),
+      TicketUrgency.late => AppColors.red,             // #FF6F7E
     };
 
-Color _urgencyBadgeColor(_Urgency u) => switch (u) {
-      _Urgency.fresh => AppColors.greenDim,        // 10% tint of #69F6B8
-      _Urgency.inProgress => const Color(0x1AFBBF24),
-      _Urgency.late => AppColors.redDim,           // 10% tint of #FF6F7E
+Color _urgencyBadgeColor(TicketUrgency u) => switch (u) {
+      TicketUrgency.fresh => AppColors.greenDim,       // 10% tint of #69F6B8
+      TicketUrgency.inProgress => const Color(0x1AFBBF24),
+      TicketUrgency.watch => const Color(0x1AFBBF24),
+      TicketUrgency.late => AppColors.redDim,          // 10% tint of #FF6F7E
     };
 
-String _urgencyLabel(_Urgency u) => switch (u) {
-      _Urgency.fresh => 'NEW',
-      _Urgency.inProgress => 'COOKING',
-      _Urgency.late => 'LATE',
+String _urgencyLabel(TicketUrgency u) => switch (u) {
+      TicketUrgency.fresh => 'NEW',
+      TicketUrgency.inProgress => 'COOKING',
+      TicketUrgency.watch => 'WAITING',
+      TicketUrgency.late => 'LATE',
     };
 
 String _formatElapsed(KitchenTicketEntity ticket) {
@@ -904,7 +935,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     required Map<String, GangTemplateEntity> gangMap,
     required RestaurantSettings settings,
   }) {
-    final urgency = _getUrgency(ticket, lateThreshold);
+    final urgency = getTicketUrgency(ticket, lateThreshold);
     final borderColor = _urgencyBorderColor(urgency);
     final badgeColor = _urgencyBadgeColor(urgency);
     final titleSize = largeFont ? 34.0 : 26.0;
