@@ -11,3 +11,7 @@ export 'src/models/kitchen_ticket_data.dart';
 
 export 'src/templates/receipt_template.dart';
 export 'src/templates/kitchen_ticket_template.dart';
+
+export 'src/service/printer_service.dart';
+export 'src/service/esc_pos_printer_service.dart';
+export 'src/service/mock_printer_service.dart';
