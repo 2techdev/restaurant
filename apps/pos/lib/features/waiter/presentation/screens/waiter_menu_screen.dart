@@ -390,18 +390,16 @@ class _ProductTile extends ConsumerWidget {
       modifierGroups: modifierGroups,
     );
     if (result != null) {
-      final orderModifiers = <OrderItemModifierEntity>[];
-      for (final entry in result.selectedModifiers.entries) {
-        for (final opt in entry.value) {
-          orderModifiers.add(OrderItemModifierEntity(
+      final orderModifiers = <OrderItemModifierEntity>[
+        for (final sel in result.flattened())
+          OrderItemModifierEntity(
             id: IdGenerator.generateId(),
             orderItemId: '',
-            modifierId: opt.id,
-            modifierName: opt.name,
-            priceDelta: opt.priceDelta,
-          ));
-        }
-      }
+            modifierId: sel.option.id,
+            modifierName: sel.displayName,
+            priceDelta: sel.option.priceDelta,
+          ),
+      ];
       if (context.mounted) {
         HapticFeedback.lightImpact();
         ref.read(waiterActiveTicketProvider.notifier).addProduct(

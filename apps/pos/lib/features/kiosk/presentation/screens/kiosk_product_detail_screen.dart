@@ -69,7 +69,7 @@ class _KioskProductDetailScreenState
             id: 'tmp-${mod.id}',
             orderItemId: '',
             modifierId: mod.id,
-            modifierName: mod.name,
+            modifierName: group.displayName(mod.name),
             priceDelta: mod.priceDelta,
           ));
         }
@@ -80,9 +80,15 @@ class _KioskProductDetailScreenState
 
   bool _canAdd(ProductEntity product) {
     for (final group in product.modifierGroups) {
-      if (!group.isRequired) continue;
-      final selected = (_selectedModifiers[group.id] ?? {}).length;
-      if (selected < group.minSelections) return false;
+      final count = (_selectedModifiers[group.id] ?? {}).length;
+      // Required groups must meet at least their minimum (or 1, when
+      // minSelections is left at 0). Optional groups still have to respect
+      // the upper bound.
+      final effectiveMin = group.isRequired
+          ? (group.minSelections < 1 ? 1 : group.minSelections)
+          : group.minSelections;
+      if (count < effectiveMin) return false;
+      if (group.hasUpperBound && count > group.maxSelections) return false;
     }
     return true;
   }

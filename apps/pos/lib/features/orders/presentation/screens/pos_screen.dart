@@ -508,18 +508,16 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       );
       if (result == null) return;
 
-      final orderModifiers = <OrderItemModifierEntity>[];
-      for (final entry in result.selectedModifiers.entries) {
-        for (final opt in entry.value) {
-          orderModifiers.add(OrderItemModifierEntity(
+      final orderModifiers = <OrderItemModifierEntity>[
+        for (final sel in result.flattened())
+          OrderItemModifierEntity(
             id: IdGenerator.generateId(),
             orderItemId: '',
-            modifierId: opt.id,
-            modifierName: opt.name,
-            priceDelta: opt.priceDelta,
-          ));
-        }
-      }
+            modifierId: sel.option.id,
+            modifierName: sel.displayName,
+            priceDelta: sel.option.priceDelta,
+          ),
+      ];
       ref.read(currentTicketProvider.notifier).addItem(
             product,
             quantity: result.quantity.toDouble(),

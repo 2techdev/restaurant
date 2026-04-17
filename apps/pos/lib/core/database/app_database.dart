@@ -103,7 +103,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -206,6 +206,14 @@ class AppDatabase extends _$AppDatabase {
         // v10: orthogonal state flags on restaurant tables so one tile can
         // be `occupied` AND `billRequested` AND `vip` simultaneously.
         await m.addColumn(restaurantTables, restaurantTables.flags);
+      }
+      if (from < 11) {
+        // v11: Order Tag Group richness — SambaPOS parity parameters on
+        // modifier groups (askQuantity, freeTagging, columnCount, prefix).
+        await m.addColumn(modifierGroups, modifierGroups.askQuantity);
+        await m.addColumn(modifierGroups, modifierGroups.freeTagging);
+        await m.addColumn(modifierGroups, modifierGroups.columnCount);
+        await m.addColumn(modifierGroups, modifierGroups.prefix);
       }
     },
     onCreate: (m) async {

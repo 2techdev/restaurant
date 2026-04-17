@@ -32,12 +32,20 @@ class ModifierOptionData {
 }
 
 /// A group of related modifier options (e.g. "Size", "Extras", "Sauce").
+///
+/// Mirrors the SambaPOS Order Tag Group settings loaded from
+/// [ModifierGroupEntity]: the dialog reads minSelections / maxSelections
+/// to gate submission, columnCount to lay the grid out, and prefix to
+/// label selected options on receipts.
 class ModifierGroupData {
   final String id;
   final String name;
   final bool isRequired;
   final bool isMultiSelect;
+  final int minSelections;
   final int maxSelections;
+  final int columnCount;
+  final String prefix;
   final List<ModifierOptionData> options;
 
   const ModifierGroupData({
@@ -45,9 +53,14 @@ class ModifierGroupData {
     required this.name,
     this.isRequired = false,
     this.isMultiSelect = false,
+    this.minSelections = 0,
     this.maxSelections = 0,
+    this.columnCount = 1,
+    this.prefix = '',
     required this.options,
   });
+
+  bool get hasUpperBound => maxSelections > 0;
 
   /// Convert real product modifier groups to dialog data.
   static List<ModifierGroupData> fromProductEntity(ProductEntity product) {
@@ -56,7 +69,10 @@ class ModifierGroupData {
       name: group.name,
       isRequired: group.isRequired,
       isMultiSelect: group.selectionType == ModifierSelectionType.multiple,
+      minSelections: group.minSelections,
       maxSelections: group.maxSelections,
+      columnCount: group.effectiveColumnCount,
+      prefix: group.prefix,
       options: group.modifiers.map((mod) => ModifierOptionData(
         id: mod.id,
         name: mod.name,
@@ -67,17 +83,58 @@ class ModifierGroupData {
   }
 }
 
+/// A selected option paired with its group-prefixed display name.
+///
+/// The prefix is applied here (not at callers) so every site that builds
+/// `OrderItemModifierEntity` from a dialog result agrees on what lands on
+/// the receipt and KDS.
+class SelectedModifier {
+  final ModifierOptionData option;
+
+  /// `group.prefix + option.name` when the group has a prefix, otherwise
+  /// the bare option name.
+  final String displayName;
+
+  const SelectedModifier({required this.option, required this.displayName});
+}
+
 /// Result returned when the user confirms modifier selection.
 class ModifierDialogResult {
+  /// Raw selections keyed by group name. Retained for callers that
+  /// introspect by group; new code should prefer [flattened].
   final Map<String, List<ModifierOptionData>> selectedModifiers;
   final int quantity;
   final String notes;
+
+  /// The groups that produced this result. Captured so [flattened] can
+  /// apply the group's prefix without the caller having to rejoin by
+  /// group name.
+  final List<ModifierGroupData> _groups;
 
   const ModifierDialogResult({
     required this.selectedModifiers,
     required this.quantity,
     required this.notes,
-  });
+    List<ModifierGroupData> groups = const [],
+  }) : _groups = groups;
+
+  /// Flat iteration over selected modifiers in group order, with each
+  /// group's [ModifierGroupData.prefix] pre-applied to [displayName].
+  /// Construct `OrderItemModifierEntity` from `displayName`, not
+  /// `option.name`, so receipts show "+ Extra Cheese" / "- Onions" as
+  /// the operator configured.
+  Iterable<SelectedModifier> flattened() sync* {
+    for (final group in _groups) {
+      final opts = selectedModifiers[group.name] ?? const [];
+      for (final opt in opts) {
+        yield SelectedModifier(
+          option: opt,
+          displayName:
+              group.prefix.isEmpty ? opt.name : '${group.prefix}${opt.name}',
+        );
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +245,13 @@ class _ModifierDialogContentState
         if (set.contains(option.id)) {
           set.remove(option.id);
         } else {
+          // Block the add if we're already at maxSelections. SambaPOS
+          // uses the same hard stop instead of silently dropping a prior
+          // pick; the cap is a policy choice the operator has to
+          // acknowledge.
+          if (group.hasUpperBound && set.length >= group.maxSelections) {
+            return;
+          }
           set.add(option.id);
         }
       } else {
@@ -201,6 +265,28 @@ class _ModifierDialogContentState
   bool _isSelected(String groupName, String optionId) {
     return _selections[groupName]?.contains(optionId) ?? false;
   }
+
+  /// Count of currently-picked options in [group].
+  int _selectedCount(ModifierGroupData group) =>
+      _selections[group.name]?.length ?? 0;
+
+  /// Whether [group]'s current selection satisfies its minimum.
+  /// Optional groups (`isRequired=false` and `minSelections=0`) always
+  /// validate — the operator can skip them.
+  bool _isGroupValid(ModifierGroupData group) {
+    final count = _selectedCount(group);
+    final effectiveMin =
+        group.isRequired ? (group.minSelections < 1 ? 1 : group.minSelections)
+                         : group.minSelections;
+    if (count < effectiveMin) return false;
+    if (group.hasUpperBound && count > group.maxSelections) return false;
+    return true;
+  }
+
+  /// Whether every group is within its allowed selection range. Drives
+  /// the Confirm button's enabled state.
+  bool get _allGroupsValid =>
+      widget.modifierGroups.every(_isGroupValid);
 
   // -- Quantity --
 
@@ -228,6 +314,7 @@ class _ModifierDialogContentState
       selectedModifiers: result,
       quantity: _quantity,
       notes: _notesController.text.trim(),
+      groups: widget.modifierGroups,
     ));
   }
 
@@ -343,10 +430,18 @@ class _ModifierDialogContentState
   }
 
   Widget _buildGroupSection(ModifierGroupData group) {
+    final count = _selectedCount(group);
+    final belowMin = group.isRequired && count < (group.minSelections < 1
+        ? 1
+        : group.minSelections);
+    final counterText = group.hasUpperBound
+        ? '$count / ${group.maxSelections}'
+        : '$count';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Group label + required badge
+        // Group label + required badge + live counter
         Row(
           children: [
             Text(
@@ -377,24 +472,58 @@ class _ModifierDialogContentState
                 ),
               ),
             ],
+            const Spacer(),
+            Text(
+              counterText,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: belowMin ? AppColors.orange : AppColors.textDim,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 10),
 
-        // Horizontal scrollable chips
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: group.options.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final opt = group.options[index];
-              final selected = _isSelected(group.name, opt.id);
-              return _buildChip(group, opt, selected);
+        // Grid of option chips — columnCount drives the layout.
+        // columnCount == 1 keeps the previous horizontal scroll; > 1
+        // renders a grid the dialog width divides evenly.
+        if (group.columnCount <= 1)
+          SizedBox(
+            height: 44,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: group.options.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final opt = group.options[index];
+                return _buildChip(
+                    group, opt, _isSelected(group.name, opt.id));
+              },
+            ),
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = 8.0;
+              final cols = group.columnCount;
+              final tileWidth =
+                  (constraints.maxWidth - gap * (cols - 1)) / cols;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final opt in group.options)
+                    SizedBox(
+                      width: tileWidth,
+                      child: _buildChip(
+                          group, opt, _isSelected(group.name, opt.id)),
+                    ),
+                ],
+              );
             },
           ),
-        ),
       ],
     );
   }
@@ -628,27 +757,37 @@ class _ModifierDialogContentState
           ),
           const SizedBox(width: 10),
 
-          // Confirm
+          // Confirm — disabled until every group's selection count is
+          // within [minSelections, maxSelections].
           GestureDetector(
-            onTap: _onConfirm,
-            child: Container(
+            onTap: _allGroupsValid ? _onConfirm : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
               height: 48,
               padding: const EdgeInsets.symmetric(horizontal: 28),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryContainer],
-                  begin: Alignment(-0.7, -0.7), // ~135 degrees
-                  end: Alignment(0.7, 0.7),
-                ),
+                gradient: _allGroupsValid
+                    ? const LinearGradient(
+                        colors: [
+                          AppColors.primary,
+                          AppColors.primaryContainer
+                        ],
+                        begin: Alignment(-0.7, -0.7),
+                        end: Alignment(0.7, 0.7),
+                      )
+                    : null,
+                color: _allGroupsValid ? null : AppColors.surfaceContainerHigh,
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   'Zur Bestellung',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF0D1B3A),
+                    color: _allGroupsValid
+                        ? const Color(0xFF0D1B3A)
+                        : AppColors.textDim,
                     letterSpacing: 0.3,
                   ),
                 ),
