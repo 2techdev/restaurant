@@ -239,6 +239,52 @@ class GangRepository {
     );
   }
 
+  /// Recall a Gang back one step in the lifecycle.
+  ///
+  /// Accepts [toStatus] as the target state and clears the later-stage
+  /// timestamp(s) so the recall looks and behaves like the gang never reached
+  /// them. Used by the KDS card when a cook taps-by-mistake and long-presses
+  /// to undo: served → ready, ready → fired, fired → pending.
+  ///
+  /// Only `pending`, `fired`, and `ready` are valid recall targets — you can't
+  /// recall *to* served or in_prep from here (no UX need yet).
+  Future<void> recallGang({
+    required String ticketId,
+    required String gangTemplateId,
+    required GangOrderStatus toStatus,
+  }) async {
+    final now = DateTime.now();
+    final companion = switch (toStatus) {
+      GangOrderStatus.pending => OrderGangStatesCompanion(
+          status: const Value('pending'),
+          firedAt: const Value(null),
+          readyAt: const Value(null),
+          servedAt: const Value(null),
+          updatedAt: Value(now),
+        ),
+      GangOrderStatus.fired => OrderGangStatesCompanion(
+          status: const Value('fired'),
+          readyAt: const Value(null),
+          servedAt: const Value(null),
+          updatedAt: Value(now),
+        ),
+      GangOrderStatus.ready => OrderGangStatesCompanion(
+          status: const Value('ready'),
+          servedAt: const Value(null),
+          updatedAt: Value(now),
+        ),
+      _ => throw ArgumentError(
+          'recallGang: toStatus must be pending/fired/ready, got $toStatus'),
+    };
+    await (_db.update(_db.orderGangStates)
+          ..where(
+            (t) =>
+                t.ticketId.equals(ticketId) &
+                t.gangTemplateId.equals(gangTemplateId),
+          ))
+        .write(companion);
+  }
+
   // =========================================================================
   // Mappers
   // =========================================================================

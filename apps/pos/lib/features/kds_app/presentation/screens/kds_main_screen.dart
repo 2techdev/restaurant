@@ -263,6 +263,58 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
         .fireGang(ticketId, gangTemplateId);
   }
 
+  /// Advance a Gang one step forward in the lifecycle (tap on chip).
+  ///   fired / inPrep → ready   (cook signals course is plated)
+  ///   ready          → served  (waiter bumps the course off the card)
+  Future<void> _advanceGang(
+    String ticketId,
+    String gangTemplateId,
+    GangOrderStatus current,
+  ) async {
+    final repo = ref.read(gangRepositoryProvider);
+    switch (current) {
+      case GangOrderStatus.fired:
+      case GangOrderStatus.inPrep:
+        HapticFeedback.lightImpact();
+        await repo.markGangReady(ticketId, gangTemplateId);
+      case GangOrderStatus.ready:
+        HapticFeedback.lightImpact();
+        await repo.markGangServed(ticketId, gangTemplateId);
+      case GangOrderStatus.pending:
+      case GangOrderStatus.served:
+        break; // no forward action
+    }
+  }
+
+  /// Recall a Gang one step back (long-press on chip). Lets the cook fix an
+  /// accidental mark-ready / bump without having to re-fire from pending.
+  Future<void> _recallGang(
+    String ticketId,
+    String gangTemplateId,
+    GangOrderStatus current,
+  ) async {
+    final repo = ref.read(gangRepositoryProvider);
+    GangOrderStatus? target;
+    switch (current) {
+      case GangOrderStatus.fired:
+      case GangOrderStatus.inPrep:
+        target = GangOrderStatus.pending;
+      case GangOrderStatus.ready:
+        target = GangOrderStatus.fired;
+      case GangOrderStatus.served:
+        target = GangOrderStatus.ready;
+      case GangOrderStatus.pending:
+        target = null;
+    }
+    if (target == null) return;
+    HapticFeedback.mediumImpact();
+    await repo.recallGang(
+      ticketId: ticketId,
+      gangTemplateId: gangTemplateId,
+      toStatus: target,
+    );
+  }
+
   // -------------------------------------------------------------------------
   // New-ticket detection + sound alert
   // -------------------------------------------------------------------------
@@ -828,6 +880,15 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
           onFire: (gang != null && status == GangOrderStatus.pending)
               ? () => _fireGang(ticket.ticketId, gang.id)
               : null,
+          onAdvance: (gang != null &&
+                  (status == GangOrderStatus.fired ||
+                      status == GangOrderStatus.inPrep ||
+                      status == GangOrderStatus.ready))
+              ? () => _advanceGang(ticket.ticketId, gang.id, status)
+              : null,
+          onRecall: (gang != null && status != GangOrderStatus.pending)
+              ? () => _recallGang(ticket.ticketId, gang.id, status)
+              : null,
         ));
 
         // Per-gang alert banner — red for allergy, gold for VIP. Makes the
@@ -985,6 +1046,8 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
     required DateTime? firedAt,
     required bool largeFont,
     VoidCallback? onFire,
+    VoidCallback? onAdvance,
+    VoidCallback? onRecall,
   }) {
     final baseColor = gang?.flutterColor ?? AppColors.textSecondary;
     final name = gang?.name ?? 'Andere';
@@ -1041,6 +1104,8 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
             baseColor: baseColor,
             largeFont: largeFont,
             onFire: onFire,
+            onAdvance: onAdvance,
+            onRecall: onRecall,
           ),
         ],
       ),
@@ -1090,11 +1155,17 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
 
   /// Trailing widget on the Gang header: FIRE button when pending, otherwise
   /// a status chip (FIRED / READY / SERVED).
+  ///
+  /// Chips are interactive on non-pending states:
+  ///   - tap       → [onAdvance] (fired/inPrep → ready; ready → served)
+  ///   - long-press → [onRecall] (one step back, to fix a miss-tap)
   Widget _buildGangStatusTrailing({
     required GangOrderStatus status,
     required Color baseColor,
     required bool largeFont,
     VoidCallback? onFire,
+    VoidCallback? onAdvance,
+    VoidCallback? onRecall,
   }) {
     if (status == GangOrderStatus.pending && onFire != null) {
       return GestureDetector(
@@ -1162,7 +1233,18 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
       ),
     };
 
-    return Container(
+    // Leading icon hints at the action available on tap — ✓ for mark-ready /
+    // bump, ↩ for recall-only (served).
+    IconData? hintIcon;
+    if (status == GangOrderStatus.fired ||
+        status == GangOrderStatus.inPrep ||
+        status == GangOrderStatus.ready) {
+      hintIcon = Icons.check_rounded;
+    } else if (status == GangOrderStatus.served) {
+      hintIcon = Icons.undo_rounded;
+    }
+
+    Widget chip = Container(
       padding: EdgeInsets.symmetric(
         horizontal: largeFont ? 8 : 6,
         vertical: largeFont ? 4 : 2,
@@ -1171,15 +1253,33 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
         color: bg,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: largeFont ? 10 : 8,
-          fontWeight: FontWeight.w900,
-          color: fg,
-          letterSpacing: 1.5,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hintIcon != null) ...[
+            Icon(hintIcon, size: largeFont ? 12 : 10, color: fg),
+            const SizedBox(width: 3),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: largeFont ? 10 : 8,
+              fontWeight: FontWeight.w900,
+              color: fg,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ],
       ),
+    );
+
+    if (onAdvance == null && onRecall == null) return chip;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onAdvance,
+      onLongPress: onRecall,
+      child: chip,
     );
   }
 
@@ -1335,7 +1435,7 @@ class _KdsMainScreenState extends ConsumerState<KdsMainScreen> {
           _footerDot(AppColors.green, 'Live sync active'), // #69F6B8
           const SizedBox(width: 24),
           _footerDot(AppColors.primary, // #90ABFF
-              'Tap = bump  •  Long-press = recall  •  Space/Enter = bump oldest'),
+              'Tap chip = advance gang  •  Long-press chip = recall  •  Tap card = bump ticket'),
           const Spacer(),
           const Text(
             'GASTROCORE KDS',
