@@ -178,6 +178,16 @@ class OrderRepositoryImpl {
   // Ticket status
   // =========================================================================
 
+  /// Update the guest (cover) count for a ticket.
+  Future<void> updateTicketGuestCount(String id, int guestCount) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
+      TicketsCompanion(
+        guestCount: Value(guestCount),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   /// Update the lifecycle status of a ticket.
   Future<void> updateTicketStatus(String id, TicketStatus newStatus) async {
     final companion = TicketsCompanion(
@@ -272,6 +282,18 @@ class OrderRepositoryImpl {
 
       await calculateTicketTotals(item.ticketId);
     });
+  }
+
+  /// Assign a seat number to an order item (null clears the assignment).
+  Future<void> updateItemSeat(String orderItemId, int? seatNumber) async {
+    await (_db.update(_db.orderItems)
+          ..where((i) => i.id.equals(orderItemId)))
+        .write(
+      OrderItemsCompanion(
+        seatNumber: Value(seatNumber),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Update the preparation status of an order item.
@@ -517,6 +539,7 @@ class OrderRepositoryImpl {
       notes: row.notes,
       course: row.course,
       gangId: row.gangId,
+      seatNumber: row.seatNumber,
       modifiers: modifiers,
     );
   }
@@ -538,6 +561,7 @@ class OrderRepositoryImpl {
       notes: Value(entity.notes),
       course: Value(entity.course),
       gangId: Value(entity.gangId),
+      seatNumber: Value(entity.seatNumber),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
       isDeleted: const Value(false),

@@ -170,6 +170,8 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     String? gangId,
     /// Category-level default Gang (fallback when product has no default).
     String? categoryGangId,
+    /// Seat number (1-based) this item belongs to. Null = unassigned.
+    int? seatNumber,
   }) {
     if (state == null) return;
 
@@ -209,11 +211,30 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
       notes: notes,
       course: course,
       gangId: resolvedGangId,
+      seatNumber: seatNumber,
       modifiers: modifiers,
       taxGroup: product.taxGroup,
     );
 
     state = state!.addItem(item);
+  }
+
+  /// Assign [seatNumber] to an existing order item (null clears it).
+  ///
+  /// Persists immediately so the split-bill screen can read a stable view
+  /// even if the app is interrupted mid-assignment.
+  Future<void> updateItemSeat(String itemId, int? seatNumber) async {
+    if (state == null) return;
+    final updatedItems = state!.items.map((item) {
+      if (item.id != itemId) return item;
+      return item.copyWith(seatNumber: () => seatNumber);
+    }).toList();
+    state = state!.copyWith(items: updatedItems);
+
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.updateItemSeat(itemId, seatNumber);
+    }
   }
 
   /// Override the Gang assignment for an existing order item.
@@ -482,6 +503,22 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     final repo = _ref.read(orderRepositoryProvider);
     await repo.removeTicketDiscount(state!.id);
     state = await repo.getTicketById(state!.id);
+  }
+
+  /// Update the guest count (cover count) for the current ticket.
+  ///
+  /// Seat-based split billing relies on this value to bound the seat picker
+  /// and to distribute unassigned items across seats equitably. Clamped to
+  /// a sane floor of 1 so the split calculator never divides by zero.
+  Future<void> updateGuestCount(int guestCount) async {
+    if (state == null) return;
+    final clamped = guestCount < 1 ? 1 : guestCount;
+    state = state!.copyWith(guestCount: clamped);
+
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.updateTicketGuestCount(state!.id, clamped);
+    }
   }
 
   /// Clear the current ticket (e.g. after payment).

@@ -1,47 +1,30 @@
-/// Split Bill Screen for GastroCore POS - Stitch V2 Design.
+/// Split Bill Screen — seat-first split payment.
 ///
-/// Equal Split / By Item / Custom Amount tabs.
-/// Guest count selector, per-person calculation, guest cards with
-/// paid/unpaid status, rounding adjustment.
-/// Matches Stitch V2 split_bill design exactly.
+/// Three modes, matching Sprint 2 P0.2:
+///  - **By Seat** (default): uses [SeatSplitCalculator] to derive a
+///    per-seat share from each item's [OrderItemEntity.seatNumber].
+///    Unassigned items are pooled and divided equally, with any penny
+///    remainder landing on seat 1 so the sum never drifts.
+///  - **By Item**: each line is paid individually; running balance tracks
+///    what's still outstanding.
+///  - **Custom Amount**: waiter types an ad-hoc tender; remainder stays
+///    on the ticket for the next round.
+///
+/// The seat-first split is the Gastrocore delta over SambaPOS-3 — there
+/// is no seat concept in SambaPOS, but fine-dining service needs per-seat
+/// totals *before* a single payment is tendered.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
-
-// ---------------------------------------------------------------------------
-// Demo data (MVP)
-// ---------------------------------------------------------------------------
-
-class _BillItem {
-  final String id;
-  final String name;
-  final String detail;
-  final int qty;
-  final int unitPrice;
-
-  const _BillItem({
-    required this.id,
-    required this.name,
-    this.detail = '',
-    required this.qty,
-    required this.unitPrice,
-  });
-
-  int get subtotal => qty * unitPrice;
-}
-
-const _kDemoBillItems = [
-  _BillItem(id: 'bi1', name: 'Izgara Tavuk', detail: 'Medium rare, no onions', qty: 2, unitPrice: 18500),
-  _BillItem(id: 'bi2', name: 'Adana Kebap', detail: 'Extra spicy', qty: 1, unitPrice: 21000),
-  _BillItem(id: 'bi3', name: 'Sezar Salata', qty: 1, unitPrice: 12000),
-  _BillItem(id: 'bi4', name: 'Ayran', detail: '300ml', qty: 2, unitPrice: 3500),
-  _BillItem(id: 'bi5', name: 'Kunefe', detail: 'Antep fistikli', qty: 1, unitPrice: 11000),
-  _BillItem(id: 'bi6', name: 'Mercimek Corbasi', qty: 2, unitPrice: 6500),
-];
+import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
+import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/features/payments/domain/services/seat_split_calculator.dart';
 
 // ---------------------------------------------------------------------------
 // Split Bill Screen
@@ -56,158 +39,59 @@ class SplitBillScreen extends ConsumerStatefulWidget {
   ConsumerState<SplitBillScreen> createState() => _SplitBillScreenState();
 }
 
+enum _SplitMode { seat, item, amount }
+
 class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
-  int _activeTab = 0; // 0 = Equal Split, 1 = By Item, 2 = Custom Amount
-  int _guestCount = 3;
+  _SplitMode _mode = _SplitMode.seat;
 
-  // Track which guests have paid (for demo)
-  final Set<int> _paidGuests = {1}; // Guest 2 is paid by default
+  /// Seats already settled (by seat number, 1-based).
+  final Set<int> _paidSeats = <int>{};
 
-  int get _grandTotal =>
-      _kDemoBillItems.fold<int>(0, (s, i) => s + i.subtotal);
+  /// Items already settled (by item id).
+  final Set<String> _paidItems = <String>{};
 
-  String _formatCHF(int cents) {
-    final abs = cents.abs();
-    final whole = abs ~/ 100;
-    final frac = (abs % 100).toString().padLeft(2, '0');
-    return 'CHF $whole.$frac';
+  /// Tenders collected under the Custom Amount tab, in cents.
+  final List<int> _customTenders = <int>[];
+  final TextEditingController _amountController = TextEditingController();
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
   }
-
-  int get _perPerson => _guestCount > 0 ? _grandTotal ~/ _guestCount : 0;
-  int get _remainder => _guestCount > 0 ? _grandTotal % _guestCount : 0;
 
   @override
   Widget build(BuildContext context) {
+    final ticketAsync = ref.watch(ticketByIdProvider(widget.ticketId));
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
-      body: Row(
-        children: [
-          // Left sidebar
-          _buildSidebar(),
-          // Main content
-          Expanded(
-            child: Column(
-              children: [
-                _buildHeader(),
-                _buildTabSelector(),
-                Expanded(child: _buildContent()),
-                _buildFooter(),
-              ],
-            ),
-          ),
-        ],
+      body: ticketAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(
+          child: Text('Fiş yüklenemedi: $err',
+              style: const TextStyle(color: AppColors.red)),
+        ),
+        data: (ticket) {
+          if (ticket == null) {
+            return const Center(
+              child: Text('Fiş bulunamadı',
+                  style: TextStyle(color: AppColors.textSecondary)),
+            );
+          }
+          return _buildBody(ticket);
+        },
       ),
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Sidebar
-  // -------------------------------------------------------------------------
-
-  Widget _buildSidebar() {
-    return Container(
-      width: 240,
-      color: AppColors.surface,
-      child: Column(
-        children: [
-          // Brand
-          Padding(
-            padding: const EdgeInsets.fromLTRB(32, 32, 32, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: [AppColors.primaryLight, AppColors.primary],
-                  ).createShader(bounds),
-                  child: const Text(
-                    'GastroCore',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'STATION 01',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF8C909F),
-                    letterSpacing: 2.0,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          // Nav items
-          _buildNavItem(Icons.shopping_cart, 'Order', true),
-          _buildNavItem(Icons.receipt_long, 'Records', false),
-          _buildNavItem(Icons.grid_view, 'Tables', false),
-          _buildNavItem(Icons.restaurant_menu, 'Menu', false),
-          _buildNavItem(Icons.terminal, 'KDS', false),
-          const Spacer(),
-          // Support
-          _buildNavItem(Icons.help, 'Support', false),
-          // Profile
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF33343B),
-                  ),
-                  child: const Icon(Icons.person, size: 20, color: AppColors.textSecondary),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Marco R.',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFE2E2EB)),
-                    ),
-                    Text(
-                      'Lead Chef',
-                      style: TextStyle(fontSize: 10, color: Color(0xFF8C909F)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, bool isActive) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: isActive ? AppColors.surfaceContainer : Colors.transparent,
-        border: isActive
-            ? const Border(left: BorderSide(color: AppColors.primary, width: 4))
-            : null,
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: isActive ? AppColors.textPrimary : AppColors.textSecondary),
-          const SizedBox(width: 16),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
+  Widget _buildBody(TicketEntity ticket) {
+    return Column(
+      children: [
+        _buildHeader(ticket),
+        _buildTabSelector(),
+        Expanded(child: _buildContent(ticket)),
+        _buildFooter(ticket),
+      ],
     );
   }
 
@@ -215,16 +99,15 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
   // Header
   // -------------------------------------------------------------------------
 
-  Widget _buildHeader() {
+  Widget _buildHeader(TicketEntity ticket) {
     return Container(
       height: 96,
       padding: const EdgeInsets.symmetric(horizontal: 40),
       color: AppColors.surfaceContainerHigh,
       child: Row(
         children: [
-          // Back button
           GestureDetector(
-            onTap: () => context.go('/order-center'),
+            onTap: () => context.pop(),
             child: Container(
               width: 48,
               height: 48,
@@ -232,17 +115,17 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                 color: AppColors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.arrow_back, color: Color(0xFFE2E2EB)),
+              child: const Icon(Icons.arrow_back,
+                  color: AppColors.textPrimary),
             ),
           ),
           const SizedBox(width: 24),
-          // Title
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Split Bill',
+                'Hesabı Böl',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
@@ -250,34 +133,33 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                   letterSpacing: -0.5,
                 ),
               ),
-              const Text(
-                'TABLE #12 \u2014 4 GUESTS',
-                style: TextStyle(
+              Text(
+                _subheader(ticket),
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFFC3C6D7),
+                  color: AppColors.textSecondary,
                   letterSpacing: 2.0,
                 ),
               ),
             ],
           ),
           const Spacer(),
-          // Total
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               const Text(
-                'TOTAL BALANCE',
+                'KALAN BAKİYE',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF8C909F),
+                  color: AppColors.textSecondary,
                   letterSpacing: 2.0,
                 ),
               ),
               Text(
-                _formatCHF(_grandTotal),
+                _formatCHF(_outstanding(ticket)),
                 style: const TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.w900,
@@ -292,12 +174,24 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
     );
   }
 
+  String _subheader(TicketEntity ticket) {
+    final parts = <String>[
+      'FİŞ #${ticket.orderNumber}',
+      '${ticket.guestCount} KİŞİ',
+    ];
+    if (ticket.tableId != null) {
+      parts.insert(0, 'MASA ${ticket.tableId}');
+    }
+    return parts.join('  \u2014  ');
+  }
+
   // -------------------------------------------------------------------------
-  // Tab Selector
+  // Tab selector
   // -------------------------------------------------------------------------
 
   Widget _buildTabSelector() {
-    const tabs = ['Equal Split', 'By Item', 'Custom Amount'];
+    const labels = ['Koltuk', 'Ürün', 'Tutar'];
+    const modes = [_SplitMode.seat, _SplitMode.item, _SplitMode.amount];
     return Padding(
       padding: const EdgeInsets.fromLTRB(40, 24, 40, 0),
       child: Align(
@@ -310,25 +204,34 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: List.generate(tabs.length, (i) {
-              final isActive = _activeTab == i;
+            children: List.generate(labels.length, (i) {
+              final isActive = _mode == modes[i];
               return GestureDetector(
-                onTap: () => setState(() => _activeTab = i),
+                key: Key('split_tab_${modes[i].name}'),
+                onTap: () => setState(() => _mode = modes[i]),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 32, vertical: 12),
                   decoration: BoxDecoration(
-                    color: isActive ? AppColors.surfaceContainerHigh : Colors.transparent,
+                    color: isActive
+                        ? AppColors.surfaceContainerHigh
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: isActive
-                        ? [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 12)]
+                        ? [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 12),
+                          ]
                         : null,
                   ),
                   child: Text(
-                    tabs[i],
+                    labels[i],
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight:
+                          isActive ? FontWeight.w700 : FontWeight.w500,
                       color: isActive
                           ? AppColors.textPrimary
                           : AppColors.textSecondary,
@@ -343,223 +246,78 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Content
-  // -------------------------------------------------------------------------
-
-  Widget _buildContent() {
-    switch (_activeTab) {
-      case 0:
-        return _buildEqualSplitContent();
-      case 1:
-        return _buildByItemContent();
-      case 2:
-        return _buildCustomContent();
-      default:
-        return _buildEqualSplitContent();
+  Widget _buildContent(TicketEntity ticket) {
+    switch (_mode) {
+      case _SplitMode.seat:
+        return _buildSeatMode(ticket);
+      case _SplitMode.item:
+        return _buildItemMode(ticket);
+      case _SplitMode.amount:
+        return _buildAmountMode(ticket);
     }
   }
 
-  // -- Equal Split --
-  Widget _buildEqualSplitContent() {
+  // -------------------------------------------------------------------------
+  // Seat mode
+  // -------------------------------------------------------------------------
+
+  Widget _buildSeatMode(TicketEntity ticket) {
+    final seatCount =
+        ticket.guestCount.clamp(1, 99); // guestCount defaults to 1
+    final result =
+        SeatSplitCalculator.split(ticket, seatCount: seatCount);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(40, 24, 40, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left: Controls
-          Expanded(
-            flex: 5,
-            child: Column(
-              children: [
-                // Guest count
-                Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1D1F26),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'NUMBER OF GUESTS',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF8C909F),
-                          letterSpacing: 2.0,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              if (_guestCount > 2) setState(() => _guestCount--);
-                            },
-                            child: Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceContainerHigh,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(Icons.remove, size: 28, color: Color(0xFFE2E2EB)),
-                            ),
-                          ),
-                          const SizedBox(width: 48),
-                          Text(
-                            '$_guestCount',
-                            style: const TextStyle(
-                              fontSize: 72,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 48),
-                          GestureDetector(
-                            onTap: () {
-                              if (_guestCount < 20) setState(() => _guestCount++);
-                            },
-                            child: Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceContainerHigh,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(Icons.add, size: 28, color: Color(0xFFE2E2EB)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Calculated per person
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1D1F26),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Stack(
-                      children: [
-                        // Gradient overlay
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppColors.primaryLight.withValues(alpha: 0.05),
-                                  AppColors.primary.withValues(alpha: 0.05),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                          ),
-                        ),
-                        Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                'CALCULATED PER PERSON',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primaryLight,
-                                  letterSpacing: 2.0,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _formatCHF(_perPerson),
-                                style: const TextStyle(
-                                  fontSize: 56,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.textPrimary,
-                                  letterSpacing: -2.0,
-                                ),
-                              ),
-                              if (_remainder > 0) ...[
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Remaining: ${_formatCHF(_remainder)} (Rounding adjustment)',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF8C909F),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 32),
-          // Right: Guest cards
-          Expanded(
-            flex: 7,
-            child: ListView.builder(
-              padding: const EdgeInsets.only(right: 8),
-              itemCount: _guestCount + (_remainder > 0 ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _guestCount) {
-                  // Rounding adjustment card
-                  return _buildRoundingCard();
-                }
-                final isPaid = _paidGuests.contains(index);
-                return _buildGuestCard(index, isPaid);
-              },
-            ),
-          ),
-        ],
+      child: ListView.builder(
+        itemCount: seatCount + (result.unassignedItems.isNotEmpty ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == seatCount) {
+            return _buildUnassignedCard(result.unassignedItems);
+          }
+          final seat = index + 1;
+          final share = result.shareBySeat[seat] ?? 0;
+          final items = result.itemsBySeat[seat] ?? const <OrderItemEntity>[];
+          final isPaid = _paidSeats.contains(seat);
+          return _buildSeatCard(seat, share, items, isPaid);
+        },
       ),
     );
   }
 
-  Widget _buildGuestCard(int index, bool isPaid) {
+  Widget _buildSeatCard(
+      int seat, int share, List<OrderItemEntity> items, bool isPaid) {
     return Container(
+      key: Key('seat_card_$seat'),
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: isPaid
-            ? const Color(0xFF22C55E).withValues(alpha: 0.05)
+            ? AppColors.green.withValues(alpha: 0.05)
             : AppColors.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
         border: isPaid
-            ? const Border(left: BorderSide(color: Color(0xFF22C55E), width: 4))
+            ? const Border(
+                left: BorderSide(color: AppColors.green, width: 4))
             : null,
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isPaid
-                  ? const Color(0xFF22C55E).withValues(alpha: 0.2)
-                  : AppColors.surfaceContainerHigh,
+                  ? AppColors.green.withValues(alpha: 0.2)
+                  : AppColors.surfaceContainer,
             ),
             child: Center(
               child: isPaid
-                  ? const Icon(Icons.check, color: Color(0xFF22C55E))
+                  ? const Icon(Icons.check, color: AppColors.green)
                   : Text(
-                      '${index + 1}',
+                      '$seat',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
@@ -569,13 +327,12 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
             ),
           ),
           const SizedBox(width: 24),
-          // Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Guest ${(index + 1).toString().padLeft(2, '0')}',
+                  'Koltuk ${seat.toString().padLeft(2, '0')}',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -583,57 +340,58 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: isPaid
-                        ? const Color(0xFF22C55E).withValues(alpha: 0.1)
-                        : const Color(0xFF1D1F26),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    isPaid ? 'Paid Cash' : 'Unpaid',
+                if (items.isEmpty)
+                  const Text(
+                    'Atanmış ürün yok',
                     style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isPaid ? FontWeight.w700 : FontWeight.w500,
-                      color: isPaid
-                          ? const Color(0xFF22C55E)
-                          : const Color(0xFFC3C6D7),
-                    ),
+                        fontSize: 12, color: AppColors.textSecondary),
+                  )
+                else
+                  Text(
+                    items
+                        .map((i) => '${i.quantity.toStringAsFixed(0)}× '
+                            '${i.productName}')
+                        .join(', '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
                   ),
-                ),
               ],
             ),
           ),
-          // Amount + action
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                _formatCHF(_perPerson),
-                style: TextStyle(
+                _formatCHF(share),
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                   color: AppColors.textPrimary,
-                  decorationColor: isPaid ? AppColors.textDim : null,
                 ),
               ),
-              if (!isPaid)
+              const SizedBox(height: 4),
+              if (isPaid)
+                const Text(
+                  'Ödendi',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.green,
+                      fontWeight: FontWeight.w700),
+                )
+              else
                 GestureDetector(
-                  onTap: () => setState(() => _paidGuests.add(index)),
+                  key: Key('settle_seat_$seat'),
+                  onTap: () => setState(() => _paidSeats.add(seat)),
                   child: const Text(
-                    'Settle Card',
+                    'Tahsil Et',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.primaryLight,
                     ),
                   ),
-                )
-              else
-                const Text(
-                  'Receipt #8821',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF8C909F)),
                 ),
             ],
           ),
@@ -642,105 +400,313 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
     );
   }
 
-  Widget _buildRoundingCard() {
+  Widget _buildUnassignedCard(List<OrderItemEntity> items) {
+    final total = items.fold<int>(0, (s, i) => s + i.subtotal);
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerHigh,
+        color: AppColors.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Opacity(
-        opacity: 0.4,
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF1D1F26),
-              ),
-              child: const Icon(Icons.info, color: Color(0xFF8C909F)),
+      child: Row(
+        children: [
+          const Icon(Icons.group, color: AppColors.textSecondary),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Koltuksuz (eşit dağıtıldı)',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${items.length} ürün',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
             ),
-            const SizedBox(width: 24),
-            const Text(
-              'Rounding Adjustment',
-              style: TextStyle(
-                fontSize: 14,
+          ),
+          Text(
+            _formatCHF(total),
+            style: const TextStyle(
+                fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF8C909F),
-              ),
-            ),
-            const Spacer(),
-            Text(
-              _formatCHF(_remainder),
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF8C909F),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // -- By Item (placeholder) --
-  Widget _buildByItemContent() {
-    return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.list_alt, size: 48, color: AppColors.textDim),
-          SizedBox(height: 16),
-          Text(
-            'Item-based splitting',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Drag items to assign them to individual guests',
-            style: TextStyle(fontSize: 13, color: AppColors.textDim),
+                color: AppColors.textPrimary),
           ),
         ],
       ),
     );
   }
 
-  // -- Custom (placeholder) --
-  Widget _buildCustomContent() {
-    return const Center(
+  // -------------------------------------------------------------------------
+  // Item mode
+  // -------------------------------------------------------------------------
+
+  Widget _buildItemMode(TicketEntity ticket) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(40, 24, 40, 0),
+      child: ListView.builder(
+        itemCount: ticket.items.length,
+        itemBuilder: (context, index) {
+          final item = ticket.items[index];
+          final isPaid = _paidItems.contains(item.id);
+          return Container(
+            key: Key('item_row_${item.id}'),
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isPaid
+                  ? AppColors.green.withValues(alpha: 0.05)
+                  : AppColors.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(12),
+              border: isPaid
+                  ? const Border(
+                      left:
+                          BorderSide(color: AppColors.green, width: 4))
+                  : null,
+            ),
+            child: Row(
+              children: [
+                if (item.seatNumber != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '#${item.seatNumber}',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryLight),
+                    ),
+                  ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${item.quantity.toStringAsFixed(0)}× '
+                        '${item.productName}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (item.notes != null && item.notes!.isNotEmpty)
+                        Text(
+                          item.notes!,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary),
+                        ),
+                    ],
+                  ),
+                ),
+                Text(
+                  _formatCHF(item.subtotal),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: isPaid
+                        ? AppColors.textSecondary
+                        : AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                if (isPaid)
+                  const Icon(Icons.check_circle, color: AppColors.green)
+                else
+                  GestureDetector(
+                    key: Key('settle_item_${item.id}'),
+                    onTap: () =>
+                        setState(() => _paidItems.add(item.id)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Tahsil',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primaryLight),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Amount mode
+  // -------------------------------------------------------------------------
+
+  Widget _buildAmountMode(TicketEntity ticket) {
+    final outstanding = _outstanding(ticket);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(40, 24, 40, 0),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.edit, size: 48, color: AppColors.textDim),
-          SizedBox(height: 16),
-          Text(
-            'Custom amount splitting',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainer,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const Key('split_amount_field'),
+                    controller: _amountController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'[0-9.,]')),
+                    ],
+                    style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary),
+                    decoration: const InputDecoration(
+                      hintText: '0.00',
+                      hintStyle: TextStyle(color: AppColors.textDim),
+                      prefixText: 'CHF  ',
+                      prefixStyle: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  key: const Key('split_amount_add'),
+                  onPressed: outstanding > 0
+                      ? () => _addCustomTender(outstanding)
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Ekle',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                ),
+              ],
+            ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 16),
           Text(
-            'Enter custom amounts for each guest',
-            style: TextStyle(fontSize: 13, color: AppColors.textDim),
+            'Tahsil edilenler',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary
+                    .withValues(alpha: 0.9)),
           ),
+          const SizedBox(height: 8),
+          if (_customTenders.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text('Henüz tutar eklenmedi.',
+                  style:
+                      TextStyle(color: AppColors.textDim, fontSize: 13)),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: _customTenders.length,
+                itemBuilder: (context, index) {
+                  final cents = _customTenders[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Text('Tender #${index + 1}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary)),
+                        const Spacer(),
+                        Text(_formatCHF(cents),
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textPrimary)),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          color: AppColors.textSecondary,
+                          onPressed: () => setState(
+                              () => _customTenders.removeAt(index)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  void _addCustomTender(int outstanding) {
+    final raw = _amountController.text.trim().replaceAll(',', '.');
+    final parsed = double.tryParse(raw);
+    if (parsed == null || parsed <= 0) return;
+    final cents = (parsed * 100).round();
+    if (cents <= 0) return;
+    final capped = cents.clamp(0, outstanding);
+    setState(() {
+      _customTenders.add(capped);
+      _amountController.clear();
+    });
   }
 
   // -------------------------------------------------------------------------
   // Footer
   // -------------------------------------------------------------------------
 
-  Widget _buildFooter() {
+  Widget _buildFooter(TicketEntity ticket) {
+    final outstanding = _outstanding(ticket);
+    final settled = ticket.total - outstanding;
     return Container(
-      height: 128,
+      height: 112,
       padding: const EdgeInsets.symmetric(horizontal: 40),
       decoration: BoxDecoration(
-        color: const Color(0xFF1D1F26),
+        color: AppColors.surfaceContainer,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.2),
@@ -751,89 +717,136 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
       ),
       child: Row(
         children: [
-          // Print All
-          GestureDetector(
-            child: Container(
-              height: 64,
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(16),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('TAHSIL EDILEN',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5)),
+              Text(
+                _formatCHF(settled),
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.green),
               ),
-              child: const Row(
-                children: [
-                  Icon(Icons.print, color: AppColors.textPrimary),
-                  SizedBox(width: 12),
-                  Text(
-                    'Print All Drafts',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                  ),
-                ],
-              ),
-            ),
+            ],
           ),
-          const SizedBox(width: 16),
-          // Reset Split
+          const SizedBox(width: 32),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('KALAN',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5)),
+              Text(
+                _formatCHF(outstanding),
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          const Spacer(),
           GestureDetector(
-            onTap: () => setState(_paidGuests.clear),
+            key: const Key('split_reset'),
+            onTap: () => setState(() {
+              _paidSeats.clear();
+              _paidItems.clear();
+              _customTenders.clear();
+              _amountController.clear();
+            }),
             child: Container(
-              height: 64,
-              padding: const EdgeInsets.symmetric(horizontal: 32),
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: const Row(
                 children: [
                   Icon(Icons.undo, color: AppColors.textPrimary),
-                  SizedBox(width: 12),
-                  Text(
-                    'Reset Split',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                  ),
+                  SizedBox(width: 8),
+                  Text('Sıfırla',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary)),
                 ],
               ),
             ),
           ),
-          const Spacer(),
-          // Settle All
+          const SizedBox(width: 12),
           GestureDetector(
-            onTap: () => context.go('/order-center'),
-            child: Container(
-              height: 64,
-              padding: const EdgeInsets.symmetric(horizontal: 48),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.primaryLight, AppColors.primary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            key: const Key('split_settle_all'),
+            onTap: outstanding == 0 ? () => context.pop() : null,
+            child: Opacity(
+              opacity: outstanding == 0 ? 1.0 : 0.5,
+              child: Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primaryLight, AppColors.primary],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.2),
-                    blurRadius: 24,
-                  ),
-                ],
-              ),
-              child: const Row(
-                children: [
-                  Text(
-                    'Settle All Bills',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Icon(Icons.payments, color: Colors.white),
-                ],
+                child: const Row(
+                  children: [
+                    Text('Hesabı Kapat',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white)),
+                    SizedBox(width: 12),
+                    Icon(Icons.payments, color: Colors.white),
+                  ],
+                ),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------------
+
+  int _outstanding(TicketEntity ticket) {
+    int settled = 0;
+    switch (_mode) {
+      case _SplitMode.seat:
+        final result = SeatSplitCalculator.split(ticket,
+            seatCount: ticket.guestCount.clamp(1, 99));
+        for (final seat in _paidSeats) {
+          settled += result.shareBySeat[seat] ?? 0;
+        }
+      case _SplitMode.item:
+        for (final item in ticket.items) {
+          if (_paidItems.contains(item.id)) settled += item.subtotal;
+        }
+      case _SplitMode.amount:
+        settled = _customTenders.fold<int>(0, (s, v) => s + v);
+    }
+    final remaining = ticket.total - settled;
+    return remaining < 0 ? 0 : remaining;
+  }
+
+  String _formatCHF(int cents) {
+    final abs = cents.abs();
+    final whole = abs ~/ 100;
+    final frac = (abs % 100).toString().padLeft(2, '0');
+    return 'CHF $whole.$frac';
   }
 }

@@ -65,12 +65,12 @@ class OrderPanel extends ConsumerWidget {
 // Cover header — table info
 // ---------------------------------------------------------------------------
 
-class _CoverHeader extends StatelessWidget {
+class _CoverHeader extends ConsumerWidget {
   const _CoverHeader({required this.ticket});
   final TicketEntity? ticket;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tableLabel = ticket?.tableId != null
         ? 'Masa ${ticket!.tableId}'
         : 'Paket Servis';
@@ -106,40 +106,93 @@ class _CoverHeader extends StatelessWidget {
               ],
             ),
           ),
-          if (cover > 0) _CoverBadge(count: cover),
+          if (ticket != null)
+            _CoverStepper(
+              count: cover,
+              onChanged: (next) {
+                ref
+                    .read(currentTicketProvider.notifier)
+                    .updateGuestCount(next);
+              },
+            ),
         ],
       ),
     );
   }
 }
 
-class _CoverBadge extends StatelessWidget {
-  const _CoverBadge({required this.count});
+/// Compact ± stepper for the cover (guest) count. Clamped to [1, kMaxCover].
+class _CoverStepper extends StatelessWidget {
+  const _CoverStepper({required this.count, required this.onChanged});
+
+  static const int _min = 1;
+  static const int _max = 20;
+
   final int count;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.primaryContainer.withValues(alpha: 0.25),
+        color: AppColors.primaryContainer.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.people_alt_rounded,
-              size: 14, color: AppColors.primary),
-          const SizedBox(width: 4),
-          Text(
-            '$count',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
+          _stepButton(
+            icon: Icons.remove_rounded,
+            enabled: count > _min,
+            onTap: () => onChanged(count - 1),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.people_alt_rounded,
+                    size: 14, color: AppColors.primary),
+                const SizedBox(width: 4),
+                Text(
+                  '$count',
+                  key: const Key('cover_count_value'),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
             ),
           ),
+          _stepButton(
+            icon: Icons.add_rounded,
+            enabled: count < _max,
+            onTap: () => onChanged(count + 1),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _stepButton({
+    required IconData icon,
+    required bool enabled,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      customBorder: const CircleBorder(),
+      child: SizedBox(
+        width: 24,
+        height: 24,
+        child: Icon(
+          icon,
+          size: 16,
+          color: enabled ? AppColors.primary : AppColors.textDim,
+        ),
       ),
     );
   }
@@ -396,12 +449,14 @@ class _GangSection extends StatelessWidget {
   }
 }
 
-class _OrderItemRow extends StatelessWidget {
+class _OrderItemRow extends ConsumerWidget {
   const _OrderItemRow({required this.item});
   final OrderItemEntity item;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ticket = ref.watch(currentTicketProvider);
+    final seatCount = ticket?.guestCount ?? 1;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -451,6 +506,12 @@ class _OrderItemRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppTokens.space8),
+          _SeatChip(
+            seatNumber: item.seatNumber,
+            seatCount: seatCount,
+            onTap: () => _pickSeat(context, ref, item, seatCount),
+          ),
+          const SizedBox(width: AppTokens.space8),
           Text(
             _formatCHF(item.subtotal),
             style: const TextStyle(
@@ -464,10 +525,164 @@ class _OrderItemRow extends StatelessWidget {
     );
   }
 
+  Future<void> _pickSeat(
+    BuildContext context,
+    WidgetRef ref,
+    OrderItemEntity item,
+    int seatCount,
+  ) async {
+    final picked = await showModalBottomSheet<int?>(
+      context: context,
+      backgroundColor: AppColors.surfaceContainer,
+      builder: (sheetCtx) => _SeatPickerSheet(
+        current: item.seatNumber,
+        seatCount: seatCount,
+      ),
+    );
+    if (picked == null && item.seatNumber == null) return;
+    await ref
+        .read(currentTicketProvider.notifier)
+        .updateItemSeat(item.id, picked);
+  }
+
   static String _formatCHF(int cents) {
     final whole = cents ~/ 100;
     final frac = (cents % 100).toString().padLeft(2, '0');
     return 'CHF $whole.$frac';
+  }
+}
+
+/// Compact badge showing the seat number, or "—" when unassigned.
+class _SeatChip extends StatelessWidget {
+  const _SeatChip({
+    required this.seatNumber,
+    required this.seatCount,
+    required this.onTap,
+  });
+  final int? seatNumber;
+  final int seatCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = seatNumber == null ? '—' : '#$seatNumber';
+    final assigned = seatNumber != null;
+    return Material(
+      color: assigned
+          ? AppColors.primaryContainer.withValues(alpha: 0.22)
+          : AppColors.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(6),
+      child: InkWell(
+        onTap: seatCount <= 0 ? null : onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          child: Text(
+            label,
+            key: ValueKey('seat_chip_${seatNumber ?? 'none'}'),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: assigned ? AppColors.primary : AppColors.textDim,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom-sheet picker for seat assignment (1..seatCount + "Kaldır").
+class _SeatPickerSheet extends StatelessWidget {
+  const _SeatPickerSheet({required this.current, required this.seatCount});
+  final int? current;
+  final int seatCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppTokens.space16,
+          AppTokens.space16,
+          AppTokens.space16,
+          AppTokens.space16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: AppTokens.space12),
+              child: Text(
+                'Koltuk seç',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            Wrap(
+              spacing: AppTokens.space8,
+              runSpacing: AppTokens.space8,
+              children: [
+                for (var s = 1; s <= seatCount; s++)
+                  _pickerButton(
+                    context: context,
+                    label: '#$s',
+                    selected: current == s,
+                    value: s,
+                  ),
+                _pickerButton(
+                  context: context,
+                  label: 'Kaldır',
+                  selected: current == null,
+                  value: null,
+                  isClear: true,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pickerButton({
+    required BuildContext context,
+    required String label,
+    required bool selected,
+    required int? value,
+    bool isClear = false,
+  }) {
+    return SizedBox(
+      width: 72,
+      height: 48,
+      child: Material(
+        color: selected
+            ? AppColors.primaryContainer
+            : (isClear
+                ? AppColors.surfaceContainerHigh
+                : AppColors.surfaceContainerHigh),
+        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+        child: InkWell(
+          onTap: () => Navigator.of(context).pop(value),
+          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: selected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -141,6 +141,12 @@ class OrderItemEntity {
   /// References GangTemplate.id. Null = no Gang assigned.
   final String? gangId;
 
+  /// Seat number this item is assigned to (1-based). Null = unassigned.
+  ///
+  /// Drives seat-based split billing. Kept nullable so single-cover tickets
+  /// and walk-ups don't need to pick a seat.
+  final int? seatNumber;
+
   /// Modifiers applied to this item.
   final List<OrderItemModifierEntity> modifiers;
 
@@ -192,6 +198,7 @@ class OrderItemEntity {
     this.notes,
     this.course = 1,
     this.gangId,
+    this.seatNumber,
     this.modifiers = const [],
     this.isTaxFree = false,
     this.isOpenPrice = false,
@@ -226,6 +233,7 @@ class OrderItemEntity {
     String? Function()? notes,
     int? course,
     String? Function()? gangId,
+    int? Function()? seatNumber,
     List<OrderItemModifierEntity>? modifiers,
     bool? isTaxFree,
     bool? isOpenPrice,
@@ -251,6 +259,7 @@ class OrderItemEntity {
       notes: notes != null ? notes() : this.notes,
       course: course ?? this.course,
       gangId: gangId != null ? gangId() : this.gangId,
+      seatNumber: seatNumber != null ? seatNumber() : this.seatNumber,
       modifiers: modifiers ?? this.modifiers,
       isTaxFree: isTaxFree ?? this.isTaxFree,
       isOpenPrice: isOpenPrice ?? this.isOpenPrice,
@@ -282,6 +291,7 @@ class OrderItemEntity {
           sentToKitchen == other.sentToKitchen &&
           notes == other.notes &&
           course == other.course &&
+          seatNumber == other.seatNumber &&
           isTaxFree == other.isTaxFree &&
           isOpenPrice == other.isOpenPrice &&
           isWeightBased == other.isWeightBased &&
@@ -306,6 +316,7 @@ class OrderItemEntity {
         sentToKitchen,
         notes,
         course,
+        seatNumber,
         isTaxFree,
         isWeightBased,
         specialDiscountAmount,

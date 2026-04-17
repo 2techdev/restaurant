@@ -22,6 +22,12 @@ class OrderItems extends Table {
   /// Waiter can override per-item at order time.
   TextColumn get gangId => text().nullable()();
 
+  /// Seat number this item is assigned to (1-based). Null = unassigned.
+  ///
+  /// First-class field (not a tag) so seat-based split billing is indexable
+  /// without parsing a modifier string. A SambaPOS-era gap we fill on day one.
+  IntColumn get seatNumber => integer().nullable()();
+
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   IntColumn get syncStatus => integer().withDefault(const Constant(0))();
