@@ -213,6 +213,11 @@ class KitchenRepositoryImpl {
       tableName = tableRow?.name;
     }
 
+    // Resolve the ticket's kitchen station from the items' products. When all
+    // items belong to the same station we route the ticket there; mixed orders
+    // fall through to 'kitchen' (the pass / expo lane) so nothing is lost.
+    final station = await _resolveTicketStation(items);
+
     final kitchenItems = <KitchenTicketItemEntity>[];
 
     await _db.transaction(() async {
@@ -224,7 +229,7 @@ class KitchenRepositoryImpl {
               kitchenTableName: Value(tableName),
               waiterName: Value(waiterName),
               orderNumber: Value(int.tryParse(ticket.orderNumber) ?? 0),
-              printerGroup: const Value('kitchen'),
+              printerGroup: Value(station),
               status: const Value('pending'),
               sentAt: Value(now),
               createdAt: Value(now),
@@ -305,11 +310,35 @@ class KitchenRepositoryImpl {
       tableName: tableName,
       waiterName: waiterName,
       orderNumber: ticket.orderNumber,
-      printerGroup: 'kitchen',
+      printerGroup: station,
       status: KitchenTicketStatus.pending,
       items: kitchenItems,
       sentAt: now,
     );
+  }
+
+  /// Resolve a single station [printerGroup] for a set of order items.
+  ///
+  /// Looks up each item's product and reads [Products.printerGroup]. If every
+  /// item resolves to the same non-empty station code, that station wins. If
+  /// the items span multiple stations (fine-dining mixed order) or no station
+  /// can be resolved at all, we fall back to `'kitchen'` — which matches the
+  /// default station code and keeps the ticket on the pass / expo lane.
+  Future<String> _resolveTicketStation(List<OrderItemEntity> items) async {
+    final productIds = items.map((i) => i.productId).toSet().toList();
+    if (productIds.isEmpty) return 'kitchen';
+
+    final productRows = await (_db.select(_db.products)
+          ..where((p) => p.id.isIn(productIds)))
+        .get();
+
+    final groups = productRows
+        .map((p) => p.printerGroup)
+        .where((g) => g.isNotEmpty)
+        .toSet();
+
+    if (groups.length == 1) return groups.first;
+    return 'kitchen';
   }
 
   // =========================================================================

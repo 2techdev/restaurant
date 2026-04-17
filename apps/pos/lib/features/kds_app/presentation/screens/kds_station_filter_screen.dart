@@ -1,8 +1,10 @@
 /// KDS Station Filter Screen — select which kitchen station to display.
 ///
-/// Stations match the [printerGroup] field on [KitchenTicketEntity].
-/// Selecting a station filters the main KDS grid to show only that station's
-/// tickets. Selecting "All Stations" clears the filter.
+/// Stations match the [printerGroup] field on [KitchenTicketEntity] and are
+/// loaded from the DB-backed [stationsProvider], so restaurants can manage
+/// their own list from settings. Selecting a station filters the main KDS
+/// grid to show only that station's tickets. Selecting "All Stations" clears
+/// the filter.
 library;
 
 import 'package:flutter/material.dart';
@@ -13,28 +15,7 @@ import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_provider.dart';
 import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_providers.dart';
 import 'package:gastrocore_pos/features/kds_app/router/kds_router.dart';
-
-// ---------------------------------------------------------------------------
-// Builtin station definitions
-// ---------------------------------------------------------------------------
-
-class _Station {
-  final String id; // matches printerGroup value
-  final String label;
-  final IconData icon;
-
-  const _Station(this.id, this.label, this.icon);
-}
-
-const _kBuiltinStations = [
-  _Station('kitchen', 'Kitchen', Icons.local_fire_department),
-  _Station('grill', 'Grill', Icons.outdoor_grill),
-  _Station('bar', 'Bar', Icons.local_bar),
-  _Station('dessert', 'Dessert', Icons.cake),
-  _Station('cold', 'Cold / Salads', Icons.ac_unit),
-  _Station('fryer', 'Fryer', Icons.set_meal),
-  _Station('expo', 'Expo / Pass', Icons.restaurant),
-];
+import 'package:gastrocore_pos/features/stations/presentation/providers/station_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -47,12 +28,12 @@ class KdsStationFilterScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentFilter = ref.watch(kdsStationFilterProvider);
     final ticketsAsync = ref.watch(activeKitchenTicketsProvider);
+    final stationsAsync = ref.watch(stationsProvider);
 
-    // Count active tickets per station group.
-    final countByGroup = <String, int>{};
+    // Count active tickets per station code.
+    final countByCode = <String, int>{};
     ticketsAsync.valueOrNull?.forEach((t) {
-      countByGroup[t.printerGroup] =
-          (countByGroup[t.printerGroup] ?? 0) + 1;
+      countByCode[t.printerGroup] = (countByCode[t.printerGroup] ?? 0) + 1;
     });
 
     void select(String? stationId) {
@@ -91,42 +72,61 @@ class KdsStationFilterScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
-
-            // All stations tile
             _StationTile(
               icon: Icons.grid_view,
               label: 'All Stations',
-              subtitle: '${ticketsAsync.valueOrNull?.length ?? 0} active tickets',
+              subtitle:
+                  '${ticketsAsync.valueOrNull?.length ?? 0} active tickets',
               isSelected: currentFilter == null,
               onTap: () => select(null),
             ),
             const SizedBox(height: 12),
-
             const Divider(color: AppColors.outlineVariant),
             const SizedBox(height: 12),
-
             Expanded(
-              child: GridView.builder(
-                gridDelegate:
-                    const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 280,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 2.8,
+              child: stationsAsync.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(),
                 ),
-                itemCount: _kBuiltinStations.length,
-                itemBuilder: (context, i) {
-                  final station = _kBuiltinStations[i];
-                  final count = countByGroup[station.id] ?? 0;
-                  return _StationTile(
-                    icon: station.icon,
-                    label: station.label,
-                    subtitle: count > 0
-                        ? '$count active ticket${count == 1 ? '' : 's'}'
-                        : 'No active tickets',
-                    isSelected: currentFilter == station.id,
-                    onTap: () => select(station.id),
-                    badgeCount: count,
+                error: (err, _) => Center(
+                  child: Text(
+                    'Failed to load stations: $err',
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+                data: (stations) {
+                  if (stations.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No stations configured yet.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    );
+                  }
+                  return GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 280,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 2.8,
+                    ),
+                    itemCount: stations.length,
+                    itemBuilder: (context, i) {
+                      final station = stations[i];
+                      final count = countByCode[station.code] ?? 0;
+                      return _StationTile(
+                        icon: station.iconData,
+                        label: station.name,
+                        subtitle: count > 0
+                            ? '$count active ticket${count == 1 ? '' : 's'}'
+                            : 'No active tickets',
+                        isSelected: currentFilter == station.code,
+                        onTap: () => select(station.code),
+                        badgeCount: count,
+                        accent: station.accentColor,
+                      );
+                    },
                   );
                 },
               ),
@@ -149,6 +149,7 @@ class _StationTile extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final int badgeCount;
+  final Color? accent;
 
   const _StationTile({
     required this.icon,
@@ -157,6 +158,7 @@ class _StationTile extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     this.badgeCount = 0,
+    this.accent,
   });
 
   @override
@@ -185,7 +187,7 @@ class _StationTile extends StatelessWidget {
               size: 22,
               color: isSelected
                   ? AppColors.primary
-                  : AppColors.textSecondary,
+                  : (accent ?? AppColors.textSecondary),
             ),
             const SizedBox(width: 12),
             Expanded(
