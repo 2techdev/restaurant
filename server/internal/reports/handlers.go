@@ -31,111 +31,189 @@ func (m *Module) handleDailyReport(w http.ResponseWriter, r *http.Request) {
 		day = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	}
 	dayEnd := day.Add(24*time.Hour - time.Nanosecond)
+	m.writePeriodReport(w, r, tenantID, day, dayEnd, day.Format("2006-01-02"))
+}
 
-	// Core revenue aggregation
-	var totalRevenue, totalTax, totalDiscounts, netRevenue int64
-	var totalOrders int
-	var avgOrderValue int64
+// handleWeeklyReport returns a sales summary for the last 7 days.
+// GET /api/v1/reports/weekly
+func (m *Module) handleWeeklyReport(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.GetTenantID(r.Context())
+	if tenantID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Tenant context required")
+		return
+	}
+	now := time.Now()
+	end := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, now.Location())
+	start := end.AddDate(0, 0, -6)
+	start = time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
+	m.writePeriodReport(w, r, tenantID, start, end, start.Format("2006-01-02"))
+}
+
+// handleMonthlyReport returns a sales summary for the current calendar month.
+// GET /api/v1/reports/monthly
+func (m *Module) handleMonthlyReport(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.GetTenantID(r.Context())
+	if tenantID == "" {
+		response.Error(w, http.StatusForbidden, "FORBIDDEN", "Tenant context required")
+		return
+	}
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	end := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
+	m.writePeriodReport(w, r, tenantID, start, end, start.Format("2006-01-02"))
+}
+
+// writePeriodReport runs the aggregations for a given date range and writes
+// the response in the shape the backoffice Reports page expects (revenue /
+// order_count / average_order / hourly_sales / by_payment / top_products /
+// by_category). Each aggregation swallows its own error so a single empty
+// table never takes down the whole report.
+func (m *Module) writePeriodReport(w http.ResponseWriter, r *http.Request, tenantID string, start, end time.Time, dateLabel string) {
+	var revenue, orderCount int64
+	var averageOrder int64
 
 	err := m.db.QueryRowContext(r.Context(), `
 		SELECT
 			COUNT(*) FILTER (WHERE status NOT IN ('void','open')),
 			COALESCE(SUM(total) FILTER (WHERE status NOT IN ('void','open')), 0),
-			COALESCE(AVG(total) FILTER (WHERE status NOT IN ('void','open'))::BIGINT, 0),
-			COALESCE(SUM(tax_amount) FILTER (WHERE status NOT IN ('void','open')), 0),
-			COALESCE(SUM(discount_amount) FILTER (WHERE status NOT IN ('void','open')), 0),
-			COALESCE(SUM(total - discount_amount) FILTER (WHERE status NOT IN ('void','open')), 0)
+			COALESCE(AVG(total) FILTER (WHERE status NOT IN ('void','open'))::BIGINT, 0)
 		FROM tickets
-		WHERE tenant_id = $1
-		  AND is_deleted = FALSE
-		  AND created_at >= $2
-		  AND created_at <= $3
-	`, tenantID, day, dayEnd).Scan(
-		&totalOrders, &totalRevenue, &avgOrderValue,
-		&totalTax, &totalDiscounts, &netRevenue,
-	)
+		WHERE tenant_id = $1 AND is_deleted = FALSE
+		  AND created_at >= $2 AND created_at <= $3
+	`, tenantID, start, end).Scan(&orderCount, &revenue, &averageOrder)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to aggregate daily stats")
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to aggregate period stats")
 		return
 	}
 
-	// Orders by type
-	typeRows, err := m.db.QueryContext(r.Context(), `
-		SELECT order_type, COUNT(*)
-		FROM tickets
-		WHERE tenant_id = $1 AND is_deleted = FALSE
-		  AND status NOT IN ('void','open')
-		  AND created_at >= $2 AND created_at <= $3
-		GROUP BY order_type
-	`, tenantID, day, dayEnd)
-	ordersByType := map[string]int{}
-	if err == nil {
-		defer typeRows.Close()
-		for typeRows.Next() {
-			var ot string
-			var cnt int
-			if typeRows.Scan(&ot, &cnt) == nil {
-				ordersByType[ot] = cnt
-			}
-		}
-	}
-
-	// Payments by method (from payments table)
-	payRows, err := m.db.QueryContext(r.Context(), `
-		SELECT payment_method, COUNT(*), COALESCE(SUM(amount), 0)
-		FROM payments p
-		JOIN tickets t ON t.id = p.ticket_id
-		WHERE p.tenant_id = $1 AND p.is_deleted = FALSE
-		  AND p.paid_at >= $2 AND p.paid_at <= $3
-		GROUP BY payment_method
-	`, tenantID, day, dayEnd)
-	paymentsByMethod := map[string]int64{}
-	if err == nil {
-		defer payRows.Close()
-		for payRows.Next() {
-			var method string
-			var cnt int
-			var amount int64
-			if payRows.Scan(&method, &cnt, &amount) == nil {
-				_ = cnt
-				paymentsByMethod[method] = amount
-			}
-		}
-	}
-
-	// Hourly breakdown (24 buckets)
-	hourlyRows, err := m.db.QueryContext(r.Context(), `
-		SELECT EXTRACT(HOUR FROM created_at)::INT, COALESCE(SUM(total), 0)
-		FROM tickets
-		WHERE tenant_id = $1 AND is_deleted = FALSE
-		  AND status NOT IN ('void','open')
-		  AND created_at >= $2 AND created_at <= $3
-		GROUP BY EXTRACT(HOUR FROM created_at)
-	`, tenantID, day, dayEnd)
-	hourlyBreakdown := make([]int64, 24)
-	if err == nil {
-		defer hourlyRows.Close()
-		for hourlyRows.Next() {
-			var hour int
-			var amount int64
-			if hourlyRows.Scan(&hour, &amount) == nil && hour >= 0 && hour < 24 {
-				hourlyBreakdown[hour] = amount
-			}
-		}
-	}
+	hourlySales := m.loadHourlySales(r, tenantID, start, end)
+	byPayment := m.loadPaymentBreakdown(r, tenantID, start, end)
+	topProducts := m.loadTopProducts(r, tenantID, start, end, 10)
+	byCategory := m.loadCategoryBreakdown(r, tenantID, start, end)
 
 	response.JSON(w, http.StatusOK, map[string]any{
-		"date":                day.Format("2006-01-02"),
-		"total_revenue":       totalRevenue,
-		"total_orders":        totalOrders,
-		"average_order_value": avgOrderValue,
-		"total_tax":           totalTax,
-		"total_discounts":     totalDiscounts,
-		"net_revenue":         netRevenue,
-		"orders_by_type":      ordersByType,
-		"payments_by_method":  paymentsByMethod,
-		"hourly_breakdown":    hourlyBreakdown,
+		"date":          dateLabel,
+		"revenue":       revenue,
+		"order_count":   orderCount,
+		"average_order": averageOrder,
+		"hourly_sales":  hourlySales,
+		"by_payment":    byPayment,
+		"top_products":  topProducts,
+		"by_category":   byCategory,
 	})
+}
+
+func (m *Module) loadHourlySales(r *http.Request, tenantID string, start, end time.Time) []map[string]any {
+	rows, err := m.db.QueryContext(r.Context(), `
+		SELECT EXTRACT(HOUR FROM created_at)::INT AS hr,
+		       COALESCE(SUM(total), 0)
+		FROM tickets
+		WHERE tenant_id = $1 AND is_deleted = FALSE
+		  AND status NOT IN ('void','open')
+		  AND created_at >= $2 AND created_at <= $3
+		GROUP BY hr
+		ORDER BY hr
+	`, tenantID, start, end)
+	if err != nil {
+		return []map[string]any{}
+	}
+	defer rows.Close()
+	out := make([]map[string]any, 0, 24)
+	for rows.Next() {
+		var hr int
+		var total int64
+		if rows.Scan(&hr, &total) == nil {
+			out = append(out, map[string]any{"hour": hr, "total": total})
+		}
+	}
+	return out
+}
+
+func (m *Module) loadPaymentBreakdown(r *http.Request, tenantID string, start, end time.Time) []map[string]any {
+	rows, err := m.db.QueryContext(r.Context(), `
+		SELECT payment_method, COALESCE(SUM(amount), 0)
+		FROM payments
+		WHERE tenant_id = $1 AND is_deleted = FALSE
+		  AND paid_at >= $2 AND paid_at <= $3
+		GROUP BY payment_method
+		ORDER BY 2 DESC
+	`, tenantID, start, end)
+	if err != nil {
+		return []map[string]any{}
+	}
+	defer rows.Close()
+	out := make([]map[string]any, 0)
+	for rows.Next() {
+		var method string
+		var total int64
+		if rows.Scan(&method, &total) == nil {
+			out = append(out, map[string]any{"type": method, "total": total})
+		}
+	}
+	return out
+}
+
+func (m *Module) loadTopProducts(r *http.Request, tenantID string, start, end time.Time, limit int) []map[string]any {
+	rows, err := m.db.QueryContext(r.Context(), `
+		SELECT oi.product_name,
+		       COALESCE(SUM(oi.quantity), 0) AS qty,
+		       COALESCE(SUM(oi.subtotal), 0) AS total
+		FROM order_items oi
+		JOIN tickets t ON t.id = oi.ticket_id
+		WHERE oi.tenant_id = $1
+		  AND oi.is_deleted = FALSE
+		  AND t.is_deleted = FALSE
+		  AND t.status NOT IN ('void','open')
+		  AND t.created_at >= $2 AND t.created_at <= $3
+		GROUP BY oi.product_name
+		ORDER BY total DESC
+		LIMIT $4
+	`, tenantID, start, end, limit)
+	if err != nil {
+		return []map[string]any{}
+	}
+	defer rows.Close()
+	out := make([]map[string]any, 0)
+	for rows.Next() {
+		var name string
+		var qty float64
+		var total int64
+		if rows.Scan(&name, &qty, &total) == nil {
+			out = append(out, map[string]any{"name": name, "qty": qty, "total": total})
+		}
+	}
+	return out
+}
+
+func (m *Module) loadCategoryBreakdown(r *http.Request, tenantID string, start, end time.Time) []map[string]any {
+	rows, err := m.db.QueryContext(r.Context(), `
+		SELECT COALESCE(c.name, 'Diğer') AS name,
+		       COALESCE(SUM(oi.subtotal), 0) AS total
+		FROM order_items oi
+		JOIN tickets t ON t.id = oi.ticket_id
+		LEFT JOIN products p ON p.id = oi.product_id
+		LEFT JOIN categories c ON c.id = p.category_id
+		WHERE oi.tenant_id = $1
+		  AND oi.is_deleted = FALSE
+		  AND t.is_deleted = FALSE
+		  AND t.status NOT IN ('void','open')
+		  AND t.created_at >= $2 AND t.created_at <= $3
+		GROUP BY c.name
+		ORDER BY total DESC
+	`, tenantID, start, end)
+	if err != nil {
+		return []map[string]any{}
+	}
+	defer rows.Close()
+	out := make([]map[string]any, 0)
+	for rows.Next() {
+		var name string
+		var total int64
+		if rows.Scan(&name, &total) == nil {
+			out = append(out, map[string]any{"name": name, "total": total})
+		}
+	}
+	return out
 }
 
 // handleProductReport returns product performance data.

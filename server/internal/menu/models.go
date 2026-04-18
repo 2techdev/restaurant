@@ -33,6 +33,7 @@ type Product struct {
 	DisplayOrder    int       `json:"display_order"`
 	PrepTimeMinutes *int      `json:"prep_time_minutes,omitempty"`
 	PrinterGroup    string    `json:"printer_group"`
+	DefaultGang     *int      `json:"default_gang,omitempty"` // 1, 2, or 3; null = no default course hint
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 	IsDeleted       bool      `json:"is_deleted"`

@@ -19,6 +19,66 @@ import (
 // Organization handlers
 // ============================================================
 
+// handleListOrganizations returns organizations visible to the caller.
+// Super-admins see every organization; everyone else sees just their own.
+// GET /api/v1/admin/organizations
+func (m *Module) handleListOrganizations(w http.ResponseWriter, r *http.Request) {
+	role := middleware.GetRole(r.Context())
+	orgID := middleware.GetTenantID(r.Context())
+
+	var (
+		rows *sql.Rows
+		err  error
+	)
+
+	baseQuery := `
+		SELECT id, name, COALESCE(legal_name,''), COALESCE(tax_id,''),
+		       country, COALESCE(address,''), COALESCE(phone,''), COALESCE(email,''),
+		       COALESCE(logo,''), plan, status, trial_ends_at, created_at, updated_at
+		FROM organizations`
+
+	if role == "super_admin" {
+		rows, err = m.db.QueryContext(r.Context(), baseQuery+` ORDER BY name ASC`)
+	} else {
+		if orgID == "" {
+			response.Error(w, http.StatusForbidden, "FORBIDDEN", "Organization context required")
+			return
+		}
+		rows, err = m.db.QueryContext(r.Context(), baseQuery+` WHERE id = $1`, orgID)
+	}
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to list organizations")
+		return
+	}
+	defer rows.Close()
+
+	out := make([]Organization, 0)
+	for rows.Next() {
+		var org Organization
+		var taxID, address, phone, email, logo sql.NullString
+		var trialEndsAt sql.NullTime
+		if err := rows.Scan(
+			&org.ID, &org.Name, &org.LegalName, &taxID,
+			&org.Country, &address, &phone, &email,
+			&logo, &org.Plan, &org.Status, &trialEndsAt, &org.CreatedAt, &org.UpdatedAt,
+		); err != nil {
+			continue
+		}
+		org.TaxID = taxID.String
+		org.Address = address.String
+		org.Phone = phone.String
+		org.Email = email.String
+		org.Logo = logo.String
+		if trialEndsAt.Valid {
+			t := trialEndsAt.Time
+			org.TrialEndsAt = &t
+		}
+		out = append(out, org)
+	}
+
+	response.JSON(w, http.StatusOK, out)
+}
+
 // handleGetOrganization returns the current organization.
 // GET /api/v1/admin/organization
 func (m *Module) handleGetOrganization(w http.ResponseWriter, r *http.Request) {

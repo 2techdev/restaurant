@@ -183,16 +183,19 @@ func TestRecover_PanicWithNonStringValue(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCORS_AddsHeaders(t *testing.T) {
-	handler := CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	handler := CORS(CORSConfig{AllowedOrigins: []string{"http://localhost:3000"}})(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/data", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Error("expected Access-Control-Allow-Origin: *")
+	if w.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3000" {
+		t.Errorf("unexpected Access-Control-Allow-Origin: %q", w.Header().Get("Access-Control-Allow-Origin"))
 	}
 	if w.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Error("expected Access-Control-Allow-Methods to be set")
@@ -203,11 +206,14 @@ func TestCORS_AddsHeaders(t *testing.T) {
 }
 
 func TestCORS_OptionsReturns204(t *testing.T) {
-	handler := CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Error("should not reach inner handler for OPTIONS")
-	}))
+	handler := CORS(CORSConfig{AllowedOrigins: []string{"http://localhost:3000"}})(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("should not reach inner handler for OPTIONS")
+		}),
+	)
 
 	req := httptest.NewRequest(http.MethodOptions, "/api/data", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -218,14 +224,17 @@ func TestCORS_OptionsReturns204(t *testing.T) {
 
 func TestCORS_NonOptionsPassesThrough(t *testing.T) {
 	var reached bool
-	handler := CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reached = true
-		w.WriteHeader(http.StatusOK)
-	}))
+	handler := CORS(CORSConfig{AllowedOrigins: []string{"http://localhost:3000"}})(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
 
 	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete} {
 		reached = false
 		req := httptest.NewRequest(method, "/api/resource", nil)
+		req.Header.Set("Origin", "http://localhost:3000")
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 		if !reached {
