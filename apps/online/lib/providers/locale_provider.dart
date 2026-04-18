@@ -21,6 +21,7 @@ class LocaleNotifier extends StateNotifier<Locale> {
   static const _supported = [
     Locale('en'),
     Locale('de'),
+    Locale('tr'),
     Locale('fr'),
     Locale('it'),
   ];

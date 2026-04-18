@@ -8,24 +8,32 @@ library;
 import 'dart:convert';
 
 /// UI display language.
+///
+/// Default order reflects the Swiss fine-dining pilot priority: German first
+/// (de-CH primary market), Turkish (for the multilingual staff pool), then
+/// English as an international fallback. French and Italian round out the
+/// Swiss quadrilingual baseline.
 enum AppLanguage {
   de,
+  tr,
+  en,
   fr,
-  it,
-  en;
+  it;
 
   String get label => switch (this) {
         de => 'Deutsch',
+        tr => 'Türkçe',
+        en => 'English',
         fr => 'Français',
         it => 'Italiano',
-        en => 'English',
       };
 
   String get flag => switch (this) {
-        de => '🇩🇪',
+        de => '🇨🇭',
+        tr => '🇹🇷',
+        en => '🇬🇧',
         fr => '🇫🇷',
         it => '🇮🇹',
-        en => '🇬🇧',
       };
 
   static AppLanguage fromString(String s) =>

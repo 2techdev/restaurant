@@ -16,9 +16,10 @@ class LanguageSelector extends ConsumerWidget {
 
     final langs = [
       {'code': 'de', 'label': 'DE'},
+      {'code': 'tr', 'label': 'TR'},
+      {'code': 'en', 'label': 'EN'},
       {'code': 'fr', 'label': 'FR'},
       {'code': 'it', 'label': 'IT'},
-      {'code': 'en', 'label': 'EN'},
     ];
 
     return GestureDetector(
@@ -126,13 +127,15 @@ class LanguageSelector extends ConsumerWidget {
   String _flag(String code) {
     switch (code) {
       case 'de':
-        return '🇩🇪';
+        return '🇨🇭';
+      case 'tr':
+        return '🇹🇷';
+      case 'en':
+        return '🇬🇧';
       case 'fr':
         return '🇫🇷';
       case 'it':
         return '🇮🇹';
-      case 'en':
-        return '🇬🇧';
       default:
         return '🌐';
     }
@@ -142,12 +145,14 @@ class LanguageSelector extends ConsumerWidget {
     switch (code) {
       case 'de':
         return 'Deutsch';
+      case 'tr':
+        return 'Türkçe';
+      case 'en':
+        return 'English';
       case 'fr':
         return 'Français';
       case 'it':
         return 'Italiano';
-      case 'en':
-        return 'English';
       default:
         return code;
     }
