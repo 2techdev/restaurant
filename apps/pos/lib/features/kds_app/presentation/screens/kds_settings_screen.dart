@@ -4,6 +4,8 @@
 /// next navigation to [KdsMainScreen].
 library;
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_providers.dart';
 import 'package:gastrocore_pos/features/kds_app/router/kds_router.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -29,6 +32,8 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
   final _stationNameCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
   final _syncUrlCtrl = TextEditingController();
+  final _kitchenPrinterIpCtrl = TextEditingController();
+  final _kitchenPrinterPortCtrl = TextEditingController();
 
   int _lateThreshold = 10;
   bool _largeFont = false;
@@ -36,6 +41,9 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
   bool _immersive = true;
 
   bool _saving = false;
+  bool _testingPrinter = false;
+  String? _printerTestResult;
+  bool _printerTestOk = false;
 
   @override
   void initState() {
@@ -48,11 +56,15 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
     _stationNameCtrl.dispose();
     _pinCtrl.dispose();
     _syncUrlCtrl.dispose();
+    _kitchenPrinterIpCtrl.dispose();
+    _kitchenPrinterPortCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
+    final printer =
+        ref.read(printerSettingsProvider).valueOrNull;
     setState(() {
       _stationNameCtrl.text =
           prefs.getString('kds_station_name') ?? 'Station 01';
@@ -63,6 +75,9 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
       _syncUrlCtrl.text =
           prefs.getString('sync_server_url') ?? 'http://localhost:8080';
       _pinCtrl.text = prefs.getString('kds_station_pin') ?? '1234';
+      _kitchenPrinterIpCtrl.text = printer?.kitchenPrinterIp ?? '';
+      _kitchenPrinterPortCtrl.text =
+          (printer?.kitchenPrinterPort ?? 9100).toString();
     });
   }
 
@@ -81,6 +96,13 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
     if (pin.length == 4 && int.tryParse(pin) != null) {
       await prefs.setString('kds_station_pin', pin);
     }
+
+    // Persist kitchen printer settings via the shared PrinterSettings repo.
+    final ip = _kitchenPrinterIpCtrl.text.trim();
+    final port = int.tryParse(_kitchenPrinterPortCtrl.text.trim()) ?? 9100;
+    await ref.read(printerSettingsProvider.notifier).update(
+          (s) => s.copyWith(kitchenPrinterIp: ip, kitchenPrinterPort: port),
+        );
 
     // Apply providers immediately.
     ref.read(kdsLateThresholdProvider.notifier).state = _lateThreshold;
@@ -105,6 +127,64 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
         ),
       );
       context.go(KdsRoutes.main);
+    }
+  }
+
+  /// Live connectivity check — opens a raw TCP socket to the configured
+  /// kitchen printer and sends a minimal ESC/POS test page. Surfaces any
+  /// network error inline so the operator can correct the IP / port before
+  /// saving. Same payload as the POS settings test print so results match.
+  Future<void> _testKitchenPrinter() async {
+    final ip = _kitchenPrinterIpCtrl.text.trim();
+    final port =
+        int.tryParse(_kitchenPrinterPortCtrl.text.trim()) ?? 9100;
+    if (ip.isEmpty) {
+      setState(() {
+        _printerTestResult = 'Enter an IP address first.';
+        _printerTestOk = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _testingPrinter = true;
+      _printerTestResult = 'Connecting to $ip:$port…';
+      _printerTestOk = false;
+    });
+
+    try {
+      final socket = await Socket.connect(
+        ip,
+        port,
+        timeout: const Duration(seconds: 5),
+      );
+      socket.add([
+        0x1B, 0x40, // ESC @ — initialize
+        0x1B, 0x61, 0x01, // center align
+        ...('GastroCore KDS\n').codeUnits,
+        ...('--- Kitchen Test Print ---\n').codeUnits,
+        ...('If you see this, the KDS can\n').codeUnits,
+        ...('reach the kitchen printer.\n').codeUnits,
+        0x1B, 0x64, 0x03, // feed 3 lines
+        0x1D, 0x56, 0x42, 0x00, // partial cut
+      ]);
+      await socket.flush();
+      await socket.close();
+      if (mounted) {
+        setState(() {
+          _printerTestResult = 'Test page sent to $ip:$port.';
+          _printerTestOk = true;
+          _testingPrinter = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _printerTestResult = 'Connection failed: $e';
+          _printerTestOk = false;
+          _testingPrinter = false;
+        });
+      }
     }
   }
 
@@ -175,6 +255,13 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
             maxLength: 4,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
+          const SizedBox(height: 12),
+          _linkTile(
+            icon: Icons.tune,
+            label: 'Manage Kitchen Stations',
+            subtitle: 'Add / rename / reorder cold, hot, dessert, bar…',
+            onTap: () => context.go(KdsRoutes.stationManage),
+          ),
 
           const SizedBox(height: 28),
 
@@ -187,6 +274,29 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
             controller: _syncUrlCtrl,
             keyboardType: TextInputType.url,
           ),
+
+          const SizedBox(height: 28),
+
+          // ── Kitchen Printer ──────────────────────────────────────────────
+          _sectionHeader('Kitchen Printer'),
+          const SizedBox(height: 12),
+          _inputField(
+            label: 'Printer IP Address',
+            hint: '192.168.1.25',
+            controller: _kitchenPrinterIpCtrl,
+            keyboardType: TextInputType.url,
+          ),
+          const SizedBox(height: 12),
+          _inputField(
+            label: 'TCP Port',
+            hint: '9100',
+            controller: _kitchenPrinterPortCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            maxLength: 5,
+          ),
+          const SizedBox(height: 12),
+          _printerTestBlock(),
 
           const SizedBox(height: 28),
 
@@ -319,6 +429,59 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
     );
   }
 
+  Widget _linkTile({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 22, color: AppColors.textSecondary),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _settingTile({
     required IconData icon,
     required String label,
@@ -364,6 +527,91 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
             onChanged: onChanged,
             activeThumbColor: AppColors.primary,
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _printerTestBlock() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 44,
+            child: FilledButton.icon(
+              onPressed: _testingPrinter ? null : _testKitchenPrinter,
+              icon: _testingPrinter
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.print_outlined, size: 18),
+              label: Text(
+                _testingPrinter ? 'Testing…' : 'Send Test Page',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: const Color(0xFF001944),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+          if (_printerTestResult != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: _printerTestOk
+                    ? AppColors.greenDim
+                    : AppColors.redDim,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _printerTestOk
+                        ? Icons.check_circle_rounded
+                        : Icons.error_outline_rounded,
+                    size: 18,
+                    color: _printerTestOk
+                        ? AppColors.green
+                        : AppColors.red,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _printerTestResult!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _printerTestOk
+                            ? AppColors.green
+                            : AppColors.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

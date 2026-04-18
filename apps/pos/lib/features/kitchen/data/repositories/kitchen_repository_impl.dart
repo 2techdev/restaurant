@@ -190,12 +190,16 @@ class KitchenRepositoryImpl {
   /// [ticket] is the order ticket that was just sent to the kitchen.
   /// [items] are the unsent order items to include on the ticket.
   /// [waiterName] is the display name of the logged-in waiter (snapshot).
-  Future<void> createTicketFromOrder({
+  ///
+  /// Returns the created [KitchenTicketEntity] with resolved [tableName], or
+  /// null when [items] is empty. Callers (e.g. printer fallback) can use the
+  /// return value to render the physical Bestellbon without re-querying.
+  Future<KitchenTicketEntity?> createTicketFromOrder({
     required TicketEntity ticket,
     required List<OrderItemEntity> items,
     String? waiterName,
   }) async {
-    if (items.isEmpty) return;
+    if (items.isEmpty) return null;
 
     final now = DateTime.now();
     final kitchenTicketId = IdGenerator.generateId();
@@ -209,6 +213,13 @@ class KitchenRepositoryImpl {
       tableName = tableRow?.name;
     }
 
+    // Resolve the ticket's kitchen station from the items' products. When all
+    // items belong to the same station we route the ticket there; mixed orders
+    // fall through to 'kitchen' (the pass / expo lane) so nothing is lost.
+    final station = await _resolveTicketStation(items);
+
+    final kitchenItems = <KitchenTicketItemEntity>[];
+
     await _db.transaction(() async {
       await _db.into(_db.kitchenTickets).insert(
             KitchenTicketsCompanion(
@@ -218,7 +229,7 @@ class KitchenRepositoryImpl {
               kitchenTableName: Value(tableName),
               waiterName: Value(waiterName),
               orderNumber: Value(int.tryParse(ticket.orderNumber) ?? 0),
-              printerGroup: const Value('kitchen'),
+              printerGroup: Value(station),
               status: const Value('pending'),
               sentAt: Value(now),
               createdAt: Value(now),
@@ -231,10 +242,11 @@ class KitchenRepositoryImpl {
         final modText = item.modifiers.isEmpty
             ? null
             : item.modifiers.map((m) => m.modifierName).join(', ');
+        final itemId = IdGenerator.generateId();
 
         await _db.into(_db.kitchenTicketItems).insert(
               KitchenTicketItemsCompanion(
-                id: Value(IdGenerator.generateId()),
+                id: Value(itemId),
                 kitchenTicketId: Value(kitchenTicketId),
                 orderItemId: Value(item.id),
                 productName: Value(item.productName),
@@ -246,8 +258,87 @@ class KitchenRepositoryImpl {
                 createdAt: Value(now),
               ),
             );
+
+        kitchenItems.add(KitchenTicketItemEntity(
+          id: itemId,
+          kitchenTicketId: kitchenTicketId,
+          orderItemId: item.id,
+          productName: item.productName,
+          quantity: item.quantity,
+          modifiersText: modText,
+          notes: item.notes,
+          status: KitchenTicketStatus.pending,
+          gangId: item.gangId,
+        ));
+      }
+
+      // Ensure an OrderGangState row exists for every gang referenced by the
+      // items on this ticket. Each row starts in 'pending' (HOLD) and flips to
+      // 'fired' when the waiter hits FIRE on the KDS card.
+      //
+      // insertOrIgnore means re-sends of the same order don't duplicate rows;
+      // an already-fired gang keeps its state.
+      final gangIds = items
+          .map((i) => i.gangId)
+          .whereType<String>()
+          .toSet();
+      for (final gangTemplateId in gangIds) {
+        // Deterministic id so a re-send of the same order doesn't duplicate
+        // the row (primary key collision → insertOrIgnore drops the write).
+        final gangStateId = 'ogs_${ticket.id}_$gangTemplateId';
+        await _db.into(_db.orderGangStates).insert(
+              OrderGangStatesCompanion(
+                id: Value(gangStateId),
+                tenantId: Value(ticket.tenantId),
+                ticketId: Value(ticket.id),
+                gangTemplateId: Value(gangTemplateId),
+                status: const Value('pending'),
+                createdAt: Value(now),
+                updatedAt: Value(now),
+                syncStatus: const Value(0),
+                isDeleted: const Value(false),
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
       }
     });
+
+    return KitchenTicketEntity(
+      id: kitchenTicketId,
+      tenantId: ticket.tenantId,
+      ticketId: ticket.id,
+      tableName: tableName,
+      waiterName: waiterName,
+      orderNumber: ticket.orderNumber,
+      printerGroup: station,
+      status: KitchenTicketStatus.pending,
+      items: kitchenItems,
+      sentAt: now,
+    );
+  }
+
+  /// Resolve a single station [printerGroup] for a set of order items.
+  ///
+  /// Looks up each item's product and reads [Products.printerGroup]. If every
+  /// item resolves to the same non-empty station code, that station wins. If
+  /// the items span multiple stations (fine-dining mixed order) or no station
+  /// can be resolved at all, we fall back to `'kitchen'` — which matches the
+  /// default station code and keeps the ticket on the pass / expo lane.
+  Future<String> _resolveTicketStation(List<OrderItemEntity> items) async {
+    final productIds = items.map((i) => i.productId).toSet().toList();
+    if (productIds.isEmpty) return 'kitchen';
+
+    final productRows = await (_db.select(_db.products)
+          ..where((p) => p.id.isIn(productIds)))
+        .get();
+
+    final groups = productRows
+        .map((p) => p.printerGroup)
+        .where((g) => g.isNotEmpty)
+        .toSet();
+
+    if (groups.length == 1) return groups.first;
+    return 'kitchen';
   }
 
   // =========================================================================

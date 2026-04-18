@@ -50,23 +50,33 @@ class GangRepository {
     return row == null ? null : _gangTemplateToEntity(row);
   }
 
-  /// Seed Swiss default Gangs for a tenant if none exist yet.
+  /// Seed the three canonical Gangs for a tenant if none exist yet.
   ///
-  /// Called once on first launch. Gangs are:
-  ///   Gang 1 = Vorspeise  (#90ABFF — primary blue)
-  ///   Gang 2 = Hauptgang  (#69F6B8 — green)
-  ///   Gang 3 = Dessert    (#BF5AF2 — purple)
-  ///   Gang 4 = Getränke   (#FF9F0A — orange)
+  /// Policy (2026-04-17 decision): Gang labels are fixed — **"Gang 1", "Gang
+  /// 2", "Gang 3"** — and cannot be renamed. Seed and UI are kept in lock-step
+  /// so both a fresh install and an override attempt end up displaying the
+  /// same literal label to the cook.
+  ///
+  /// Per-gang color (used for the KDS card header + per-gang alert banner):
+  ///   Gang 1 → #90ABFF (primary blue)
+  ///   Gang 2 → #69F6B8 (green)
+  ///   Gang 3 → #BF5AF2 (purple)
   Future<void> seedDefaultGangs(String tenantId) async {
     final existing = await getGangTemplates(tenantId);
-    if (existing.isNotEmpty) return;
+    if (existing.isNotEmpty) {
+      // Rewrite legacy default names (Vorspeise / Hauptgang / Dessert) to
+      // the canonical "Gang N" label so dev installs that pre-date the fixed
+      // label policy converge on the new standard on next launch.
+      await _rewriteDefaultGangNames(tenantId);
+      return;
+    }
 
     final now = DateTime.now();
     final defaults = [
       GangTemplatesCompanion(
         id: const Value('gang-1'),
         tenantId: Value(tenantId),
-        name: const Value('Vorspeise'),
+        name: const Value('Gang 1'),
         sortOrder: const Value(1),
         color: const Value('#90ABFF'),
         isDefault: const Value(true),
@@ -79,7 +89,7 @@ class GangRepository {
       GangTemplatesCompanion(
         id: const Value('gang-2'),
         tenantId: Value(tenantId),
-        name: const Value('Hauptgang'),
+        name: const Value('Gang 2'),
         sortOrder: const Value(2),
         color: const Value('#69F6B8'),
         isDefault: const Value(true),
@@ -92,22 +102,9 @@ class GangRepository {
       GangTemplatesCompanion(
         id: const Value('gang-3'),
         tenantId: Value(tenantId),
-        name: const Value('Dessert'),
+        name: const Value('Gang 3'),
         sortOrder: const Value(3),
         color: const Value('#BF5AF2'),
-        isDefault: const Value(true),
-        isActive: const Value(true),
-        createdAt: Value(now),
-        updatedAt: Value(now),
-        syncStatus: const Value(0),
-        isDeleted: const Value(false),
-      ),
-      GangTemplatesCompanion(
-        id: const Value('gang-4'),
-        tenantId: Value(tenantId),
-        name: const Value('Getränke'),
-        sortOrder: const Value(4),
-        color: const Value('#FF9F0A'),
         isDefault: const Value(true),
         isActive: const Value(true),
         createdAt: Value(now),
@@ -126,6 +123,25 @@ class GangRepository {
         );
       }
     });
+  }
+
+  /// Force default-Gang rows onto the canonical `Gang N` label.
+  ///
+  /// Only touches rows where `isDefault == true` — tenant-specific renames
+  /// would be respected, but today `isDefault` is the only shipped Gang.
+  Future<void> _rewriteDefaultGangNames(String tenantId) async {
+    for (var i = 1; i <= 3; i++) {
+      await (_db.update(_db.gangTemplates)
+            ..where((t) =>
+                t.tenantId.equals(tenantId) &
+                t.isDefault.equals(true) &
+                t.sortOrder.equals(i) &
+                t.name.equals('Gang $i').not()))
+          .write(GangTemplatesCompanion(
+        name: Value('Gang $i'),
+        updatedAt: Value(DateTime.now()),
+      ));
+    }
   }
 
   // =========================================================================
@@ -250,6 +266,52 @@ class GangRepository {
         updatedAt: Value(now),
       ),
     );
+  }
+
+  /// Recall a Gang back one step in the lifecycle.
+  ///
+  /// Accepts [toStatus] as the target state and clears the later-stage
+  /// timestamp(s) so the recall looks and behaves like the gang never reached
+  /// them. Used by the KDS card when a cook taps-by-mistake and long-presses
+  /// to undo: served → ready, ready → fired, fired → pending.
+  ///
+  /// Only `pending`, `fired`, and `ready` are valid recall targets — you can't
+  /// recall *to* served or in_prep from here (no UX need yet).
+  Future<void> recallGang({
+    required String ticketId,
+    required String gangTemplateId,
+    required GangOrderStatus toStatus,
+  }) async {
+    final now = DateTime.now();
+    final companion = switch (toStatus) {
+      GangOrderStatus.pending => OrderGangStatesCompanion(
+          status: const Value('pending'),
+          firedAt: const Value(null),
+          readyAt: const Value(null),
+          servedAt: const Value(null),
+          updatedAt: Value(now),
+        ),
+      GangOrderStatus.fired => OrderGangStatesCompanion(
+          status: const Value('fired'),
+          readyAt: const Value(null),
+          servedAt: const Value(null),
+          updatedAt: Value(now),
+        ),
+      GangOrderStatus.ready => OrderGangStatesCompanion(
+          status: const Value('ready'),
+          servedAt: const Value(null),
+          updatedAt: Value(now),
+        ),
+      _ => throw ArgumentError(
+          'recallGang: toStatus must be pending/fired/ready, got $toStatus'),
+    };
+    await (_db.update(_db.orderGangStates)
+          ..where(
+            (t) =>
+                t.ticketId.equals(ticketId) &
+                t.gangTemplateId.equals(gangTemplateId),
+          ))
+        .write(companion);
   }
 
   // =========================================================================

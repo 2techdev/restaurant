@@ -206,6 +206,109 @@ void main() {
       expect(rows, isEmpty);
     });
 
+    test(
+        'routes ticket to the shared station when all items share a '
+        'printerGroup', () async {
+      final now = DateTime.now();
+      await db.into(db.categories).insert(
+            CategoriesCompanion.insert(
+              id: 'cat-1',
+              tenantId: 'tenant-1',
+              name: 'Grill',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      // Two products both routed to the grill station.
+      await db.into(db.products).insert(
+            ProductsCompanion.insert(
+              id: 'prod-1',
+              tenantId: 'tenant-1',
+              categoryId: 'cat-1',
+              name: 'Ribeye',
+              price: 3200,
+              createdAt: now,
+              updatedAt: now,
+              printerGroup: const Value('grill'),
+            ),
+          );
+      await db.into(db.products).insert(
+            ProductsCompanion.insert(
+              id: 'prod-2',
+              tenantId: 'tenant-1',
+              categoryId: 'cat-1',
+              name: 'Bratwurst',
+              price: 1400,
+              createdAt: now,
+              updatedAt: now,
+              printerGroup: const Value('grill'),
+            ),
+          );
+
+      final ticket = _ticket();
+      await repo.createTicketFromOrder(
+        ticket: ticket,
+        items: [
+          _item(id: 'i1'),
+          _item(id: 'i2').copyWith(productId: 'prod-2'),
+        ],
+      );
+
+      final kt = await db.select(db.kitchenTickets).getSingle();
+      expect(kt.printerGroup, 'grill');
+    });
+
+    test(
+        'falls back to kitchen when items span multiple stations',
+        () async {
+      final now = DateTime.now();
+      await db.into(db.categories).insert(
+            CategoriesCompanion.insert(
+              id: 'cat-1',
+              tenantId: 'tenant-1',
+              name: 'Mixed',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await db.into(db.products).insert(
+            ProductsCompanion.insert(
+              id: 'prod-1',
+              tenantId: 'tenant-1',
+              categoryId: 'cat-1',
+              name: 'Salad',
+              price: 1200,
+              createdAt: now,
+              updatedAt: now,
+              printerGroup: const Value('cold'),
+            ),
+          );
+      await db.into(db.products).insert(
+            ProductsCompanion.insert(
+              id: 'prod-2',
+              tenantId: 'tenant-1',
+              categoryId: 'cat-1',
+              name: 'Steak',
+              price: 3200,
+              createdAt: now,
+              updatedAt: now,
+              printerGroup: const Value('grill'),
+            ),
+          );
+
+      final ticket = _ticket();
+      await repo.createTicketFromOrder(
+        ticket: ticket,
+        items: [
+          _item(id: 'i1'),
+          _item(id: 'i2').copyWith(productId: 'prod-2'),
+        ],
+      );
+
+      final kt = await db.select(db.kitchenTickets).getSingle();
+      expect(kt.printerGroup, 'kitchen');
+    });
+
     test('resolves table name from restaurant_tables', () async {
       // Seed a tenant and a table row first.
       await db.into(db.tenants).insert(

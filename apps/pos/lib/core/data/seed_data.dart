@@ -14,6 +14,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/material.dart' show Icons;
 
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
@@ -129,6 +130,7 @@ class SeedData {
       await db.delete(db.users).go();
       await db.delete(db.orderGangStates).go();
       await db.delete(db.gangTemplates).go();
+      await db.delete(db.stations).go();
       await db.delete(db.tenants).go();
     });
   }
@@ -141,6 +143,7 @@ class SeedData {
     await _seedTenant();
     await _seedUsers();
     await _seedGangs();
+    await _seedStations();
     await _seedCategories();
     await _seedProducts();
     await _seedModifiers();
@@ -262,7 +265,7 @@ class SeedData {
       GangTemplatesCompanion(
         id: const Value('gang-1'),
         tenantId: Value(_tenantId),
-        name: const Value('Vorspeise'),
+        name: const Value('Gang 1'),
         sortOrder: const Value(1),
         color: const Value('#90ABFF'),
         isDefault: const Value(true),
@@ -275,7 +278,7 @@ class SeedData {
       GangTemplatesCompanion(
         id: const Value('gang-2'),
         tenantId: Value(_tenantId),
-        name: const Value('Hauptgang'),
+        name: const Value('Gang 2'),
         sortOrder: const Value(2),
         color: const Value('#69F6B8'),
         isDefault: const Value(true),
@@ -288,7 +291,7 @@ class SeedData {
       GangTemplatesCompanion(
         id: const Value('gang-3'),
         tenantId: Value(_tenantId),
-        name: const Value('Dessert'),
+        name: const Value('Gang 3'),
         sortOrder: const Value(3),
         color: const Value('#BF5AF2'),
         isDefault: const Value(true),
@@ -298,23 +301,93 @@ class SeedData {
         syncStatus: const Value(0),
         isDeleted: const Value(false),
       ),
-      GangTemplatesCompanion(
-        id: const Value('gang-4'),
+      // Drinks are NOT a gang — they route to the Bar station (printerGroup)
+      // and fire independently of course pacing. Gangs are pure course
+      // ordinals (1..3 default, up to kMaxGangs=5) — see RestaurantSettings.
+    ];
+    await db.batch((batch) {
+      for (final g in gangs) {
+        batch.insert(db.gangTemplates, g, mode: InsertMode.insertOrIgnore);
+      }
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Stations (Swiss defaults: Kitchen / Grill / Cold / Dessert / Bar)
+  // -------------------------------------------------------------------------
+
+  Future<void> _seedStations() async {
+    final now = DateTime.now();
+    StationsCompanion row({
+      required String id,
+      required String code,
+      required String name,
+      required int icon,
+      required String color,
+      required int sortOrder,
+    }) {
+      return StationsCompanion(
+        id: Value(id),
         tenantId: Value(_tenantId),
-        name: const Value('Getränke'),
-        sortOrder: const Value(4),
-        color: const Value('#FF9F0A'),
+        code: Value(code),
+        name: Value(name),
+        icon: Value(icon.toString()),
+        color: Value(color),
+        sortOrder: Value(sortOrder),
         isDefault: const Value(true),
         isActive: const Value(true),
         createdAt: Value(now),
         updatedAt: Value(now),
         syncStatus: const Value(0),
         isDeleted: const Value(false),
+      );
+    }
+
+    final stations = <StationsCompanion>[
+      row(
+        id: 'station-kitchen',
+        code: 'kitchen',
+        name: 'Kitchen',
+        icon: Icons.local_fire_department.codePoint,
+        color: '#FB923C',
+        sortOrder: 1,
+      ),
+      row(
+        id: 'station-grill',
+        code: 'grill',
+        name: 'Grill',
+        icon: Icons.outdoor_grill.codePoint,
+        color: '#EF4444',
+        sortOrder: 2,
+      ),
+      row(
+        id: 'station-cold',
+        code: 'cold',
+        name: 'Cold / Salads',
+        icon: Icons.ac_unit.codePoint,
+        color: '#38BDF8',
+        sortOrder: 3,
+      ),
+      row(
+        id: 'station-dessert',
+        code: 'dessert',
+        name: 'Dessert',
+        icon: Icons.cake.codePoint,
+        color: '#BF5AF2',
+        sortOrder: 4,
+      ),
+      row(
+        id: 'station-bar',
+        code: 'bar',
+        name: 'Bar',
+        icon: Icons.local_bar.codePoint,
+        color: '#FACC15',
+        sortOrder: 5,
       ),
     ];
     await db.batch((batch) {
-      for (final g in gangs) {
-        batch.insert(db.gangTemplates, g, mode: InsertMode.insertOrIgnore);
+      for (final s in stations) {
+        batch.insert(db.stations, s, mode: InsertMode.insertOrIgnore);
       }
     });
   }
@@ -371,7 +444,8 @@ class SeedData {
         icon: '\uD83E\uDD64', // 🥤
         color: '#4F8CFF',
         order: 4,
-        gangId: 'gang-4', // Getränke
+        // No gang — drinks fire independently via the Bar station.
+        gangId: null,
       ),
     ];
 

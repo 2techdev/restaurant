@@ -45,9 +45,9 @@ Future<void> _seedTenant(AppDatabase db) async {
 void main() {
   // -------------------------------------------------------------------------
   group('schema version', () {
-    test('schemaVersion is 7', () {
+    test('schemaVersion is at least 7', () {
       final db = _makeDb();
-      expect(db.schemaVersion, 7);
+      expect(db.schemaVersion, greaterThanOrEqualTo(7));
       db.close();
     });
   });

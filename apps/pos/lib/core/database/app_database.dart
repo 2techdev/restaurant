@@ -33,6 +33,7 @@ import 'tables/products.dart';
 import 'tables/receipts.dart';
 import 'tables/restaurant_tables.dart';
 import 'tables/shifts.dart';
+import 'tables/stations.dart';
 import 'tables/sync_metadata.dart';
 import 'tables/sync_queue.dart';
 import 'tables/tax_profiles.dart';
@@ -96,6 +97,7 @@ part 'app_database.g.dart';
     ManagerPins,
     GangTemplates,
     OrderGangStates,
+    Stations,
   ],
   daos: [AuditLogDao, InventoryDao, SyncEventDao],
 )
@@ -103,7 +105,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -208,6 +210,11 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(payments, payments.entryMethod);
         await m.addColumn(payments, payments.terminalId);
         await m.addColumn(payments, payments.terminalProvider);
+      }
+      if (from < 10) {
+        // v10: kitchen stations — configurable station list backing the KDS
+        // station filter and the Products.printerGroup routing.
+        await m.createTable(stations);
       }
     },
     onCreate: (m) async {
