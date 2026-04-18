@@ -90,6 +90,14 @@ class PaymentRepositoryImpl {
     required String receivedBy,
     String? reference,
     int tipAmount = 0,
+    // Terminal response fields — forwarded from PaymentEngine for reconciliation.
+    String? terminalTransactionId,
+    String? authCode,
+    String? maskedPan,
+    String? cardType,
+    String? entryMethod,
+    String? terminalId,
+    String? terminalProvider,
   }) async {
     late PaymentEntity result;
 
@@ -169,6 +177,13 @@ class PaymentRepositoryImpl {
               reference: Value(reference),
               receivedBy: Value(receivedBy),
               paidAt: Value(now),
+              terminalTransactionId: Value(terminalTransactionId),
+              authCode: Value(authCode),
+              maskedPan: Value(maskedPan),
+              cardType: Value(cardType),
+              entryMethod: Value(entryMethod),
+              terminalId: Value(terminalId),
+              terminalProvider: Value(terminalProvider),
               createdAt: Value(now),
               updatedAt: Value(now),
               isDeleted: const Value(false),
@@ -287,6 +302,13 @@ class PaymentRepositoryImpl {
       reference: row.reference,
       receivedBy: row.receivedBy,
       paidAt: row.paidAt,
+      terminalTransactionId: row.terminalTransactionId,
+      authCode: row.authCode,
+      maskedPan: row.maskedPan,
+      cardType: row.cardType,
+      entryMethod: row.entryMethod,
+      terminalId: row.terminalId,
+      terminalProvider: row.terminalProvider,
     );
   }
 
@@ -304,6 +326,13 @@ class PaymentRepositoryImpl {
       reference: Value(entity.reference),
       receivedBy: Value(entity.receivedBy),
       paidAt: Value(entity.paidAt),
+      terminalTransactionId: Value(entity.terminalTransactionId),
+      authCode: Value(entity.authCode),
+      maskedPan: Value(entity.maskedPan),
+      cardType: Value(entity.cardType),
+      entryMethod: Value(entity.entryMethod),
+      terminalId: Value(entity.terminalId),
+      terminalProvider: Value(entity.terminalProvider),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
       isDeleted: const Value(false),

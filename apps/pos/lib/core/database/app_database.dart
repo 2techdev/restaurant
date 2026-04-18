@@ -103,7 +103,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -197,6 +197,17 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(categories, categories.defaultGangId);
         await m.addColumn(orderItems, orderItems.gangId);
         await m.addColumn(kitchenTicketItems, kitchenTicketItems.gangId);
+      }
+      if (from < 9) {
+        // v9: persist hardware terminal response fields on payments for
+        // reconciliation (Wallee LTI / MyPOS Sigma).
+        await m.addColumn(payments, payments.terminalTransactionId);
+        await m.addColumn(payments, payments.authCode);
+        await m.addColumn(payments, payments.maskedPan);
+        await m.addColumn(payments, payments.cardType);
+        await m.addColumn(payments, payments.entryMethod);
+        await m.addColumn(payments, payments.terminalId);
+        await m.addColumn(payments, payments.terminalProvider);
       }
     },
     onCreate: (m) async {

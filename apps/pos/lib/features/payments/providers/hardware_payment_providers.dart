@@ -1,24 +1,20 @@
 /// Riverpod providers for hardware payment terminal integration.
 ///
-/// Configuration providers are intentionally left as `throw UnimplementedError`
-/// and must be overridden in [ProviderScope] at app startup with real values
-/// loaded from settings / database, following the same pattern as
-/// [databaseProvider] and [tenantIdProvider].
+/// Configuration providers derive live values from [paymentSettingsProvider]
+/// (backed by SharedPreferences via SettingsRepository). The user edits
+/// terminal IP / port / POS ID in the Settings screen; those values flow
+/// directly into the hardware-side [WalleeConfig] and [MyPosConfig]
+/// consumed by [PaymentEngine].
 ///
-/// Example bootstrap in main.dart:
-/// ```dart
-/// runApp(ProviderScope(
-///   overrides: [
-///     walleeConfigProvider.overrideWithValue(
-///       WalleeConfig(terminalIp: '192.168.1.100', posId: 'POS1'),
-///     ),
-///     myposConfigProvider.overrideWithValue(
-///       MyPosConfig(terminalIp: '192.168.1.101'),
-///     ),
-///   ],
-///   child: const App(),
-/// ));
-/// ```
+/// While the settings repository is still loading (first frame), we fall
+/// back to empty-IP configs — the engine's connection attempts will fail
+/// fast and surface a "terminal unreachable" error in the UI, which is the
+/// correct behaviour for an unconfigured install.
+///
+/// Settings and hardware layers each define their own `WalleeConfig` /
+/// `MyPosConfig` with different field names (settings uses `ip`/`port`,
+/// hardware uses `terminalIp`/`ltiPort` / `terminalPort`). We bridge them
+/// here via aliased imports and a mapper at provider construction.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,21 +24,47 @@ import 'package:gastrocore_pos/core/payment/config/wallee_config.dart';
 import 'package:gastrocore_pos/features/payments/data/hardware/mypos/mypos_payment_provider.dart';
 import 'package:gastrocore_pos/features/payments/data/hardware/payment_engine.dart';
 import 'package:gastrocore_pos/features/payments/data/hardware/wallee/wallee_payment_provider.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart'
+    as settings;
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 
 // ---------------------------------------------------------------------------
-// Configuration
+// Configuration — derived from settings
 // ---------------------------------------------------------------------------
 
-/// Wallee terminal configuration.
-/// Must be overridden in ProviderScope before use.
+/// Wallee terminal configuration derived from [paymentSettingsProvider].
+///
+/// Returns a config with empty `terminalIp` while settings are still
+/// loading; callers should treat that as "not yet configured" and surface
+/// an error rather than attempting to connect.
 final walleeConfigProvider = Provider<WalleeConfig>((ref) {
-  throw UnimplementedError('walleeConfigProvider must be overridden in ProviderScope');
+  final async = ref.watch(paymentSettingsProvider);
+  final s = async.valueOrNull?.wallee ?? const settings.WalleeConfig();
+  return WalleeConfig(
+    terminalIp: s.terminalIp,
+    posId: s.posId,
+    ltiPort: s.terminalPort,
+  );
 });
 
-/// MyPOS terminal configuration.
-/// Must be overridden in ProviderScope before use.
+/// MyPOS terminal configuration derived from [paymentSettingsProvider].
 final myposConfigProvider = Provider<MyPosConfig>((ref) {
-  throw UnimplementedError('myposConfigProvider must be overridden in ProviderScope');
+  final async = ref.watch(paymentSettingsProvider);
+  final s = async.valueOrNull?.mypos ?? const settings.MyPosConfig();
+  return MyPosConfig(
+    terminalIp: s.ip,
+    terminalPort: s.port,
+    currency: s.currency,
+  );
+});
+
+/// The active payment gateway selected in settings.
+///
+/// The payment UI consults this to decide whether card/debit buttons should
+/// trigger the hardware terminal or fall back to manual entry.
+final activePaymentGatewayProvider = Provider<settings.PaymentGateway>((ref) {
+  final async = ref.watch(paymentSettingsProvider);
+  return async.valueOrNull?.activeGateway ?? settings.PaymentGateway.none;
 });
 
 // ---------------------------------------------------------------------------

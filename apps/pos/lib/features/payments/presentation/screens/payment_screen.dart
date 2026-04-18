@@ -5,11 +5,17 @@
 /// Matches Stitch V2 payment design exactly.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
+import 'package:gastrocore_pos/core/payment/models/hardware_payment_method.dart';
+import 'package:gastrocore_pos/core/payment/models/hardware_payment_request.dart';
+import 'package:gastrocore_pos/core/payment/models/hardware_payment_result.dart';
+import 'package:gastrocore_pos/core/payment/models/hardware_payment_status.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
@@ -18,6 +24,8 @@ import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dar
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/payments/domain/entities/payment_entity.dart';
 import 'package:gastrocore_pos/features/payments/presentation/providers/refund_provider.dart';
+import 'package:gastrocore_pos/features/payments/providers/hardware_payment_providers.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 
 // ---------------------------------------------------------------------------
 // Payment Screen
@@ -38,6 +46,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   _PaymentMethod _selectedMethod = _PaymentMethod.cash;
   String _amountStr = '';
   bool _paymentComplete = false;
+
+  // Terminal-flow state (only active for card / debit).
+  bool _isProcessing = false;
+  String _processingMessage = '';
+  bool _isCancelling = false;
+  String? _terminalError;
 
   /// Cached ticket — updated whenever the async provider emits a new value.
   TicketEntity? _ticket;
@@ -86,12 +100,39 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     setState(() => _amountStr = amount.toString());
   }
 
+  // ---------------------------------------------------------------------------
+  // Payment completion dispatcher
+  // ---------------------------------------------------------------------------
+  //
+  // Cash / "Bol Ode" → direct DB write (legacy path).
+  // Kredi / Banka → terminal flow via PaymentEngine, with the terminal
+  //                 response fields persisted on the payment row for
+  //                 end-of-day reconciliation.
+
   Future<void> _onCompletePayment() async {
+    if (_isProcessing) return;
+
+    switch (_selectedMethod) {
+      case _PaymentMethod.cash:
+      case _PaymentMethod.split:
+        await _persistPayment();
+        _onPaymentSucceeded();
+      case _PaymentMethod.creditCard:
+      case _PaymentMethod.debitCard:
+        await _processTerminalPayment();
+    }
+  }
+
+  /// DB-only write — used for cash/split and as the last step after a
+  /// successful terminal authorisation.
+  Future<void> _persistPayment({
+    HardwarePaymentResult? terminalResult,
+    String? terminalProvider,
+  }) async {
     final tenantId = ref.read(tenantIdProvider);
     final currentUser = ref.read(currentUserProvider);
     final receivedBy = currentUser?.name ?? 'POS';
 
-    // Map local enum to domain PaymentMethod.
     final domainMethod = switch (_selectedMethod) {
       _PaymentMethod.cash => PaymentMethod.cash,
       _PaymentMethod.creditCard => PaymentMethod.creditCard,
@@ -99,13 +140,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       _PaymentMethod.split => PaymentMethod.other,
     };
 
-    // tenderedAmount: for cash use the entered amount (whole CHF → cents),
-    // for card use the exact ticket total.
     final tendered = _selectedMethod == _PaymentMethod.cash
         ? _enteredAmount * 100
         : _grandTotal;
 
-    // Process payment: creates bill, records payment row, closes ticket.
     final paymentRepo = ref.read(paymentRepositoryProvider);
     await paymentRepo.processPayment(
       ticketId: widget.ticketId,
@@ -114,13 +152,158 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       amount: _grandTotal,
       tenderedAmount: tendered,
       receivedBy: receivedBy,
+      reference: terminalResult?.transactionId,
+      terminalTransactionId: terminalResult?.transactionId,
+      authCode: terminalResult?.authCode,
+      maskedPan: terminalResult?.cardNumber,
+      cardType: terminalResult?.cardType,
+      entryMethod: terminalResult?.entryMethod,
+      terminalId: terminalResult?.terminalId,
+      terminalProvider: terminalProvider,
     );
+  }
 
+  void _onPaymentSucceeded() {
     ref.read(currentTicketProvider.notifier).clear();
-
     setState(() => _paymentComplete = true);
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) context.go(AppRoutes.receiptFor(widget.ticketId));
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Hardware terminal flow — card / debit only
+  // ---------------------------------------------------------------------------
+
+  Future<void> _processTerminalPayment() async {
+    final gateway = ref.read(activePaymentGatewayProvider);
+    if (gateway == PaymentGateway.none) {
+      // No terminal configured — fall back to the DB-only path so operators
+      // can still close tickets in manual-entry mode.
+      await _persistPayment();
+      _onPaymentSucceeded();
+      return;
+    }
+
+    final method = HardwarePaymentMethod.card;
+    final providerLabel = gateway == PaymentGateway.wallee ? 'Wallee' : 'MyPOS';
+    final reference = 'POS-${widget.ticketId}-${DateTime.now().millisecondsSinceEpoch}';
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = 'Connecting to terminal…';
+      _terminalError = null;
+    });
+
+    final engine = ref.read(paymentEngineProvider);
+    if (!engine.isInitialized) {
+      setState(() => _processingMessage = 'Initialising terminal…');
+      try {
+        await engine.initialize();
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _isProcessing = false;
+          _terminalError = 'Terminal unavailable. Please try again.';
+        });
+        return;
+      }
+    }
+
+    setState(() => _processingMessage = 'Tap or insert card on the terminal…');
+
+    final request = HardwarePaymentRequest(
+      reference: reference,
+      amount: _grandTotal / 100.0,
+      currency: 'CHF',
+      paymentMethod: method,
+    );
+
+    // 30s response timeout — matches the "connection lost / no response" case
+    // in the spike brief. A genuine card transaction takes 3-10s; anything
+    // beyond 30s usually means the terminal is unreachable.
+    late final HardwarePaymentResult result;
+    try {
+      result = await engine
+          .processPayment(request)
+          .timeout(const Duration(seconds: 30));
+    } on TimeoutException {
+      try {
+        await engine.cancelPayment();
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        _isProcessing = false;
+        _terminalError =
+            'Terminal did not respond within 30 seconds. Please try again.';
+      });
+      return;
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isProcessing = false;
+        _terminalError = 'Terminal error. Please try again.';
+      });
+      return;
+    }
+
+    if (!mounted) return;
+
+    switch (result.status) {
+      case HardwarePaymentStatus.approved:
+        setState(() => _processingMessage = 'Approved — closing ticket…');
+        try {
+          await _persistPayment(
+            terminalResult: result,
+            terminalProvider: providerLabel,
+          );
+        } catch (_) {
+          if (!mounted) return;
+          setState(() {
+            _isProcessing = false;
+            _terminalError =
+                'Payment approved but ticket could not be closed. '
+                'Please see a manager.';
+          });
+          return;
+        }
+        if (!mounted) return;
+        setState(() => _isProcessing = false);
+        _onPaymentSucceeded();
+
+      case HardwarePaymentStatus.declined:
+        setState(() {
+          _isProcessing = false;
+          _terminalError = 'Card declined. Please try another card.';
+        });
+
+      case HardwarePaymentStatus.cancelled:
+        setState(() {
+          _isProcessing = false;
+          _terminalError = null;
+        });
+
+      case HardwarePaymentStatus.failed:
+        setState(() {
+          _isProcessing = false;
+          _terminalError = result.errorMessage?.isNotEmpty == true
+              ? result.errorMessage
+              : 'Terminal error. Please try again.';
+        });
+    }
+  }
+
+  Future<void> _onCancelTerminalPayment() async {
+    if (!_isProcessing || _isCancelling) return;
+    setState(() => _isCancelling = true);
+    try {
+      await ref.read(paymentEngineProvider).cancelPayment();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = false;
+      _isCancelling = false;
+      _terminalError = null;
     });
   }
 
@@ -146,39 +329,125 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
-      body: Row(
+      body: Stack(
         children: [
-          // Sidebar
-          _buildSidebar(),
-          // Main content
-          Expanded(
-            child: Column(
-              children: [
-                // Top bar
-                _buildTopBar(),
-                // Content: order summary + payment
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Row(
-                      children: [
-                        // Left: Order summary (4/12)
-                        Expanded(
-                          flex: 4,
-                          child: _buildOrderSummary(),
+          Row(
+            children: [
+              // Sidebar
+              _buildSidebar(),
+              // Main content
+              Expanded(
+                child: Column(
+                  children: [
+                    // Top bar
+                    _buildTopBar(),
+                    // Content: order summary + payment
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Row(
+                          children: [
+                            // Left: Order summary (4/12)
+                            Expanded(
+                              flex: 4,
+                              child: _buildOrderSummary(),
+                            ),
+                            const SizedBox(width: 24),
+                            // Right: Payment interface (8/12)
+                            Expanded(
+                              flex: 8,
+                              child: _buildPaymentInterface(),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 24),
-                        // Right: Payment interface (8/12)
-                        Expanded(
-                          flex: 8,
-                          child: _buildPaymentInterface(),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                    if (_terminalError != null) _buildTerminalErrorBanner(),
+                  ],
                 ),
-              ],
+              ),
+            ],
+          ),
+          if (_isProcessing) _buildTerminalProcessingOverlay(),
+        ],
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Terminal processing overlay + error banner
+  // -------------------------------------------------------------------------
+
+  Widget _buildTerminalProcessingOverlay() {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.black.withValues(alpha: 0.75),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 80,
+                height: 80,
+                child: CircularProgressIndicator(
+                  strokeWidth: 6,
+                  color: Color(0xFFAFC6FF),
+                ),
+              ),
+              const SizedBox(height: 32),
+              Text(
+                _processingMessage,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Do not close this screen',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 40),
+              OutlinedButton.icon(
+                key: const Key('cancel_terminal_btn'),
+                onPressed: _isCancelling ? null : _onCancelTerminalPayment,
+                icon: const Icon(Icons.cancel_outlined, size: 20),
+                label: Text(_isCancelling ? 'Cancelling…' : 'Cancel Payment'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTerminalErrorBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF93000A).withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFB4AB).withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFFFB4AB), size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _terminalError ?? '',
+              style: const TextStyle(color: Color(0xFFFFB4AB), fontSize: 13),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Color(0xFFFFB4AB), size: 18),
+            onPressed: () => setState(() => _terminalError = null),
           ),
         ],
       ),

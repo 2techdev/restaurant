@@ -91,6 +91,31 @@ class PaymentEntity {
   /// Name of the cashier who processed this payment.
   final String? cashierName;
 
+  // -------------------------------------------------------------------------
+  // Hardware terminal response fields (Wallee / MyPOS). Null for cash.
+  // -------------------------------------------------------------------------
+
+  /// Terminal-assigned transaction identifier (RRN for MyPOS, LTI ref for Wallee).
+  final String? terminalTransactionId;
+
+  /// Authorisation code returned by the card scheme (ep2AuthCode).
+  final String? authCode;
+
+  /// Masked PAN (e.g. "411111******1111").
+  final String? maskedPan;
+
+  /// Card brand label ("Mastercard", "Visa", "TWINT").
+  final String? cardType;
+
+  /// Entry method ("CHIP", "CTLS", "MSR").
+  final String? entryMethod;
+
+  /// Physical terminal identifier (ep2TrmId).
+  final String? terminalId;
+
+  /// Which provider processed the transaction ("Wallee", "MyPOS").
+  final String? terminalProvider;
+
   const PaymentEntity({
     required this.id,
     required this.tenantId,
@@ -110,6 +135,13 @@ class PaymentEntity {
     this.externalChannel,
     this.externalPaymentId,
     this.cashierName,
+    this.terminalTransactionId,
+    this.authCode,
+    this.maskedPan,
+    this.cardType,
+    this.entryMethod,
+    this.terminalId,
+    this.terminalProvider,
   });
 
   /// Create a copy with selectively overridden fields.
@@ -132,6 +164,13 @@ class PaymentEntity {
     String? Function()? externalChannel,
     String? Function()? externalPaymentId,
     String? Function()? cashierName,
+    String? Function()? terminalTransactionId,
+    String? Function()? authCode,
+    String? Function()? maskedPan,
+    String? Function()? cardType,
+    String? Function()? entryMethod,
+    String? Function()? terminalId,
+    String? Function()? terminalProvider,
   }) {
     return PaymentEntity(
       id: id ?? this.id,
@@ -157,6 +196,16 @@ class PaymentEntity {
           ? externalPaymentId()
           : this.externalPaymentId,
       cashierName: cashierName != null ? cashierName() : this.cashierName,
+      terminalTransactionId: terminalTransactionId != null
+          ? terminalTransactionId()
+          : this.terminalTransactionId,
+      authCode: authCode != null ? authCode() : this.authCode,
+      maskedPan: maskedPan != null ? maskedPan() : this.maskedPan,
+      cardType: cardType != null ? cardType() : this.cardType,
+      entryMethod: entryMethod != null ? entryMethod() : this.entryMethod,
+      terminalId: terminalId != null ? terminalId() : this.terminalId,
+      terminalProvider:
+          terminalProvider != null ? terminalProvider() : this.terminalProvider,
     );
   }
 
