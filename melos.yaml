@@ -1,4 +1,5 @@
 name: gastrocore
+repository: https://github.com/2techdev/restaurant
 
 # Melos monorepo config for GastroCore.
 # Drives `flutter pub get`, analyze, test, and format across all apps and packages
@@ -11,7 +12,7 @@ name: gastrocore
 # Run commands across the workspace:
 #   melos run analyze
 #   melos run test
-#   melos run format-check
+#   melos run format:check
 
 packages:
   - apps/*
@@ -35,41 +36,41 @@ command:
 
 scripts:
   analyze:
-    description: "Run `flutter analyze` (or `dart analyze` for pure-Dart packages) across the workspace."
-    run: melos exec -- "flutter analyze --fatal-infos"
+    description: "Run `flutter analyze` across every Flutter package."
+    run: melos exec -c 1 -- "flutter analyze --fatal-infos"
     packageFilters:
       flutter: true
 
-  analyze-dart:
+  analyze:dart:
     description: "Run `dart analyze` for pure-Dart packages (e.g. gastrocore_models)."
-    run: melos exec -- "dart analyze --fatal-infos"
+    run: melos exec -c 1 -- "dart analyze --fatal-infos"
     packageFilters:
       flutter: false
 
   test:
     description: "Run Flutter tests across the workspace."
-    run: melos exec -- "flutter test"
+    run: melos exec -c 1 -- "flutter test"
     packageFilters:
       flutter: true
       dirExists: test
 
-  test-dart:
+  test:dart:
     description: "Run pure-Dart tests."
-    run: melos exec -- "dart test"
+    run: melos exec -c 1 -- "dart test"
     packageFilters:
       flutter: false
       dirExists: test
 
-  format-check:
+  format:check:
     description: "Verify formatting (CI-friendly; exits non-zero on diff)."
-    run: melos exec -- "dart format --output=none --set-exit-if-changed ."
+    run: melos exec -c 1 -- "dart format --output=none --set-exit-if-changed ."
 
   format:
     description: "Format all Dart code in-place."
-    run: melos exec -- "dart format ."
+    run: melos exec -c 1 -- "dart format ."
 
   clean:
-    description: "Clean build artefacts across the workspace."
-    run: melos exec -- "flutter clean"
+    description: "Clean build artefacts across Flutter packages."
+    run: melos exec -c 4 -- "flutter clean"
     packageFilters:
       flutter: true
