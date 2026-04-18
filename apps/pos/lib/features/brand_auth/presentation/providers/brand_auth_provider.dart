@@ -159,10 +159,12 @@ class BrandAuthNotifier extends StateNotifier<BrandAuthState> {
         clearContext: true,
       );
       return false;
-    } catch (e) {
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('[BrandAuth] unexpected login error: $e\n$st');
       state = state.copyWith(
         isLoading: false,
-        error: 'Verbindungsfehler. Bitte erneut versuchen.',
+        error: 'Beklenmeyen hata: $e',
         clearContext: true,
       );
       return false;
@@ -186,10 +188,12 @@ class BrandAuthNotifier extends StateNotifier<BrandAuthState> {
     } on AuthException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
       return false;
-    } catch (e) {
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('[BrandAuth] unexpected register error: $e\n$st');
       state = state.copyWith(
         isLoading: false,
-        error: 'Registrierung fehlgeschlagen. Bitte erneut versuchen.',
+        error: 'Kayıt hatası: $e',
       );
       return false;
     }

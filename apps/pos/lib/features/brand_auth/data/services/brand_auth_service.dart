@@ -116,66 +116,99 @@ class BrandAuthService {
   AuthResult _parseAuthResult(http.Response response) {
     final data = _decode(response);
 
-    final accessToken = data['access_token'] as String? ?? '';
-    final refreshToken = data['refresh_token'] as String? ?? '';
+    try {
+      final accessToken = _asString(data['access_token']) ?? '';
+      final refreshToken = _asString(data['refresh_token']) ?? '';
 
-    if (accessToken.isEmpty) {
-      throw const AuthException('Missing access_token in response');
-    }
-
-    // The multi-tenant backend returns fields on a nested `user` object:
-    //   { access_token, refresh_token, user: { store_id, organization_id, role, … } }
-    // Older/alternate shapes may expose a flat `store` or `context` object
-    // or root-level scalars; probe all of them in priority order.
-    final userData = data['user'] as Map<String, dynamic>?;
-    final storeData = (data['store'] ?? data['context'] ?? const {})
-        as Map<String, dynamic>;
-
-    String pick(String key, [String fallback = '']) {
-      final fromUser = userData?[key];
-      if (fromUser is String && fromUser.isNotEmpty) return fromUser;
-      if (fromUser is List && fromUser.isNotEmpty) {
-        // e.g. `store_ids: ["…"]` — take the first entry.
-        final first = fromUser.first;
-        if (first is String && first.isNotEmpty) return first;
+      if (accessToken.isEmpty) {
+        throw const AuthException('Missing access_token in response');
       }
-      final fromStore = storeData[key];
-      if (fromStore is String && fromStore.isNotEmpty) return fromStore;
-      final fromRoot = data[key];
-      if (fromRoot is String && fromRoot.isNotEmpty) return fromRoot;
-      return fallback;
+
+      // The multi-tenant backend returns fields on a nested `user` object:
+      //   { access_token, refresh_token, user: { store_id, organization_id, role, … } }
+      // Older/alternate shapes may expose a flat `store` or `context` object
+      // or root-level scalars; probe all of them in priority order.
+      // NOTE: use a non-const literal for the fallback — `const {}` is typed
+      //   Map<dynamic, dynamic> and casting it to Map<String, dynamic> raises
+      //   a TypeError in release builds, surfacing as "Verbindungsfehler" even
+      //   when the server returned 200 OK.
+      final userData = _asMap(data['user']);
+      final storeData = _asMap(data['store']) ??
+          _asMap(data['context']) ??
+          <String, dynamic>{};
+
+      String pick(String key, [String fallback = '']) {
+        final fromUser = userData?[key];
+        if (fromUser is String && fromUser.isNotEmpty) return fromUser;
+        if (fromUser is List && fromUser.isNotEmpty) {
+          // e.g. `store_ids: ["…"]` — take the first entry.
+          final first = fromUser.first;
+          if (first is String && first.isNotEmpty) return first;
+        }
+        final fromStore = storeData[key];
+        if (fromStore is String && fromStore.isNotEmpty) return fromStore;
+        final fromRoot = data[key];
+        if (fromRoot is String && fromRoot.isNotEmpty) return fromRoot;
+        return fallback;
+      }
+
+      final storeId = pick('store_id').isNotEmpty
+          ? pick('store_id')
+          : pick('store_ids');
+
+      final brandId = pick('organization_id').isNotEmpty
+          ? pick('organization_id')
+          : pick('brand_id');
+
+      final roleStr = pick('role', pick('user_role', 'staff')).toLowerCase();
+      final role = switch (roleStr) {
+        'owner' => BrandUserRole.owner,
+        'manager' => BrandUserRole.manager,
+        _ => BrandUserRole.staff,
+      };
+
+      final ctx = StoreContext(
+        brandId: brandId,
+        storeId: storeId,
+        storeName: pick('store_name', 'My Restaurant'),
+        brandName: pick('brand_name').isNotEmpty
+            ? pick('brand_name')
+            : pick('restaurant_name', 'My Brand'),
+        userRole: role,
+        isOnlineMode: true,
+      );
+
+      return AuthResult(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        storeContext: ctx,
+      );
+    } on AuthException {
+      rethrow;
+    } catch (e, st) {
+      // Any runtime error during parsing (type casts, missing keys, …) must
+      // surface as an AuthException so the UI layer shows a specific error
+      // instead of the generic "Verbindungsfehler" catch-all.
+      // ignore: avoid_print
+      print('[BrandAuthService] parse failed: $e\n$st');
+      throw AuthException('Sunucu yanıtı okunamadı: $e');
     }
+  }
 
-    final storeId = pick('store_id').isNotEmpty
-        ? pick('store_id')
-        : pick('store_ids');
+  // ---------------------------------------------------------------------------
+  // Permissive JSON accessors — tolerate unexpected server shapes instead of
+  // letting a TypeError escape into the generic "Verbindungsfehler" catch.
+  // ---------------------------------------------------------------------------
 
-    final brandId = pick('organization_id').isNotEmpty
-        ? pick('organization_id')
-        : pick('brand_id');
+  static String? _asString(Object? v) {
+    if (v == null) return null;
+    if (v is String) return v;
+    return v.toString();
+  }
 
-    final roleStr = pick('role', pick('user_role', 'staff')).toLowerCase();
-    final role = switch (roleStr) {
-      'owner' => BrandUserRole.owner,
-      'manager' => BrandUserRole.manager,
-      _ => BrandUserRole.staff,
-    };
-
-    final ctx = StoreContext(
-      brandId: brandId,
-      storeId: storeId,
-      storeName: pick('store_name', 'My Restaurant'),
-      brandName: pick('brand_name').isNotEmpty
-          ? pick('brand_name')
-          : pick('restaurant_name', 'My Brand'),
-      userRole: role,
-      isOnlineMode: true,
-    );
-
-    return AuthResult(
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-      storeContext: ctx,
-    );
+  static Map<String, dynamic>? _asMap(Object? v) {
+    if (v is Map<String, dynamic>) return v;
+    if (v is Map) return v.map((k, val) => MapEntry(k.toString(), val));
+    return null;
   }
 }
