@@ -1,14 +1,15 @@
-/// Fine-dining shell — Kinetic Grid 4-column layout.
+/// Fine-dining shell — Kinetic Grid 4-column layout (v3).
 ///
-/// Left:   [OrderPanel]        — ticket sidebar with selected/void states.
-/// Centre: [CategoryStrip]     — horizontal SambaPOS warm tiles.
-///         [ProductGrid]       — 1/2-column responsive grid.
-/// Right:  [ActionRail]        — Pay + Split + Void in semantic colours.
-/// Bottom: [BottomActionBar]   — Close / New / Send / Split / Card / Cash.
+/// Top bar          — "Gastro Core" brand + sync / settings / user icons.
+/// Row:
+///   1. [LeftNavRail]          — nav stack + action zone (incl. Pay).
+///   2. [OrderPanel]           — ticket sidebar (header / items / totals).
+///   3. [GridCategoryColumn]   — vertical 2-col aspect-square category grid.
+///   4. Product area           — category header + search + product grid.
+/// Bottom: [BottomActionBar]   — Close / New / Send / totals / Split / Card / Cash.
 ///
-/// The whole subtree is wrapped in a local [Theme] override so only the
-/// sales surface gets the Kinetic palette — Settings / Tables / Reports
-/// continue to render on the existing dark theme.
+/// Only the sales subtree runs under [buildKineticTheme]; every other screen
+/// still uses the app-wide dark Stitch theme.
 library;
 
 import 'package:flutter/material.dart';
@@ -19,12 +20,14 @@ import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
 import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
+import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
-import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/action_rail.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/bottom_action_bar.dart';
-import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/category_strip.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/column_toggle_button.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/grid_category_column.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/left_nav_rail.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/order_panel.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/product_grid.dart';
 
@@ -34,7 +37,6 @@ class FineDiningShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ticket = ref.watch(currentTicketProvider);
-    final columns = ref.watch(productGridColumnsProvider);
     final activeGang = ref.watch(activeGangProvider);
 
     final pendingByProduct = <String, int>{};
@@ -58,29 +60,22 @@ class FineDiningShell extends ConsumerWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const LeftNavRail(),
                     const OrderPanel(),
+                    const GridCategoryColumn(),
                     Expanded(
-                      child: Column(
-                        children: [
-                          const CategoryStrip(trailing: ColumnToggleButton()),
-                          Expanded(
-                            child: ProductGrid(
-                              columns: columns,
-                              cartQuantities: pendingByProduct,
-                              onProductTap: (product) {
-                                _onProductTap(
-                                  context,
-                                  ref,
-                                  product,
-                                  course: activeGang,
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+                      child: _ProductArea(
+                        cartQuantities: pendingByProduct,
+                        onProductTap: (product) {
+                          _onProductTap(
+                            context,
+                            ref,
+                            product,
+                            course: activeGang,
+                          );
+                        },
                       ),
                     ),
-                    const ActionRail(),
                   ],
                 ),
               ),
@@ -114,7 +109,178 @@ class FineDiningShell extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Top bar — dark-green SambaPOS accent, Terminal / Admin identity.
+// Product area — h-14 header with category name + underline search, then grid.
+// ---------------------------------------------------------------------------
+
+class _ProductArea extends ConsumerWidget {
+  const _ProductArea({
+    required this.cartQuantities,
+    required this.onProductTap,
+  });
+
+  final Map<String, int> cartQuantities;
+  final void Function(ProductEntity) onProductTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedId = ref.watch(selectedCategoryProvider);
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final headerLabel = categoriesAsync.maybeWhen(
+      data: (cats) => _headerFor(selectedId, cats),
+      orElse: () => 'TÜMÜ',
+    );
+
+    return ColoredBox(
+      color: GcColors.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ProductHeader(title: headerLabel),
+          Expanded(
+            child: ProductGrid(
+              cartQuantities: cartQuantities,
+              onProductTap: onProductTap,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _headerFor(String? id, List<CategoryEntity> cats) {
+    if (id == null) return 'TÜMÜ';
+    return cats
+        .firstWhere(
+          (c) => c.id == id,
+          orElse: () => cats.isEmpty
+              ? const CategoryEntity(
+                  id: '',
+                  tenantId: '',
+                  name: '',
+                  displayOrder: 0,
+                  color: '',
+                  icon: '',
+                  isActive: true,
+                )
+              : cats.first,
+        )
+        .name
+        .toUpperCase();
+  }
+}
+
+class _ProductHeader extends ConsumerWidget {
+  const _ProductHeader({required this.title});
+  final String title;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      height: 56,
+      color: GcColors.surface,
+      padding: const EdgeInsets.symmetric(horizontal: AppTokens.space16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title.toUpperCase(),
+              style: const TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: GcColors.onSurface,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+          const ColumnToggleButton(),
+          const SizedBox(width: AppTokens.space12),
+          const _SearchField(),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchField extends ConsumerStatefulWidget {
+  const _SearchField();
+
+  @override
+  ConsumerState<_SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends ConsumerState<_SearchField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: ref.read(productSearchProvider),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 240,
+      height: 36,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: GcColors.surfaceContainerLowest,
+          border: Border(
+            bottom: BorderSide(color: GcColors.primary, width: 2),
+          ),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: AppTokens.space8),
+            const Icon(
+              Icons.search_rounded,
+              size: 18,
+              color: GcColors.onSurfaceVariant,
+            ),
+            const SizedBox(width: AppTokens.space8),
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                onChanged: (v) =>
+                    ref.read(productSearchProvider.notifier).state = v,
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: GcColors.onSurface,
+                ),
+                decoration: const InputDecoration(
+                  hintText: 'Ara…',
+                  hintStyle: TextStyle(
+                    color: GcColors.onSurfaceVariant,
+                    fontSize: 13,
+                  ),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(vertical: 8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Top bar — "Gastro Core" brand on a high-surface strip.
 // ---------------------------------------------------------------------------
 
 class _TopBar extends ConsumerWidget {
@@ -122,147 +288,61 @@ class _TopBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-    final initials = _initials(user?.name ?? 'Staff');
     return Container(
       height: AppTokens.topBarHeight,
-      color: GcColors.catDarkGreen,
-      padding: const EdgeInsets.symmetric(horizontal: AppTokens.space12),
+      color: GcColors.surfaceContainer,
+      padding: const EdgeInsets.symmetric(horizontal: AppTokens.space16),
       child: Row(
         children: [
-          _IconTile(
-            icon: Icons.grid_view_rounded,
-            onTap: () => context.go(AppRoutes.home),
-          ),
-          const SizedBox(width: AppTokens.space12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'TERMINAL 01',
-                style: GcText.labelTiny.copyWith(
-                  color: GcColors.onPrimary.withValues(alpha: 0.75),
-                ),
-              ),
-              Text(
-                (user?.name ?? 'Admin').toUpperCase(),
-                style: GcText.headline.copyWith(
-                  color: GcColors.onPrimary,
-                  fontSize: 13,
-                ),
-              ),
-            ],
+          const Text(
+            'Gastro Core',
+            style: TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: GcColors.onSurface,
+              letterSpacing: -0.5,
+            ),
           ),
           const Spacer(),
-          const _TopTileGroup(),
-          const SizedBox(width: AppTokens.space8),
-          _IconTile(
-            icon: Icons.table_restaurant_rounded,
-            onTap: () => context.push(AppRoutes.tables),
+          _IconButton(
+            icon: Icons.sync_rounded,
+            onTap: () {},
           ),
-          const SizedBox(width: 4),
-          _IconTile(
+          _IconButton(
             icon: Icons.settings_rounded,
             onTap: () => context.push(AppRoutes.settings),
           ),
-          const SizedBox(width: AppTokens.space8),
-          _UserBadge(initials: initials),
+          _IconButton(
+            icon: Icons.person_rounded,
+            onTap: () => context.go(AppRoutes.home),
+          ),
         ],
       ),
     );
   }
-
-  static String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return name.substring(0, name.length.clamp(0, 2)).toUpperCase();
-  }
 }
 
-class _IconTile extends StatelessWidget {
-  const _IconTile({required this.icon, required this.onTap});
+class _IconButton extends StatelessWidget {
+  const _IconButton({required this.icon, required this.onTap});
   final IconData icon;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: GcColors.secondaryDim,
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        hoverColor: GcColors.surfaceContainerHigh,
         child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Icon(icon, size: 18, color: GcColors.onPrimary),
-        ),
-      ),
-    );
-  }
-}
-
-/// Small cluster of "quick item" tiles on the top bar — a placeholder
-/// for the SambaPOS-style favourites row (e.g. Coca-Cola variants).
-/// Rendered only on wide tablets (>= 1100px) so it doesn't crowd the
-/// 7" pilot layout.
-class _TopTileGroup extends StatelessWidget {
-  const _TopTileGroup();
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (ctx, bc) {
-        final wide = MediaQuery.sizeOf(ctx).width >= 1100;
-        if (!wide) return const SizedBox.shrink();
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _quick('COLA', GcColors.catRed),
-            const SizedBox(width: 2),
-            _quick('ZERO', GcColors.error),
-            const SizedBox(width: 2),
-            _quick('LIGHT', GcColors.catRed),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _quick(String label, Color bg) {
-    return Container(
-      color: bg,
-      height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        style: GcText.button.copyWith(
-          fontSize: 10,
-          color: GcColors.onPrimary,
-        ),
-      ),
-    );
-  }
-}
-
-class _UserBadge extends StatelessWidget {
-  const _UserBadge({required this.initials});
-  final String initials;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 36,
-      height: 36,
-      color: GcColors.secondaryDim,
-      alignment: Alignment.center,
-      child: Text(
-        initials,
-        style: GcText.button.copyWith(
-          fontSize: 12,
-          color: GcColors.onPrimary,
+          width: 44,
+          height: 44,
+          child: Icon(
+            icon,
+            size: 20,
+            color: GcColors.primary,
+          ),
         ),
       ),
     );

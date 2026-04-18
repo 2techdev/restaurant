@@ -45,7 +45,7 @@ final _stubProducts = [
 ];
 
 Widget _harness({
-  required int columns,
+  required double width,
   required void Function(ProductEntity) onTap,
   List<ProductEntity>? products,
 }) {
@@ -56,7 +56,13 @@ Widget _harness({
     ],
     child: MaterialApp(
       home: Scaffold(
-        body: ProductGrid(columns: columns, onProductTap: onTap),
+        body: Center(
+          child: SizedBox(
+            width: width,
+            height: 600,
+            child: ProductGrid(onProductTap: onTap),
+          ),
+        ),
       ),
     ),
   );
@@ -103,34 +109,32 @@ void main() {
   });
 
   group('ProductGrid rendering', () {
-    testWidgets('renders with 1-column key', (tester) async {
-      await tester.pumpWidget(_harness(columns: 1, onTap: (_) {}));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const ValueKey('product_grid_cols_1')), findsOneWidget);
-      expect(find.byKey(const ValueKey('product_grid_cols_2')), findsNothing);
-    });
-
-    testWidgets('renders with 2-column key', (tester) async {
-      await tester.pumpWidget(_harness(columns: 2, onTap: (_) {}));
+    testWidgets('renders 2-column layout at narrow width', (tester) async {
+      await tester.pumpWidget(_harness(width: 400, onTap: (_) {}));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('product_grid_cols_2')), findsOneWidget);
-      expect(find.byKey(const ValueKey('product_grid_cols_1')), findsNothing);
     });
 
-    testWidgets('clamps invalid column count when rendering', (tester) async {
-      // Passing 5 should be clamped to max=2.
-      await tester.pumpWidget(_harness(columns: 5, onTap: (_) {}));
+    testWidgets('renders 3-column layout at mid width', (tester) async {
+      await tester.pumpWidget(_harness(width: 620, onTap: (_) {}));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('product_grid_cols_2')), findsOneWidget);
+
+      expect(find.byKey(const ValueKey('product_grid_cols_3')), findsOneWidget);
+    });
+
+    testWidgets('renders 4-column layout at tablet width', (tester) async {
+      await tester.pumpWidget(_harness(width: 780, onTap: (_) {}));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('product_grid_cols_4')), findsOneWidget);
     });
 
     testWidgets('invokes onProductTap with the tapped product',
         (tester) async {
       final tapped = <String>[];
       await tester.pumpWidget(_harness(
-        columns: 2,
+        width: 620,
         onTap: (p) => tapped.add(p.id),
       ));
       await tester.pumpAndSettle();

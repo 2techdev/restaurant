@@ -11,7 +11,11 @@
 ///   * `#f4f7f9` canvas, surface-container-lowest / low / high / highest —
 ///     depth is expressed via tonal nesting instead of shadows or 1px lines.
 ///   * SambaPOS warm category palette (catRed / catOrange / catYellow /
-///     catGreen / catTeal / catCyan) — saturated, scan-optimized tiles.
+///     catGreen / catDarkGreen / catTeal / catCyan) — seeded defaults for
+///     pilot v3: every category tile renders [catOrange], the active
+///     category flips to [catYellow], products render [catGreen] with
+///     white text. Per-restaurant overrides land post-pilot via
+///     `RestaurantSettings.categoryColorMap` / `productColorMap`.
 ///
 /// Typography: Work Sans for headlines / labels UPPERCASE, Inter for body.
 /// `google_fonts` is NOT currently in pubspec (pilot deadline), so these
@@ -85,64 +89,64 @@ abstract final class GcColors {
 }
 
 // ---------------------------------------------------------------------------
-// Category color resolution — SambaPOS default mapping + contrast helpers
+// Category tone — SambaPOS warm defaults (pilot v3).
 // ---------------------------------------------------------------------------
 
-/// Resolve a category fill color by human-readable name.
+/// Visual tone for a category tile. For pilot v3 every unmodified category
+/// resolves to [warm] — the uniform SambaPOS-style orange default. The
+/// enum is retained so a later sprint can add per-category overrides
+/// (Desserts → tertiary, Drinks → secondary, etc.) without touching every
+/// call site.
+enum CategoryTone { warm, primary, secondary, tertiary }
+
+/// Resolve a category to its [CategoryTone] based on its name.
 ///
-/// Used when the restaurant hasn't set a per-category override in
-/// `RestaurantSettings.categoryColorMap` (future P1). Comparison is
-/// case-insensitive and matches on both the seed English names and the
-/// Turkish menu the pilot uses day-one.
-///
-/// Falls back to [GcColors.primaryContainer] so unknown categories still
-/// render a legible tile rather than a naked surface.
-Color resolveCategoryColor(String name, {Color? fallback}) {
-  final key = name.trim().toLowerCase();
-  for (final (match, color) in _categoryDefaults) {
-    if (key.contains(match)) return color;
+/// Pilot v3 default: **every category is [CategoryTone.warm]**. Restaurant
+/// owners override per-category later via Settings; the name-based matchers
+/// from earlier iterations have been retired to match the classic SambaPOS
+/// "one warm hue, yellow-for-active" workflow the user referenced in the
+/// 019da150 screenshot.
+CategoryTone categoryTone(String name) => CategoryTone.warm;
+
+/// Fill + foreground + gradient for a given tone. Kept as a single lookup
+/// so every tile renderer in the codebase picks the same values.
+({Color bg, Color fg, LinearGradient? gradient}) toneStyle(CategoryTone tone) {
+  switch (tone) {
+    case CategoryTone.warm:
+      return (bg: GcColors.catOrange, fg: GcColors.onSurface, gradient: null);
+    case CategoryTone.primary:
+      return (bg: GcColors.primary, fg: GcColors.onPrimary, gradient: kPrimaryGradient);
+    case CategoryTone.secondary:
+      return (
+        bg: GcColors.secondary,
+        fg: GcColors.onSecondary,
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [GcColors.secondary, GcColors.secondaryDim],
+        ),
+      );
+    case CategoryTone.tertiary:
+      return (
+        bg: GcColors.tertiary,
+        fg: GcColors.onPrimary,
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [GcColors.tertiary, GcColors.tertiaryDim],
+        ),
+      );
   }
-  return fallback ?? GcColors.primaryContainer;
 }
 
-/// Pick a foreground color that reads over [bg]. Uses the perceptual
-/// luminance rule — yellows / light oranges flip to dark text, everything
-/// else stays white.
-Color onCategoryColor(Color bg) {
-  final lum = bg.computeLuminance();
-  return lum > 0.55 ? GcColors.onSurface : GcColors.onPrimary;
+/// Active-category tile fill (yellow on warm defaults, primary on coloured
+/// tones). Kept as a helper so the grid widget stays declarative.
+({Color bg, Color fg}) activeStyle(CategoryTone tone) {
+  if (tone == CategoryTone.warm) {
+    return (bg: GcColors.catYellow, fg: GcColors.onSurface);
+  }
+  return (bg: GcColors.primary, fg: GcColors.onPrimary);
 }
-
-// Ordered because 'sandwiches' would match both "sandwich" and "salad" if
-// we didn't scan the more specific token first.
-const List<(String, Color)> _categoryDefaults = [
-  ('starter', GcColors.catRed),
-  ('wing', GcColors.catRed),
-  ('salad', GcColors.catYellow),
-  ('side', GcColors.catYellow),
-  ('burger', GcColors.catOrange),
-  ('wrap', GcColors.catOrange),
-  ('sandwich', GcColors.catYellow),
-  ('pizza', GcColors.catRed),
-  ('rib', GcColors.catOrange),
-  ('chicken', GcColors.catOrange),
-  ('seafood', GcColors.catRed),
-  ('dessert', GcColors.tertiaryFixed),
-  ('tatl', GcColors.tertiaryFixed), // tr: tatlı
-  ('beverage', GcColors.catRed),
-  ('frozen', GcColors.catOrange),
-  ('kebab', GcColors.catOrange),
-  ('kebap', GcColors.catOrange), // tr
-  ('drink', GcColors.catCyan),
-  ('içecek', GcColors.catCyan), // tr
-  ('içki', GcColors.catPurple), // tr: alkol
-  ('alcohol', GcColors.catPurple),
-  ('starter & wing', GcColors.catRed),
-  ('vorspeise', GcColors.catRed), // de
-  ('hauptgang', GcColors.catOrange), // de
-  ('nachspeise', GcColors.tertiaryFixed), // de
-  ('getränk', GcColors.catCyan), // de
-];
 
 // ---------------------------------------------------------------------------
 // GcText — typography presets. Opaque TextStyles; callers pick the size.
@@ -232,10 +236,10 @@ ThemeData buildKineticTheme() {
     onPrimaryContainer: GcColors.primary,
     secondary: GcColors.secondary,
     onSecondary: GcColors.onSecondary,
-    secondaryContainer: GcColors.catGreen,
+    secondaryContainer: GcColors.secondaryDim,
     tertiary: GcColors.tertiary,
     onTertiary: GcColors.onPrimary,
-    tertiaryContainer: GcColors.tertiaryFixed,
+    tertiaryContainer: GcColors.tertiaryDim,
     error: GcColors.error,
     onError: GcColors.onPrimary,
     surface: GcColors.surface,

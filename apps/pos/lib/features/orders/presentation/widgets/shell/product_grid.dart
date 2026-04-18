@@ -1,10 +1,14 @@
 /// Product grid for the Kinetic sales shell.
 ///
-/// Renders `filteredProductsProvider` in a responsive GridView whose column
-/// count is user-toggleable (1 ↔ 2). The grid stays on zero-radius tiles
-/// with a ghost border — depth is expressed via surface nesting, not
-/// shadows. Products with an [ProductEntity.imagePath] set get a thumbnail
-/// pushed against the leading edge; text-only tiles stay Kinetic-clean.
+/// Renders [filteredProductsProvider] as a dense tile grid matching the
+/// SambaPOS reference (019da150) the user approved: each tile is a
+/// zero-radius [catGreen] card with white body text (top-left) and a
+/// white price chip (bottom-right).
+///
+/// Column count is responsive — driven by the rendering width rather than
+/// a user toggle, because the middle "category column" already owns the
+/// 1↔2 toggle via [productGridColumnsProvider]. A tablet at 1280dp hits the
+/// 4-column breakpoint; the 7" pilot (~800dp product area) lands on 3.
 library;
 
 import 'package:flutter/material.dart';
@@ -15,7 +19,10 @@ import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
 
-/// Column-count preference for the product grid (1 or 2).
+/// Column-count preference shared by the middle category column and — when
+/// set to 1 — by a fallback single-column product list. The product grid
+/// itself is responsive, so in the default (2-column category) mode this
+/// value doesn't actually constrain the product grid.
 final productGridColumnsProvider = StateProvider<int>((ref) => 2);
 
 const int kProductGridMinColumns = 1;
@@ -31,49 +38,70 @@ void toggleProductGridColumns(WidgetRef ref) {
 }
 
 // ---------------------------------------------------------------------------
+// Tile sizing — picks a column count based on the grid's usable width.
+// ---------------------------------------------------------------------------
+
+const double _tileHeight = 112;
+const double _tileMinWidth = 140;
+
+int _columnsForWidth(double width) {
+  if (width >= 880) return 5;
+  if (width >= 720) return 4;
+  if (width >= 520) return 3;
+  return 2;
+}
+
+// ---------------------------------------------------------------------------
 // ProductGrid
 // ---------------------------------------------------------------------------
 
 class ProductGrid extends ConsumerWidget {
   const ProductGrid({
     super.key,
-    required this.columns,
     required this.onProductTap,
     this.cartQuantities = const <String, int>{},
   });
 
-  final int columns;
   final Map<String, int> cartQuantities;
   final void Function(ProductEntity) onProductTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final productsAsync = ref.watch(filteredProductsProvider);
-    final crossAxisCount = clampProductGridColumns(columns);
 
     return ColoredBox(
       color: GcColors.surface,
       child: productsAsync.when(
         data: (products) {
           if (products.isEmpty) return const _EmptyState();
-          return GridView.builder(
-            key: ValueKey('product_grid_cols_$crossAxisCount'),
-            padding: AppInsets.all12,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              mainAxisSpacing: AppTokens.space8,
-              crossAxisSpacing: AppTokens.space8,
-              childAspectRatio: crossAxisCount == 1 ? 3.2 : 1.25,
-            ),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              final p = products[index];
-              return ProductCard(
-                key: ValueKey('product_card_${p.id}'),
-                product: p,
-                quantity: cartQuantities[p.id] ?? 0,
-                columns: crossAxisCount,
-                onTap: () => onProductTap(p),
+          return LayoutBuilder(
+            builder: (context, bc) {
+              final cols = _columnsForWidth(bc.maxWidth);
+              final tileWidth = (bc.maxWidth -
+                      AppTokens.space16 - // outer padding
+                      AppTokens.space8 * (cols - 1)) /
+                  cols;
+              final aspect = tileWidth / _tileHeight;
+
+              return GridView.builder(
+                key: ValueKey('product_grid_cols_$cols'),
+                padding: const EdgeInsets.all(AppTokens.space8),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: cols,
+                  mainAxisSpacing: AppTokens.space8,
+                  crossAxisSpacing: AppTokens.space8,
+                  childAspectRatio: tileWidth < _tileMinWidth ? 1 : aspect,
+                ),
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  final p = products[index];
+                  return ProductCard(
+                    key: ValueKey('product_card_${p.id}'),
+                    product: p,
+                    quantity: cartQuantities[p.id] ?? 0,
+                    onTap: () => onProductTap(p),
+                  );
+                },
               );
             },
           );
@@ -95,7 +123,7 @@ class ProductGrid extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// ProductCard
+// ProductCard — zero-radius tile, name top-left, price bottom-right.
 // ---------------------------------------------------------------------------
 
 class ProductCard extends StatelessWidget {
@@ -103,33 +131,65 @@ class ProductCard extends StatelessWidget {
     super.key,
     required this.product,
     required this.onTap,
-    required this.columns,
     this.quantity = 0,
   });
 
   final ProductEntity product;
   final VoidCallback onTap;
-  final int columns;
   final int quantity;
 
   @override
   Widget build(BuildContext context) {
-    final hasThumb = (product.imagePath ?? '').isNotEmpty;
     return Material(
-      color: GcColors.surfaceContainerLowest,
-      shape: const Border.fromBorderSide(
-        BorderSide(color: GcColors.ghostBorder),
-      ),
+      color: GcColors.catGreen,
       child: InkWell(
         onTap: onTap,
+        splashColor: GcColors.catDarkGreen,
+        highlightColor: GcColors.catDarkGreen,
         child: Stack(
           children: [
-            hasThumb
-                ? _thumbLayout(context)
-                : Padding(
-                    padding: AppInsets.all12,
-                    child: _textOnlyLayout(),
-                  ),
+            DecoratedBox(
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: kInsetHighlight, width: 2),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppTokens.space8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        product.name,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          height: 1.15,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Text(
+                        _formatCHF(product.price),
+                        style: const TextStyle(
+                          fontFamily: 'WorkSans',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             if (quantity > 0)
               Positioned(
                 top: AppTokens.space4,
@@ -139,94 +199,6 @@ class ProductCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _textOnlyLayout() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                product.name,
-                style: GcText.body.copyWith(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Text(
-                  _formatCHF(product.price),
-                  style: GcText.price.copyWith(
-                    fontSize: 13,
-                    color: GcColors.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _thumbLayout(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          width: 80,
-          child: Image.network(
-            product.imagePath!,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const ColoredBox(
-              color: GcColors.surfaceContainerHigh,
-              child: Icon(Icons.restaurant_rounded,
-                  size: 28, color: GcColors.outlineVariant),
-            ),
-            loadingBuilder: (c, child, prog) => prog == null
-                ? child
-                : const ColoredBox(color: GcColors.surfaceContainer),
-          ),
-        ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTokens.space12,
-              vertical: AppTokens.space8,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  product.name,
-                  style: GcText.body.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  _formatCHF(product.price),
-                  style: GcText.price.copyWith(
-                    fontSize: 13,
-                    color: GcColors.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -245,12 +217,12 @@ class _QuantityBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      color: GcColors.primary,
+      color: GcColors.catYellow,
       child: Text(
         '×$quantity',
         style: GcText.button.copyWith(
           fontSize: 11,
-          color: GcColors.onPrimary,
+          color: GcColors.onSurface,
         ),
       ),
     );

@@ -1,15 +1,17 @@
-/// Bottom action bar — Kinetic semantic payment row.
+/// Bottom action bar — SambaPOS warm defaults (pilot v3).
 ///
-/// SambaPOS-style settle / cash / card / split / close cluster with
-/// semantic colours from the warm palette:
-///   * Cash    → green (catGreen)
-///   * Card    → yellow (catYellow, dark text)
-///   * Ticket  → orange-tint yellow (catYellow lighter)
-///   * Settle  → teal (catTeal)
-///   * Split   → cyan (catCyan)
-///   * Close   → red (error)
-/// The running total sits in the centre in Work Sans black; the Pay CTA
-/// keeps the primary gradient treatment from the Kinetic brief.
+/// Close / New / Send / totals / Split / Card / Cash cluster. Colours are
+/// seeded from the classic SambaPOS warm palette so operators coming from
+/// the old terminal land on familiar greens / reds / blues:
+///   * Close → [catRed] + white
+///   * New   → neutral surface, dark text
+///   * Send  → [catDarkGreen] + white
+///   * Split → [primary] blue + white
+///   * Card  → [primary] blue + white
+///   * Cash  → [catGreen] + white (with [kCashGradient] top→dark-green)
+/// The Pay CTA lives in the [LeftNavRail]'s action zone — this bar is for
+/// mid-flow settlement actions only. Per-restaurant overrides land in a
+/// later sprint via `RestaurantSettings.buttonColorMap`.
 library;
 
 import 'package:flutter/material.dart';
@@ -39,8 +41,8 @@ class BottomActionBar extends ConsumerWidget {
           _ActionButton(
             label: 'KAPAT',
             icon: Icons.close_rounded,
-            fill: GcColors.error,
-            fg: GcColors.onPrimary,
+            fill: GcColors.catRed,
+            fg: Colors.white,
             onTap: () {
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
@@ -61,8 +63,8 @@ class BottomActionBar extends ConsumerWidget {
           _ActionButton(
             label: 'GÖNDER',
             icon: Icons.send_rounded,
-            fill: GcColors.primaryContainer,
-            fg: GcColors.onPrimary,
+            fill: GcColors.catDarkGreen,
+            fg: Colors.white,
             enabled: hasItems,
             onTap: () => _sendToKitchen(context, ref),
           ),
@@ -72,7 +74,7 @@ class BottomActionBar extends ConsumerWidget {
           _ActionButton(
             label: 'BÖL',
             icon: Icons.call_split_rounded,
-            fill: GcColors.catCyan,
+            fill: GcColors.primary,
             fg: GcColors.onPrimary,
             enabled: hasItems,
             onTap: () {
@@ -85,8 +87,8 @@ class BottomActionBar extends ConsumerWidget {
           _ActionButton(
             label: 'KART',
             icon: Icons.credit_card_rounded,
-            fill: GcColors.catYellow,
-            fg: GcColors.onSurface,
+            fill: GcColors.primary,
+            fg: GcColors.onPrimary,
             enabled: hasItems,
             onTap: () {
               if (ticket != null) {
@@ -99,7 +101,7 @@ class BottomActionBar extends ConsumerWidget {
             label: 'NAKİT',
             icon: Icons.payments_rounded,
             fill: GcColors.catGreen,
-            fg: GcColors.onPrimary,
+            fg: Colors.white,
             enabled: hasItems,
             gradient: kCashGradient,
             onTap: () {
