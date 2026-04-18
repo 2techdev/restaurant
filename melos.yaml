@@ -1,0 +1,75 @@
+name: gastrocore
+
+# Melos monorepo config for GastroCore.
+# Drives `flutter pub get`, analyze, test, and format across all apps and packages
+# so parallel agents don't drift on version resolution or lint rules.
+#
+# Bootstrap:
+#   dart pub global activate melos
+#   melos bootstrap
+#
+# Run commands across the workspace:
+#   melos run analyze
+#   melos run test
+#   melos run format-check
+
+packages:
+  - apps/*
+  - packages/*
+
+ignore:
+  - apps/online/build/**
+  - apps/pos/build/**
+  - apps/dashboard/build/**
+
+command:
+  bootstrap:
+    # Resolve transitive deps before pub-getting each package. Keeps the lock
+    # consistent across apps sharing gastrocore_models / gastrocore_api.
+    runPubGetInParallel: true
+  version:
+    # We release everything together under one semver.
+    linkToCommits: true
+    branch: main
+    workspaceChangelog: true
+
+scripts:
+  analyze:
+    description: "Run `flutter analyze` (or `dart analyze` for pure-Dart packages) across the workspace."
+    run: melos exec -- "flutter analyze --fatal-infos"
+    packageFilters:
+      flutter: true
+
+  analyze-dart:
+    description: "Run `dart analyze` for pure-Dart packages (e.g. gastrocore_models)."
+    run: melos exec -- "dart analyze --fatal-infos"
+    packageFilters:
+      flutter: false
+
+  test:
+    description: "Run Flutter tests across the workspace."
+    run: melos exec -- "flutter test"
+    packageFilters:
+      flutter: true
+      dirExists: test
+
+  test-dart:
+    description: "Run pure-Dart tests."
+    run: melos exec -- "dart test"
+    packageFilters:
+      flutter: false
+      dirExists: test
+
+  format-check:
+    description: "Verify formatting (CI-friendly; exits non-zero on diff)."
+    run: melos exec -- "dart format --output=none --set-exit-if-changed ."
+
+  format:
+    description: "Format all Dart code in-place."
+    run: melos exec -- "dart format ."
+
+  clean:
+    description: "Clean build artefacts across the workspace."
+    run: melos exec -- "flutter clean"
+    packageFilters:
+      flutter: true

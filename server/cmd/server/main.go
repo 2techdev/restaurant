@@ -37,7 +37,7 @@ import (
 	gosync "github.com/gastrocore/server/internal/sync"
 )
 
-const version = "0.1.0"
+const version = "1.0.0-beta.1"
 
 func main() {
 	// Load config

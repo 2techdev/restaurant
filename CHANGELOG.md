@@ -7,6 +7,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.0-beta.1] — 2026-04-17
+
+### Changed
+- **Version reset to pilot beta:** all apps (`apps/pos` `1.3.0+130`, `apps/online` `0.1.0+1`, `apps/dashboard` `0.1.0+1`), all packages (`gastrocore_{api,models,sync,ui}` `0.1.0`), and Go server (`0.1.0`) aligned to `1.0.0-beta.1`. First pilot-ready tag.
+
+### Infra (P0 release blockers)
+- nginx (`infra/deploy/nginx-gastrocore.conf`): fixed `ws://` and root `location /` ports `8080` → `8090` to match Go server
+- `docker-compose.prod.yml`: removed hard-coded default secrets; `infra/deploy/.env.example` template added (v1.1 → Vault integration)
+- Sentry: `sentry_flutter` dep + `crash_reporter.dart` init (DSN via `--dart-define=SENTRY_DSN=...`)
+- Android signing: `apps/pos/android/key.properties.template` + gradle signing config wired
+- Go: `1.22` → `1.23` bump (`go.mod`, `server/Dockerfile`, CI workflows)
+- Monorepo: root `melos.yaml` bootstrap config added
+
+### Packages
+- `gastrocore_{api,models,sync,ui}` scaffolds: barrel export files, per-package `README.md`
+
+### CI/CD
+- `pr-check.yml` — flutter analyze + test + Go test on PR
+- `deploy-backoffice.yml` — dashboard build + Cloudflare Pages deploy hook
+- `deploy-server.yml` — server Docker build + GHCR push + VPS deploy
+
+---
+
 ## [Unreleased]
 
 ### Added

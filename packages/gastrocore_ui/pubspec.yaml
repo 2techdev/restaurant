@@ -1,7 +1,7 @@
 name: gastrocore_ui
 description: "GastroCore shared Flutter widgets, theme, and design system. Depends on gastrocore_models."
 publish_to: 'none'
-version: 0.1.0
+version: 1.0.0-beta.1
 
 environment:
   sdk: ^3.9.2

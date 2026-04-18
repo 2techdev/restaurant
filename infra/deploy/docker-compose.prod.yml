@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: gastrocore
       POSTGRES_USER: gastrocore
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-GC_2tech_2026!secure}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required — see infra/deploy/.env.example}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -32,9 +32,10 @@ services:
       PORT: 8090
       ENV: production
       LOG_LEVEL: info
-      DATABASE_URL: postgres://gastrocore:${DB_PASSWORD:-GC_2tech_2026!secure}@postgres:5432/gastrocore?sslmode=disable
-      JWT_SECRET: ${JWT_SECRET:-gc-jwt-secret-change-in-prod-2026}
-      LICENSE_SIGNING_KEY: ${LICENSE_KEY:-gc-license-key-change-in-prod}
+      DATABASE_URL: postgres://gastrocore:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/gastrocore?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — see .env.example}
+      LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY:?LICENSE_SIGNING_KEY is required — see .env.example}
+      SENTRY_DSN: ${SENTRY_DSN:-}
     ports:
       - "127.0.0.1:8090:8090"
 
