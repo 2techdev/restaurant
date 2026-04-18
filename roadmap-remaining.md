@@ -274,8 +274,8 @@
 - [ ] Settings (tax, currency, printer, service fee)
 - [ ] Go backend API integration
 
-### Phase 5: Patron App
-- [ ] `apps/patron/` Flutter project
+### Phase 5: Boss App
+- [ ] `apps/boss/` Flutter project
 - [ ] Dashboard (today's sales, order count)
 - [ ] Multi-branch view (enterprise)
 - [ ] Staff performance
@@ -425,4 +425,4 @@
 | Ongoing tests (Epic 13) | ~13d | ongoing |
 | **Total tracked** | **~136d** | |
 
-Additional untracked effort: shared packages, web dashboard app, patron app, hardware integration, online ordering, customer app, retail mode.
+Additional untracked effort: shared packages, web dashboard app, boss app, hardware integration, online ordering, customer app, retail mode.

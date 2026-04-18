@@ -278,7 +278,7 @@
 |---------|--------|-------|
 | Web management dashboard (Flutter Web / React) | 🔲 Planned | |
 | Loyalty / points system | 🔲 Planned | |
-| Customer mobile app (Patron App) | 🔲 Planned | |
+| Customer mobile app (Boss App) | 🔲 Planned | |
 | Delivery management + third-party integrations | 🔲 Planned | |
 | Advanced analytics + BI dashboard | 🔲 Planned | |
 | Inventory management | 🔲 Planned | |

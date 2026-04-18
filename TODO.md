@@ -122,9 +122,9 @@
 
 ---
 
-## PHASE 5: PATRON APP (Öncelik 5)
+## PHASE 5: BOSS APP (Öncelik 5)
 
-- [ ] `apps/patron/` Flutter projesi olustur
+- [ ] `apps/boss/` Flutter projesi olustur
 - [ ] Dashboard (bugunun satislari, siparis sayisi)
 - [ ] Coklu sube gorunumu (enterprise)
 - [ ] Personel performansi
