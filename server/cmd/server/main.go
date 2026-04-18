@@ -15,7 +15,7 @@ import (
 	"github.com/gastrocore/server/internal/auth"
 	"github.com/gastrocore/server/internal/crm"
 	"github.com/gastrocore/server/internal/dashboard"
-	"github.com/gastrocore/server/internal/demo"
+	// _ "github.com/gastrocore/server/internal/demo" // [pilot 2026-04-19] disabled, online module owns /demo
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
 	"github.com/gastrocore/server/internal/fiscal"
@@ -139,9 +139,10 @@ func main() {
 		})
 	})
 
-	// Online ordering demo page
-	mux.HandleFunc("GET /demo", demo.Handler())
-	mux.HandleFunc("GET /demo/", demo.Handler())
+	// [pilot 2026-04-19] /demo moved into internal/online/module.go — was duplicate
+	// registration here and in online.RegisterRoutes, causing ServeMux panic on boot.
+	// mux.HandleFunc("GET /demo", demo.Handler())
+	// mux.HandleFunc("GET /demo/", demo.Handler())
 
 	// OpenAPI docs
 	mux.HandleFunc("GET /docs/swagger.json", docs.Handler())
