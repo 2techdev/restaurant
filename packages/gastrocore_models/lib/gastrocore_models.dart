@@ -20,4 +20,5 @@ export 'src/fare/fare_engine.dart';
 export 'src/fare/fare_models.dart';
 
 // Utilities
+export 'src/utils/date_format.dart';
 export 'src/utils/money.dart';

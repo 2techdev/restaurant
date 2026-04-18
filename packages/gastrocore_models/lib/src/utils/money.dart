@@ -82,6 +82,44 @@ class Money implements Comparable<Money> {
     return '${isNeg ? '-' : ''}$whole.$fractional';
   }
 
+  /// Swiss de-CH number format with apostrophe-grouped thousands:
+  /// 1234567 cents -> "12'345.67". Keeps the receipt column aligned for
+  /// fine-dining totals that often cross CHF 1'000.
+  String formatSwiss() {
+    final isNeg = cents < 0;
+    final absCents = cents.abs();
+    final whole = (absCents ~/ 100).toString();
+    final fractional = (absCents % 100).toString().padLeft(2, '0');
+
+    // Group digits in threes from the right with "'" separator.
+    final buf = StringBuffer();
+    for (var i = 0; i < whole.length; i++) {
+      if (i > 0 && (whole.length - i) % 3 == 0) buf.write("'");
+      buf.write(whole[i]);
+    }
+    return '${isNeg ? '-' : ''}$buf.$fractional';
+  }
+
+  /// Localised compact format. Currently switches only the thousands
+  /// separator — de/fr/it-CH use "'", en uses ",", tr uses ".".
+  String formatForLocale(String languageCode) {
+    if (languageCode == 'de' || languageCode == 'fr' || languageCode == 'it') {
+      return formatSwiss();
+    }
+    final isNeg = cents < 0;
+    final absCents = cents.abs();
+    final whole = (absCents ~/ 100).toString();
+    final fractional = (absCents % 100).toString().padLeft(2, '0');
+    final sep = languageCode == 'tr' ? '.' : ',';
+    final decimal = languageCode == 'tr' ? ',' : '.';
+    final buf = StringBuffer();
+    for (var i = 0; i < whole.length; i++) {
+      if (i > 0 && (whole.length - i) % 3 == 0) buf.write(sep);
+      buf.write(whole[i]);
+    }
+    return '${isNeg ? '-' : ''}$buf$decimal$fractional';
+  }
+
   /// Convert to double for display or interop only. Prefer [cents] for logic.
   double toDouble() => cents / 100.0;
 
