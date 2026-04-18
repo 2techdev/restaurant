@@ -172,10 +172,11 @@ func main() {
 	// Middleware chain
 	// ---------------------------------------------------------------------------
 	// Rate limits:
-	//   - 200 req/min per IP for general API traffic
-	//   - 10 req/min per IP for auth endpoints (brute-force / credential-stuffing protection)
-	rateLimiter := middleware.RateLimit(200, time.Minute)
-	authRateLimiter := middleware.RateLimit(10, time.Minute)
+	//   - 500 req/min per IP for general API traffic
+	//   - 200 req/min per IP for auth endpoints
+	// [demo pilot 2026-04-19] bumped from 200/10 for pilot stress test. Revert after pilot week.
+	rateLimiter := middleware.RateLimit(500, time.Minute)
+	authRateLimiter := middleware.RateLimit(200, time.Minute)
 
 	corsMW := middleware.CORS(middleware.CORSConfig{
 		AllowedOrigins: cfg.CORSOrigins,
