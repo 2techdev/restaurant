@@ -371,7 +371,7 @@
 - [ ] Loyalty / customer rewards program
 - [ ] Coupon system
 - [ ] Promotion engine (happy hour, combo)
-- [ ] Multi-language UI (i18n — DE, EN, TR, FR)
+- [x] Multi-language UI (i18n — DE-CH, TR, EN, FR-CH, IT-CH) · 2026-04-17 · see [docs/40-i18n-localization.md](docs/40-i18n-localization.md)
 - [ ] Multi-currency full support
 - [ ] Advanced analytics dashboard
 - [ ] AI-powered sales prediction
