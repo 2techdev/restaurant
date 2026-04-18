@@ -22,6 +22,13 @@ enum TableShape {
 // ---------------------------------------------------------------------------
 
 /// Current status of a restaurant table.
+///
+/// This is the table's *primary* state — one value drives the tile's
+/// main colour on the floor plan. Concurrent signals (e.g. bill has
+/// been requested while the table is still occupied, or a
+/// reservation is approaching while the table is currently dirty)
+/// live on [TableFlag] so that multiple states can coexist without
+/// overwriting each other.
 enum TableStatus {
   /// Ready for seating.
   available,
@@ -34,6 +41,71 @@ enum TableStatus {
 
   /// Needs clearing / cleaning.
   dirty,
+}
+
+// ---------------------------------------------------------------------------
+// TableFlag enum
+// ---------------------------------------------------------------------------
+
+/// Orthogonal state signals that can stack on top of [TableStatus].
+///
+/// Modelled after SambaPOS-3's Entity State groups: a table can be
+/// `occupied` AND have `billRequested` AND have `reservationSoon`
+/// simultaneously. Flags are rendered as small badges overlaid on
+/// the table tile.
+enum TableFlag {
+  /// Waiter / guest has requested the bill — cashier should prepare
+  /// payment without the guest asking again.
+  billRequested,
+
+  /// An upcoming reservation is within the "warning" window
+  /// (typically < 30 min). The table tile should alert staff that
+  /// the current party may need to be moved along.
+  reservationSoon,
+
+  /// Service has been flagged — e.g. guest pressed a call button,
+  /// or a manager escalated the table.
+  needsAttention,
+
+  /// VIP guest marker — surfaces preferred service and often
+  /// guides seating choices.
+  vip,
+}
+
+/// Canonical wire form for [TableFlag.name] → enum. Used by the
+/// Drift mapper and by LAN sync payloads.
+TableFlag? _parseTableFlag(String name) {
+  for (final flag in TableFlag.values) {
+    if (flag.name == name) return flag;
+  }
+  return null;
+}
+
+/// Decode the persisted CSV blob into a deterministic flag set.
+///
+/// Unknown tokens are silently dropped so a new app version can roll
+/// back without breaking existing rows.
+Set<TableFlag> decodeTableFlags(String? csv) {
+  if (csv == null || csv.isEmpty) return const <TableFlag>{};
+  final out = <TableFlag>{};
+  for (final raw in csv.split(',')) {
+    final token = raw.trim();
+    if (token.isEmpty) continue;
+    final parsed = _parseTableFlag(token);
+    if (parsed != null) out.add(parsed);
+  }
+  return out;
+}
+
+/// Encode a flag set for persistence. Order is deterministic (enum
+/// declaration order) so round-trips are byte-stable — useful for
+/// sync conflict detection.
+String encodeTableFlags(Set<TableFlag> flags) {
+  if (flags.isEmpty) return '';
+  return TableFlag.values
+      .where(flags.contains)
+      .map((f) => f.name)
+      .join(',');
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +198,11 @@ class RestaurantTableEntity {
   /// ID of the currently active order, if any.
   final String? currentOrderId;
 
+  /// Orthogonal state signals layered on top of [status]. Any number
+  /// of flags can be set simultaneously — e.g. occupied + bill
+  /// requested + VIP.
+  final Set<TableFlag> flags;
+
   const RestaurantTableEntity({
     required this.id,
     required this.tenantId,
@@ -139,10 +216,14 @@ class RestaurantTableEntity {
     required this.height,
     this.status = TableStatus.available,
     this.currentOrderId,
+    this.flags = const <TableFlag>{},
   });
 
   /// Whether the table is free to seat new guests.
   bool get isAvailable => status == TableStatus.available;
+
+  /// Convenience: is the [flag] currently active on this table?
+  bool hasFlag(TableFlag flag) => flags.contains(flag);
 
   /// Create a copy with selectively overridden fields.
   RestaurantTableEntity copyWith({
@@ -158,6 +239,7 @@ class RestaurantTableEntity {
     double? height,
     TableStatus? status,
     String? Function()? currentOrderId,
+    Set<TableFlag>? flags,
   }) {
     return RestaurantTableEntity(
       id: id ?? this.id,
@@ -173,26 +255,32 @@ class RestaurantTableEntity {
       status: status ?? this.status,
       currentOrderId:
           currentOrderId != null ? currentOrderId() : this.currentOrderId,
+      flags: flags ?? this.flags,
     );
   }
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is RestaurantTableEntity &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          tenantId == other.tenantId &&
-          floorId == other.floorId &&
-          name == other.name &&
-          capacity == other.capacity &&
-          shape == other.shape &&
-          posX == other.posX &&
-          posY == other.posY &&
-          width == other.width &&
-          height == other.height &&
-          status == other.status &&
-          currentOrderId == other.currentOrderId;
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! RestaurantTableEntity) return false;
+    if (flags.length != other.flags.length) return false;
+    for (final flag in flags) {
+      if (!other.flags.contains(flag)) return false;
+    }
+    return runtimeType == other.runtimeType &&
+        id == other.id &&
+        tenantId == other.tenantId &&
+        floorId == other.floorId &&
+        name == other.name &&
+        capacity == other.capacity &&
+        shape == other.shape &&
+        posX == other.posX &&
+        posY == other.posY &&
+        width == other.width &&
+        height == other.height &&
+        status == other.status &&
+        currentOrderId == other.currentOrderId;
+  }
 
   @override
   int get hashCode => Object.hash(
@@ -208,9 +296,11 @@ class RestaurantTableEntity {
         height,
         status,
         currentOrderId,
+        Object.hashAllUnordered(flags),
       );
 
   @override
   String toString() =>
-      'RestaurantTableEntity(id: $id, name: $name, status: ${status.name})';
+      'RestaurantTableEntity(id: $id, name: $name, status: ${status.name}, '
+      'flags: ${flags.map((f) => f.name).join(",")})';
 }

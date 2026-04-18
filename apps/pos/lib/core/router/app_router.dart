@@ -17,7 +17,7 @@ import 'package:gastrocore_pos/features/brand_auth/presentation/screens/register
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_open_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/z_report_screen.dart';
 import 'package:gastrocore_pos/features/home/presentation/screens/home_screen.dart';
-import 'package:gastrocore_pos/features/orders/presentation/screens/order_center_screen.dart';
+import 'package:gastrocore_pos/features/orders/presentation/shells/pos_shell_router.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/screens/kitchen_display_screen.dart';
 import 'package:gastrocore_pos/features/payments/presentation/screens/payment_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_close_screen.dart';
@@ -210,7 +210,7 @@ GoRouter createAppRouter({
         ),
         GoRoute(
           path: AppRoutes.orderCenter,
-          builder: (context, state) => const OrderCenterScreen(),
+          builder: (context, state) => const PosShellRouter(),
         ),
         GoRoute(
           path: AppRoutes.pos,

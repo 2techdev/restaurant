@@ -278,6 +278,52 @@ void main() {
       expect(text, contains('Rabatt'));
       expect(text, contains('37.50'));
     });
+
+    test('Service charge > 0 dedicated "Service" satırı basılır', () {
+      final data = SwissReceiptData(
+        restaurantName: 'X',
+        receiptNo: '1',
+        items: const [],
+        total: 11000,
+        subtotal: 10000,
+        serviceChargeAmount: 1000,
+        serviceChargePercent: 10,
+      );
+      final text = extractText(SwissReceiptBuilder(data: data).build());
+      expect(text, contains('Service 10%'));
+      expect(text, contains('10.00'));
+    });
+
+    test('Service charge = 0 ise satır yazdırılmaz', () {
+      final data = SwissReceiptData(
+        restaurantName: 'X',
+        receiptNo: '1',
+        items: const [],
+        total: 10000,
+      );
+      final text = extractText(SwissReceiptBuilder(data: data).build());
+      expect(text, isNot(contains('Service')));
+    });
+
+    test('Service satırı Rabatt ile TOTAL arasında — pipeline sırası',
+        () {
+      final data = SwissReceiptData(
+        restaurantName: 'X',
+        receiptNo: '1',
+        items: const [],
+        total: 9500,
+        subtotal: 10000,
+        discountAmount: 1000,
+        serviceChargeAmount: 500,
+      );
+      final text = extractText(SwissReceiptBuilder(data: data).build());
+      final rabattIdx = text.indexOf('Rabatt');
+      final serviceIdx = text.indexOf('Service');
+      final totalIdx = text.indexOf('TOTAL');
+      expect(rabattIdx, greaterThan(-1));
+      expect(serviceIdx, greaterThan(rabattIdx));
+      expect(totalIdx, greaterThan(serviceIdx));
+    });
   });
 
   // ===========================================================================
@@ -524,6 +570,8 @@ extension _TestExt on SwissReceiptData {
       orderTypeLabel: orderTypeLabel,
       subtotal: subtotal,
       discountAmount: discountAmount,
+      serviceChargeAmount: serviceChargeAmount,
+      serviceChargePercent: serviceChargePercent,
       roundingAmount: roundingAmount,
       mwstBreakdown: mwstBreakdown,
       payments: payments,

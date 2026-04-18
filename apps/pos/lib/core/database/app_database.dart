@@ -107,7 +107,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -229,6 +229,25 @@ class AppDatabase extends _$AppDatabase {
           'ON service_calls (tenant_id, status) '
           'WHERE is_deleted = 0',
         );
+      }
+      if (from < 12) {
+        // v12: POS-side enrichments bundled together —
+        // (a) first-class nullable seat_number on order_items (sits alongside
+        //     the v11 `seat` column; split-bill calculator reads this one),
+        // (b) orthogonal state flags bitmap on restaurant_tables (occupied /
+        //     billRequested / vip can coexist on one tile),
+        // (c) SambaPOS-parity Order Tag Group richness on modifier_groups
+        //     (askQuantity, freeTagging, columnCount, prefix),
+        // (d) per-application tag richness on order_item_modifiers
+        //     (quantity multiplier + free-form note).
+        await m.addColumn(orderItems, orderItems.seatNumber);
+        await m.addColumn(restaurantTables, restaurantTables.flags);
+        await m.addColumn(modifierGroups, modifierGroups.askQuantity);
+        await m.addColumn(modifierGroups, modifierGroups.freeTagging);
+        await m.addColumn(modifierGroups, modifierGroups.columnCount);
+        await m.addColumn(modifierGroups, modifierGroups.prefix);
+        await m.addColumn(orderItemModifiers, orderItemModifiers.quantity);
+        await m.addColumn(orderItemModifiers, orderItemModifiers.note);
       }
     },
     onCreate: (m) async {

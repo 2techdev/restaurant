@@ -14,6 +14,7 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/printing/models/print_models.dart';
 import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/features/orders/domain/calculations/calculation_pipeline.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 
@@ -77,15 +78,30 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
       );
     }).toList();
 
-    // MwSt breakdown: code → gross amount
-    final breakdown = <String, int>{};
+    // Per-MwSt-bucket subtotal, feeding the SambaPOS-style pipeline
+    // (Discount → Service → Tax → Rounding). The pipeline apportions
+    // discount + service across buckets before extracting MwSt so the
+    // printed breakdown matches what the customer actually paid.
+    final subtotalByMwst = <String, int>{};
     for (final item in ticket.items) {
       final code = MwStCode.forProduct(
         taxGroup: item.taxGroup,
         isDineIn: isDineIn,
       ).code;
-      breakdown[code] = (breakdown[code] ?? 0) + item.subtotal;
+      subtotalByMwst[code] = (subtotalByMwst[code] ?? 0) + item.subtotal;
     }
+    final pipeline = runCalculationPipeline(
+      PipelineInput(
+        subtotalByMwst: subtotalByMwst,
+        discountAmount: ticket.discountAmount,
+        serviceAmount: ticket.serviceFeeAmount,
+        // Receipt screen consumes TicketEntity.total which already
+        // embeds its own rounding policy — skip 5-Rappen here to
+        // avoid double-rounding the printed breakdown.
+        applyRounding: false,
+      ),
+    );
+    final breakdown = Map<String, int>.from(pipeline.taxableBaseByCode);
 
     final tenant = ref.read(tenantInfoProvider).valueOrNull;
     final restaurantName = tenant?.name ?? 'GastroCore Restaurant';
@@ -106,6 +122,7 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
       total: ticket.total,
       subtotal: ticket.subtotal,
       discountAmount: ticket.discountAmount,
+      serviceChargeAmount: ticket.serviceFeeAmount,
       mwstBreakdown: breakdown,
       footerText: 'Afiyet Olsun! · Merci de votre visite!',
       openDrawer: false,
@@ -170,6 +187,9 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
     lines.add('-' * w);
     if (data.discountAmount != 0) {
       lines.add('İndirim:  -CHF ${_formatCents(data.discountAmount)}');
+    }
+    if (data.serviceChargeAmount != 0) {
+      lines.add('Servis:   CHF ${_formatCents(data.serviceChargeAmount)}');
     }
     final totalLabel = 'TOPLAM';
     final totalPrice = 'CHF ${_formatCents(data.total)}';
@@ -563,6 +583,30 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                       ),
                       Text(
                         '-CHF ${_formatCents(ticket.discountAmount)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF333333),
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                // Service charge (if any) — dedicated line per
+                // SambaPOS Discount → Service → Tax pipeline.
+                if (ticket.serviceFeeAmount > 0) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Servis',
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF555555)),
+                      ),
+                      Text(
+                        'CHF ${_formatCents(ticket.serviceFeeAmount)}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF333333),

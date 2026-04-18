@@ -35,6 +35,12 @@ enum OrderItemStatus {
 // ---------------------------------------------------------------------------
 
 /// A modifier applied to a specific order item (snapshot at order time).
+///
+/// Carries SambaPOS-parity per-application richness:
+///   * [quantity] — multiplier when the parent group's `askQuantity` is
+///     enabled (e.g. "3× Extra Cheese"). Defaults to 1.
+///   * [note] — free-form text when the parent group's `freeTagging`
+///     is enabled ("less salt", "extra crispy"). Null when unused.
 class OrderItemModifierEntity {
   final String id;
   final String orderItemId;
@@ -43,8 +49,17 @@ class OrderItemModifierEntity {
   /// Snapshot of the modifier name at order time.
   final String modifierName;
 
-  /// Price adjustment in cents.
+  /// Price adjustment in cents for a single application of this
+  /// modifier. Total contribution is `priceDelta * quantity`.
   final int priceDelta;
+
+  /// How many times this modifier is applied to the parent item. 1 for
+  /// the common case; > 1 when the group opted into `askQuantity`.
+  final int quantity;
+
+  /// Operator-entered free-form note; only populated when the parent
+  /// group opted into `freeTagging`.
+  final String? note;
 
   const OrderItemModifierEntity({
     required this.id,
@@ -52,15 +67,28 @@ class OrderItemModifierEntity {
     required this.modifierId,
     required this.modifierName,
     required this.priceDelta,
+    this.quantity = 1,
+    this.note,
   });
 
+  /// Effective contribution in cents (`priceDelta * quantity`). Callers
+  /// summing the parent item's modifier deltas should use this so
+  /// askQuantity selections price correctly.
+  int get effectiveDelta => priceDelta * quantity;
+
   /// Create a copy with selectively overridden fields.
+  ///
+  /// [note] uses the factory-function pattern so callers can explicitly
+  /// clear the note (`note: () => null`) without it being treated as
+  /// "leave unchanged".
   OrderItemModifierEntity copyWith({
     String? id,
     String? orderItemId,
     String? modifierId,
     String? modifierName,
     int? priceDelta,
+    int? quantity,
+    String? Function()? note,
   }) {
     return OrderItemModifierEntity(
       id: id ?? this.id,
@@ -68,6 +96,8 @@ class OrderItemModifierEntity {
       modifierId: modifierId ?? this.modifierId,
       modifierName: modifierName ?? this.modifierName,
       priceDelta: priceDelta ?? this.priceDelta,
+      quantity: quantity ?? this.quantity,
+      note: note != null ? note() : this.note,
     );
   }
 
@@ -80,7 +110,9 @@ class OrderItemModifierEntity {
           orderItemId == other.orderItemId &&
           modifierId == other.modifierId &&
           modifierName == other.modifierName &&
-          priceDelta == other.priceDelta;
+          priceDelta == other.priceDelta &&
+          quantity == other.quantity &&
+          note == other.note;
 
   @override
   int get hashCode => Object.hash(
@@ -89,11 +121,13 @@ class OrderItemModifierEntity {
         modifierId,
         modifierName,
         priceDelta,
+        quantity,
+        note,
       );
 
   @override
   String toString() =>
-      'OrderItemModifierEntity(id: $id, name: $modifierName, delta: $priceDelta)';
+      'OrderItemModifierEntity(id: $id, name: $modifierName, delta: $priceDelta, qty: $quantity)';
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +179,12 @@ class OrderItemEntity {
   /// Gang (course group) ID assigned to this item.
   /// References GangTemplate.id. Null = no Gang assigned.
   final String? gangId;
+
+  /// Seat number this item is assigned to (1-based). Null = unassigned.
+  ///
+  /// Drives seat-based split billing. Kept nullable so single-cover tickets
+  /// and walk-ups don't need to pick a seat.
+  final int? seatNumber;
 
   /// Modifiers applied to this item.
   final List<OrderItemModifierEntity> modifiers;
@@ -198,6 +238,7 @@ class OrderItemEntity {
     this.course = 1,
     this.seat = 0,
     this.gangId,
+    this.seatNumber,
     this.modifiers = const [],
     this.isTaxFree = false,
     this.isOpenPrice = false,
@@ -209,9 +250,11 @@ class OrderItemEntity {
   });
 
   /// Recalculate the subtotal from unit price, quantity, and modifiers.
+  /// Uses [OrderItemModifierEntity.effectiveDelta] so askQuantity
+  /// selections (e.g. "3× Extra Cheese") price correctly.
   int calculateSubtotal() {
     final modifierTotal =
-        modifiers.fold<int>(0, (sum, m) => sum + m.priceDelta);
+        modifiers.fold<int>(0, (sum, m) => sum + m.effectiveDelta);
     return ((unitPrice + modifierTotal) * quantity).round();
   }
 
@@ -233,6 +276,7 @@ class OrderItemEntity {
     int? course,
     int? seat,
     String? Function()? gangId,
+    int? Function()? seatNumber,
     List<OrderItemModifierEntity>? modifiers,
     bool? isTaxFree,
     bool? isOpenPrice,
@@ -259,6 +303,7 @@ class OrderItemEntity {
       course: course ?? this.course,
       seat: seat ?? this.seat,
       gangId: gangId != null ? gangId() : this.gangId,
+      seatNumber: seatNumber != null ? seatNumber() : this.seatNumber,
       modifiers: modifiers ?? this.modifiers,
       isTaxFree: isTaxFree ?? this.isTaxFree,
       isOpenPrice: isOpenPrice ?? this.isOpenPrice,
@@ -291,6 +336,7 @@ class OrderItemEntity {
           notes == other.notes &&
           course == other.course &&
           seat == other.seat &&
+          seatNumber == other.seatNumber &&
           isTaxFree == other.isTaxFree &&
           isOpenPrice == other.isOpenPrice &&
           isWeightBased == other.isWeightBased &&
@@ -316,6 +362,7 @@ class OrderItemEntity {
         notes,
         course,
         seat,
+        seatNumber,
         isTaxFree,
         isWeightBased,
         specialDiscountAmount,

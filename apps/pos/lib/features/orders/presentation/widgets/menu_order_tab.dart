@@ -183,18 +183,18 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
       );
 
       if (result != null) {
-        final orderModifiers = <OrderItemModifierEntity>[];
-        for (final entry in result.selectedModifiers.entries) {
-          for (final opt in entry.value) {
-            orderModifiers.add(OrderItemModifierEntity(
+        final orderModifiers = <OrderItemModifierEntity>[
+          for (final sel in result.flattened())
+            OrderItemModifierEntity(
               id: IdGenerator.generateId(),
               orderItemId: '',
-              modifierId: opt.id,
-              modifierName: opt.name,
-              priceDelta: opt.priceDelta,
-            ));
-          }
-        }
+              modifierId: sel.option.id,
+              modifierName: sel.displayName,
+              priceDelta: sel.option.priceDelta,
+              quantity: sel.quantity,
+              note: sel.note,
+            ),
+        ];
 
         ref.read(currentTicketProvider.notifier).addItem(
               product,

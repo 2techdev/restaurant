@@ -230,6 +230,12 @@ class SeedData {
         role: 'waiter',
         avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&q=60',
       ),
+      (
+        name: 'Hans Koch',
+        pin: '4567',
+        role: 'kitchen',
+        avatar: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=100&h=100&fit=crop&q=60',
+      ),
     ];
 
     for (final s in staff) {

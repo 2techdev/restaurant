@@ -106,6 +106,12 @@
   "tableTransfer": "Umbuchen",
   "@tableTransfer": { "description": "Table: Transfer" },
 
+  "gangLabel": "Gang {number}",
+  "@gangLabel": {
+    "description": "Default course (Gang) label with its 1-based index. Text stays 'Gang N' in every locale by convention — 'Gang' is a Swiss-industry loanword. Restaurants may override per-slot via RestaurantSettings.gangLabels (e.g. Vorspeise/Hauptgang/Dessert); this l10n key is the fallback when no override is set.",
+    "placeholders": { "number": { "type": "int" } }
+  },
+
   "tableGuest": "{count,plural, one{1 Gast} other{{count} Gäste}}",
   "@tableGuest": {
     "description": "Table: Guest count",

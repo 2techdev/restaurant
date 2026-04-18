@@ -36,8 +36,14 @@ String? validateMwstNr(String value) {
 /// service can disable the whole system via [RestaurantSettings.gangsEnabled];
 /// a fine-dining restaurant that needs e.g. amuse-bouche + four courses can
 /// go up to five.
+///
+/// "Gang" is a loanword used by German/French/Italian Swiss kitchens, so
+/// labels are kept identical across locales by design.
 const int kMinGangs = 1;
 const int kMaxGangs = 5;
+
+/// Alias for legacy call sites that still import the single-bound constant.
+const int kGangsUpperBound = kMaxGangs;
 
 /// Default Gang labels used both by seed data and by the KDS UI when the
 /// restaurant has not overridden them. Length matches [kMaxGangs] so
@@ -80,17 +86,23 @@ class RestaurantSettings {
   /// Absolute path to the logo image file on device storage.
   final String? logoPath;
 
-  /// When `true`, a service charge is added as a separate line on every
-  /// order summary (Waiter + POS) and printed receipt.
+  /// Whether a service charge line should be added to every dine-in ticket.
+  ///
+  /// Switzerland does not legally require a service charge (unlike, e.g.,
+  /// France), but fine-dining restaurants commonly add one. When off the
+  /// ticket is unaffected; when on, a separate line at
+  /// [serviceChargePercent]% of the subtotal is applied and printed
+  /// separately on the receipt as required by FiscalDE/MwSt transparency.
   final bool serviceChargeEnabled;
 
-  /// Service charge rate as a percentage of the pre-tax subtotal.
-  /// Ignored when [serviceChargeEnabled] is `false`.
+  /// Service charge rate applied when [serviceChargeEnabled] is true.
   final double serviceChargePercent;
 
-  /// When `false`, the KDS renders a single flat stream of tickets ordered by
-  /// arrival time — no Gang headers, no per-Gang fire button. Casual
-  /// restaurants (bar, fast-casual, takeaway) typically turn this off.
+  /// Whether the restaurant runs a coursed service (fine-dining "Gang"
+  /// workflow). Fast-food and bistro concepts turn this off and treat
+  /// the order as a single flow — the order panel hides the Gang
+  /// selector and Hold/Fire controls, and kitchen tickets omit the
+  /// "Gang N" section header.
   final bool gangsEnabled;
 
   /// Number of Gangs offered for course-based service. Stored as-is; use
@@ -117,14 +129,16 @@ class RestaurantSettings {
     });
   }
 
-  /// Resolve the display label for a given `sortOrder` (1-based). Falls back
-  /// to `'Gang N'` when the restaurant hasn't provided a custom entry or the
-  /// ordinal is out of range.
+  /// Resolve the display label for a given `sortOrder` (1-based). Applies
+  /// fallbacks in order: restaurant override → default "Gang N".
   String gangLabelFor(int sortOrder) {
     final idx = sortOrder - 1;
     if (idx >= 0 && idx < gangLabels.length) {
       final label = gangLabels[idx].trim();
       if (label.isNotEmpty) return label;
+    }
+    if (idx >= 0 && idx < kDefaultGangLabels.length) {
+      return kDefaultGangLabels[idx];
     }
     return 'Gang $sortOrder';
   }

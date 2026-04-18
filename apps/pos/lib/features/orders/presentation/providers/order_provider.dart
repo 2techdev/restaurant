@@ -175,6 +175,8 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     String? gangId,
     /// Category-level default Gang (fallback when product has no default).
     String? categoryGangId,
+    /// Seat number (1-based) this item belongs to. Null = unassigned.
+    int? seatNumber,
   }) {
     if (state == null) return;
 
@@ -214,11 +216,30 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
       notes: notes,
       course: course,
       gangId: resolvedGangId,
+      seatNumber: seatNumber,
       modifiers: modifiers,
       taxGroup: product.taxGroup,
     );
 
     state = state!.addItem(item);
+  }
+
+  /// Assign [seatNumber] to an existing order item (null clears it).
+  ///
+  /// Persists immediately so the split-bill screen can read a stable view
+  /// even if the app is interrupted mid-assignment.
+  Future<void> updateItemSeat(String itemId, int? seatNumber) async {
+    if (state == null) return;
+    final updatedItems = state!.items.map((item) {
+      if (item.id != itemId) return item;
+      return item.copyWith(seatNumber: () => seatNumber);
+    }).toList();
+    state = state!.copyWith(items: updatedItems);
+
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.updateItemSeat(itemId, seatNumber);
+    }
   }
 
   /// Override the Gang assignment for an existing order item.
@@ -288,6 +309,55 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
 
     // If already persisted, just return current state
     return state;
+  }
+
+  /// Fire a single Gang (course) — send only that Gang's unsent items
+  /// to the kitchen as its own KDS ticket.
+  ///
+  /// This is the Hold & Fire flow for fine-dining service: each course is
+  /// dispatched to the kitchen at its own pace so the expo line stays in
+  /// tempo with the dining room. Filters by [OrderItemEntity.course] and
+  /// reuses the same pipeline as [sendToKitchen] — marks items as sent,
+  /// emits a KDS ticket, and refreshes state from DB.
+  ///
+  /// No-op when: ticket is null, or the Gang has no unsent items.
+  Future<void> fireGang(int gang) async {
+    if (state == null) return;
+
+    final repo = _ref.read(orderRepositoryProvider);
+    final kitchenRepo = _ref.read(kitchenRepositoryProvider);
+    final currentUser = _ref.read(currentUserProvider);
+
+    // Persist draft before firing so the KDS ticket references a real row.
+    if (state!.status == TicketStatus.draft) {
+      final saved = await repo.createTicket(
+        state!.copyWith(status: TicketStatus.open),
+      );
+      state = saved;
+    }
+
+    final unsentForGang = state!.items
+        .where((item) => !item.sentToKitchen && item.course == gang)
+        .toList();
+    if (unsentForGang.isEmpty) return;
+
+    for (final item in unsentForGang) {
+      await repo.updateItemStatus(item.id, OrderItemStatus.sent);
+    }
+
+    // Only advance the ticket status if it hasn't already been past 'sent'.
+    if (state!.status == TicketStatus.draft ||
+        state!.status == TicketStatus.open) {
+      await repo.updateTicketStatus(state!.id, TicketStatus.sent);
+    }
+
+    await kitchenRepo.createTicketFromOrder(
+      ticket: state!,
+      items: unsentForGang,
+      waiterName: currentUser?.name,
+    );
+
+    state = await repo.getTicketById(state!.id);
   }
 
   /// Mark all un-sent items as "sent" and persist to the database.
@@ -492,6 +562,22 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     final repo = _ref.read(orderRepositoryProvider);
     await repo.removeTicketDiscount(state!.id);
     state = await repo.getTicketById(state!.id);
+  }
+
+  /// Update the guest count (cover count) for the current ticket.
+  ///
+  /// Seat-based split billing relies on this value to bound the seat picker
+  /// and to distribute unassigned items across seats equitably. Clamped to
+  /// a sane floor of 1 so the split calculator never divides by zero.
+  Future<void> updateGuestCount(int guestCount) async {
+    if (state == null) return;
+    final clamped = guestCount < 1 ? 1 : guestCount;
+    state = state!.copyWith(guestCount: clamped);
+
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.updateTicketGuestCount(state!.id, clamped);
+    }
   }
 
   /// Clear the current ticket (e.g. after payment).

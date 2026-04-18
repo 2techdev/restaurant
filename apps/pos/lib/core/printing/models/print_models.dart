@@ -191,6 +191,8 @@ class SwissReceiptData {
     this.orderTypeLabel,
     this.subtotal,
     this.discountAmount = 0,
+    this.serviceChargeAmount = 0,
+    this.serviceChargePercent,
     this.roundingAmount = 0,
     this.mwstBreakdown = const {},
     this.payments = const [],
@@ -228,6 +230,19 @@ class SwissReceiptData {
   final int total;
   final int? subtotal;
   final int discountAmount;
+
+  /// Service charge amount in cents. Printed on a dedicated line between
+  /// discount and TOTAL per the SambaPOS-3 calculation pipeline order
+  /// (Discount → Service → Tax). Must also be reflected in
+  /// [mwstBreakdown] when non-zero so Swiss MWST is extracted from
+  /// (subtotal − discount + service) and the printed tax table reconciles
+  /// to [total].
+  final int serviceChargeAmount;
+
+  /// Optional service charge rate displayed alongside the service line
+  /// (e.g. "Service 10%"). Purely informational; [serviceChargeAmount]
+  /// is the source of truth.
+  final double? serviceChargePercent;
 
   /// 5-Rappen yuvarlama tutarı (cents).
   ///

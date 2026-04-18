@@ -42,6 +42,8 @@ class OrderRepositoryImpl {
                   modifierId: Value(mod.modifierId),
                   modifierName: Value(mod.modifierName),
                   priceDelta: Value(mod.priceDelta),
+                  quantity: Value(mod.quantity),
+                  note: Value(mod.note),
                   createdAt: Value(DateTime.now()),
                 ),
               );
@@ -198,6 +200,16 @@ class OrderRepositoryImpl {
   // Ticket status
   // =========================================================================
 
+  /// Update the guest (cover) count for a ticket.
+  Future<void> updateTicketGuestCount(String id, int guestCount) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
+      TicketsCompanion(
+        guestCount: Value(guestCount),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   /// Update the lifecycle status of a ticket.
   Future<void> updateTicketStatus(String id, TicketStatus newStatus) async {
     final companion = TicketsCompanion(
@@ -261,6 +273,8 @@ class OrderRepositoryImpl {
                 modifierId: Value(mod.modifierId),
                 modifierName: Value(mod.modifierName),
                 priceDelta: Value(mod.priceDelta),
+                quantity: Value(mod.quantity),
+                note: Value(mod.note),
                 createdAt: Value(DateTime.now()),
               ),
             );
@@ -303,7 +317,9 @@ class OrderRepositoryImpl {
     final modsQuery = _db.select(_db.orderItemModifiers)
       ..where((m) => m.orderItemId.equals(orderItemId));
     final mods = await modsQuery.get();
-    final modifierTotal = mods.fold<int>(0, (s, m) => s + m.priceDelta);
+    // Effective delta = priceDelta * quantity so askQuantity modifiers price right.
+    final modifierTotal =
+        mods.fold<int>(0, (s, m) => s + m.priceDelta * m.quantity);
     final newSubtotal = ((item.unitPrice + modifierTotal) * newQty);
 
     await _db.transaction(() async {
@@ -319,6 +335,18 @@ class OrderRepositoryImpl {
 
       await calculateTicketTotals(item.ticketId);
     });
+  }
+
+  /// Assign a seat number to an order item (null clears the assignment).
+  Future<void> updateItemSeat(String orderItemId, int? seatNumber) async {
+    await (_db.update(_db.orderItems)
+          ..where((i) => i.id.equals(orderItemId)))
+        .write(
+      OrderItemsCompanion(
+        seatNumber: Value(seatNumber),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Update the preparation status of an order item.
@@ -472,6 +500,8 @@ class OrderRepositoryImpl {
               modifierId: m.modifierId,
               modifierName: m.modifierName,
               priceDelta: m.priceDelta,
+              quantity: m.quantity,
+              note: m.note,
             ),
           );
     }
@@ -565,6 +595,7 @@ class OrderRepositoryImpl {
       course: row.course,
       seat: row.seat,
       gangId: row.gangId,
+      seatNumber: row.seatNumber,
       modifiers: modifiers,
     );
   }
@@ -587,6 +618,7 @@ class OrderRepositoryImpl {
       course: Value(entity.course),
       seat: Value(entity.seat),
       gangId: Value(entity.gangId),
+      seatNumber: Value(entity.seatNumber),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
       isDeleted: const Value(false),

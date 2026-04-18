@@ -32,12 +32,29 @@ class ModifierOptionData {
 }
 
 /// A group of related modifier options (e.g. "Size", "Extras", "Sauce").
+///
+/// Mirrors the SambaPOS Order Tag Group settings loaded from
+/// [ModifierGroupEntity]: the dialog reads minSelections / maxSelections
+/// to gate submission, columnCount to lay the grid out, and prefix to
+/// label selected options on receipts.
 class ModifierGroupData {
   final String id;
   final String name;
   final bool isRequired;
   final bool isMultiSelect;
+  final int minSelections;
   final int maxSelections;
+  final int columnCount;
+  final String prefix;
+
+  /// SambaPOS askQuantity richness — each selected option exposes a
+  /// ×N stepper (1..10) and its effective price is `priceDelta × qty`.
+  final bool askQuantity;
+
+  /// SambaPOS freeTagging richness — each selected option exposes an
+  /// inline note field (≤ 100 chars) surfaced on receipts / KDS.
+  final bool freeTagging;
+
   final List<ModifierOptionData> options;
 
   const ModifierGroupData({
@@ -45,9 +62,16 @@ class ModifierGroupData {
     required this.name,
     this.isRequired = false,
     this.isMultiSelect = false,
+    this.minSelections = 0,
     this.maxSelections = 0,
+    this.columnCount = 1,
+    this.prefix = '',
+    this.askQuantity = false,
+    this.freeTagging = false,
     required this.options,
   });
+
+  bool get hasUpperBound => maxSelections > 0;
 
   /// Convert real product modifier groups to dialog data.
   static List<ModifierGroupData> fromProductEntity(ProductEntity product) {
@@ -56,7 +80,12 @@ class ModifierGroupData {
       name: group.name,
       isRequired: group.isRequired,
       isMultiSelect: group.selectionType == ModifierSelectionType.multiple,
+      minSelections: group.minSelections,
       maxSelections: group.maxSelections,
+      columnCount: group.effectiveColumnCount,
+      prefix: group.prefix,
+      askQuantity: group.askQuantity,
+      freeTagging: group.freeTagging,
       options: group.modifiers.map((mod) => ModifierOptionData(
         id: mod.id,
         name: mod.name,
@@ -67,17 +96,94 @@ class ModifierGroupData {
   }
 }
 
+/// A selected option paired with its group-prefixed display name.
+///
+/// The prefix is applied here (not at callers) so every site that builds
+/// `OrderItemModifierEntity` from a dialog result agrees on what lands on
+/// the receipt and KDS.
+class SelectedModifier {
+  final ModifierOptionData option;
+
+  /// `group.prefix + option.name` when the group has a prefix, otherwise
+  /// the bare option name.
+  final String displayName;
+
+  /// Per-application multiplier from the group's askQuantity stepper.
+  /// Callers pass this through to `OrderItemModifierEntity.quantity`.
+  final int quantity;
+
+  /// Free-form per-application note from the group's freeTagging field.
+  /// Null when the group doesn't opt into freeTagging or the operator
+  /// left the field empty.
+  final String? note;
+
+  const SelectedModifier({
+    required this.option,
+    required this.displayName,
+    this.quantity = 1,
+    this.note,
+  });
+}
+
 /// Result returned when the user confirms modifier selection.
 class ModifierDialogResult {
+  /// Raw selections keyed by group name. Retained for callers that
+  /// introspect by group; new code should prefer [flattened].
   final Map<String, List<ModifierOptionData>> selectedModifiers;
   final int quantity;
   final String notes;
+
+  /// Per-option quantity multipliers for groups with askQuantity enabled.
+  /// Shape: `[groupName][optionId] -> int` (defaults to 1 when absent).
+  final Map<String, Map<String, int>> optionQuantities;
+
+  /// Per-option freeTagging notes. Shape: `[groupName][optionId] -> String`
+  /// (absent / empty means no note).
+  final Map<String, Map<String, String>> optionNotes;
+
+  /// The groups that produced this result. Captured so [flattened] can
+  /// apply the group's prefix without the caller having to rejoin by
+  /// group name.
+  final List<ModifierGroupData> _groups;
 
   const ModifierDialogResult({
     required this.selectedModifiers,
     required this.quantity,
     required this.notes,
-  });
+    this.optionQuantities = const {},
+    this.optionNotes = const {},
+    List<ModifierGroupData> groups = const [],
+  }) : _groups = groups;
+
+  /// Flat iteration over selected modifiers in group order, with each
+  /// group's [ModifierGroupData.prefix] pre-applied to [displayName].
+  /// Construct `OrderItemModifierEntity` from `displayName`, not
+  /// `option.name`, so receipts show "+ Extra Cheese" / "- Onions" as
+  /// the operator configured.
+  ///
+  /// When the group opted into askQuantity / freeTagging, the returned
+  /// [SelectedModifier] carries the per-application multiplier and note
+  /// so callers can forward them into `OrderItemModifierEntity.quantity`
+  /// / `.note` without re-threading the raw maps.
+  Iterable<SelectedModifier> flattened() sync* {
+    for (final group in _groups) {
+      final opts = selectedModifiers[group.name] ?? const [];
+      final qtyMap = optionQuantities[group.name] ?? const <String, int>{};
+      final noteMap = optionNotes[group.name] ?? const <String, String>{};
+      for (final opt in opts) {
+        final rawNote = noteMap[opt.id];
+        yield SelectedModifier(
+          option: opt,
+          displayName:
+              group.prefix.isEmpty ? opt.name : '${group.prefix}${opt.name}',
+          quantity: group.askQuantity ? (qtyMap[opt.id] ?? 1) : 1,
+          note: group.freeTagging && rawNote != null && rawNote.isNotEmpty
+              ? rawNote
+              : null,
+        );
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +240,22 @@ class _ModifierDialogContentState
   int _quantity = 1;
   final TextEditingController _notesController = TextEditingController();
 
+  /// Per-option quantity multipliers for askQuantity groups.
+  /// Shape: `[groupName][optionId] -> int` (clamped 1..10).
+  final Map<String, Map<String, int>> _optQty = {};
+
+  /// Per-option note controllers for freeTagging groups.
+  /// Shape: `[groupName][optionId] -> TextEditingController`.
+  final Map<String, Map<String, TextEditingController>> _noteControllers = {};
+
+  /// Max length for inline freeTagging notes — guards the receipt layout
+  /// against novel-length entries.
+  static const int _kMaxNoteChars = 100;
+
+  /// Hard bounds on the askQuantity stepper.
+  static const int _kMinOptQty = 1;
+  static const int _kMaxOptQty = 10;
+
   @override
   void initState() {
     super.initState();
@@ -144,12 +266,26 @@ class _ModifierDialogContentState
         if (opt.isDefault) defaults.add(opt.id);
       }
       _selections[group.name] = defaults;
+
+      if (group.askQuantity) {
+        _optQty[group.name] = {for (final o in group.options) o.id: 1};
+      }
+      if (group.freeTagging) {
+        _noteControllers[group.name] = {
+          for (final o in group.options) o.id: TextEditingController(),
+        };
+      }
     }
   }
 
   @override
   void dispose() {
     _notesController.dispose();
+    for (final groupCtrls in _noteControllers.values) {
+      for (final c in groupCtrls.values) {
+        c.dispose();
+      }
+    }
     super.dispose();
   }
 
@@ -159,13 +295,24 @@ class _ModifierDialogContentState
     var delta = 0;
     for (final group in widget.modifierGroups) {
       final selected = _selections[group.name] ?? {};
+      final qtyMap = _optQty[group.name];
       for (final opt in group.options) {
         if (selected.contains(opt.id)) {
-          delta += opt.priceDelta;
+          final qty = group.askQuantity ? (qtyMap?[opt.id] ?? 1) : 1;
+          delta += opt.priceDelta * qty;
         }
       }
     }
     return delta;
+  }
+
+  void _bumpOptQty(ModifierGroupData group, ModifierOptionData option, int delta) {
+    if (!group.askQuantity) return;
+    setState(() {
+      final map = _optQty[group.name] ??= {};
+      final next = (map[option.id] ?? 1) + delta;
+      map[option.id] = next.clamp(_kMinOptQty, _kMaxOptQty);
+    });
   }
 
   int get _unitTotal => widget.productPrice + _modifierDelta;
@@ -188,6 +335,13 @@ class _ModifierDialogContentState
         if (set.contains(option.id)) {
           set.remove(option.id);
         } else {
+          // Block the add if we're already at maxSelections. SambaPOS
+          // uses the same hard stop instead of silently dropping a prior
+          // pick; the cap is a policy choice the operator has to
+          // acknowledge.
+          if (group.hasUpperBound && set.length >= group.maxSelections) {
+            return;
+          }
           set.add(option.id);
         }
       } else {
@@ -201,6 +355,28 @@ class _ModifierDialogContentState
   bool _isSelected(String groupName, String optionId) {
     return _selections[groupName]?.contains(optionId) ?? false;
   }
+
+  /// Count of currently-picked options in [group].
+  int _selectedCount(ModifierGroupData group) =>
+      _selections[group.name]?.length ?? 0;
+
+  /// Whether [group]'s current selection satisfies its minimum.
+  /// Optional groups (`isRequired=false` and `minSelections=0`) always
+  /// validate — the operator can skip them.
+  bool _isGroupValid(ModifierGroupData group) {
+    final count = _selectedCount(group);
+    final effectiveMin =
+        group.isRequired ? (group.minSelections < 1 ? 1 : group.minSelections)
+                         : group.minSelections;
+    if (count < effectiveMin) return false;
+    if (group.hasUpperBound && count > group.maxSelections) return false;
+    return true;
+  }
+
+  /// Whether every group is within its allowed selection range. Drives
+  /// the Confirm button's enabled state.
+  bool get _allGroupsValid =>
+      widget.modifierGroups.every(_isGroupValid);
 
   // -- Quantity --
 
@@ -216,18 +392,42 @@ class _ModifierDialogContentState
 
   void _onConfirm() {
     final result = <String, List<ModifierOptionData>>{};
+    final qtys = <String, Map<String, int>>{};
+    final notes = <String, Map<String, String>>{};
+
     for (final group in widget.modifierGroups) {
       final selected = _selections[group.name] ?? {};
       final opts =
           group.options.where((o) => selected.contains(o.id)).toList();
-      if (opts.isNotEmpty) {
-        result[group.name] = opts;
+      if (opts.isEmpty) continue;
+      result[group.name] = opts;
+
+      if (group.askQuantity) {
+        final src = _optQty[group.name] ?? const <String, int>{};
+        final picked = <String, int>{
+          for (final o in opts) o.id: src[o.id] ?? 1,
+        };
+        qtys[group.name] = picked;
+      }
+      if (group.freeTagging) {
+        final ctrls =
+            _noteControllers[group.name] ?? const <String, TextEditingController>{};
+        final picked = <String, String>{};
+        for (final o in opts) {
+          final txt = ctrls[o.id]?.text.trim() ?? '';
+          if (txt.isNotEmpty) picked[o.id] = txt;
+        }
+        if (picked.isNotEmpty) notes[group.name] = picked;
       }
     }
+
     Navigator.of(context).pop(ModifierDialogResult(
       selectedModifiers: result,
       quantity: _quantity,
       notes: _notesController.text.trim(),
+      optionQuantities: qtys,
+      optionNotes: notes,
+      groups: widget.modifierGroups,
     ));
   }
 
@@ -343,10 +543,18 @@ class _ModifierDialogContentState
   }
 
   Widget _buildGroupSection(ModifierGroupData group) {
+    final count = _selectedCount(group);
+    final belowMin = group.isRequired && count < (group.minSelections < 1
+        ? 1
+        : group.minSelections);
+    final counterText = group.hasUpperBound
+        ? '$count / ${group.maxSelections}'
+        : '$count';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Group label + required badge
+        // Group label + required badge + live counter
         Row(
           children: [
             Text(
@@ -377,25 +585,158 @@ class _ModifierDialogContentState
                 ),
               ),
             ],
+            const Spacer(),
+            Text(
+              counterText,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: belowMin ? AppColors.orange : AppColors.textDim,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 10),
 
-        // Horizontal scrollable chips
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: group.options.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final opt = group.options[index];
-              final selected = _isSelected(group.name, opt.id);
-              return _buildChip(group, opt, selected);
+        // Grid of option chips — columnCount drives the layout.
+        // columnCount == 1 keeps the previous horizontal scroll; > 1
+        // renders a grid the dialog width divides evenly.
+        if (group.columnCount <= 1 && !group.askQuantity && !group.freeTagging)
+          SizedBox(
+            height: 44,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: group.options.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final opt = group.options[index];
+                return _buildChip(
+                    group, opt, _isSelected(group.name, opt.id));
+              },
+            ),
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = 8.0;
+              final cols = group.columnCount < 1 ? 1 : group.columnCount;
+              final tileWidth =
+                  (constraints.maxWidth - gap * (cols - 1)) / cols;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final opt in group.options)
+                    SizedBox(
+                      width: tileWidth,
+                      child: _buildOptionCell(
+                          group, opt, _isSelected(group.name, opt.id)),
+                    ),
+                ],
+              );
             },
           ),
-        ),
       ],
+    );
+  }
+
+  /// Chip + optional stepper + optional freeTagging note field for a
+  /// single option. Used when the parent group opted into askQuantity
+  /// or freeTagging; collapses to just [_buildChip] otherwise.
+  Widget _buildOptionCell(
+    ModifierGroupData group,
+    ModifierOptionData option,
+    bool selected,
+  ) {
+    if (!group.askQuantity && !group.freeTagging) {
+      return _buildChip(group, option, selected);
+    }
+
+    final qty = _optQty[group.name]?[option.id] ?? 1;
+    final noteCtrl = _noteControllers[group.name]?[option.id];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildChip(group, option, selected),
+        if (selected && group.askQuantity) ...[
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _buildStepperButton(Icons.remove, qty > _kMinOptQty,
+                  () => _bumpOptQty(group, option, -1)),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 28,
+                child: Text(
+                  '×$qty',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _buildStepperButton(Icons.add, qty < _kMaxOptQty,
+                  () => _bumpOptQty(group, option, 1)),
+            ],
+          ),
+        ],
+        if (selected && group.freeTagging && noteCtrl != null) ...[
+          const SizedBox(height: 6),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: TextField(
+              controller: noteCtrl,
+              maxLength: _kMaxNoteChars,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textPrimary,
+              ),
+              decoration: const InputDecoration(
+                hintText: 'Not...',
+                hintStyle: TextStyle(
+                    fontSize: 12, color: AppColors.textDim),
+                counterText: '',
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                isDense: true,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStepperButton(IconData icon, bool enabled, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 26,
+        height: 26,
+        decoration: BoxDecoration(
+          color: enabled
+              ? AppColors.surfaceContainerHigh
+              : AppColors.surfaceContainer,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          icon,
+          size: 14,
+          color: enabled ? AppColors.textPrimary : AppColors.textDim,
+        ),
+      ),
     );
   }
 
@@ -628,27 +969,37 @@ class _ModifierDialogContentState
           ),
           const SizedBox(width: 10),
 
-          // Confirm
+          // Confirm — disabled until every group's selection count is
+          // within [minSelections, maxSelections].
           GestureDetector(
-            onTap: _onConfirm,
-            child: Container(
+            onTap: _allGroupsValid ? _onConfirm : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
               height: 48,
               padding: const EdgeInsets.symmetric(horizontal: 28),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryContainer],
-                  begin: Alignment(-0.7, -0.7), // ~135 degrees
-                  end: Alignment(0.7, 0.7),
-                ),
+                gradient: _allGroupsValid
+                    ? const LinearGradient(
+                        colors: [
+                          AppColors.primary,
+                          AppColors.primaryContainer
+                        ],
+                        begin: Alignment(-0.7, -0.7),
+                        end: Alignment(0.7, 0.7),
+                      )
+                    : null,
+                color: _allGroupsValid ? null : AppColors.surfaceContainerHigh,
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   'Zur Bestellung',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF0D1B3A),
+                    color: _allGroupsValid
+                        ? const Color(0xFF0D1B3A)
+                        : AppColors.textDim,
                     letterSpacing: 0.3,
                   ),
                 ),

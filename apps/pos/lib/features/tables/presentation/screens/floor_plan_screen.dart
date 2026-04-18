@@ -617,65 +617,76 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
     return GestureDetector(
       onTap: () => _onTableTap(table),
       onLongPress: () => showTableDetailSheet(context, table),
-      child: Container(
-        // Stitch: bg surfaceContainerHigh (#1C2028), no border
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerHigh,
-          borderRadius: isRound
-              ? BorderRadius.circular(100)
-              : BorderRadius.circular(4),
-        ),
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Table number — huge, font-black
-            Text(
-              table.name,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: AppColors.textPrimary,
-                letterSpacing: -0.5,
-              ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            // Stitch: bg surfaceContainerHigh (#1C2028), no border
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerHigh,
+              borderRadius: isRound
+                  ? BorderRadius.circular(100)
+                  : BorderRadius.circular(4),
             ),
-            const SizedBox(height: 4),
-            // Status badge
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(3),
-              ),
-              child: Text(
-                _statusLabel(table.status),
-                style: TextStyle(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w800,
-                  color: statusColor,
-                  letterSpacing: 0.6,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            // Guest / seat count
-            Row(
-              mainAxisSize: MainAxisSize.min,
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(Icons.person_rounded,
-                    size: 11, color: AppColors.textDim),
-                const SizedBox(width: 2),
+                // Table number — huge, font-black
                 Text(
-                  '${table.capacity}',
+                  table.name,
                   style: const TextStyle(
-                      fontSize: 10, color: AppColors.textDim),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // Status badge
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    _statusLabel(table.status),
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                      color: statusColor,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // Guest / seat count
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.person_rounded,
+                        size: 11, color: AppColors.textDim),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${table.capacity}',
+                      style: const TextStyle(
+                          fontSize: 10, color: AppColors.textDim),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          if (table.flags.isNotEmpty)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: _TableFlagBadges(flags: table.flags, iconSize: 12),
+            ),
+        ],
       ),
     );
   }
@@ -954,59 +965,161 @@ class _DraggableTableTile extends StatelessWidget {
       onTap: onTap,
       onPanUpdate: (details) => onDragUpdate(details.delta),
       onPanEnd: (_) => onDragEnd(),
-      child: Container(
+      child: SizedBox(
         width: table.width,
         height: table.height,
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
-          borderRadius: isRound
-              ? BorderRadius.circular(200)
-              : table.shape == TableShape.square
-                  ? BorderRadius.circular(8)
-                  : BorderRadius.circular(10),
-          border: Border.all(
-              color: statusColor.withValues(alpha: 0.8), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: statusColor.withValues(alpha: 0.15),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Text(
-              table.name,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary),
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              statusLabel,
-              style: TextStyle(fontSize: 9, color: statusColor),
-            ),
-            const SizedBox(height: 2),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.person_rounded,
-                    size: 10, color: AppColors.textDim),
-                const SizedBox(width: 2),
-                Text('${table.capacity}',
+            Container(
+              width: table.width,
+              height: table.height,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: isRound
+                    ? BorderRadius.circular(200)
+                    : table.shape == TableShape.square
+                        ? BorderRadius.circular(8)
+                        : BorderRadius.circular(10),
+                border: Border.all(
+                    color: statusColor.withValues(alpha: 0.8), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: statusColor.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    table.name,
                     style: const TextStyle(
-                        fontSize: 9, color: AppColors.textDim)),
-              ],
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    statusLabel,
+                    style: TextStyle(fontSize: 9, color: statusColor),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.person_rounded,
+                          size: 10, color: AppColors.textDim),
+                      const SizedBox(width: 2),
+                      Text('${table.capacity}',
+                          style: const TextStyle(
+                              fontSize: 9, color: AppColors.textDim)),
+                    ],
+                  ),
+                ],
+              ),
             ),
+            if (table.flags.isNotEmpty)
+              Positioned(
+                top: 2,
+                right: 2,
+                child: _TableFlagBadges(flags: table.flags, iconSize: 10),
+              ),
           ],
         ),
       ),
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// TableFlag badge overlay
+// ---------------------------------------------------------------------------
+
+/// Renders up to 3 small pill badges in priority order:
+/// vip > billRequested > reservationSoon > needsAttention.
+///
+/// Priority cap keeps the tile from being drowned by simultaneous flags
+/// (a VIP table can also have a bill request and an upcoming reservation;
+/// showing all four would overflow the tile on small grid sizes).
+class _TableFlagBadges extends StatelessWidget {
+  const _TableFlagBadges({
+    required this.flags,
+    this.iconSize = 12,
+  });
+
+  final Set<TableFlag> flags;
+  final double iconSize;
+
+  static const _priority = <TableFlag>[
+    TableFlag.vip,
+    TableFlag.billRequested,
+    TableFlag.reservationSoon,
+    TableFlag.needsAttention,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = _priority.where(flags.contains).take(3).toList();
+    if (visible.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(
+      spacing: 2,
+      children: [
+        for (final f in visible)
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: _bgFor(f),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Icon(_iconFor(f), size: iconSize, color: _fgFor(f)),
+          ),
+      ],
+    );
+  }
+
+  IconData _iconFor(TableFlag f) {
+    switch (f) {
+      case TableFlag.vip:
+        return Icons.star_rounded;
+      case TableFlag.billRequested:
+        return Icons.receipt_long_rounded;
+      case TableFlag.reservationSoon:
+        return Icons.schedule_rounded;
+      case TableFlag.needsAttention:
+        return Icons.priority_high_rounded;
+    }
+  }
+
+  Color _bgFor(TableFlag f) {
+    switch (f) {
+      case TableFlag.vip:
+        return const Color(0xFFFFD60A).withValues(alpha: 0.22);
+      case TableFlag.billRequested:
+        return const Color(0xFF4F8CFF).withValues(alpha: 0.22);
+      case TableFlag.reservationSoon:
+        return const Color(0xFFFF9F0A).withValues(alpha: 0.22);
+      case TableFlag.needsAttention:
+        return const Color(0xFFFF453A).withValues(alpha: 0.22);
+    }
+  }
+
+  Color _fgFor(TableFlag f) {
+    switch (f) {
+      case TableFlag.vip:
+        return const Color(0xFFFFD60A);
+      case TableFlag.billRequested:
+        return const Color(0xFF4F8CFF);
+      case TableFlag.reservationSoon:
+        return const Color(0xFFFF9F0A);
+      case TableFlag.needsAttention:
+        return const Color(0xFFFF453A);
+    }
   }
 }
 

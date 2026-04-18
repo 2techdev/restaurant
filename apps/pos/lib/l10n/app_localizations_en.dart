@@ -114,6 +114,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tableTransfer => 'Transfer';
 
   @override
+  String gangLabel(int number) {
+    return 'Gang $number';
+  }
+
+  @override
   String tableGuest(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

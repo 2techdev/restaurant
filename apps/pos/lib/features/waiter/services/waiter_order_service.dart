@@ -81,6 +81,10 @@ class WaiterOrderService {
   ///
   /// Returns the updated [TicketEntity] after the item is persisted,
   /// or `null` if the ticket is closed / not found.
+  ///
+  /// [course] tags the item with a Gang number (1..`RestaurantSettings.maxGangs`)
+  /// so the fine-dining Hold & Fire flow can dispatch each course
+  /// independently. Defaults to 1 to match single-course waiter flows.
   Future<TicketEntity?> addItemToTicket({
     required String ticketId,
     required ProductEntity product,
@@ -167,14 +171,15 @@ class WaiterOrderService {
     return _orderRepo.getTicketById(ticketId);
   }
 
-  /// Fire a single gang (course) to the kitchen.
+  /// Fire a single Gang (course) to the kitchen — scope the dispatch to
+  /// items tagged with [OrderItemEntity.course] == [gang].
   ///
   /// Only items in [gang] that are still unsent are pushed. Kitchen receives
   /// a single gang-tagged kitchen ticket, so the expo station can plate and
-  /// send them out together.
-  ///
-  /// Returns the refreshed ticket. No-op if all items in the gang are
-  /// already fired.
+  /// send them out together. Mirrors the fine-dining
+  /// [CurrentTicketNotifier.fireGang] flow so the waiter tablet and the POS
+  /// shell share one canonical Hold & Fire pattern. Idempotent — no-op if
+  /// all items in the gang are already fired.
   Future<TicketEntity?> fireGang({
     required String ticketId,
     required int gang,
@@ -184,7 +189,7 @@ class WaiterOrderService {
     if (ticket == null) return null;
 
     final target = ticket.items
-        .where((i) => i.course == gang && !i.sentToKitchen)
+        .where((i) => !i.sentToKitchen && i.course == gang)
         .toList();
     if (target.isEmpty) return ticket;
 
@@ -193,7 +198,8 @@ class WaiterOrderService {
     }
 
     // Bump ticket to "sent" once any items are in the kitchen pipeline.
-    if (ticket.status == TicketStatus.draft) {
+    if (ticket.status == TicketStatus.draft ||
+        ticket.status == TicketStatus.open) {
       await _orderRepo.updateTicketStatus(ticketId, TicketStatus.sent);
     }
 
@@ -273,8 +279,21 @@ class WaiterOrderService {
   }
 
   /// Request the bill for a table (signals POS to handle payment).
+  ///
+  /// Mirrors the signal onto the table's state-flag set so the floor
+  /// plan can surface a "bill requested" badge alongside the
+  /// occupied-status tile colour — SambaPOS-style orthogonal state.
   Future<void> requestBill(String ticketId) async {
     await _orderRepo.updateTicketStatus(ticketId, TicketStatus.billRequested);
+    final ticket = await _orderRepo.getTicketById(ticketId);
+    final tableId = ticket?.tableId;
+    if (tableId != null) {
+      await _tableRepo.setTableFlag(
+        tableId: tableId,
+        flag: TableFlag.billRequested,
+        enabled: true,
+      );
+    }
   }
 
   // =========================================================================

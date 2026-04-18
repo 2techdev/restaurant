@@ -9,6 +9,9 @@
 /// whether to show the brand login screen or the staff PIN screen.
 library;
 
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,9 +25,33 @@ import 'package:gastrocore_pos/features/brand_auth/presentation/providers/brand_
 import 'package:gastrocore_pos/features/licensing/data/repositories/license_repository_impl.dart';
 import 'package:gastrocore_pos/features/sync/presentation/providers/sync_provider.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+void main() {
+  // Global crash handler — catches both framework errors and any uncaught
+  // async errors. We install this before bootstrap so a failure inside
+  // initialize-the-database still ends up on the splash error screen
+  // instead of a blank/black window on the pilot tablet.
+  runZonedGuarded<Future<void>>(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      if (kDebugMode) return;
+      // In release we swallow framework-level errors so a single stray
+      // assertion doesn't kill the tablet mid-service.
+    };
+
+    try {
+      await _bootstrap();
+    } catch (error, stack) {
+      debugPrint('Startup failed: $error\n$stack');
+      runApp(_StartupErrorApp(error: error, stack: stack));
+    }
+  }, (error, stack) {
+    debugPrint('Uncaught zone error: $error\n$stack');
+  });
+}
+
+Future<void> _bootstrap() async {
   // Create the single database instance and run first-launch seed.
   final db = AppDatabase.create();
   await AppInitializer.initialize(db);
@@ -70,4 +97,65 @@ void main() async {
       child: const GastroCoreApp(),
     ),
   );
+}
+
+/// Minimal fallback UI shown when [_bootstrap] throws.
+///
+/// Displays the exception and a "Tekrar dene" button that re-runs
+/// bootstrap. Pilot staff can read the error and either retry or escalate.
+class _StartupErrorApp extends StatelessWidget {
+  const _StartupErrorApp({required this.error, required this.stack});
+
+  final Object error;
+  final StackTrace stack;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark(useMaterial3: true),
+      home: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
+                const SizedBox(height: 16),
+                const Text(
+                  'GastroCore başlatılamadı',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text('Uygulama başlangıcında bir hata oluştu.'),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      '$error\n\n$stack',
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      // Re-run bootstrap. Any exception lands back here.
+                      _bootstrap().catchError((Object e, StackTrace s) {
+                        runApp(_StartupErrorApp(error: e, stack: s));
+                      });
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Tekrar dene'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

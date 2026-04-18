@@ -13,6 +13,10 @@ class RestaurantTables extends Table {
   RealColumn get width => real().withDefault(const Constant(100.0))();
   RealColumn get height => real().withDefault(const Constant(100.0))();
   TextColumn get status => text().withDefault(const Constant('available'))(); // available, occupied, reserved, dirty
+  // Orthogonal state flags (billRequested, reservationSoon, needsAttention,
+  // vip, ...) encoded as a comma-separated list of TableFlag.name tokens.
+  // Empty string = no flags. See table_entity.dart for the codec.
+  TextColumn get flags => text().withDefault(const Constant(''))();
   TextColumn get currentOrderId => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();

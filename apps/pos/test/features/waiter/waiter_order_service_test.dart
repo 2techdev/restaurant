@@ -461,6 +461,123 @@ void main() {
     });
   });
 
+  group('WaiterOrderService.fireGang', () {
+    test('sends only the target Gang and leaves other items unsent',
+        () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      var ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+      );
+      ticket = (await svc.addItemToTicket(
+            ticketId: ticket.id,
+            product: _makeProduct(name: 'Tartar', price: 2400),
+            course: 1,
+          ))!;
+      ticket = (await svc.addItemToTicket(
+            ticketId: ticket.id,
+            product: _makeProduct(name: 'Risotto', price: 3200),
+            course: 2,
+          ))!;
+
+      final afterFire = await svc.fireGang(
+        ticketId: ticket.id,
+        gang: 1,
+        waiterName: _waiterName,
+      );
+
+      expect(afterFire, isNotNull);
+      // Gang 1 item is now sent; Gang 2 item still pending.
+      final byCourse = {for (final i in afterFire!.items) i.course: i};
+      expect(byCourse[1]!.sentToKitchen, isTrue);
+      expect(byCourse[2]!.sentToKitchen, isFalse);
+    });
+
+    test('is a no-op when the target Gang has no unsent items', () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      var ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+      );
+      ticket = (await svc.addItemToTicket(
+            ticketId: ticket.id,
+            product: _makeProduct(),
+            course: 1,
+          ))!;
+
+      // First fire sends Gang 1.
+      await svc.fireGang(
+        ticketId: ticket.id,
+        gang: 1,
+        waiterName: _waiterName,
+      );
+      // Second fire on the same Gang — everything is already sent.
+      final second = await svc.fireGang(
+        ticketId: ticket.id,
+        gang: 1,
+        waiterName: _waiterName,
+      );
+
+      expect(second, isNotNull);
+      expect(second!.items.every((i) => i.sentToKitchen), isTrue);
+    });
+
+    test('writes a KDS ticket scoped to the fired Gang', () async {
+      final (:db, :svc) = await _setup();
+      addTearDown(db.close);
+
+      final tableId = await _createTable(db);
+      var ticket = await svc.openNewOrder(
+        tenantId: _tenantId,
+        waiterId: _waiterId,
+        waiterName: _waiterName,
+        tableId: tableId,
+        deviceId: _deviceId,
+      );
+      ticket = (await svc.addItemToTicket(
+            ticketId: ticket.id,
+            product: _makeProduct(name: 'Tartar'),
+            course: 1,
+          ))!;
+      ticket = (await svc.addItemToTicket(
+            ticketId: ticket.id,
+            product: _makeProduct(name: 'Risotto'),
+            course: 2,
+          ))!;
+
+      await svc.fireGang(
+        ticketId: ticket.id,
+        gang: 2,
+        waiterName: _waiterName,
+      );
+
+      // Inspect the KDS tables directly. AppInitializer seeds demo tickets,
+      // so filter by the real ticket id we just fired.
+      final kdsForOurTicket = await (db.select(db.kitchenTickets)
+            ..where((t) => t.ticketId.equals(ticket.id)))
+          .get();
+      expect(kdsForOurTicket.length, 1,
+          reason: 'One KDS ticket per fired Gang on this order');
+      final itemsForOurTicket = await (db.select(db.kitchenTicketItems)
+            ..where((i) => i.kitchenTicketId.equals(kdsForOurTicket.first.id)))
+          .get();
+      expect(itemsForOurTicket.length, 1);
+      expect(itemsForOurTicket.first.productName, 'Risotto');
+    });
+  });
+
   group('WaiterOrderService.getActiveOrdersForWaiter', () {
     test('returns only waiter-channel orders for the given waiterId', () async {
       final (:db, :svc) = await _setup();
