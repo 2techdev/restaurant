@@ -5,11 +5,11 @@
 ///   1. [LeftNavRail]          — nav stack + action zone (incl. Pay).
 ///   2. [OrderPanel]           — ticket sidebar (header / items / totals).
 ///   3. [GridCategoryColumn]   — vertical 2-col aspect-square category grid.
-///   4. Product area           — category header + search + product grid.
-/// Bottom: [BottomActionBar]   — Close / New / Send / totals / Split / Card / Cash.
+///   4. Product area           — category header, favorites bar, product grid.
+/// Bottom: [BottomActionBar]   — Close + Pay CTA.
 ///
-/// Only the sales subtree runs under [buildKineticTheme]; every other screen
-/// still uses the app-wide dark Stitch theme.
+/// The app-level theme is now Kinetic (see `app.dart`), so the earlier local
+/// `Theme(data: buildKineticTheme(), ...)` wrap has been removed.
 library;
 
 import 'package:flutter/material.dart';
@@ -26,6 +26,7 @@ import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provide
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/bottom_action_bar.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/column_toggle_button.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/favorites_bar.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/grid_category_column.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/left_nav_rail.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/order_panel.dart';
@@ -48,40 +49,37 @@ class FineDiningShell extends ConsumerWidget {
       }
     }
 
-    return Theme(
-      data: buildKineticTheme(),
-      child: Scaffold(
-        backgroundColor: GcColors.surface,
-        body: SafeArea(
-          child: Column(
-            children: [
-              const _TopBar(),
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const LeftNavRail(),
-                    const OrderPanel(),
-                    const GridCategoryColumn(),
-                    Expanded(
-                      child: _ProductArea(
-                        cartQuantities: pendingByProduct,
-                        onProductTap: (product) {
-                          _onProductTap(
-                            context,
-                            ref,
-                            product,
-                            course: activeGang,
-                          );
-                        },
-                      ),
+    return Scaffold(
+      backgroundColor: GcColors.surface,
+      body: SafeArea(
+        child: Column(
+          children: [
+            const _TopBar(),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const LeftNavRail(),
+                  const OrderPanel(),
+                  const GridCategoryColumn(),
+                  Expanded(
+                    child: _ProductArea(
+                      cartQuantities: pendingByProduct,
+                      onProductTap: (product) {
+                        _onProductTap(
+                          context,
+                          ref,
+                          product,
+                          course: activeGang,
+                        );
+                      },
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const BottomActionBar(),
-            ],
-          ),
+            ),
+            const BottomActionBar(),
+          ],
         ),
       ),
     );
@@ -136,6 +134,7 @@ class _ProductArea extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _ProductHeader(title: headerLabel),
+          FavoritesBar.demo(onAddProduct: onProductTap),
           Expanded(
             child: ProductGrid(
               cartQuantities: cartQuantities,

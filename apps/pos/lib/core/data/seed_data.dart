@@ -658,6 +658,17 @@ class SeedData {
     );
     _drinkIds.add(colaId);
 
+    final colaZeroId = await add(
+      catId: _catGetraenkeId,
+      name: 'Coca-Cola Zero',
+      price: 450,
+      description: '330ml Dose, zuckerfrei',
+      taxGroup: 'beverage',
+      printerGroup: 'bar',
+      imagePath: 'https://images.unsplash.com/photo-1624552184280-9e9631bbeee9?w=400&h=300&fit=crop&q=80',
+    );
+    _drinkIds.add(colaZeroId);
+
     _prodHausweinId = await add(
       catId: _catGetraenkeId,
       name: 'Hauswein',

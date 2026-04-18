@@ -1,8 +1,12 @@
 /// Root application widget for GastroCore POS.
 ///
 /// Uses [MaterialApp.router] with [GoRouter] for declarative navigation,
-/// applies the dark POS theme from [buildAppTheme], and wires up
-/// Flutter's localization system for DE / FR / IT / EN (Swiss quadrilingual).
+/// applies the light Kinetic theme app-wide, and wires up Flutter's
+/// localization system for DE / FR / IT / EN (Swiss quadrilingual).
+///
+/// Pilot v3 promoted [buildKineticTheme] from a sales-shell-local override
+/// to the app-level theme. `buildAppTheme` (Stitch dark) is retired but the
+/// file is kept for reference + the still-used [PosColors] extension.
 library;
 
 import 'package:flutter/material.dart';
@@ -12,7 +16,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/providers/locale_provider.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
-import 'package:gastrocore_pos/core/theme/app_theme.dart';
+import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/brand_auth/presentation/providers/brand_auth_provider.dart';
 import 'package:gastrocore_pos/features/sync/presentation/providers/sync_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
@@ -68,7 +72,7 @@ class _GastroCoreAppState extends ConsumerState<GastroCoreApp> {
     return MaterialApp.router(
       title: 'GastroCore POS',
       debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
+      theme: buildKineticTheme(),
 
       // ── Localization ──────────────────────────────────────────────────────
       locale: locale,
