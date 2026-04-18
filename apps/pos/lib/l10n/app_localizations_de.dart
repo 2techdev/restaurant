@@ -493,4 +493,38 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get reservationCustomerEmail => 'E-Mail-Adresse';
+
+  @override
+  String courseLabel(String number) {
+    String _temp0 = intl.Intl.selectLogic(number, {
+      '1': '1. Gang',
+      '2': '2. Gang',
+      '3': '3. Gang',
+      '4': '4. Gang',
+      '5': '5. Gang',
+      'other': '$number. Gang',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get menuCategoryStarter => 'Vorspeise';
+
+  @override
+  String get menuCategoryMain => 'Hauptgang';
+
+  @override
+  String get menuCategoryDessert => 'Dessert';
+
+  @override
+  String get posServiceCharge => 'Service';
+
+  @override
+  String get posCover => 'Gäste';
+
+  @override
+  String get settingsLocale => 'Sprache & Region';
+
+  @override
+  String get fiscalReceiptVat => 'MWST';
 }

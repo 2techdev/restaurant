@@ -9,6 +9,7 @@ import 'app_localizations_de.dart';
 import 'app_localizations_en.dart';
 import 'app_localizations_fr.dart';
 import 'app_localizations_it.dart';
+import 'app_localizations_tr.dart';
 
 // ignore_for_file: type=lint
 
@@ -100,6 +101,7 @@ abstract class AppLocalizations {
     Locale('en'),
     Locale('fr'),
     Locale('it'),
+    Locale('tr'),
   ];
 
   /// App title
@@ -1037,6 +1039,54 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'E-Mail-Adresse'**
   String get reservationCustomerEmail;
+
+  /// Course label on the adisyon (e.g. '1. Gang'). Uses select because fine-dining menus rarely go above 5 courses.
+  ///
+  /// In de, this message translates to:
+  /// **'{number, select, 1{1. Gang} 2{2. Gang} 3{3. Gang} 4{4. Gang} 5{5. Gang} other{{number}. Gang}}'**
+  String courseLabel(String number);
+
+  /// Menu category: starter / appetizer
+  ///
+  /// In de, this message translates to:
+  /// **'Vorspeise'**
+  String get menuCategoryStarter;
+
+  /// Menu category: main course
+  ///
+  /// In de, this message translates to:
+  /// **'Hauptgang'**
+  String get menuCategoryMain;
+
+  /// Menu category: dessert
+  ///
+  /// In de, this message translates to:
+  /// **'Dessert'**
+  String get menuCategoryDessert;
+
+  /// Service charge line on the bill
+  ///
+  /// In de, this message translates to:
+  /// **'Service'**
+  String get posServiceCharge;
+
+  /// Cover count (guests at the table)
+  ///
+  /// In de, this message translates to:
+  /// **'Gäste'**
+  String get posCover;
+
+  /// Settings: locale section header
+  ///
+  /// In de, this message translates to:
+  /// **'Sprache & Region'**
+  String get settingsLocale;
+
+  /// Tax abbreviation on printed receipt
+  ///
+  /// In de, this message translates to:
+  /// **'MWST'**
+  String get fiscalReceiptVat;
 }
 
 class _AppLocalizationsDelegate
@@ -1050,7 +1100,7 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['de', 'en', 'fr', 'it'].contains(locale.languageCode);
+      <String>['de', 'en', 'fr', 'it', 'tr'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -1067,6 +1117,8 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
       return AppLocalizationsFr();
     case 'it':
       return AppLocalizationsIt();
+    case 'tr':
+      return AppLocalizationsTr();
   }
 
   throw FlutterError(

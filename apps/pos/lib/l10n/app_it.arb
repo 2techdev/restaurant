@@ -179,5 +179,21 @@
   "reservationCustomerName": "Nome cliente",
   "reservationNameRequired": "Il nome è obbligatorio",
   "reservationCustomerPhone": "Numero di telefono",
-  "reservationCustomerEmail": "Indirizzo e-mail"
+  "reservationCustomerEmail": "Indirizzo e-mail",
+
+  "courseLabel": "{number, select, 1{Portata 1} 2{Portata 2} 3{Portata 3} 4{Portata 4} 5{Portata 5} other{Portata {number}}}",
+  "@courseLabel": {
+    "placeholders": { "number": { "type": "String" } }
+  },
+
+  "menuCategoryStarter": "Antipasto",
+  "menuCategoryMain": "Secondo",
+  "menuCategoryDessert": "Dessert",
+
+  "posServiceCharge": "Servizio",
+  "posCover": "Coperti",
+
+  "settingsLocale": "Lingua e regione",
+
+  "fiscalReceiptVat": "IVA"
 }
