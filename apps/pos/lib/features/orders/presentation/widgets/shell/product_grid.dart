@@ -1,43 +1,29 @@
-/// Product grid for the fine-dining shell.
+/// Product grid for the Kinetic sales shell.
 ///
 /// Renders `filteredProductsProvider` in a responsive GridView whose column
-/// count is user-toggleable (1 ↔ 2). Product decision 2026-04-17: operators
-/// on crowded nights with long menus prefer a dense 1-col list; slower nights
-/// with a short "house favourites" menu prefer 2-col big-button mode.
-///
-/// The toggle state lives in [productGridColumnsProvider] so settings, the
-/// category strip header, and the grid itself all stay in sync.
+/// count is user-toggleable (1 ↔ 2). The grid stays on zero-radius tiles
+/// with a ghost border — depth is expressed via surface nesting, not
+/// shadows. Products with an [ProductEntity.imagePath] set get a thumbnail
+/// pushed against the leading edge; text-only tiles stay Kinetic-clean.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
+import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
 
-/// Column-count preference for the fine-dining product grid.
-///
-/// Values: 1 (list/wide), 2 (two-per-row). Default 2 matches SambaPOS.
-/// Clamped by [clampProductGridColumns] on write so callers can't push
-/// invalid counts from a slider or shortcut.
+/// Column-count preference for the product grid (1 or 2).
 final productGridColumnsProvider = StateProvider<int>((ref) => 2);
 
-/// Minimum column count — a single wide card per row.
 const int kProductGridMinColumns = 1;
-
-/// Maximum column count — current pilot cap. Raising means recomputing card
-/// aspect ratios; don't just bump this integer without checking [ProductCard].
 const int kProductGridMaxColumns = 2;
 
-/// Clamp [n] to the legal [kProductGridMinColumns]..[kProductGridMaxColumns]
-/// range. Exposed so tests and menu shortcuts share the same rule.
 int clampProductGridColumns(int n) =>
     n.clamp(kProductGridMinColumns, kProductGridMaxColumns);
 
-/// Toggle the [productGridColumnsProvider] between 1 and 2. Idempotent and
-/// side-effect-free beyond the state update — safe to call from a toolbar.
 void toggleProductGridColumns(WidgetRef ref) {
   final current = ref.read(productGridColumnsProvider);
   ref.read(productGridColumnsProvider.notifier).state =
@@ -45,12 +31,9 @@ void toggleProductGridColumns(WidgetRef ref) {
 }
 
 // ---------------------------------------------------------------------------
-// ProductGrid widget
+// ProductGrid
 // ---------------------------------------------------------------------------
 
-/// Renders the product grid. Accepts an explicit [columns] so tests can drive
-/// the widget without provider plumbing. In production callers pass the
-/// [productGridColumnsProvider] value.
 class ProductGrid extends ConsumerWidget {
   const ProductGrid({
     super.key,
@@ -60,10 +43,7 @@ class ProductGrid extends ConsumerWidget {
   });
 
   final int columns;
-
-  /// Map of productId → pending (not-yet-sent) quantity, for the badge.
   final Map<String, int> cartQuantities;
-
   final void Function(ProductEntity) onProductTap;
 
   @override
@@ -71,42 +51,42 @@ class ProductGrid extends ConsumerWidget {
     final productsAsync = ref.watch(filteredProductsProvider);
     final crossAxisCount = clampProductGridColumns(columns);
 
-    return productsAsync.when(
-      data: (products) {
-        if (products.isEmpty) {
-          return const _EmptyState();
-        }
-        return GridView.builder(
-          key: ValueKey('product_grid_cols_$crossAxisCount'),
-          padding: AppInsets.all12,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            mainAxisSpacing: AppTokens.space12,
-            crossAxisSpacing: AppTokens.space12,
-            // 1-col: wide banner cards (aspect 3:1). 2-col: square-ish (1.15:1).
-            childAspectRatio: crossAxisCount == 1 ? 3.2 : AppTokens.productCardAspect,
-          ),
-          itemCount: products.length,
-          itemBuilder: (context, index) {
-            final p = products[index];
-            return ProductCard(
-              key: ValueKey('product_card_${p.id}'),
-              product: p,
-              quantity: cartQuantities[p.id] ?? 0,
-              columns: crossAxisCount,
-              onTap: () => onProductTap(p),
-            );
-          },
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(
-        child: Padding(
-          padding: AppInsets.all16,
-          child: Text(
-            'Menü yüklenemedi: $err',
-            style: const TextStyle(color: AppColors.red),
-            textAlign: TextAlign.center,
+    return ColoredBox(
+      color: GcColors.surface,
+      child: productsAsync.when(
+        data: (products) {
+          if (products.isEmpty) return const _EmptyState();
+          return GridView.builder(
+            key: ValueKey('product_grid_cols_$crossAxisCount'),
+            padding: AppInsets.all12,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: AppTokens.space8,
+              crossAxisSpacing: AppTokens.space8,
+              childAspectRatio: crossAxisCount == 1 ? 3.2 : 1.25,
+            ),
+            itemCount: products.length,
+            itemBuilder: (context, index) {
+              final p = products[index];
+              return ProductCard(
+                key: ValueKey('product_card_${p.id}'),
+                product: p,
+                quantity: cartQuantities[p.id] ?? 0,
+                columns: crossAxisCount,
+                onTap: () => onProductTap(p),
+              );
+            },
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(
+          child: Padding(
+            padding: AppInsets.all16,
+            child: Text(
+              'Menü yüklenemedi: $err',
+              style: GcText.bodySmall.copyWith(color: GcColors.error),
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       ),
@@ -118,8 +98,6 @@ class ProductGrid extends ConsumerWidget {
 // ProductCard
 // ---------------------------------------------------------------------------
 
-/// A single product tile. Layout adapts to [columns] to stay readable at
-/// both aspect ratios.
 class ProductCard extends StatelessWidget {
   const ProductCard({
     super.key,
@@ -136,25 +114,26 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isRow = columns == 1;
+    final hasThumb = (product.imagePath ?? '').isNotEmpty;
     return Material(
-      color: AppColors.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+      color: GcColors.surfaceContainerLowest,
+      shape: const Border.fromBorderSide(
+        BorderSide(color: GcColors.ghostBorder),
+      ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTokens.radiusMd),
         child: Stack(
           children: [
-            Padding(
-              padding: AppInsets.all12,
-              child: isRow
-                  ? _rowLayout(context)
-                  : _squareLayout(context),
-            ),
+            hasThumb
+                ? _thumbLayout(context)
+                : Padding(
+                    padding: AppInsets.all12,
+                    child: _textOnlyLayout(),
+                  ),
             if (quantity > 0)
               Positioned(
-                top: AppTokens.space8,
-                right: AppTokens.space8,
+                top: AppTokens.space4,
+                right: AppTokens.space4,
                 child: _QuantityBadge(quantity: quantity),
               ),
           ],
@@ -163,79 +142,88 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  Widget _rowLayout(BuildContext context) {
+  Widget _textOnlyLayout() {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 product.name,
-                style: const TextStyle(
-                  fontSize: 16,
+                style: GcText.body.copyWith(
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
                 ),
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (product.description != null &&
-                  product.description!.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  product.description!,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Text(
+                  _formatCHF(product.price),
+                  style: GcText.price.copyWith(
+                    fontSize: 13,
+                    color: GcColors.onSurfaceVariant,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ],
+              ),
             ],
-          ),
-        ),
-        const SizedBox(width: AppTokens.space12),
-        Text(
-          _formatCHF(product.price),
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: AppColors.primary,
           ),
         ),
       ],
     );
   }
 
-  Widget _squareLayout(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _thumbLayout(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Center(
-            child: Text(
-              product.name,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+        SizedBox(
+          width: 80,
+          child: Image.network(
+            product.imagePath!,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const ColoredBox(
+              color: GcColors.surfaceContainerHigh,
+              child: Icon(Icons.restaurant_rounded,
+                  size: 28, color: GcColors.outlineVariant),
             ),
+            loadingBuilder: (c, child, prog) => prog == null
+                ? child
+                : const ColoredBox(color: GcColors.surfaceContainer),
           ),
         ),
-        const SizedBox(height: AppTokens.space8),
-        Text(
-          _formatCHF(product.price),
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.primary,
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.space12,
+              vertical: AppTokens.space8,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  product.name,
+                  style: GcText.body.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  _formatCHF(product.price),
+                  style: GcText.price.copyWith(
+                    fontSize: 13,
+                    color: GcColors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -256,17 +244,13 @@ class _QuantityBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.primaryContainer,
-        borderRadius: BorderRadius.circular(999),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      color: GcColors.primary,
       child: Text(
         '×$quantity',
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-          color: Colors.white,
+        style: GcText.button.copyWith(
+          fontSize: 11,
+          color: GcColors.onPrimary,
         ),
       ),
     );
@@ -283,11 +267,11 @@ class _EmptyState extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.restaurant_menu_rounded,
-              size: 48, color: AppColors.textDim),
+              size: 48, color: GcColors.outlineVariant),
           SizedBox(height: AppTokens.space8),
           Text(
             'Bu kategoride ürün yok',
-            style: TextStyle(color: AppColors.textSecondary),
+            style: GcText.bodySmall,
           ),
         ],
       ),

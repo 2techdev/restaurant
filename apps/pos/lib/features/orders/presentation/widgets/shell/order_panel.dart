@@ -1,24 +1,16 @@
-/// Left-column order panel — groups ticket items by Gang when the
-/// restaurant runs a coursed service.
+/// Left-column ticket panel — Kinetic Grid treatment.
 ///
-/// Fine-dining concepts are coursed: the cashier adds items tagged with a
-/// Gang number (Swiss-German for "course") and each Gang has its own
-/// Fire/Hold controls so the kitchen receives courses in order, not all
-/// at once. Bistros and fast-food concepts turn this off via
-/// `RestaurantSettings.gangsEnabled=false` — the panel then shows a
-/// single flat list and hides Gang/Fire/Hold controls entirely.
-///
-/// Slot count and labels are configured per-restaurant via
-/// `RestaurantSettings.maxGangs` (1..[kGangsUpperBound]) and
-/// `RestaurantSettings.gangLabels`. Labels fall back to the l10n
-/// `gangLabel(n)` key when not overridden.
+/// Ticket sidebar with Gang (course) grouping, selected-item left-border,
+/// voided strikethrough, and a bold Work Sans balance-due at the bottom.
+/// All surfaces use the Kinetic tonal palette; no 1px dividers, only
+/// surface shifts.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
+import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
@@ -26,9 +18,6 @@ import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_sett
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
 
-/// Resolve the label for a 1-based Gang index: restaurant override first,
-/// then the localized default `gangLabel(n)`. Empty overrides fall
-/// through to l10n so a blank input never breaks the UI.
 String _resolveGangLabel(
   BuildContext context,
   RestaurantSettings? settings,
@@ -43,21 +32,16 @@ String _resolveGangLabel(
   return AppLocalizations.of(context).gangLabel(oneBasedIndex);
 }
 
-/// Build the 1-based slot indices to render, clamped to the configured
-/// `[1, maxGangs]` range (and the UI-wide upper bound).
 List<int> _gangSlots(RestaurantSettings? settings) {
   final configured = (settings?.maxGangs ?? 3).clamp(1, kGangsUpperBound);
   return [for (var i = 1; i <= configured; i++) i];
 }
 
-/// The currently-focused Gang — new items are added to this Gang by default.
 final activeGangProvider = StateProvider<int>((ref) => 1);
-
-/// Client-side "hold" state for Gangs. A Gang in this set is visibly marked
-/// as on hold so the operator knows not to fire it yet. v1 does not block
-/// the fire action — it's a soft signal. Persistence is intentionally
-/// per-session; a reload returns to a clean state.
 final heldGangsProvider = StateProvider<Set<int>>((ref) => <int>{});
+
+/// Selected ticket item id — drives the left-border highlight.
+final selectedTicketItemProvider = StateProvider<String?>((ref) => null);
 
 class OrderPanel extends ConsumerWidget {
   const OrderPanel({super.key});
@@ -72,7 +56,7 @@ class OrderPanel extends ConsumerWidget {
 
     return Container(
       width: AppTokens.orderPanelWidth,
-      color: AppColors.surfaceContainerLow,
+      color: GcColors.surfaceContainerLow,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -85,19 +69,20 @@ class OrderPanel extends ConsumerWidget {
               onSelect: (g) =>
                   ref.read(activeGangProvider.notifier).state = g,
             ),
-          const Divider(height: 1, color: AppColors.border),
           Expanded(
-            child: ticket == null
-                ? const _EmptyTicketState()
-                : gangsEnabled
-                    ? _GangGroupedList(
-                        ticket: ticket,
-                        slots: slots,
-                        settings: settings,
-                      )
-                    : _FlatItemList(ticket: ticket),
+            child: ColoredBox(
+              color: GcColors.surfaceContainerLowest,
+              child: ticket == null
+                  ? const _EmptyTicketState()
+                  : gangsEnabled
+                      ? _GangGroupedList(
+                          ticket: ticket,
+                          slots: slots,
+                          settings: settings,
+                        )
+                      : _FlatItemList(ticket: ticket),
+            ),
           ),
-          const Divider(height: 1, color: AppColors.border),
           _TotalsFooter(ticket: ticket),
         ],
       ),
@@ -106,7 +91,7 @@ class OrderPanel extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Cover header — table info
+// Header — Ticket # / Table / Covers
 // ---------------------------------------------------------------------------
 
 class _CoverHeader extends ConsumerWidget {
@@ -116,36 +101,28 @@ class _CoverHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tableLabel = ticket?.tableId != null
-        ? 'Masa ${ticket!.tableId}'
-        : 'Paket Servis';
+        ? 'MASA ${ticket!.tableId}'
+        : 'PAKET SERVİS';
     final cover = ticket?.guestCount ?? 0;
     return Container(
       padding: AppInsets.h16v12,
-      color: AppColors.surfaceContainer,
+      color: GcColors.surfaceContainer,
       child: Row(
         children: [
-          const Icon(Icons.restaurant_rounded,
-              color: AppColors.primary, size: 22),
-          const SizedBox(width: AppTokens.space8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  tableLabel,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
                 if (ticket != null)
                   Text(
-                    '${ticket!.orderNumber} · $cover kişi',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
+                    'TICKET #${ticket!.orderNumber}',
+                    style: GcText.labelTiny,
+                  ),
+                Text(tableLabel, style: GcText.headline),
+                if (ticket != null)
+                  Text(
+                    '$cover KİŞİ',
+                    style: GcText.labelTiny,
                   ),
               ],
             ),
@@ -165,7 +142,6 @@ class _CoverHeader extends ConsumerWidget {
   }
 }
 
-/// Compact ± stepper for the cover (guest) count. Clamped to [1, kMaxCover].
 class _CoverStepper extends StatelessWidget {
   const _CoverStepper({required this.count, required this.onChanged});
 
@@ -178,10 +154,7 @@ class _CoverStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.primaryContainer.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-      ),
+      color: GcColors.surfaceContainerLowest,
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -193,22 +166,13 @@ class _CoverStepper extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.people_alt_rounded,
-                    size: 14, color: AppColors.primary),
-                const SizedBox(width: 4),
-                Text(
-                  '$count',
-                  key: const Key('cover_count_value'),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ],
+            child: Text(
+              '$count',
+              key: const Key('cover_count_value'),
+              style: GcText.button.copyWith(
+                fontSize: 14,
+                color: GcColors.primary,
+              ),
             ),
           ),
           _stepButton(
@@ -228,14 +192,13 @@ class _CoverStepper extends StatelessWidget {
   }) {
     return InkWell(
       onTap: enabled ? onTap : null,
-      customBorder: const CircleBorder(),
       child: SizedBox(
-        width: 24,
-        height: 24,
+        width: 28,
+        height: 28,
         child: Icon(
           icon,
-          size: 16,
-          color: enabled ? AppColors.primary : AppColors.textDim,
+          size: 18,
+          color: enabled ? GcColors.primary : GcColors.outlineVariant,
         ),
       ),
     );
@@ -243,7 +206,7 @@ class _CoverStepper extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Gang chip row — select active Gang
+// Gang chip row
 // ---------------------------------------------------------------------------
 
 class _GangChipRow extends StatelessWidget {
@@ -262,8 +225,9 @@ class _GangChipRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final lastSlot = slots.isEmpty ? 0 : slots.last;
     return Container(
+      color: GcColors.surfaceContainer,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppTokens.space12,
+        horizontal: AppTokens.space8,
         vertical: AppTokens.space8,
       ),
       child: Row(
@@ -276,7 +240,7 @@ class _GangChipRow extends StatelessWidget {
                 onTap: () => onSelect(g),
               ),
             ),
-            if (g != lastSlot) const SizedBox(width: AppTokens.space8),
+            if (g != lastSlot) const SizedBox(width: 4),
           ],
         ],
       ),
@@ -298,23 +262,20 @@ class _GangChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected
-          ? AppColors.primaryContainer
-          : AppColors.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      color: selected ? GcColors.primary : GcColors.surfaceContainerLowest,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
         child: SizedBox(
-          height: AppTokens.touchSmall,
+          height: 38,
           child: Center(
             child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: selected ? Colors.white : AppColors.textPrimary,
+              label.toUpperCase(),
+              style: GcText.button.copyWith(
+                fontSize: 12,
+                color: selected ? GcColors.onPrimary : GcColors.onSurface,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
@@ -324,7 +285,7 @@ class _GangChip extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Gang-grouped item list
+// Gang-grouped list
 // ---------------------------------------------------------------------------
 
 class _GangGroupedList extends ConsumerWidget {
@@ -347,9 +308,8 @@ class _GangGroupedList extends ConsumerWidget {
     }
     final held = ref.watch(heldGangsProvider);
 
-    // Render every slot even when empty so the operator sees the structure.
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: AppTokens.space8),
+      padding: EdgeInsets.zero,
       children: [
         for (final g in slots)
           _GangSection(
@@ -369,7 +329,6 @@ class _GangGroupedList extends ConsumerWidget {
     final label = _resolveGangLabel(ctx, settings, gang);
     try {
       await ref.read(currentTicketProvider.notifier).fireGang(gang);
-      // Clear the "held" mark when fired — the gang is now on its way.
       final held = ref.read(heldGangsProvider);
       if (held.contains(gang)) {
         ref.read(heldGangsProvider.notifier).state = {...held}..remove(gang);
@@ -384,7 +343,7 @@ class _GangGroupedList extends ConsumerWidget {
       messenger.showSnackBar(
         SnackBar(
           content: Text('$label gönderilemedi: $e'),
-          backgroundColor: AppColors.red,
+          backgroundColor: GcColors.error,
         ),
       );
     }
@@ -414,9 +373,6 @@ class _GangGroupedList extends ConsumerWidget {
   }
 }
 
-/// Flat (no-Gang) item list for bistro / fast-food concepts — no
-/// section headers, no Fire/Hold controls. Kept visually consistent
-/// with `_GangSection` rows so operators see the same item chrome.
 class _FlatItemList extends StatelessWidget {
   const _FlatItemList({required this.ticket});
   final TicketEntity ticket;
@@ -424,19 +380,9 @@ class _FlatItemList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: AppTokens.space8),
+      padding: EdgeInsets.zero,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.space12,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final item in ticket.items) _OrderItemRow(item: item),
-            ],
-          ),
-        ),
+        for (final item in ticket.items) _OrderItemRow(item: item),
       ],
     );
   }
@@ -463,79 +409,68 @@ class _GangSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final allSent = items.isNotEmpty && items.every((i) => i.sentToKitchen);
     final hasUnsent = items.any((i) => !i.sentToKitchen);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppTokens.space12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(
-              top: AppTokens.space8,
-              bottom: AppTokens.space4,
-            ),
-            child: Row(
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textSecondary,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-                if (allSent) ...[
-                  const SizedBox(width: AppTokens.space8),
-                  const _StatusBadge(
-                    label: 'Gönderildi',
-                    color: AppColors.green,
-                  ),
-                ],
-                if (isHeld) ...[
-                  const SizedBox(width: AppTokens.space8),
-                  const _StatusBadge(
-                    label: 'Beklemede',
-                    color: AppColors.orange,
-                  ),
-                ],
-                const Spacer(),
-                if (items.isNotEmpty) ...[
-                  _SmallButton(
-                    label: isHeld ? 'Devam' : 'Bekle',
-                    onTap: onHold,
-                    tone: _SmallButtonTone.neutral,
-                  ),
-                  const SizedBox(width: AppTokens.space4),
-                  if (hasUnsent)
-                    _SmallButton(
-                      label: 'Gönder',
-                      onTap: onFire,
-                      tone: _SmallButtonTone.primary,
-                    ),
-                ],
-              ],
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          color: GcColors.surfaceContainerLow,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.space12,
+            vertical: AppTokens.space8,
           ),
-          if (items.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Text(
-                '—',
-                style: TextStyle(
-                  color: AppColors.textDim.withValues(alpha: 0.6),
-                ),
+          child: Row(
+            children: [
+              Text(
+                label.toUpperCase(),
+                style: GcText.labelTiny.copyWith(color: GcColors.onSurface),
               ),
-            )
-          else
-            for (final item in items) _OrderItemRow(item: item),
-          const Divider(
-            height: AppTokens.space16,
-            color: AppColors.border,
-            indent: 0,
-            endIndent: 0,
+              if (allSent) ...[
+                const SizedBox(width: AppTokens.space8),
+                const _StatusBadge(
+                  label: 'GÖNDERİLDİ',
+                  color: GcColors.catGreen,
+                ),
+              ],
+              if (isHeld) ...[
+                const SizedBox(width: AppTokens.space8),
+                const _StatusBadge(
+                  label: 'BEKLEMEDE',
+                  color: GcColors.catOrange,
+                ),
+              ],
+              const Spacer(),
+              if (items.isNotEmpty) ...[
+                _SmallButton(
+                  label: isHeld ? 'DEVAM' : 'BEKLE',
+                  onTap: onHold,
+                  tone: _SmallButtonTone.neutral,
+                ),
+                const SizedBox(width: 4),
+                if (hasUnsent)
+                  _SmallButton(
+                    label: 'GÖNDER',
+                    onTap: onFire,
+                    tone: _SmallButtonTone.primary,
+                  ),
+              ],
+            ],
           ),
-        ],
-      ),
+        ),
+        if (items.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.space12,
+              vertical: 8,
+            ),
+            child: Text(
+              '—',
+              style: GcText.bodySmall
+                  .copyWith(color: GcColors.outlineVariant),
+            ),
+          )
+        else
+          for (final item in items) _OrderItemRow(item: item),
+      ],
     );
   }
 }
@@ -548,72 +483,114 @@ class _OrderItemRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ticket = ref.watch(currentTicketProvider);
     final seatCount = ticket?.guestCount ?? 1;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 28,
-            child: Text(
-              '${item.quantity.toStringAsFixed(0)}×',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+    final selectedId = ref.watch(selectedTicketItemProvider);
+    final isSelected = selectedId == item.id;
+    final isVoid = item.status == OrderItemStatus.voidStatus;
+
+    final fg = isVoid ? GcColors.error : GcColors.onSurface;
+    final qtyFg =
+        isSelected && !isVoid ? GcColors.primary : fg;
+
+    return Material(
+      color: _rowFill(isSelected, isVoid),
+      child: InkWell(
+        onTap: () {
+          ref.read(selectedTicketItemProvider.notifier).state =
+              isSelected ? null : item.id;
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color:
+                    isSelected ? GcColors.primary : Colors.transparent,
+                width: 4,
               ),
             ),
           ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.productName,
-                  style: const TextStyle(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTokens.space12,
+            vertical: 8,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 28,
+                child: Text(
+                  '${item.quantity.toStringAsFixed(0)}×',
+                  style: GcText.price.copyWith(
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: qtyFg,
+                    decoration:
+                        isVoid ? TextDecoration.lineThrough : null,
                   ),
                 ),
-                if (item.modifiers.isNotEmpty)
-                  Text(
-                    item.modifiers.map((m) => m.modifierName).join(', '),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
+              ),
+              Expanded(
+                child: Opacity(
+                  opacity: isVoid ? 0.6 : 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.productName,
+                        style: GcText.body.copyWith(
+                          color: fg,
+                          decoration: isVoid
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      if (isVoid)
+                        Text(
+                          'VOID — MUTFAK',
+                          style: GcText.labelTiny
+                              .copyWith(color: GcColors.error),
+                        ),
+                      if (item.modifiers.isNotEmpty)
+                        Text(
+                          item.modifiers
+                              .map((m) => '+ ${m.modifierName}')
+                              .join('  '),
+                          style: GcText.bodySmall,
+                        ),
+                      if (item.notes != null && item.notes!.isNotEmpty)
+                        Text(
+                          '"${item.notes}"',
+                          style: GcText.bodySmall.copyWith(
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                    ],
                   ),
-                if (item.notes != null && item.notes!.isNotEmpty)
-                  Text(
-                    '“${item.notes}”',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-              ],
-            ),
+                ),
+              ),
+              const SizedBox(width: AppTokens.space8),
+              _SeatChip(
+                seatNumber: item.seatNumber,
+                seatCount: seatCount,
+                onTap: () => _pickSeat(context, ref, item, seatCount),
+              ),
+              const SizedBox(width: AppTokens.space8),
+              Text(
+                _formatCHF(item.subtotal),
+                style: GcText.price.copyWith(
+                  color: fg,
+                  decoration: isVoid ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: AppTokens.space8),
-          _SeatChip(
-            seatNumber: item.seatNumber,
-            seatCount: seatCount,
-            onTap: () => _pickSeat(context, ref, item, seatCount),
-          ),
-          const SizedBox(width: AppTokens.space8),
-          Text(
-            _formatCHF(item.subtotal),
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
+        ),
       ),
     );
+  }
+
+  Color _rowFill(bool selected, bool isVoid) {
+    if (isVoid) return GcColors.surfaceContainerLowest;
+    if (selected) return GcColors.surfaceContainerHighest;
+    return GcColors.surfaceContainerLowest;
   }
 
   Future<void> _pickSeat(
@@ -624,7 +601,7 @@ class _OrderItemRow extends ConsumerWidget {
   ) async {
     final picked = await showModalBottomSheet<int?>(
       context: context,
-      backgroundColor: AppColors.surfaceContainer,
+      backgroundColor: GcColors.surfaceContainerLowest,
       builder: (sheetCtx) => _SeatPickerSheet(
         current: item.seatNumber,
         seatCount: seatCount,
@@ -643,7 +620,6 @@ class _OrderItemRow extends ConsumerWidget {
   }
 }
 
-/// Compact badge showing the seat number, or "—" when unassigned.
 class _SeatChip extends StatelessWidget {
   const _SeatChip({
     required this.seatNumber,
@@ -659,23 +635,17 @@ class _SeatChip extends StatelessWidget {
     final label = seatNumber == null ? '—' : '#$seatNumber';
     final assigned = seatNumber != null;
     return Material(
-      color: assigned
-          ? AppColors.primaryContainer.withValues(alpha: 0.22)
-          : AppColors.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(6),
+      color: assigned ? GcColors.primary : GcColors.surfaceContainerHigh,
       child: InkWell(
         onTap: seatCount <= 0 ? null : onTap,
-        borderRadius: BorderRadius.circular(6),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           child: Text(
             label,
             key: ValueKey('seat_chip_${seatNumber ?? 'none'}'),
-            style: TextStyle(
+            style: GcText.button.copyWith(
               fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: assigned ? AppColors.primary : AppColors.textDim,
-              letterSpacing: 0.3,
+              color: assigned ? GcColors.onPrimary : GcColors.onSurfaceVariant,
             ),
           ),
         ),
@@ -684,7 +654,6 @@ class _SeatChip extends StatelessWidget {
   }
 }
 
-/// Bottom-sheet picker for seat assignment (1..seatCount + "Kaldır").
 class _SeatPickerSheet extends StatelessWidget {
   const _SeatPickerSheet({required this.current, required this.seatCount});
   final int? current;
@@ -694,26 +663,14 @@ class _SeatPickerSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppTokens.space16,
-          AppTokens.space16,
-          AppTokens.space16,
-          AppTokens.space16,
-        ),
+        padding: const EdgeInsets.all(AppTokens.space16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Padding(
               padding: EdgeInsets.only(bottom: AppTokens.space12),
-              child: Text(
-                'Koltuk seç',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+              child: Text('KOLTUK SEÇ', style: GcText.headline),
             ),
             Wrap(
               spacing: AppTokens.space8,
@@ -731,7 +688,6 @@ class _SeatPickerSheet extends StatelessWidget {
                   label: 'Kaldır',
                   selected: current == null,
                   value: null,
-                  isClear: true,
                 ),
               ],
             ),
@@ -746,28 +702,19 @@ class _SeatPickerSheet extends StatelessWidget {
     required String label,
     required bool selected,
     required int? value,
-    bool isClear = false,
   }) {
     return SizedBox(
       width: 72,
       height: 48,
       child: Material(
-        color: selected
-            ? AppColors.primaryContainer
-            : (isClear
-                ? AppColors.surfaceContainerHigh
-                : AppColors.surfaceContainerHigh),
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+        color: selected ? GcColors.primary : GcColors.surfaceContainerHigh,
         child: InkWell(
           onTap: () => Navigator.of(context).pop(value),
-          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
           child: Center(
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: selected ? Colors.white : AppColors.textPrimary,
+              style: GcText.button.copyWith(
+                color: selected ? GcColors.onPrimary : GcColors.onSurface,
               ),
             ),
           ),
@@ -778,7 +725,7 @@ class _SeatPickerSheet extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Totals footer (subtotal, service charge placeholder, total)
+// Totals footer — Balance Due in Work Sans Black
 // ---------------------------------------------------------------------------
 
 class _TotalsFooter extends StatelessWidget {
@@ -793,55 +740,43 @@ class _TotalsFooter extends StatelessWidget {
     final tax = ticket?.taxAmount ?? 0;
 
     return Container(
+      color: GcColors.surfaceContainerHigh,
       padding: AppInsets.h16v12,
-      color: AppColors.surfaceContainer,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _row('Ara toplam', subtotal, bold: false),
-          if (serviceFee > 0) _row('Servis', serviceFee, bold: false),
-          if (tax > 0)
-            _row('MWST (dahil)', tax,
-                bold: false, dim: true, suffix: 'bilgi'),
+          _row('Ara toplam', subtotal),
+          if (serviceFee > 0) _row('Servis', serviceFee),
+          if (tax > 0) _row('MWST (dahil)', tax, dim: true),
           const SizedBox(height: AppTokens.space8),
-          _row('Toplam', total, bold: true, large: true),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('ÖDENECEK', style: GcText.labelTiny),
+              const Spacer(),
+              Text(
+                _formatCHF(total),
+                style: GcText.displayBlack,
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _row(
-    String label,
-    int cents, {
-    bool bold = false,
-    bool dim = false,
-    bool large = false,
-    String? suffix,
-  }) {
-    final textStyle = TextStyle(
-      fontSize: large ? 17 : 13,
-      fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-      color: dim
-          ? AppColors.textDim
-          : (bold ? AppColors.textPrimary : AppColors.textSecondary),
+  Widget _row(String label, int cents, {bool dim = false}) {
+    final style = GcText.bodySmall.copyWith(
+      color: dim ? GcColors.outline : GcColors.onSurfaceVariant,
     );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Text(label, style: textStyle),
-          if (suffix != null) ...[
-            const SizedBox(width: 4),
-            Text(
-              '· $suffix',
-              style: textStyle.copyWith(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+          Text(label, style: style),
           const Spacer(),
-          Text(_formatCHF(cents), style: textStyle),
+          Text(_formatCHF(cents), style: style),
         ],
       ),
     );
@@ -874,30 +809,20 @@ class _SmallButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = tone == _SmallButtonTone.primary
-        ? AppColors.primaryContainer
-        : AppColors.surfaceContainerHigh;
+        ? GcColors.primary
+        : GcColors.surfaceContainerLowest;
     final fg = tone == _SmallButtonTone.primary
-        ? Colors.white
-        : AppColors.textPrimary;
+        ? GcColors.onPrimary
+        : GcColors.onSurface;
     return Material(
       color: bg,
-      borderRadius: BorderRadius.circular(AppTokens.radiusXs),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTokens.radiusXs),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 6,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Text(
             label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: fg,
-              letterSpacing: 0.4,
-            ),
+            style: GcText.button.copyWith(fontSize: 11, color: fg),
           ),
         ),
       ),
@@ -914,17 +839,12 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(4),
-      ),
+      color: color,
       child: Text(
         label,
-        style: TextStyle(
+        style: GcText.button.copyWith(
           fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: color,
-          letterSpacing: 0.3,
+          color: GcColors.onPrimary,
         ),
       ),
     );
@@ -943,11 +863,11 @@ class _EmptyTicketState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.receipt_long_rounded,
-                size: 48, color: AppColors.textDim),
+                size: 48, color: GcColors.outlineVariant),
             SizedBox(height: AppTokens.space8),
             Text(
               'Masa seçin veya ürün ekleyin',
-              style: TextStyle(color: AppColors.textSecondary),
+              style: GcText.bodySmall,
               textAlign: TextAlign.center,
             ),
           ],

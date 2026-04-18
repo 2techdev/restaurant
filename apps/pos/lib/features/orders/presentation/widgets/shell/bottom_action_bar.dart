@@ -1,7 +1,15 @@
-/// Bottom action bar for the fine-dining shell.
+/// Bottom action bar — Kinetic semantic payment row.
 ///
-/// Mirrors SambaPOS' bottom strip: back (close ticket), new order, send to
-/// kitchen (fires the active Gang), running total, and a prominent Pay CTA.
+/// SambaPOS-style settle / cash / card / split / close cluster with
+/// semantic colours from the warm palette:
+///   * Cash    → green (catGreen)
+///   * Card    → yellow (catYellow, dark text)
+///   * Ticket  → orange-tint yellow (catYellow lighter)
+///   * Settle  → teal (catTeal)
+///   * Split   → cyan (catCyan)
+///   * Close   → red (error)
+/// The running total sits in the centre in Work Sans black; the Pay CTA
+/// keeps the primary gradient treatment from the Kinetic brief.
 library;
 
 import 'package:flutter/material.dart';
@@ -9,8 +17,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/router/app_router.dart';
-import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
+import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 
 class BottomActionBar extends ConsumerWidget {
@@ -23,19 +31,16 @@ class BottomActionBar extends ConsumerWidget {
     final total = ticket?.total ?? 0;
 
     return Container(
-      height: AppTokens.bottomBarHeight,
-      padding: AppInsets.h12v8,
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceContainer,
-        border: Border(
-          top: BorderSide(color: AppColors.border, width: 1),
-        ),
-      ),
+      height: AppTokens.bottomBarHeight + 8,
+      color: GcColors.surfaceContainerHigh,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
         children: [
-          _SecondaryButton(
-            icon: Icons.arrow_back_rounded,
-            label: 'Geri',
+          _ActionButton(
+            label: 'KAPAT',
+            icon: Icons.close_rounded,
+            fill: GcColors.error,
+            fg: GcColors.onPrimary,
             onTap: () {
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
@@ -44,23 +49,59 @@ class BottomActionBar extends ConsumerWidget {
               }
             },
           ),
-          const SizedBox(width: AppTokens.space8),
-          _SecondaryButton(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Yeni',
+          const SizedBox(width: 6),
+          _ActionButton(
+            label: 'YENİ',
+            icon: Icons.add_rounded,
+            fill: GcColors.surfaceContainerLowest,
+            fg: GcColors.onSurface,
             onTap: () => _createNew(context, ref),
           ),
-          const SizedBox(width: AppTokens.space8),
-          _SecondaryButton(
+          const SizedBox(width: 6),
+          _ActionButton(
+            label: 'GÖNDER',
             icon: Icons.send_rounded,
-            label: 'Gönder',
-            onTap: hasItems ? () => _sendToKitchen(context, ref) : null,
-          ),
-          const Spacer(),
-          _TotalDisplay(totalCents: total),
-          const SizedBox(width: AppTokens.space12),
-          _PayCta(
+            fill: GcColors.primaryContainer,
+            fg: GcColors.onPrimary,
             enabled: hasItems,
+            onTap: () => _sendToKitchen(context, ref),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: _TotalDisplay(totalCents: total)),
+          const SizedBox(width: 12),
+          _ActionButton(
+            label: 'BÖL',
+            icon: Icons.call_split_rounded,
+            fill: GcColors.catCyan,
+            fg: GcColors.onPrimary,
+            enabled: hasItems,
+            onTap: () {
+              if (ticket != null) {
+                context.push(AppRoutes.splitBillFor(ticket.id));
+              }
+            },
+          ),
+          const SizedBox(width: 6),
+          _ActionButton(
+            label: 'KART',
+            icon: Icons.credit_card_rounded,
+            fill: GcColors.catYellow,
+            fg: GcColors.onSurface,
+            enabled: hasItems,
+            onTap: () {
+              if (ticket != null) {
+                context.push(AppRoutes.paymentFor(ticket.id));
+              }
+            },
+          ),
+          const SizedBox(width: 6),
+          _ActionButton(
+            label: 'NAKİT',
+            icon: Icons.payments_rounded,
+            fill: GcColors.catGreen,
+            fg: GcColors.onPrimary,
+            enabled: hasItems,
+            gradient: kCashGradient,
             onTap: () {
               if (ticket != null) {
                 context.push(AppRoutes.paymentFor(ticket.id));
@@ -73,7 +114,6 @@ class BottomActionBar extends ConsumerWidget {
   }
 
   void _createNew(BuildContext ctx, WidgetRef ref) {
-    // New order from scratch — waiter context resolved by provider.
     ref.read(currentTicketProvider.notifier).createNewTicket(
           deviceId: 'DEV-POS-01',
         );
@@ -86,47 +126,56 @@ class BottomActionBar extends ConsumerWidget {
         duration: Duration(seconds: 2),
       ),
     );
-    // TODO(sprint 2): wire to CurrentTicketNotifier.sendToKitchen.
   }
 }
 
-class _SecondaryButton extends StatelessWidget {
-  const _SecondaryButton({
-    required this.icon,
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
     required this.label,
+    required this.icon,
+    required this.fill,
+    required this.fg,
     required this.onTap,
+    this.enabled = true,
+    this.gradient,
   });
 
-  final IconData icon;
   final String label;
-  final VoidCallback? onTap;
+  final IconData icon;
+  final Color fill;
+  final Color fg;
+  final VoidCallback onTap;
+  final bool enabled;
+  final Gradient? gradient;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    final fg = enabled ? AppColors.textPrimary : AppColors.textDim;
+    final effectiveFg = enabled ? fg : GcColors.outlineVariant;
     return Material(
-      color: AppColors.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      color: enabled ? fill : GcColors.surfaceContainerHighest,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.space12,
-            vertical: AppTokens.space8,
+        onTap: enabled ? onTap : null,
+        child: Container(
+          height: AppTokens.touchLarge,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            gradient: enabled ? gradient : null,
+            border: enabled
+                ? const Border(
+                    top: BorderSide(color: kInsetHighlight, width: 2),
+                  )
+                : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 18, color: fg),
+              Icon(icon, size: 18, color: effectiveFg),
               const SizedBox(width: 6),
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: fg,
+                style: GcText.button.copyWith(
+                  fontSize: 12,
+                  color: effectiveFg,
                 ),
               ),
             ],
@@ -146,60 +195,15 @@ class _TotalDisplay extends StatelessWidget {
     final whole = totalCents ~/ 100;
     final frac = (totalCents % 100).toString().padLeft(2, '0');
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text(
-          'TOPLAM',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textDim,
-            letterSpacing: 1.2,
-          ),
-        ),
+        Text('TOPLAM', style: GcText.labelTiny),
         Text(
           'CHF $whole.$frac',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
+          style: GcText.displayBlack.copyWith(fontSize: 22),
         ),
       ],
-    );
-  }
-}
-
-class _PayCta extends StatelessWidget {
-  const _PayCta({required this.enabled, required this.onTap});
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: AppTokens.touchLarge,
-      child: ElevatedButton.icon(
-        onPressed: enabled ? onTap : null,
-        icon: const Icon(Icons.payments_rounded, size: 20),
-        label: const Text(
-          'ÖDEME',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.0,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryContainer,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-          ),
-        ),
-      ),
     );
   }
 }

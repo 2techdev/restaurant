@@ -1,8 +1,9 @@
-/// Right-column action rail — global commands on the ticket.
+/// Right-column action rail — Kinetic semantic buttons.
 ///
-/// SambaPOS-like vertical stack of icon+label buttons: Discount, Split, Note,
-/// Void, Pay. Each button is a large touch target (48dp minimum) — avoids
-/// mis-taps during service.
+/// SambaPOS-style vertical stack: Search / Note / Discount / Split / Void
+/// with a Pay primary CTA pinned to the bottom. Each button carries the
+/// semantic colour from the Kinetic Grid palette — Void is error-red,
+/// Split is cyan, Pay is the primary gradient CTA.
 library;
 
 import 'package:flutter/material.dart';
@@ -10,8 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/router/app_router.dart';
-import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
+import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 
@@ -25,33 +26,35 @@ class ActionRail extends ConsumerWidget {
 
     return Container(
       width: AppTokens.actionRailWidth,
-      color: AppColors.surfaceContainerLow,
-      padding: const EdgeInsets.symmetric(vertical: AppTokens.space12),
+      color: GcColors.surfaceContainerHigh,
+      padding: const EdgeInsets.symmetric(
+        vertical: AppTokens.space8,
+        horizontal: 4,
+      ),
       child: Column(
         children: [
           _RailButton(
             icon: Icons.search_rounded,
-            label: 'Ara',
-            onTap: () {
-              // Search is handled in the CategoryStrip's search slot in v1.
-            },
+            label: 'ARA',
+            onTap: () {},
           ),
           _RailButton(
             icon: Icons.note_alt_outlined,
-            label: 'Not',
+            label: 'NOT',
             enabled: hasTicket,
             onTap: () => _showComingSoon(context, 'Not ekleme'),
           ),
           _RailButton(
             icon: Icons.percent_rounded,
-            label: 'İndirim',
+            label: 'İNDİRİM',
             enabled: hasTicket,
             onTap: () => _showComingSoon(context, 'İndirim'),
           ),
           _RailButton(
             icon: Icons.call_split_rounded,
-            label: 'Böl',
+            label: 'BÖL',
             enabled: hasTicket,
+            accent: GcColors.catCyan,
             onTap: () {
               if (ticket != null) {
                 context.push(AppRoutes.splitBillFor(ticket.id));
@@ -59,20 +62,17 @@ class ActionRail extends ConsumerWidget {
             },
           ),
           _RailButton(
-            icon: Icons.warning_amber_rounded,
-            label: 'İptal',
+            icon: Icons.remove_circle_outline_rounded,
+            label: 'İPTAL',
             enabled: hasTicket,
-            tone: _Tone.danger,
+            accent: GcColors.error,
             onTap: () => _showComingSoon(context, 'Kalem iptali'),
           ),
           const Spacer(),
-          _RailButton(
-            icon: Icons.payments_rounded,
-            label: 'Öde',
+          _PayRailButton(
             enabled: hasTicket &&
                 ticket.status != TicketStatus.completed &&
                 ticket.status != TicketStatus.voided,
-            tone: _Tone.primary,
             onTap: () {
               if (ticket != null) {
                 context.push(AppRoutes.paymentFor(ticket.id));
@@ -87,14 +87,12 @@ class ActionRail extends ConsumerWidget {
   void _showComingSoon(BuildContext context, String label) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$label — ileriki sprint\'te (placeholder).'),
+        content: Text('$label — ileriki sprint\'te.'),
         duration: const Duration(seconds: 2),
       ),
     );
   }
 }
-
-enum _Tone { normal, primary, danger }
 
 class _RailButton extends StatelessWidget {
   const _RailButton({
@@ -102,57 +100,86 @@ class _RailButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.enabled = true,
-    this.tone = _Tone.normal,
+    this.accent,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool enabled;
-  final _Tone tone;
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) {
     final fg = !enabled
-        ? AppColors.textDim
-        : switch (tone) {
-            _Tone.primary => Colors.white,
-            _Tone.danger => AppColors.red,
-            _Tone.normal => AppColors.textPrimary,
-          };
-    final bg = tone == _Tone.primary
-        ? AppColors.primaryContainer
-        : Colors.transparent;
-
+        ? GcColors.outlineVariant
+        : (accent ?? GcColors.onSurface);
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 6,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
-        color: bg,
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+        color: GcColors.surfaceContainerLowest,
         child: InkWell(
           onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(AppTokens.radiusSm),
           child: SizedBox(
             height: 64,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(icon, size: 22, color: fg),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   label,
-                  style: TextStyle(
+                  style: GcText.button.copyWith(
                     fontSize: 10,
-                    fontWeight: FontWeight.w700,
                     color: fg,
-                    letterSpacing: 0.3,
                   ),
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PayRailButton extends StatelessWidget {
+  const _PayRailButton({required this.enabled, required this.onTap});
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        child: Container(
+          height: 72,
+          decoration: BoxDecoration(
+            gradient: enabled ? kPrimaryGradient : null,
+            color: enabled ? null : GcColors.surfaceContainerHighest,
+            border: const Border(
+              top: BorderSide(color: kInsetHighlight, width: 2),
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.payments_rounded,
+                size: 26,
+                color: enabled ? GcColors.onPrimary : GcColors.outlineVariant,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'ÖDE',
+                style: GcText.button.copyWith(
+                  fontSize: 11,
+                  color: enabled ? GcColors.onPrimary : GcColors.outlineVariant,
+                ),
+              ),
+            ],
           ),
         ),
       ),
