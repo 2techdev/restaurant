@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/kds_app/presentation/providers/kds_providers.dart';
 import 'package:gastrocore_pos/features/kds_app/router/kds_router.dart';
@@ -61,7 +62,7 @@ class _KdsSettingsScreenState extends ConsumerState<KdsSettingsScreen> {
       _soundAlerts = prefs.getBool('kds_sound_alerts') ?? true;
       _immersive = prefs.getBool('kds_immersive') ?? true;
       _syncUrlCtrl.text =
-          prefs.getString('sync_server_url') ?? 'http://localhost:8080';
+          prefs.getString('sync_server_url') ?? AppEndpoints.apiBaseUrl;
       _pinCtrl.text = prefs.getString('kds_station_pin') ?? '1234';
     });
   }

@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
@@ -157,7 +158,7 @@ class _QRBillScreenState extends ConsumerState<QRBillScreen> {
 
       final response = await http
           .post(
-            Uri.parse('http://localhost:8080/api/invoices/qrbill'),
+            Uri.parse('${AppEndpoints.apiBaseUrl}/api/invoices/qrbill'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(body),
           )

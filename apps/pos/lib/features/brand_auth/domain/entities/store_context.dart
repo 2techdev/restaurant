@@ -32,7 +32,8 @@ class StoreContext extends Equatable {
   final String brandName;
   final BrandUserRole userRole;
 
-  /// Whether the app is running in online mode (connected to pos.2tech.ch).
+  /// Whether the app is running in online mode (connected to the GastroCore
+  /// backend; default host `api.2hub.ch`, see `AppEndpoints`).
   final bool isOnlineMode;
 
   final DateTime? lastSyncAt;

@@ -1,11 +1,12 @@
 /// HTTP client for brand-level email/password authentication against
-/// the GastroCore backend at pos.2tech.ch.
+/// the GastroCore backend at api.2hub.ch.
 library;
 
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/features/brand_auth/domain/entities/auth_result.dart';
 import 'package:gastrocore_pos/features/brand_auth/domain/entities/register_request.dart';
 import 'package:gastrocore_pos/features/brand_auth/domain/entities/store_context.dart';
@@ -21,11 +22,12 @@ class AuthException implements Exception {
 
 /// Communicates with the GastroCore REST API for brand authentication.
 ///
-/// Base URL defaults to `https://pos.2tech.ch`. All methods throw
+/// Base URL defaults to [AppEndpoints.apiBaseUrl] (Hetzner pilot unless
+/// overridden via `--dart-define=API_HOST=…`). All methods throw
 /// [AuthException] on non-2xx responses or network errors.
 class BrandAuthService {
   BrandAuthService({String? baseUrl}) {
-    final raw = baseUrl ?? 'https://pos.2tech.ch';
+    final raw = baseUrl ?? AppEndpoints.apiBaseUrl;
     _base = raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
   }
 

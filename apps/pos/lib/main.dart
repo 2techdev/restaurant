@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:gastrocore_pos/app.dart';
+import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/core/data/app_initializer.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
@@ -72,9 +73,11 @@ Future<void> _bootstrap() async {
     await prefs.setString('device_id', deviceId);
   }
 
-  // Load the saved sync server URL (falls back to localhost default).
+  // Load the saved sync server URLs (fall back to the Hetzner pilot defaults
+  // surfaced by AppEndpoints — override via Settings or `--dart-define`).
   final syncUrl =
-      prefs.getString('sync_server_url') ?? 'http://localhost:8080';
+      prefs.getString('sync_server_url') ?? AppEndpoints.apiBaseUrl;
+  final wsUrl = prefs.getString('ws_server_url') ?? AppEndpoints.wsBaseUrl;
 
   // Build the ProviderScope so we can restore brand auth before the first frame.
   final container = ProviderContainer(
@@ -83,6 +86,7 @@ Future<void> _bootstrap() async {
       tenantIdProvider.overrideWithValue(tenantId),
       deviceIdProvider.overrideWith((ref) => deviceId),
       syncServerUrlProvider.overrideWith((ref) => syncUrl),
+      wsServerUrlProvider.overrideWith((ref) => wsUrl),
     ],
   );
 

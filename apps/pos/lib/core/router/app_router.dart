@@ -403,7 +403,7 @@ class _ForgotPasswordScreen extends StatelessWidget {
               ),
               SizedBox(height: 12),
               Text(
-                'Bitte besuchen Sie pos.2tech.ch/reset-password '
+                'Bitte besuchen Sie backoffice.gastrocore.ch/reset-password '
                 'in Ihrem Browser, um Ihr Passwort zurückzusetzen.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
