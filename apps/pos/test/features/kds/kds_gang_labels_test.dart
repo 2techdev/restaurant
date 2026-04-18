@@ -19,19 +19,25 @@ AppDatabase _openInMemory() => AppDatabase(NativeDatabase.memory());
 
 void main() {
   group('GangRepository.seedDefaultGangs — fixed "Gang N" labels', () {
-    test('fresh seed creates gangs named exactly "Gang 1/2/3"', () async {
+    test('fresh seed creates gangs named exactly "Gang 1..5"', () async {
       final db = _openInMemory();
       addTearDown(db.close);
       final repo = GangRepository(db);
 
       await repo.seedDefaultGangs(_tenantId);
 
-      final rows = await repo.getGangTemplates(_tenantId);
-      expect(rows.length, 3);
+      // Query raw Drift rows for the `name` column — the domain entity
+      // no longer exposes it (labels come from RestaurantSettings).
+      final rows = await db.select(db.gangTemplates).get();
+      expect(rows.length, 5);
       final byOrder = {for (final g in rows) g.sortOrder: g};
-      expect(byOrder[1]!.name, 'Gang 1');
-      expect(byOrder[2]!.name, 'Gang 2');
-      expect(byOrder[3]!.name, 'Gang 3');
+      for (var i = 1; i <= 5; i++) {
+        expect(byOrder[i]!.name, 'Gang $i');
+      }
+      // Entity-level fallback label should mirror sortOrder.
+      final entities = await repo.getGangTemplates(_tenantId);
+      expect(entities.map((g) => g.fallbackLabel).toSet(),
+          {'Gang 1', 'Gang 2', 'Gang 3', 'Gang 4', 'Gang 5'});
     });
 
     test('re-seed on legacy install rewrites Vorspeise/Hauptgang/Dessert', () async {
@@ -64,7 +70,7 @@ void main() {
 
       await repo.seedDefaultGangs(_tenantId);
 
-      final rows = await repo.getGangTemplates(_tenantId);
+      final rows = await db.select(db.gangTemplates).get();
       final names = rows.map((g) => g.name).toSet();
       expect(names, {'Gang 1', 'Gang 2', 'Gang 3'});
     });
@@ -93,7 +99,7 @@ void main() {
 
       await repo.seedDefaultGangs(_tenantId);
 
-      final rows = await repo.getGangTemplates(_tenantId);
+      final rows = await db.select(db.gangTemplates).get();
       expect(rows.any((g) => g.name == 'Custom Apéro'), isTrue);
     });
   });

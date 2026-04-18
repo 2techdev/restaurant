@@ -239,19 +239,6 @@ class OrderRepositoryImpl {
     );
   }
 
-  /// Persist a new guest (cover) count on a ticket.
-  ///
-  /// Clamped to `>= 1` at the caller; this method only writes. The waiter
-  /// uses this when seat count is corrected mid-service.
-  Future<void> updateTicketGuestCount(String id, int guestCount) async {
-    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
-      TicketsCompanion(
-        guestCount: Value(guestCount),
-        updatedAt: Value(DateTime.now()),
-      ),
-    );
-  }
-
   // =========================================================================
   // Order items
   // =========================================================================

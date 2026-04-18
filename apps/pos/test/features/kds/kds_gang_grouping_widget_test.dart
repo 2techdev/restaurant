@@ -57,7 +57,6 @@ GangTemplateEntity _gang(int sortOrder) {
   return GangTemplateEntity(
     id: 'gang-$sortOrder',
     tenantId: _tenantId,
-    name: 'Gang $sortOrder',
     sortOrder: sortOrder,
     color: '#90ABFF',
     isDefault: true,
