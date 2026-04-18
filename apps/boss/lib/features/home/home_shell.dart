@@ -7,6 +7,8 @@ import 'package:gastrocore_ui/gastrocore_ui.dart';
 
 import '../auth/auth_controller.dart';
 import '../auth/auth_state.dart';
+import '../notifications/notifications_controller.dart';
+import '../notifications/notifications_sheet.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -29,6 +31,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
     final ownerName = auth is AuthAuthenticated ? auth.session.user.name : '';
+    final unread = ref.watch(unreadCountProvider);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
@@ -49,6 +52,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ],
         ),
         actions: [
+          _NotificationBell(unread: unread),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Çıkış',
@@ -81,6 +85,51 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _NotificationBell extends StatelessWidget {
+  final int unread;
+  const _NotificationBell({required this.unread});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        IconButton(
+          key: const Key('boss-notif-bell'),
+          icon: const Icon(Icons.notifications_none),
+          tooltip: 'Bildirimler',
+          onPressed: () => showNotificationsSheet(context),
+        ),
+        if (unread > 0)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 5,
+                vertical: 1,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.red,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              constraints: const BoxConstraints(minWidth: 16),
+              child: Text(
+                unread > 9 ? '9+' : '$unread',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
