@@ -16,6 +16,10 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
+import 'package:gastrocore_pos/features/tables/domain/entities/table_entity.dart';
+import 'package:gastrocore_pos/features/waiter/domain/entities/service_call_entity.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/providers/waiter_provider.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/screens/waiter_menu_screen.dart';
 import 'package:gastrocore_pos/features/waiter/router/waiter_router.dart';
@@ -105,13 +109,27 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              tableName,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    tableName,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (ticket != null) ...[
+                  const SizedBox(width: 8),
+                  _GuestCountChip(
+                    guestCount: ticket.guestCount,
+                    onTap: () => _editGuestCount(ticket),
+                  ),
+                ],
+              ],
             ),
             if (ticket != null)
               Text(
@@ -127,8 +145,34 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
           // Quick order status badge
           if (ticket != null)
             Padding(
-              padding: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.only(right: 4),
               child: _StatusChip(status: ticket.status),
+            ),
+          IconButton(
+            tooltip: 'Call for service',
+            icon: const Icon(Icons.notifications_active_outlined,
+                color: AppColors.textPrimary),
+            onPressed: _openServiceCallSheet,
+          ),
+          if (ticket != null)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
+              onSelected: (key) {
+                if (key == 'transfer') _openTransferSheet(ticket);
+              },
+              itemBuilder: (ctx) => const [
+                PopupMenuItem<String>(
+                  value: 'transfer',
+                  child: Row(
+                    children: [
+                      Icon(Icons.swap_horiz_outlined,
+                          size: 18, color: AppColors.textPrimary),
+                      SizedBox(width: 8),
+                      Text('Move to another table'),
+                    ],
+                  ),
+                ),
+              ],
             ),
         ],
         bottom: TabBar(
@@ -240,6 +284,184 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
       );
     }
   }
+
+  Future<void> _editGuestCount(TicketEntity ticket) async {
+    final next = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      showDragHandle: true,
+      builder: (ctx) => _GuestCountSheet(initial: ticket.guestCount),
+    );
+    if (next == null || next == ticket.guestCount || !mounted) return;
+    await ref
+        .read(waiterActiveTicketProvider.notifier)
+        .updateGuestCount(next);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cover count set to $next'),
+          backgroundColor: AppColors.green,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openServiceCallSheet() async {
+    final result = await showModalBottomSheet<_ServiceCallResult>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _ServiceCallSheet(),
+    );
+    if (result == null || !mounted) return;
+    final call = await raiseServiceCall(
+      ref,
+      kind: result.kind,
+      note: result.note,
+    );
+    if (!mounted) return;
+    if (call == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${serviceCallKindLabel(call.kind)} — sent to the team',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _openTransferSheet(TicketEntity ticket) async {
+    final tables = ref.read(waiterAllTablesProvider).valueOrNull ?? const [];
+    final candidates = tables
+        .where((t) => t.id != ticket.tableId)
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+
+    final selected = await showModalBottomSheet<RestaurantTableEntity>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Move order to another table',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (candidates.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Text(
+                      'No other tables available',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textDim),
+                    ),
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(ctx).size.height * 0.55,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: candidates.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 4),
+                      itemBuilder: (_, i) {
+                        final t = candidates[i];
+                        final isOccupied = t.status == TableStatus.occupied;
+                        return ListTile(
+                          leading: Icon(
+                            Icons.table_restaurant_outlined,
+                            color: isOccupied
+                                ? AppColors.orange
+                                : AppColors.primary,
+                          ),
+                          title: Text(
+                            t.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            isOccupied ? 'Occupied' : 'Available',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isOccupied
+                                  ? AppColors.orange
+                                  : AppColors.textDim,
+                            ),
+                          ),
+                          onTap: () => Navigator.of(ctx).pop(t),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected == null || !mounted) return;
+
+    if (selected.status == TableStatus.occupied) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Move to occupied table?'),
+          content: Text(
+            '${selected.name} already has an active order. Moving this '
+            'order there will merge it visually but keep tickets separate.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Move anyway'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true || !mounted) return;
+    }
+
+    await ref
+        .read(waiterActiveTicketProvider.notifier)
+        .transferToTable(selected);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Moved to ${selected.name}'),
+          backgroundColor: AppColors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      // Navigate the screen to track the new table so subsequent rebuilds
+      // key off the correct tableId.
+      context.go(WaiterRoutes.orderFor(selected.id));
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -278,27 +500,285 @@ class _OrderTab extends ConsumerWidget {
       );
     }
 
+    final settings = ref.watch(restaurantSettingsProvider).valueOrNull ??
+        const RestaurantSettings();
+    final gangsEnabled = settings.gangsEnabled;
+    final gangLabels = settings.effectiveGangLabels;
+
+    // Group items by gang number so fine-dining service reads as per-gang
+    // blocks. When gangs are disabled, we render a single flat list instead.
+    final grouped = <int, List<OrderItemEntity>>{};
+    for (final item in ticket!.items) {
+      final key = gangsEnabled ? item.course : 0;
+      grouped.putIfAbsent(key, () => []).add(item);
+    }
+    final gangNumbers = grouped.keys.toList()..sort();
+
     return Column(
       children: [
-        // Items list
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(12),
-            itemCount: ticket!.items.length,
+            itemCount: gangNumbers.length,
             itemBuilder: (context, index) {
-              return _OrderItemRow(
-                item: ticket!.items[index],
-                onRemove: () => ref
-                    .read(waiterActiveTicketProvider.notifier)
-                    .removeItem(ticket!.items[index].id),
+              final gangNum = gangNumbers[index];
+              final items = grouped[gangNum]!;
+              final hasUnsent = items.any((i) => !i.sentToKitchen);
+              final progress = _GangProgress.from(items);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (gangsEnabled)
+                    _CourseHeader(
+                      courseNumber: gangNum,
+                      label: (gangNum >= 1 && gangNum <= gangLabels.length)
+                          ? gangLabels[gangNum - 1]
+                          : 'Gang $gangNum',
+                      itemCount: items.length,
+                      hasUnsent: hasUnsent,
+                      progress: progress,
+                      onFire: hasUnsent
+                          ? () => ref
+                              .read(waiterActiveTicketProvider.notifier)
+                              .fireGang(gangNum)
+                          : null,
+                    ),
+                  for (final item in items)
+                    _OrderItemRow(
+                      item: item,
+                      onRemove: () => ref
+                          .read(waiterActiveTicketProvider.notifier)
+                          .removeItem(item.id),
+                    ),
+                ],
               );
             },
           ),
         ),
-        // Totals summary
         _TotalsSummary(ticket: ticket!),
       ],
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Course header
+// ---------------------------------------------------------------------------
+
+/// Aggregate preparation state for a gang (course group).
+///
+/// Bucket counts drive the small status badge on [_CourseHeader] so the
+/// waiter sees "Gang 1 ready" at a glance without opening every item.
+class _GangProgress {
+  final int unsent;
+  final int sent;
+  final int preparing;
+  final int ready;
+  final int served;
+  final int total;
+
+  const _GangProgress({
+    required this.unsent,
+    required this.sent,
+    required this.preparing,
+    required this.ready,
+    required this.served,
+    required this.total,
+  });
+
+  factory _GangProgress.from(List<OrderItemEntity> items) {
+    int unsent = 0, sent = 0, preparing = 0, ready = 0, served = 0;
+    for (final item in items) {
+      if (!item.sentToKitchen) {
+        unsent++;
+        continue;
+      }
+      switch (item.status) {
+        case OrderItemStatus.ordered:
+        case OrderItemStatus.sent:
+          sent++;
+          break;
+        case OrderItemStatus.preparing:
+          preparing++;
+          break;
+        case OrderItemStatus.ready:
+          ready++;
+          break;
+        case OrderItemStatus.served:
+          served++;
+          break;
+        case OrderItemStatus.voidStatus:
+          break;
+      }
+    }
+    return _GangProgress(
+      unsent: unsent,
+      sent: sent,
+      preparing: preparing,
+      ready: ready,
+      served: served,
+      total: items.length,
+    );
+  }
+
+  bool get allServed => total > 0 && served == total;
+  bool get allReady => total > 0 && (ready + served) == total && ready > 0;
+  bool get anyReady => ready > 0;
+  bool get anyPreparing => preparing > 0;
+  bool get allFired => total > 0 && unsent == 0;
+}
+
+class _CourseHeader extends StatelessWidget {
+  final int courseNumber;
+
+  /// Restaurant-configured label (e.g. "Entrée"). Falls back to "Gang N".
+  final String label;
+  final int itemCount;
+
+  /// `true` if any item in this gang is still unsent. Drives the
+  /// Fire-this-gang CTA visibility.
+  final bool hasUnsent;
+
+  /// Aggregate prep status for the items in this gang.
+  final _GangProgress? progress;
+
+  /// Tapped by the waiter to push just this gang to the kitchen.
+  /// `null` disables the button (all items in the gang already fired).
+  final VoidCallback? onFire;
+
+  const _CourseHeader({
+    required this.courseNumber,
+    required this.label,
+    required this.itemCount,
+    this.hasUnsent = false,
+    this.progress,
+    this.onFire,
+  });
+
+  String get _label => label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            decoration: const BoxDecoration(
+              color: AppColors.accentDim,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '$courseNumber',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '· $itemCount',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textDim,
+            ),
+          ),
+          const Expanded(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Divider(color: AppColors.outlineVariant, height: 1),
+            ),
+          ),
+          if (hasUnsent)
+            SizedBox(
+              height: 28,
+              child: TextButton.icon(
+                onPressed: onFire,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: const BorderSide(color: AppColors.primary, width: 1),
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+                icon: const Icon(Icons.local_fire_department_outlined, size: 14),
+                label: Text(
+                  'Fire $label',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            )
+          else
+            _GangStatusBadge(progress: progress),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small badge rendered at the end of the course header once all items in the
+/// gang have been fired. Surfaces the kitchen's latest state without the
+/// waiter having to inspect every line.
+class _GangStatusBadge extends StatelessWidget {
+  final _GangProgress? progress;
+
+  const _GangStatusBadge({this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = progress;
+    final (label, color) = _style(p);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: color,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  (String, Color) _style(_GangProgress? p) {
+    if (p == null || p.total == 0) {
+      return ('Fired', AppColors.textDim);
+    }
+    if (p.allServed) return ('Served', AppColors.textDim);
+    if (p.allReady) return ('Ready · serve', AppColors.green);
+    if (p.anyReady) return ('${p.ready}/${p.total} Ready', AppColors.green);
+    if (p.anyPreparing) {
+      return ('${p.preparing}/${p.total} Cooking', AppColors.orange);
+    }
+    return ('Fired', AppColors.textDim);
   }
 }
 
@@ -362,15 +842,26 @@ class _OrderItemRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.productName,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isSent
-                          ? AppColors.textSecondary
-                          : AppColors.textPrimary,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          item.productName,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isSent
+                                ? AppColors.textSecondary
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (item.seat > 0) ...[
+                        const SizedBox(width: 6),
+                        _SeatBadge(seat: item.seat),
+                      ],
+                    ],
                   ),
                   if (item.notes != null && item.notes!.isNotEmpty)
                     Text(
@@ -470,19 +961,77 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
+/// Compact "Seat N" pill rendered next to an item's name when the line is
+/// tagged to a specific cover. Hidden for seat==0 (shared) since that is the
+/// default for any un-tagged line.
+class _SeatBadge extends StatelessWidget {
+  const _SeatBadge({required this.seat});
+
+  final int seat;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: AppColors.accentDim,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.event_seat_outlined,
+              size: 9, color: AppColors.primary),
+          const SizedBox(width: 2),
+          Text(
+            '$seat',
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Totals summary
 // ---------------------------------------------------------------------------
 
-class _TotalsSummary extends StatelessWidget {
+class _TotalsSummary extends ConsumerWidget {
   final TicketEntity ticket;
 
   const _TotalsSummary({required this.ticket});
 
   String _fmt(int cents) => 'CHF ${(cents / 100).toStringAsFixed(2)}';
 
+  /// Compute the service charge in cents from the current tax-inclusive
+  /// subtotal. Returns `0` when the toggle is off.
+  int _computeServiceCharge({
+    required bool enabled,
+    required double percent,
+    required int subtotalCents,
+  }) {
+    if (!enabled || percent <= 0 || subtotalCents <= 0) return 0;
+    return (subtotalCents * percent / 100).round();
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings =
+        ref.watch(restaurantSettingsProvider).valueOrNull;
+    final serviceChargeEnabled = settings?.serviceChargeEnabled ?? false;
+    final serviceChargePercent = settings?.serviceChargePercent ?? 0;
+    final serviceCharge = _computeServiceCharge(
+      enabled: serviceChargeEnabled,
+      percent: serviceChargePercent,
+      subtotalCents: ticket.subtotal,
+    );
+    final displayTotal = ticket.total + serviceCharge;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       color: AppColors.surfaceContainerLow,
@@ -494,10 +1043,19 @@ class _TotalsSummary extends StatelessWidget {
               label: 'VAT',
               value: _fmt(ticket.taxAmount),
               valueColor: AppColors.textSecondary),
+          if (serviceChargeEnabled && serviceCharge > 0) ...[
+            const SizedBox(height: 4),
+            _TotalRow(
+              label:
+                  'Service charge (${serviceChargePercent.toStringAsFixed(serviceChargePercent.truncateToDouble() == serviceChargePercent ? 0 : 1)}%)',
+              value: _fmt(serviceCharge),
+              valueColor: AppColors.textSecondary,
+            ),
+          ],
           const Divider(color: AppColors.outlineVariant, height: 20),
           _TotalRow(
             label: 'Total',
-            value: _fmt(ticket.total),
+            value: _fmt(displayTotal),
             labelStyle: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
@@ -549,6 +1107,363 @@ class _TotalRow extends StatelessWidget {
               ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Guest count chip + editor sheet
+// ---------------------------------------------------------------------------
+
+class _GuestCountChip extends StatelessWidget {
+  final int guestCount;
+  final VoidCallback onTap;
+
+  const _GuestCountChip({required this.guestCount, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppColors.accentDim,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.groups_outlined,
+                size: 14, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text(
+              '$guestCount',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GuestCountSheet extends StatefulWidget {
+  final int initial;
+
+  const _GuestCountSheet({required this.initial});
+
+  @override
+  State<_GuestCountSheet> createState() => _GuestCountSheetState();
+}
+
+class _GuestCountSheetState extends State<_GuestCountSheet> {
+  late int _count;
+
+  @override
+  void initState() {
+    super.initState();
+    _count = widget.initial;
+  }
+
+  void _bump(int delta) {
+    setState(() {
+      final next = _count + delta;
+      _count = next < 1 ? 1 : (next > 99 ? 99 : next);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Cover count',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'How many guests at this table?',
+              style: TextStyle(fontSize: 12, color: AppColors.textDim),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _CountButton(
+                  icon: Icons.remove,
+                  onTap: _count > 1 ? () => _bump(-1) : null,
+                ),
+                const SizedBox(width: 28),
+                SizedBox(
+                  width: 60,
+                  child: Text(
+                    '$_count',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 28),
+                _CountButton(
+                  icon: Icons.add,
+                  onTap: _count < 99 ? () => _bump(1) : null,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.surfaceDim,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => Navigator.of(context).pop(_count),
+                child: const Text(
+                  'Save',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CountButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _CountButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerHigh,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          color:
+              enabled ? AppColors.textPrimary : AppColors.textDim,
+          size: 22,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Service call quick-action sheet
+// ---------------------------------------------------------------------------
+
+/// Bottom-sheet result when the waiter raises a service call.
+class _ServiceCallResult {
+  final ServiceCallKind kind;
+  final String? note;
+  const _ServiceCallResult(this.kind, this.note);
+}
+
+/// Lets the waiter tap one of the canonical service-call kinds (water, bread,
+/// manager, cleanup) or pick "Other" and type a note. Submits on tap — a
+/// single tap should cover 80 % of floor calls.
+class _ServiceCallSheet extends StatefulWidget {
+  const _ServiceCallSheet();
+
+  @override
+  State<_ServiceCallSheet> createState() => _ServiceCallSheetState();
+}
+
+class _ServiceCallSheetState extends State<_ServiceCallSheet> {
+  final TextEditingController _noteController = TextEditingController();
+  final ServiceCallKind _kind = ServiceCallKind.other;
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  static const _quickKinds = [
+    (ServiceCallKind.water, Icons.local_drink_outlined),
+    (ServiceCallKind.bread, Icons.bakery_dining_outlined),
+    (ServiceCallKind.manager, Icons.support_agent_outlined),
+    (ServiceCallKind.cleanup, Icons.cleaning_services_outlined),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          16 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12, top: 4),
+              child: Text(
+                'Call for service',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 2.3,
+              children: [
+                for (final (kind, icon) in _quickKinds)
+                  _QuickCallButton(
+                    icon: icon,
+                    label: serviceCallKindLabel(kind),
+                    onTap: () => Navigator.of(context)
+                        .pop(_ServiceCallResult(kind, null)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Other',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+                letterSpacing: 0.4,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _noteController,
+              textInputAction: TextInputAction.send,
+              onSubmitted: _submitOther,
+              decoration: InputDecoration(
+                hintText: 'e.g. "extra napkins", "allergy check"',
+                filled: true,
+                fillColor: AppColors.bgInput,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 44,
+              child: FilledButton.icon(
+                onPressed: () => _submitOther(_noteController.text),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.surfaceDim,
+                ),
+                icon: const Icon(Icons.send_outlined, size: 18),
+                label: const Text(
+                  'Send custom call',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submitOther(String raw) {
+    final note = raw.trim();
+    if (note.isEmpty) return;
+    Navigator.of(context).pop(_ServiceCallResult(_kind, note));
+  }
+}
+
+class _QuickCallButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickCallButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 22, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

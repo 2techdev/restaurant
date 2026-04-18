@@ -75,6 +75,10 @@ class WaiterOrderService {
 
   /// Add a product to an existing open ticket.
   ///
+  /// [course] maps to the fine-dining course number (1=starter, 2=main, 3=dessert, etc.).
+  /// It is stored on the order item and later used by the kitchen to fire
+  /// grouped items together.
+  ///
   /// Returns the updated [TicketEntity] after the item is persisted,
   /// or `null` if the ticket is closed / not found.
   Future<TicketEntity?> addItemToTicket({
@@ -83,6 +87,8 @@ class WaiterOrderService {
     double quantity = 1,
     List<OrderItemModifierEntity> modifiers = const [],
     String? notes,
+    int course = 1,
+    int seat = 0,
   }) async {
     final ticket = await _orderRepo.getTicketById(ticketId);
     if (ticket == null || !ticket.isOpen) return null;
@@ -110,6 +116,8 @@ class WaiterOrderService {
       subtotal: subtotal,
       taxAmount: taxAmount,
       notes: notes,
+      course: course,
+      seat: seat,
       modifiers: reKeyedModifiers,
       taxGroup: product.taxGroup,
     );
@@ -154,6 +162,93 @@ class WaiterOrderService {
         items: unsent,
         waiterName: waiterName,
       );
+    }
+
+    return _orderRepo.getTicketById(ticketId);
+  }
+
+  /// Fire a single gang (course) to the kitchen.
+  ///
+  /// Only items in [gang] that are still unsent are pushed. Kitchen receives
+  /// a single gang-tagged kitchen ticket, so the expo station can plate and
+  /// send them out together.
+  ///
+  /// Returns the refreshed ticket. No-op if all items in the gang are
+  /// already fired.
+  Future<TicketEntity?> fireGang({
+    required String ticketId,
+    required int gang,
+    required String waiterName,
+  }) async {
+    final ticket = await _orderRepo.getTicketById(ticketId);
+    if (ticket == null) return null;
+
+    final target = ticket.items
+        .where((i) => i.course == gang && !i.sentToKitchen)
+        .toList();
+    if (target.isEmpty) return ticket;
+
+    for (final item in target) {
+      await _orderRepo.updateItemStatus(item.id, OrderItemStatus.sent);
+    }
+
+    // Bump ticket to "sent" once any items are in the kitchen pipeline.
+    if (ticket.status == TicketStatus.draft) {
+      await _orderRepo.updateTicketStatus(ticketId, TicketStatus.sent);
+    }
+
+    await _kitchenRepo.createTicketFromOrder(
+      ticket: ticket,
+      items: target,
+      waiterName: waiterName,
+    );
+
+    return _orderRepo.getTicketById(ticketId);
+  }
+
+  /// Update the cover (guest) count on a ticket.
+  ///
+  /// Clamps to `[1, 99]` so the UI cannot persist nonsensical values.
+  /// Returns the refreshed ticket, or `null` if the ticket is closed.
+  Future<TicketEntity?> updateGuestCount({
+    required String ticketId,
+    required int guestCount,
+  }) async {
+    final ticket = await _orderRepo.getTicketById(ticketId);
+    if (ticket == null || !ticket.isOpen) return null;
+    final clamped = guestCount < 1
+        ? 1
+        : guestCount > 99
+            ? 99
+            : guestCount;
+    if (clamped == ticket.guestCount) return ticket;
+    await _orderRepo.updateTicketGuestCount(ticketId, clamped);
+    return _orderRepo.getTicketById(ticketId);
+  }
+
+  /// Move a draft ticket to a different table.
+  ///
+  /// Frees the old table (if it has no other open tickets) and claims the
+  /// new one. Intended for "customer moved" or "we merged tables" flows.
+  ///
+  /// Returns the refreshed ticket, or `null` if the ticket is closed.
+  Future<TicketEntity?> transferToTable({
+    required String ticketId,
+    required String newTableId,
+  }) async {
+    final ticket = await _orderRepo.getTicketById(ticketId);
+    if (ticket == null || !ticket.isOpen) return null;
+    if (ticket.tableId == newTableId) return ticket;
+
+    final oldTableId = ticket.tableId;
+    await _orderRepo.updateTicketTable(ticketId, newTableId);
+    await _tableRepo.updateTableStatus(newTableId, TableStatus.occupied);
+
+    if (oldTableId != null) {
+      final remaining = await _orderRepo.getTicketsByTable(oldTableId);
+      if (remaining.isEmpty) {
+        await _tableRepo.updateTableStatus(oldTableId, TableStatus.available);
+      }
     }
 
     return _orderRepo.getTicketById(ticketId);

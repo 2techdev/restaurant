@@ -510,7 +510,10 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
   final _addressCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _mwstCtrl = TextEditingController();
+  final _serviceChargeCtrl = TextEditingController();
+  bool _serviceChargeEnabled = false;
   String? _mwstError;
+  String? _serviceChargeError;
   bool _initialised = false;
 
   @override
@@ -519,6 +522,7 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
     _addressCtrl.dispose();
     _phoneCtrl.dispose();
     _mwstCtrl.dispose();
+    _serviceChargeCtrl.dispose();
     super.dispose();
   }
 
@@ -528,6 +532,12 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
     _addressCtrl.text = s.address;
     _phoneCtrl.text = s.phone;
     _mwstCtrl.text = s.mwstNr;
+    _serviceChargeEnabled = s.serviceChargeEnabled;
+    _serviceChargeCtrl.text = s.serviceChargePercent
+        .toStringAsFixed(s.serviceChargePercent.truncateToDouble() ==
+                s.serviceChargePercent
+            ? 0
+            : 2);
     _initialised = true;
   }
 
@@ -540,15 +550,32 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
     }
     setState(() => _mwstError = null);
 
+    // Validate service charge percent (only when enabled).
+    double parsedPercent = 10.0;
+    if (_serviceChargeEnabled) {
+      final raw = _serviceChargeCtrl.text.trim().replaceAll(',', '.');
+      final pct = double.tryParse(raw);
+      if (pct == null || pct < 0 || pct > 25) {
+        setState(() => _serviceChargeError =
+            'Enter a value between 0 and 25');
+        return;
+      }
+      parsedPercent = pct;
+    }
+    setState(() => _serviceChargeError = null);
+
     final notifier =
         ref.read(restaurantSettingsProvider.notifier);
-    await notifier.save(RestaurantSettings(
+    // Preserve gang-related config + logo that this form doesn't edit.
+    final current = ref.read(restaurantSettingsProvider).valueOrNull ??
+        const RestaurantSettings();
+    await notifier.save(current.copyWith(
       name: _nameCtrl.text.trim(),
       address: _addressCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
       mwstNr: _mwstCtrl.text.trim(),
-      logoPath:
-          ref.read(restaurantSettingsProvider).valueOrNull?.logoPath,
+      serviceChargeEnabled: _serviceChargeEnabled,
+      serviceChargePercent: parsedPercent,
     ));
     if (mounted) {
       _showSnack('Restaurant settings saved.');
@@ -637,6 +664,57 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
               ),
               data: (s) => _LogoRow(settings: s),
             ),
+          ],
+        ),
+        _Card(
+          title: 'SERVICE CHARGE',
+          children: [
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Charge service fee',
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+              subtitle: const Text(
+                'When on, a separate service line is shown on every order '
+                'summary and printed receipt.',
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+              value: _serviceChargeEnabled,
+              onChanged: (v) =>
+                  setState(() => _serviceChargeEnabled = v),
+            ),
+            if (_serviceChargeEnabled) ...[
+              const SizedBox(height: 8),
+              _Field(
+                label: 'Percent',
+                controller: _serviceChargeCtrl,
+                hint: '10',
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (v) {
+                  if (_serviceChargeError != null) {
+                    setState(() => _serviceChargeError = null);
+                  }
+                },
+              ),
+              if (_serviceChargeError != null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.error_outline_rounded,
+                        size: 14, color: AppColors.red),
+                    const SizedBox(width: 6),
+                    Text(
+                      _serviceChargeError!,
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.red),
+                    ),
+                  ],
+                ),
+              ],
+            ],
           ],
         ),
       ],

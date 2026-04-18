@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/features/waiter/presentation/widgets/waiter_bottom_nav.dart';
+import 'package:gastrocore_pos/features/waiter/presentation/widgets/waiter_connectivity_banner.dart';
 import 'package:gastrocore_pos/features/waiter/router/waiter_router.dart';
 
 // ---------------------------------------------------------------------------
@@ -32,7 +33,12 @@ class WaiterShellScreen extends StatelessWidget {
     final currentIndex = _selectedIndex(context);
 
     return Scaffold(
-      body: child,
+      body: Column(
+        children: [
+          const WaiterConnectivityBanner(),
+          Expanded(child: child),
+        ],
+      ),
       bottomNavigationBar: WaiterBottomNav(
         selectedIndex: currentIndex,
         onDestinationSelected: (index) {

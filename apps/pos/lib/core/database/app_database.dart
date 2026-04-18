@@ -33,6 +33,7 @@ import 'tables/products.dart';
 import 'tables/receipts.dart';
 import 'tables/restaurant_tables.dart';
 import 'tables/shifts.dart';
+import 'tables/service_calls.dart';
 import 'tables/stations.dart';
 import 'tables/sync_metadata.dart';
 import 'tables/sync_queue.dart';
@@ -98,6 +99,7 @@ part 'app_database.g.dart';
     GangTemplates,
     OrderGangStates,
     Stations,
+    ServiceCalls,
   ],
   daos: [AuditLogDao, InventoryDao, SyncEventDao],
 )
@@ -105,7 +107,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -215,6 +217,18 @@ class AppDatabase extends _$AppDatabase {
         // v10: kitchen stations — configurable station list backing the KDS
         // station filter and the Products.printerGroup routing.
         await m.createTable(stations);
+      }
+      if (from < 11) {
+        // v11: waiter upgrades —
+        // (a) seat column on order_items for split-by-seat billing foundation,
+        // (b) service_calls table for waiter → boss/KDS service requests.
+        await m.addColumn(orderItems, orderItems.seat);
+        await m.createTable(serviceCalls);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_service_calls_tenant_status '
+          'ON service_calls (tenant_id, status) '
+          'WHERE is_deleted = 0',
+        );
       }
     },
     onCreate: (m) async {

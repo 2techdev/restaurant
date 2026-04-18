@@ -1,8 +1,11 @@
 /// Gang (course group) domain entities.
 ///
 /// A Gang represents a course in a multi-course meal service.
-/// Swiss defaults: Gang 1 = Vorspeise, Gang 2 = Hauptgang,
-/// Gang 3 = Dessert, Gang 4 = Getränke.
+/// The restaurant picks how many gangs to use (1..5) and optionally overrides
+/// the displayed labels via `RestaurantSettings.maxGangs` / `gangLabels`; this
+/// entity only carries the stable sort position + color. Fall back to
+/// [GangTemplateEntity.fallbackLabel] when no settings-driven label is
+/// available.
 library;
 
 import 'package:flutter/material.dart';
@@ -63,7 +66,6 @@ extension GangOrderStatusX on GangOrderStatus {
 class GangTemplateEntity {
   final String id;
   final String tenantId;
-  final String name;
   final int sortOrder;
 
   /// Hex color string, e.g. '#528DFF'.
@@ -74,12 +76,17 @@ class GangTemplateEntity {
   const GangTemplateEntity({
     required this.id,
     required this.tenantId,
-    required this.name,
     required this.sortOrder,
     required this.color,
     this.isDefault = false,
     this.isActive = true,
   });
+
+  /// Fallback label ("Gang N") used when the caller has no access to the
+  /// restaurant's configured gang labels — e.g. very early boot, or tests.
+  /// Prefer `RestaurantSettings.effectiveGangLabels[sortOrder-1]` when the
+  /// settings provider is available.
+  String get fallbackLabel => 'Gang $sortOrder';
 
   /// Parse hex color string to Flutter Color.
   Color get flutterColor {
@@ -96,7 +103,6 @@ class GangTemplateEntity {
   GangTemplateEntity copyWith({
     String? id,
     String? tenantId,
-    String? name,
     int? sortOrder,
     String? color,
     bool? isDefault,
@@ -105,7 +111,6 @@ class GangTemplateEntity {
     return GangTemplateEntity(
       id: id ?? this.id,
       tenantId: tenantId ?? this.tenantId,
-      name: name ?? this.name,
       sortOrder: sortOrder ?? this.sortOrder,
       color: color ?? this.color,
       isDefault: isDefault ?? this.isDefault,
@@ -124,8 +129,7 @@ class GangTemplateEntity {
   int get hashCode => id.hashCode;
 
   @override
-  String toString() =>
-      'GangTemplateEntity(id: $id, name: $name, sort: $sortOrder)';
+  String toString() => 'GangTemplateEntity(id: $id, sort: $sortOrder)';
 }
 
 // ---------------------------------------------------------------------------

@@ -50,17 +50,20 @@ class GangRepository {
     return row == null ? null : _gangTemplateToEntity(row);
   }
 
-  /// Seed the three canonical Gangs for a tenant if none exist yet.
+  /// Seed the five canonical Gang rows for a tenant if none exist yet.
   ///
-  /// Policy (2026-04-17 decision): Gang labels are fixed — **"Gang 1", "Gang
-  /// 2", "Gang 3"** — and cannot be renamed. Seed and UI are kept in lock-step
-  /// so both a fresh install and an override attempt end up displaying the
-  /// same literal label to the cook.
+  /// We always provision the full 1..5 range (the allowed `maxGangs` ceiling)
+  /// so that flipping `RestaurantSettings.maxGangs` upward at runtime doesn't
+  /// have to create new rows. The UI shows only the first
+  /// `RestaurantSettings.clampedMaxGangs` entries; the rest are inert.
   ///
-  /// Per-gang color (used for the KDS card header + per-gang alert banner):
-  ///   Gang 1 → #90ABFF (primary blue)
-  ///   Gang 2 → #69F6B8 (green)
-  ///   Gang 3 → #BF5AF2 (purple)
+  /// `name` is stored for debug/back-compat — user-facing labels are sourced
+  /// from `RestaurantSettings.effectiveGangLabels`.
+  ///
+  /// Per-gang color palette (used for the KDS card header + per-gang alert):
+  ///   Gang 1 → #90ABFF (blue)    Gang 2 → #69F6B8 (green)
+  ///   Gang 3 → #BF5AF2 (purple)  Gang 4 → #FF9F0A (orange)
+  ///   Gang 5 → #FF375F (red)
   Future<void> seedDefaultGangs(String tenantId) async {
     final existing = await getGangTemplates(tenantId);
     if (existing.isNotEmpty) {
@@ -72,46 +75,28 @@ class GangRepository {
     }
 
     final now = DateTime.now();
+    const palette = [
+      '#90ABFF', // gang 1 — blue
+      '#69F6B8', // gang 2 — green
+      '#BF5AF2', // gang 3 — purple
+      '#FF9F0A', // gang 4 — orange
+      '#FF375F', // gang 5 — red
+    ];
     final defaults = [
-      GangTemplatesCompanion(
-        id: const Value('gang-1'),
-        tenantId: Value(tenantId),
-        name: const Value('Gang 1'),
-        sortOrder: const Value(1),
-        color: const Value('#90ABFF'),
-        isDefault: const Value(true),
-        isActive: const Value(true),
-        createdAt: Value(now),
-        updatedAt: Value(now),
-        syncStatus: const Value(0),
-        isDeleted: const Value(false),
-      ),
-      GangTemplatesCompanion(
-        id: const Value('gang-2'),
-        tenantId: Value(tenantId),
-        name: const Value('Gang 2'),
-        sortOrder: const Value(2),
-        color: const Value('#69F6B8'),
-        isDefault: const Value(true),
-        isActive: const Value(true),
-        createdAt: Value(now),
-        updatedAt: Value(now),
-        syncStatus: const Value(0),
-        isDeleted: const Value(false),
-      ),
-      GangTemplatesCompanion(
-        id: const Value('gang-3'),
-        tenantId: Value(tenantId),
-        name: const Value('Gang 3'),
-        sortOrder: const Value(3),
-        color: const Value('#BF5AF2'),
-        isDefault: const Value(true),
-        isActive: const Value(true),
-        createdAt: Value(now),
-        updatedAt: Value(now),
-        syncStatus: const Value(0),
-        isDeleted: const Value(false),
-      ),
+      for (var i = 1; i <= 5; i++)
+        GangTemplatesCompanion(
+          id: Value('gang-$i'),
+          tenantId: Value(tenantId),
+          name: Value('Gang $i'),
+          sortOrder: Value(i),
+          color: Value(palette[i - 1]),
+          isDefault: const Value(true),
+          isActive: const Value(true),
+          createdAt: Value(now),
+          updatedAt: Value(now),
+          syncStatus: const Value(0),
+          isDeleted: const Value(false),
+        ),
     ];
 
     await _db.batch((batch) {
@@ -322,7 +307,6 @@ class GangRepository {
     return GangTemplateEntity(
       id: row.id,
       tenantId: row.tenantId,
-      name: row.name,
       sortOrder: row.sortOrder,
       color: row.color,
       isDefault: row.isDefault,

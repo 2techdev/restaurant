@@ -473,4 +473,107 @@ void main() {
       expect(tickets.any((t) => t.id == ticket.id), isFalse);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // watchTicketById — reactive stream powering KDS→waiter badge sync.
+  //
+  // Subscriptions are not awaited on cancel: the underlying generator is
+  // suspended in `await for (_ in tableUpdates)` and Drift's broadcast stream
+  // does not fully release until the database closes. Unawaited cancel lets
+  // the test complete; tearDown's db.close() performs the final cleanup.
+  // -------------------------------------------------------------------------
+
+  group('OrderRepositoryImpl — watchTicketById', () {
+    late AppDatabase db;
+    late OrderRepositoryImpl repo;
+
+    setUp(() async {
+      db = AppDatabase.createInMemory();
+      repo = _makeRepo(db);
+    });
+
+    tearDown(() async => db.close());
+
+    test('emits initial state on subscribe then re-emits on item status flip',
+        () async {
+      final ticketId = IdGenerator.generateId();
+      final itemId = IdGenerator.generateId();
+      final item = _makeItem(
+        id: itemId,
+        ticketId: ticketId,
+        productName: 'Köfte',
+        unitPrice: 2000,
+        subtotal: 2000,
+      );
+      final ticket = _makeTicket(id: ticketId, items: [item]);
+      await repo.createTicket(ticket);
+
+      final emitted = <TicketEntity?>[];
+      final sub = repo.watchTicketById(ticketId).listen(emitted.add);
+      // The sync closure is load-bearing: cancel() on this async* generator
+      // suspends inside Drift's tableUpdates await-for and never resolves, so
+      // a tearoff would make addTearDown await a never-completing future.
+      // db.close() in the group tearDown performs the real cleanup.
+      addTearDown(() { // ignore: unnecessary_lambdas
+        sub.cancel();
+      });
+
+      // Let the initial yield propagate.
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(emitted, hasLength(1),
+          reason: 'stream must emit current state on subscribe');
+      expect(emitted.first?.items.first.status, OrderItemStatus.ordered);
+
+      // KDS-side flip: mark the item ready.
+      await repo.updateItemStatus(itemId, OrderItemStatus.ready);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(emitted.length, greaterThanOrEqualTo(2),
+          reason: 'item status flip must re-trigger an emission');
+      expect(emitted.last?.items.first.status, OrderItemStatus.ready,
+          reason: 'watcher must surface the new ready state');
+    });
+
+    test('emits null for a ticket that does not exist', () async {
+      final emitted = <TicketEntity?>[];
+      final sub =
+          repo.watchTicketById('ghost-ticket').listen(emitted.add);
+      // The sync closure is load-bearing: cancel() on this async* generator
+      // suspends inside Drift's tableUpdates await-for and never resolves, so
+      // a tearoff would make addTearDown await a never-completing future.
+      // db.close() in the group tearDown performs the real cleanup.
+      addTearDown(() { // ignore: unnecessary_lambdas
+        sub.cancel();
+      });
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(emitted, hasLength(1));
+      expect(emitted.first, isNull,
+          reason: 'missing ticket resolves to a null emission, not an error');
+    });
+
+    test('re-emits on ticket-level status change (e.g. bill requested)',
+        () async {
+      final ticket = await repo.createTicket(_makeTicket());
+
+      final emitted = <TicketEntity?>[];
+      final sub = repo.watchTicketById(ticket.id).listen(emitted.add);
+      // The sync closure is load-bearing: cancel() on this async* generator
+      // suspends inside Drift's tableUpdates await-for and never resolves, so
+      // a tearoff would make addTearDown await a never-completing future.
+      // db.close() in the group tearDown performs the real cleanup.
+      addTearDown(() { // ignore: unnecessary_lambdas
+        sub.cancel();
+      });
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      await repo.updateTicketStatus(ticket.id, TicketStatus.billRequested);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(emitted.length, greaterThanOrEqualTo(2));
+      expect(emitted.last?.status, TicketStatus.billRequested);
+    });
+  });
 }

@@ -17,6 +17,8 @@ import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dar
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/modifier_dialog.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/providers/waiter_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -47,6 +49,12 @@ class _WaiterMenuScreenState extends ConsumerState<WaiterMenuScreen> {
 
     return Column(
       children: [
+        // ── Course selector ───────────────────────────────────────────────
+        const CourseSelector(),
+        // ── Seat selector ─────────────────────────────────────────────────
+        const SeatSelector(),
+        // ── Allergen chips ────────────────────────────────────────────────
+        const _AllergenChips(),
         // ── Search bar ────────────────────────────────────────────────────
         _SearchBar(controller: _searchController),
         // ── Category chips ────────────────────────────────────────────────
@@ -63,6 +71,326 @@ class _WaiterMenuScreenState extends ConsumerState<WaiterMenuScreen> {
               : _CategoryProductsGrid(),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Course selector (sticky — applies to every quick-added item)
+// ---------------------------------------------------------------------------
+
+/// Renders one tappable chip per Gang slot. Slot count and labels come from
+/// [RestaurantSettings] (`maxGangs` + `gangLabels`); when `gangsEnabled=false`
+/// the selector renders as a zero-size widget so the waiter sends flat,
+/// un-paced orders.
+///
+/// Public so widget tests can mount it in isolation (see
+/// `waiter_course_selector_test.dart`).
+class CourseSelector extends ConsumerWidget {
+  const CourseSelector({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(restaurantSettingsProvider).valueOrNull ??
+        const RestaurantSettings();
+    if (!settings.gangsEnabled) return const SizedBox.shrink();
+
+    final labels = settings.effectiveGangLabels;
+    final current = ref.watch(waiterCurrentCourseProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      child: Row(
+        key: const Key('waiter.courseSelector'),
+        children: [
+          for (var i = 0; i < labels.length; i++) ...[
+            Expanded(
+              child: _CourseChip(
+                slot: i + 1,
+                label: labels[i],
+                selected: current == (i + 1),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  ref.read(waiterCurrentCourseProvider.notifier).state = i + 1;
+                },
+              ),
+            ),
+            if (i != labels.length - 1) const SizedBox(width: 6),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CourseChip extends StatelessWidget {
+  const _CourseChip({
+    required this.slot,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int slot;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        height: 36,
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.accentDim
+              : AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.primary : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 16,
+              height: 16,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected
+                    ? AppColors.primary
+                    : AppColors.textSecondary.withValues(alpha: 0.25),
+              ),
+              child: Text(
+                '$slot',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: selected
+                      ? AppColors.surfaceDim
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight:
+                      selected ? FontWeight.w800 : FontWeight.w600,
+                  color: selected
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Seat selector (sticky — tags every quick-added item to a cover)
+// ---------------------------------------------------------------------------
+
+/// Horizontal chip row: `Shared` + one chip per cover (1..guestCount). Chip
+/// count tracks the ticket's guest count live, so bumping the cover count via
+/// the header stepper immediately widens the row.
+///
+/// Hides itself when no active ticket (nothing to tag) or when guestCount < 2
+/// — a solo diner doesn't benefit from seat assignment, and the chip row
+/// would just be a "Shared" label by itself.
+///
+/// Public so widget tests can mount it in isolation.
+class SeatSelector extends ConsumerWidget {
+  const SeatSelector({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ticket = ref.watch(waiterActiveTicketProvider);
+    final guests = ticket?.guestCount ?? 0;
+    if (guests < 2) return const SizedBox.shrink();
+
+    final current = ref.watch(waiterCurrentSeatProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: SizedBox(
+        height: 34,
+        child: ListView.builder(
+          key: const Key('waiter.seatSelector'),
+          scrollDirection: Axis.horizontal,
+          itemCount: guests + 1,
+          itemBuilder: (context, index) {
+            final selected = current == index;
+            final label = index == 0 ? 'Shared' : 'Seat $index';
+            return Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: _SeatChip(
+                seat: index,
+                label: label,
+                selected: selected,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  ref.read(waiterCurrentSeatProvider.notifier).state = index;
+                },
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _SeatChip extends StatelessWidget {
+  const _SeatChip({
+    required this.seat,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int seat;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isShared = seat == 0;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.accentDim
+              : AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? AppColors.primary : Colors.transparent,
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isShared ? Icons.people_outline : Icons.event_seat_outlined,
+              size: 13,
+              color: selected
+                  ? AppColors.primary
+                  : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight:
+                    selected ? FontWeight.w800 : FontWeight.w600,
+                color: selected
+                    ? AppColors.primary
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Allergen / dietary chips (flushed into the next item's notes)
+// ---------------------------------------------------------------------------
+
+class _AllergenChips extends ConsumerWidget {
+  const _AllergenChips();
+
+  static const List<(String, IconData)> _chips = [
+    ('No nuts', Icons.dangerous_outlined),
+    ('Gluten-free', Icons.no_food_outlined),
+    ('Lactose-free', Icons.no_drinks_outlined),
+    ('Vegan', Icons.eco_outlined),
+    ('Spicy', Icons.whatshot_outlined),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = ref.watch(waiterPendingAllergensProvider);
+
+    return SizedBox(
+      height: 34,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        itemCount: _chips.length,
+        itemBuilder: (context, index) {
+          final (label, icon) = _chips[index];
+          final isOn = active.contains(label);
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              final next = Set<String>.from(active);
+              if (isOn) {
+                next.remove(label);
+              } else {
+                next.add(label);
+              }
+              ref.read(waiterPendingAllergensProvider.notifier).state = next;
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: isOn
+                    ? AppColors.yellow.withValues(alpha: 0.2)
+                    : AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isOn ? AppColors.yellow : Colors.transparent,
+                  width: 1.2,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 12,
+                    color: isOn ? AppColors.yellow : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isOn ? FontWeight.w800 : FontWeight.w600,
+                      color:
+                          isOn ? AppColors.yellow : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -291,7 +619,15 @@ class _ProductTile extends ConsumerWidget {
           ? null
           : () {
               HapticFeedback.lightImpact();
-              ref.read(waiterActiveTicketProvider.notifier).addProduct(product);
+              final course = ref.read(waiterCurrentCourseProvider);
+              final seat = ref.read(waiterCurrentSeatProvider);
+              final allergens = _flushPendingAllergens(ref);
+              ref.read(waiterActiveTicketProvider.notifier).addProduct(
+                    product,
+                    course: course,
+                    seat: seat,
+                    notes: allergens,
+                  );
               _showAddedFeedback(context);
             },
       // Long press = modifier dialog (if modifiers exist) or quantity sheet.
@@ -404,11 +740,20 @@ class _ProductTile extends ConsumerWidget {
       }
       if (context.mounted) {
         HapticFeedback.lightImpact();
+        final course = ref.read(waiterCurrentCourseProvider);
+        final seat = ref.read(waiterCurrentSeatProvider);
+        final allergens = _flushPendingAllergens(ref);
+        final combinedNotes = _mergeNotes(
+          result.notes.isNotEmpty ? result.notes : null,
+          allergens,
+        );
         ref.read(waiterActiveTicketProvider.notifier).addProduct(
               product,
               quantity: result.quantity.toDouble(),
               modifiers: orderModifiers,
-              notes: result.notes.isNotEmpty ? result.notes : null,
+              notes: combinedNotes,
+              course: course,
+              seat: seat,
             );
         _showAddedFeedback(context);
       }
@@ -496,9 +841,19 @@ class _ProductTile extends ConsumerWidget {
                       onPressed: () {
                         Navigator.of(ctx).pop();
                         HapticFeedback.lightImpact();
+                        final course =
+                            ref.read(waiterCurrentCourseProvider);
+                        final seat = ref.read(waiterCurrentSeatProvider);
+                        final allergens = _flushPendingAllergens(ref);
                         ref
                             .read(waiterActiveTicketProvider.notifier)
-                            .addProduct(product, quantity: qty.toDouble());
+                            .addProduct(
+                              product,
+                              quantity: qty.toDouble(),
+                              course: course,
+                              seat: seat,
+                              notes: allergens,
+                            );
                       },
                       child: Text(
                         'Add $qty × ${product.name}',
@@ -515,6 +870,25 @@ class _ProductTile extends ConsumerWidget {
       },
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Pending-allergen helpers — consume-and-clear so flags never leak to the
+// next item the waiter taps.
+// ---------------------------------------------------------------------------
+
+String? _flushPendingAllergens(WidgetRef ref) {
+  final set = ref.read(waiterPendingAllergensProvider);
+  if (set.isEmpty) return null;
+  final note = set.join(', ');
+  ref.read(waiterPendingAllergensProvider.notifier).state = <String>{};
+  return note;
+}
+
+String? _mergeNotes(String? userNote, String? allergenNote) {
+  if (userNote == null || userNote.isEmpty) return allergenNote;
+  if (allergenNote == null || allergenNote.isEmpty) return userNote;
+  return '$allergenNote • $userNote';
 }
 
 class _QtyButton extends StatelessWidget {

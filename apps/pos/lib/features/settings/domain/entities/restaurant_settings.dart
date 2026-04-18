@@ -40,8 +40,16 @@ const int kMinGangs = 1;
 const int kMaxGangs = 5;
 
 /// Default Gang labels used both by seed data and by the KDS UI when the
-/// restaurant has not overridden them.
-const List<String> kDefaultGangLabels = <String>['Gang 1', 'Gang 2', 'Gang 3'];
+/// restaurant has not overridden them. Length matches [kMaxGangs] so
+/// [RestaurantSettings.effectiveGangLabels] can fall back safely regardless of
+/// the active [RestaurantSettings.maxGangs] value.
+const List<String> kDefaultGangLabels = <String>[
+  'Gang 1',
+  'Gang 2',
+  'Gang 3',
+  'Gang 4',
+  'Gang 5',
+];
 
 class RestaurantSettings {
   const RestaurantSettings({
@@ -50,6 +58,8 @@ class RestaurantSettings {
     this.phone = '',
     this.mwstNr = '',
     this.logoPath,
+    this.serviceChargeEnabled = false,
+    this.serviceChargePercent = 10.0,
     this.gangsEnabled = true,
     this.maxGangs = 3,
     this.gangLabels = kDefaultGangLabels,
@@ -70,19 +80,42 @@ class RestaurantSettings {
   /// Absolute path to the logo image file on device storage.
   final String? logoPath;
 
+  /// When `true`, a service charge is added as a separate line on every
+  /// order summary (Waiter + POS) and printed receipt.
+  final bool serviceChargeEnabled;
+
+  /// Service charge rate as a percentage of the pre-tax subtotal.
+  /// Ignored when [serviceChargeEnabled] is `false`.
+  final double serviceChargePercent;
+
   /// When `false`, the KDS renders a single flat stream of tickets ordered by
   /// arrival time — no Gang headers, no per-Gang fire button. Casual
   /// restaurants (bar, fast-casual, takeaway) typically turn this off.
   final bool gangsEnabled;
 
-  /// Number of Gangs offered for course-based service. Clamped to
-  /// [kMinGangs]..[kMaxGangs] on construction.
+  /// Number of Gangs offered for course-based service. Stored as-is; use
+  /// [clampedMaxGangs] for UI rendering so a bad stored value never crashes.
   final int maxGangs;
 
-  /// Display labels for each Gang ordinal. Indexed by `sortOrder - 1`.
-  /// If the list is shorter than [maxGangs], missing entries fall back to the
-  /// generic `'Gang N'` label at render time.
+  /// Optional per-restaurant labels ("Entrée", "Plat", …). Indexed by
+  /// `sortOrder - 1`. When an entry is missing or blank, the generic
+  /// `'Gang N'` label is used. [effectiveGangLabels] resolves this at render
+  /// time sized to [clampedMaxGangs].
   final List<String> gangLabels;
+
+  /// [maxGangs] forced into the valid [kMinGangs]..[kMaxGangs] range.
+  int get clampedMaxGangs => _clampMaxGangs(maxGangs);
+
+  /// Returns the label list sized to [clampedMaxGangs]. Missing entries fall
+  /// back to [kDefaultGangLabels]; entries that are blank after trimming also
+  /// fall back, so a half-edited override never renders an empty chip.
+  List<String> get effectiveGangLabels {
+    final n = clampedMaxGangs;
+    return List<String>.generate(n, (i) {
+      final override = i < gangLabels.length ? gangLabels[i].trim() : '';
+      return override.isNotEmpty ? override : kDefaultGangLabels[i];
+    });
+  }
 
   /// Resolve the display label for a given `sortOrder` (1-based). Falls back
   /// to `'Gang N'` when the restaurant hasn't provided a custom entry or the
@@ -103,6 +136,8 @@ class RestaurantSettings {
     String? mwstNr,
     String? logoPath,
     bool clearLogo = false,
+    bool? serviceChargeEnabled,
+    double? serviceChargePercent,
     bool? gangsEnabled,
     int? maxGangs,
     List<String>? gangLabels,
@@ -113,6 +148,8 @@ class RestaurantSettings {
       phone: phone ?? this.phone,
       mwstNr: mwstNr ?? this.mwstNr,
       logoPath: clearLogo ? null : (logoPath ?? this.logoPath),
+      serviceChargeEnabled: serviceChargeEnabled ?? this.serviceChargeEnabled,
+      serviceChargePercent: serviceChargePercent ?? this.serviceChargePercent,
       gangsEnabled: gangsEnabled ?? this.gangsEnabled,
       maxGangs: _clampMaxGangs(maxGangs ?? this.maxGangs),
       gangLabels: gangLabels ?? this.gangLabels,
@@ -125,6 +162,8 @@ class RestaurantSettings {
         'phone': phone,
         'mwstNr': mwstNr,
         'logoPath': logoPath,
+        'serviceChargeEnabled': serviceChargeEnabled,
+        'serviceChargePercent': serviceChargePercent,
         'gangsEnabled': gangsEnabled,
         'maxGangs': maxGangs,
         'gangLabels': gangLabels,
@@ -141,6 +180,9 @@ class RestaurantSettings {
       phone: (json['phone'] as String?) ?? '',
       mwstNr: (json['mwstNr'] as String?) ?? '',
       logoPath: json['logoPath'] as String?,
+      serviceChargeEnabled: (json['serviceChargeEnabled'] as bool?) ?? false,
+      serviceChargePercent:
+          (json['serviceChargePercent'] as num?)?.toDouble() ?? 10.0,
       gangsEnabled: (json['gangsEnabled'] as bool?) ?? true,
       maxGangs: _clampMaxGangs((json['maxGangs'] as num?)?.toInt() ?? 3),
       gangLabels: labels,
@@ -161,6 +203,8 @@ class RestaurantSettings {
           phone == other.phone &&
           mwstNr == other.mwstNr &&
           logoPath == other.logoPath &&
+          serviceChargeEnabled == other.serviceChargeEnabled &&
+          serviceChargePercent == other.serviceChargePercent &&
           gangsEnabled == other.gangsEnabled &&
           maxGangs == other.maxGangs &&
           _listEquals(gangLabels, other.gangLabels);
@@ -172,6 +216,8 @@ class RestaurantSettings {
         phone,
         mwstNr,
         logoPath,
+        serviceChargeEnabled,
+        serviceChargePercent,
         gangsEnabled,
         maxGangs,
         Object.hashAll(gangLabels),

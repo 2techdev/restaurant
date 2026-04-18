@@ -11,6 +11,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/features/sync/domain/repositories/sync_repository.dart';
+import 'package:gastrocore_pos/features/sync/presentation/providers/sync_provider.dart';
 import 'package:gastrocore_pos/features/tables/domain/entities/table_entity.dart';
 import 'package:gastrocore_pos/features/waiter/presentation/providers/waiter_provider.dart';
 import 'package:gastrocore_pos/features/waiter/router/waiter_router.dart';
@@ -47,11 +49,18 @@ class WaiterActiveOrdersScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        backgroundColor: AppColors.surface,
-        onRefresh: () async => ref.invalidate(waiterActiveOrdersProvider),
-        child: ordersAsync.when(
+      body: Column(
+        children: [
+          const _PendingSyncPill(),
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              backgroundColor: AppColors.surface,
+              onRefresh: () async {
+                ref.invalidate(waiterActiveOrdersProvider);
+                await ref.read(syncProvider.notifier).sync();
+              },
+              child: ordersAsync.when(
           loading: () => const Center(
             child: CircularProgressIndicator(color: AppColors.primary),
           ),
@@ -117,7 +126,10 @@ class WaiterActiveOrdersScreen extends ConsumerWidget {
               },
             );
           },
-        ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -394,6 +406,75 @@ class _InfoChip extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pending-sync pill
+// ---------------------------------------------------------------------------
+
+/// Surfaces how many orders are still queued locally.
+///
+/// Sits at the top of the My Orders list so the waiter never has to wonder
+/// whether the kitchen has seen their last entry. Tapping "Sync now" kicks
+/// the outbox immediately — handy when Wi-Fi just came back and the 5-minute
+/// periodic timer hasn't fired yet.
+class _PendingSyncPill extends ConsumerWidget {
+  const _PendingSyncPill();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sync = ref.watch(syncProvider);
+    final pending = sync.pendingCount;
+    if (pending == 0) return const SizedBox.shrink();
+
+    final syncing = sync.status == SyncStatus.syncing;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.orange.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.orange.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_upload_outlined,
+              size: 18, color: AppColors.orange),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              pending == 1
+                  ? '1 change waiting to sync'
+                  : '$pending changes waiting to sync',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: syncing
+                ? null
+                : () => ref.read(syncProvider.notifier).sync(),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.orange,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(
+              syncing ? 'Syncing…' : 'Sync now',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -64,6 +64,26 @@ class OrderRepositoryImpl {
     return _ticketToEntity(row, items);
   }
 
+  /// Stream a ticket's current state, re-emitting on every relevant table
+  /// change.
+  ///
+  /// Subscribes to Drift `tableUpdates` on the tickets / order_items /
+  /// order_item_modifiers tables so a KDS-side item status flip (e.g. item
+  /// marked ready) propagates to the waiter UI without an explicit refresh.
+  /// Emits once on subscribe with the current state, then again on every
+  /// table change that could affect this ticket.
+  Stream<TicketEntity?> watchTicketById(String id) async* {
+    yield await getTicketById(id);
+    final updates = _db.tableUpdates(TableUpdateQuery.onAllTables([
+      _db.tickets,
+      _db.orderItems,
+      _db.orderItemModifiers,
+    ]));
+    await for (final _ in updates) {
+      yield await getTicketById(id);
+    }
+  }
+
   /// Return all open tickets (not completed / cancelled / voided) for
   /// [tenantId], ordered by most recent first.
   Future<List<TicketEntity>> getOpenTickets(String tenantId) async {
@@ -191,6 +211,33 @@ class OrderRepositoryImpl {
     );
     await (_db.update(_db.tickets)..where((t) => t.id.equals(id)))
         .write(companion);
+  }
+
+  /// Reassign a ticket to a different table.
+  ///
+  /// Used by the waiter table-transfer flow. The caller is responsible for
+  /// updating old/new table statuses — this method only rewrites the ticket
+  /// row itself.
+  Future<void> updateTicketTable(String id, String newTableId) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
+      TicketsCompanion(
+        tableId: Value(newTableId),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// Persist a new guest (cover) count on a ticket.
+  ///
+  /// Clamped to `>= 1` at the caller; this method only writes. The waiter
+  /// uses this when seat count is corrected mid-service.
+  Future<void> updateTicketGuestCount(String id, int guestCount) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
+      TicketsCompanion(
+        guestCount: Value(guestCount),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   // =========================================================================
@@ -516,6 +563,7 @@ class OrderRepositoryImpl {
       sentToKitchen: row.sentToKitchen,
       notes: row.notes,
       course: row.course,
+      seat: row.seat,
       gangId: row.gangId,
       modifiers: modifiers,
     );
@@ -537,6 +585,7 @@ class OrderRepositoryImpl {
       sentToKitchen: Value(entity.sentToKitchen),
       notes: Value(entity.notes),
       course: Value(entity.course),
+      seat: Value(entity.seat),
       gangId: Value(entity.gangId),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),

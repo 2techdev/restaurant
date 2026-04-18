@@ -256,51 +256,36 @@ class SeedData {
   }
 
   // -------------------------------------------------------------------------
-  // Gangs (Swiss default Gangs seeded with known IDs)
+  // Gangs — always seed five canonical rows (the allowed `maxGangs` ceiling).
+  // Restaurants pick how many to use via RestaurantSettings.maxGangs; labels
+  // come from RestaurantSettings.gangLabels (defaults to "Gang 1..5"). Drinks
+  // stay off the course ladder via defaultGangId=null on the Getränke cat.
   // -------------------------------------------------------------------------
 
   Future<void> _seedGangs() async {
     final now = DateTime.now();
+    const palette = [
+      '#90ABFF', // gang 1 — blue
+      '#69F6B8', // gang 2 — green
+      '#BF5AF2', // gang 3 — purple
+      '#FF9F0A', // gang 4 — orange
+      '#FF375F', // gang 5 — red
+    ];
     final gangs = [
-      GangTemplatesCompanion(
-        id: const Value('gang-1'),
-        tenantId: Value(_tenantId),
-        name: const Value('Gang 1'),
-        sortOrder: const Value(1),
-        color: const Value('#90ABFF'),
-        isDefault: const Value(true),
-        isActive: const Value(true),
-        createdAt: Value(now),
-        updatedAt: Value(now),
-        syncStatus: const Value(0),
-        isDeleted: const Value(false),
-      ),
-      GangTemplatesCompanion(
-        id: const Value('gang-2'),
-        tenantId: Value(_tenantId),
-        name: const Value('Gang 2'),
-        sortOrder: const Value(2),
-        color: const Value('#69F6B8'),
-        isDefault: const Value(true),
-        isActive: const Value(true),
-        createdAt: Value(now),
-        updatedAt: Value(now),
-        syncStatus: const Value(0),
-        isDeleted: const Value(false),
-      ),
-      GangTemplatesCompanion(
-        id: const Value('gang-3'),
-        tenantId: Value(_tenantId),
-        name: const Value('Gang 3'),
-        sortOrder: const Value(3),
-        color: const Value('#BF5AF2'),
-        isDefault: const Value(true),
-        isActive: const Value(true),
-        createdAt: Value(now),
-        updatedAt: Value(now),
-        syncStatus: const Value(0),
-        isDeleted: const Value(false),
-      ),
+      for (var i = 1; i <= 5; i++)
+        GangTemplatesCompanion(
+          id: Value('gang-$i'),
+          tenantId: Value(_tenantId),
+          name: Value('Gang $i'),
+          sortOrder: Value(i),
+          color: Value(palette[i - 1]),
+          isDefault: const Value(true),
+          isActive: const Value(true),
+          createdAt: Value(now),
+          updatedAt: Value(now),
+          syncStatus: const Value(0),
+          isDeleted: const Value(false),
+        ),
       // Drinks are NOT a gang — they route to the Bar station (printerGroup)
       // and fire independently of course pacing. Gangs are pure course
       // ordinals (1..3 default, up to kMaxGangs=5) — see RestaurantSettings.
@@ -444,7 +429,9 @@ class SeedData {
         icon: '\uD83E\uDD64', // 🥤
         color: '#4F8CFF',
         order: 4,
-        // No gang — drinks fire independently via the Bar station.
+        // Drinks flow independently of the 3-gang course ladder, so no
+        // defaultGangId — waiter assigns per-item Gang (or none) at order time.
+        // Drinks route to the Bar station (printerGroup) and fire independently.
         gangId: null,
       ),
     ];

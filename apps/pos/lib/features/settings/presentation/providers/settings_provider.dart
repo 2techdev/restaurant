@@ -53,7 +53,9 @@ class RestaurantSettingsNotifier
   final SettingsRepository _repository;
 
   Future<void> _load() async {
-    state = await AsyncValue.guard(_repository.loadRestaurantSettings);
+    final value = await AsyncValue.guard(_repository.loadRestaurantSettings);
+    if (!mounted) return;
+    state = value;
   }
 
   Future<void> save(RestaurantSettings settings) async {
@@ -94,7 +96,9 @@ class PrinterSettingsNotifier
   final SettingsRepository _repository;
 
   Future<void> _load() async {
-    state = await AsyncValue.guard(_repository.loadPrinterSettings);
+    final value = await AsyncValue.guard(_repository.loadPrinterSettings);
+    if (!mounted) return;
+    state = value;
   }
 
   Future<void> save(PrinterSettings settings) async {
@@ -130,7 +134,9 @@ class PaymentSettingsNotifier
   final SettingsRepository _repository;
 
   Future<void> _load() async {
-    state = await AsyncValue.guard(_repository.loadPaymentSettings);
+    final value = await AsyncValue.guard(_repository.loadPaymentSettings);
+    if (!mounted) return;
+    state = value;
   }
 
   Future<void> save(PaymentSettings settings) async {
@@ -166,7 +172,9 @@ class ReceiptSettingsNotifier
   final SettingsRepository _repository;
 
   Future<void> _load() async {
-    state = await AsyncValue.guard(_repository.loadReceiptSettings);
+    final value = await AsyncValue.guard(_repository.loadReceiptSettings);
+    if (!mounted) return;
+    state = value;
   }
 
   Future<void> save(ReceiptSettings settings) async {
@@ -200,7 +208,9 @@ class TaxSettingsNotifier extends StateNotifier<AsyncValue<TaxSettings>> {
   final SettingsRepository _repository;
 
   Future<void> _load() async {
-    state = await AsyncValue.guard(_repository.loadTaxSettings);
+    final value = await AsyncValue.guard(_repository.loadTaxSettings);
+    if (!mounted) return;
+    state = value;
   }
 
   Future<void> save(TaxSettings settings) async {
@@ -239,7 +249,9 @@ class AppSettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
   final SettingsRepository _repository;
 
   Future<void> _load() async {
-    state = await AsyncValue.guard(_repository.loadAppSettings);
+    final value = await AsyncValue.guard(_repository.loadAppSettings);
+    if (!mounted) return;
+    state = value;
   }
 
   Future<void> save(AppSettings settings) async {
