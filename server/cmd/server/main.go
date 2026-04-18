@@ -27,6 +27,7 @@ import (
 	"github.com/gastrocore/server/internal/online"
 	"github.com/gastrocore/server/internal/orders"
 	"github.com/gastrocore/server/internal/pos"
+	"github.com/gastrocore/server/internal/printers"
 	"github.com/gastrocore/server/internal/qrbill"
 	"github.com/gastrocore/server/internal/reports"
 	"github.com/gastrocore/server/internal/reservations"
@@ -110,6 +111,7 @@ func main() {
 	tablesModule := tables.NewModule(db, cfg)
 	stationsModule := stations.NewModule(db, cfg)
 	usersModule := users.NewModule(db, cfg)
+	printersModule := printers.NewModule(db)
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -176,6 +178,7 @@ func main() {
 	tablesModule.RegisterRoutes(mux)
 	stationsModule.RegisterRoutes(mux)
 	usersModule.RegisterRoutes(mux)
+	printersModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain

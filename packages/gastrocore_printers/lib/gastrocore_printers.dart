@@ -1,0 +1,17 @@
+/// Public barrel for gastrocore_printers.
+///
+/// Consumer apps (POS, Waiter, KDS, Backoffice) import only this file.
+library;
+
+export 'src/models/printer_config.dart';
+export 'src/models/printer_status.dart';
+export 'src/models/printer_target.dart';
+export 'src/models/receipt_data.dart';
+export 'src/models/kitchen_ticket_data.dart';
+
+export 'src/templates/receipt_template.dart';
+export 'src/templates/kitchen_ticket_template.dart';
+
+export 'src/service/printer_service.dart';
+export 'src/service/esc_pos_printer_service.dart';
+export 'src/service/mock_printer_service.dart';
