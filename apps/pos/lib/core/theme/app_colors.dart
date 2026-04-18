@@ -1,43 +1,45 @@
 /// Design-system color palette for GastroCore POS.
 ///
-/// Based on Stitch "Precision POS Framework" design system.
-/// Uses "Midnight Navy" spectrum with "No-Line" philosophy.
-/// Boundaries defined by background shifts and negative space, not borders.
+/// Pilot v3 rolls out the Kinetic Grid light surface across every screen.
+/// The constants in this file used to carry the legacy Stitch "Midnight Navy"
+/// dark values; the name/ identifiers are kept so the 60+ existing screens
+/// compile unchanged while flipping to the light palette automatically.
+/// For new code prefer [GcColors] in `kinetic_theme.dart`.
 library;
 
 import 'dart:ui';
 
 abstract final class AppColors {
   // ---------------------------------------------------------------------------
-  // Surface Hierarchy (Stitch "Physical Stack of Materials")
+  // Surface Hierarchy — Kinetic Grid light tonal stack
   // ---------------------------------------------------------------------------
 
-  /// Base layer - "The Tabletop" (main background, darkest)
-  static const Color surfaceDim = Color(0xFF0B0E14);
+  /// Base layer — canvas background.
+  static const Color surfaceDim = Color(0xFFF4F7F9);
 
-  /// Intermediate layer - "The Tray" (sidebar, panels)
-  static const Color surface = Color(0xFF151720);
+  /// Intermediate layer — sidebar / panels.
+  static const Color surface = Color(0xFFFFFFFF);
 
-  /// Container low - cards, product tiles
-  static const Color surfaceContainerLow = Color(0xFF191B22);
+  /// Container low — cards, product tiles.
+  static const Color surfaceContainerLow = Color(0xFFEEF1F3);
 
-  /// Container - elevated elements
-  static const Color surfaceContainer = Color(0xFF1E1F26);
+  /// Container — elevated elements.
+  static const Color surfaceContainer = Color(0xFFE4E9EB);
 
-  /// Container high - PIN pad keys, active elements
-  static const Color surfaceContainerHigh = Color(0xFF282A30);
+  /// Container high — PIN pad keys, active elements.
+  static const Color surfaceContainerHigh = Color(0xFFDEE3E6);
 
-  /// Container highest - modals, active product cards
-  static const Color surfaceContainerHighest = Color(0xFF33343B);
+  /// Container highest — modals, active product cards.
+  static const Color surfaceContainerHighest = Color(0xFFD8DEE1);
 
-  /// Bright surface - hover/active states
-  static const Color surfaceBright = Color(0xFF373940);
+  /// Bright surface — hover/active states.
+  static const Color surfaceBright = Color(0xFFFFFFFF);
 
-  /// Input field background
-  static const Color bgInput = Color(0xFF1A1C24);
+  /// Input field background.
+  static const Color bgInput = Color(0xFFFFFFFF);
 
-  /// Modal overlay (80% opacity)
-  static const Color bgOverlay = Color(0xCC111319);
+  /// Modal overlay — translucent onSurface scrim for dialogs.
+  static const Color bgOverlay = Color(0xCC2B2F31);
 
   // Legacy aliases for backward compatibility
   static const Color bgPrimary = surfaceDim;
@@ -49,20 +51,20 @@ abstract final class AppColors {
   // Primary / Accent
   // ---------------------------------------------------------------------------
 
-  /// Primary accent - action blue
-  static const Color primary = Color(0xFF90ABFF);
+  /// Primary accent — Kinetic brand blue.
+  static const Color primary = Color(0xFF3841E9);
 
-  /// Primary container - deeper blue for gradients
-  static const Color primaryContainer = Color(0xFF528DFF);
+  /// Primary container — deeper blue for gradients.
+  static const Color primaryContainer = Color(0xFF2931DE);
 
-  /// Classic accent (alias)
-  static const Color accent = Color(0xFF4F8CFF);
+  /// Classic accent (alias).
+  static const Color accent = Color(0xFF3841E9);
 
-  /// Accent hover
-  static const Color accentHover = Color(0xFF6DA0FF);
+  /// Accent hover.
+  static const Color accentHover = Color(0xFF2931DE);
 
-  /// Accent dim (tinted background for selected states)
-  static const Color accentDim = Color(0x1A4F8CFF);
+  /// Accent dim — tinted background for selected states.
+  static const Color accentDim = Color(0x1A3841E9);
 
   // ---------------------------------------------------------------------------
   // Semantic Colors
@@ -107,48 +109,48 @@ abstract final class AppColors {
   static const Color coral = Color(0xFFFF6B8A);
 
   /// Nav surface — sidebar / bottom-nav background
-  static const Color navSurface = Color(0xFF10131A);
+  static const Color navSurface = Color(0xFFEEF1F3);
 
   /// Nav surface hover state
-  static const Color navSurfaceHover = Color(0xFF1A1E28);
+  static const Color navSurfaceHover = Color(0xFFE4E9EB);
 
   /// Nav divider — subtle separator in sidebar
-  static const Color navDivider = Color(0x26424753);
+  static const Color navDivider = Color(0x33AAAEB0);
 
   /// Nav text — default sidebar label color
-  static const Color navText = Color(0xFF8E8E9A);
+  static const Color navText = Color(0xFF585C5E);
 
   /// Nav text active — selected item label color
-  static const Color navTextActive = Color(0xFFF0F0F5);
+  static const Color navTextActive = Color(0xFF2B2F31);
 
   /// Primary light — lighter variant of primary for gradients and icons
-  static const Color primaryLight = Color(0xFFB8CBFF);
+  static const Color primaryLight = Color(0xFF9097FF);
 
   /// Primary dim — 10% primary tint for hover/pressed states
-  static const Color primaryDim = Color(0x1A90ABFF);
+  static const Color primaryDim = Color(0x1A3841E9);
 
   /// Error — alias for red, for semantic clarity
   static const Color error = red;
 
-  /// Primary text (high emphasis) - NEVER use pure #FFFFFF
-  static const Color textPrimary = Color(0xFFF0F0F5);
+  /// Primary text (high emphasis).
+  static const Color textPrimary = Color(0xFF2B2F31);
 
-  /// Secondary text (medium emphasis)
-  static const Color textSecondary = Color(0xFF8E8E9A);
+  /// Secondary text (medium emphasis).
+  static const Color textSecondary = Color(0xFF585C5E);
 
-  /// Dim / placeholder / disabled text
-  static const Color textDim = Color(0xFF5A5A6A);
+  /// Dim / placeholder / disabled text.
+  static const Color textDim = Color(0xFF737779);
 
   // ---------------------------------------------------------------------------
   // Borders (use sparingly - prefer "No-Line" philosophy)
   // ---------------------------------------------------------------------------
 
-  /// Ghost border - 15% opacity outline-variant per Stitch design
-  static const Color border = Color(0x26424753);
+  /// Ghost border — translucent outline-variant (20% alpha).
+  static const Color border = Color(0x33AAAEB0);
 
-  /// Focused / active element border (only when necessary)
-  static const Color borderFocused = Color(0xFF4F8CFF);
+  /// Focused / active element border.
+  static const Color borderFocused = Color(0xFF3841E9);
 
-  /// Outline variant for subtle separators
-  static const Color outlineVariant = Color(0xFF424753);
+  /// Outline variant for subtle separators.
+  static const Color outlineVariant = Color(0xFFAAAEB0);
 }

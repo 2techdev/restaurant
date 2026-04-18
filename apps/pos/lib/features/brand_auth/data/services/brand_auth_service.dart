@@ -123,11 +123,38 @@ class BrandAuthService {
       throw const AuthException('Missing access_token in response');
     }
 
-    // The server returns a nested `store` object with brand/store context.
-    final storeData =
-        (data['store'] ?? data['context'] ?? data) as Map<String, dynamic>;
+    // The multi-tenant backend returns fields on a nested `user` object:
+    //   { access_token, refresh_token, user: { store_id, organization_id, role, … } }
+    // Older/alternate shapes may expose a flat `store` or `context` object
+    // or root-level scalars; probe all of them in priority order.
+    final userData = data['user'] as Map<String, dynamic>?;
+    final storeData = (data['store'] ?? data['context'] ?? const {})
+        as Map<String, dynamic>;
 
-    final roleStr = (storeData['user_role'] as String? ?? 'staff').toLowerCase();
+    String pick(String key, [String fallback = '']) {
+      final fromUser = userData?[key];
+      if (fromUser is String && fromUser.isNotEmpty) return fromUser;
+      if (fromUser is List && fromUser.isNotEmpty) {
+        // e.g. `store_ids: ["…"]` — take the first entry.
+        final first = fromUser.first;
+        if (first is String && first.isNotEmpty) return first;
+      }
+      final fromStore = storeData[key];
+      if (fromStore is String && fromStore.isNotEmpty) return fromStore;
+      final fromRoot = data[key];
+      if (fromRoot is String && fromRoot.isNotEmpty) return fromRoot;
+      return fallback;
+    }
+
+    final storeId = pick('store_id').isNotEmpty
+        ? pick('store_id')
+        : pick('store_ids');
+
+    final brandId = pick('organization_id').isNotEmpty
+        ? pick('organization_id')
+        : pick('brand_id');
+
+    final roleStr = pick('role', pick('user_role', 'staff')).toLowerCase();
     final role = switch (roleStr) {
       'owner' => BrandUserRole.owner,
       'manager' => BrandUserRole.manager,
@@ -135,22 +162,12 @@ class BrandAuthService {
     };
 
     final ctx = StoreContext(
-      brandId: (storeData['brand_id'] as String? ??
-              data['brand_id'] as String? ??
-              '')
-          .toString(),
-      storeId: (storeData['store_id'] as String? ??
-              data['store_id'] as String? ??
-              '')
-          .toString(),
-      storeName: (storeData['store_name'] as String? ??
-              data['store_name'] as String? ??
-              'My Restaurant')
-          .toString(),
-      brandName: (storeData['brand_name'] as String? ??
-              data['restaurant_name'] as String? ??
-              'My Brand')
-          .toString(),
+      brandId: brandId,
+      storeId: storeId,
+      storeName: pick('store_name', 'My Restaurant'),
+      brandName: pick('brand_name').isNotEmpty
+          ? pick('brand_name')
+          : pick('restaurant_name', 'My Brand'),
       userRole: role,
       isOnlineMode: true,
     );

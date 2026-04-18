@@ -134,7 +134,7 @@ class _ProductArea extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _ProductHeader(title: headerLabel),
-          FavoritesBar.demo(onAddProduct: onProductTap),
+          FavoritesBar(onAddProduct: onProductTap),
           Expanded(
             child: ProductGrid(
               cartQuantities: cartQuantities,

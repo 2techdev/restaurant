@@ -73,6 +73,8 @@ class _GastroCoreAppState extends ConsumerState<GastroCoreApp> {
       title: 'GastroCore POS',
       debugShowCheckedModeBanner: false,
       theme: buildKineticTheme(),
+      darkTheme: buildKineticTheme(),
+      themeMode: ThemeMode.light,
 
       // ── Localization ──────────────────────────────────────────────────────
       locale: locale,
