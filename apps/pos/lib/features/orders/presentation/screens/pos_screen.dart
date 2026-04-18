@@ -516,6 +516,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             modifierId: sel.option.id,
             modifierName: sel.displayName,
             priceDelta: sel.option.priceDelta,
+            quantity: sel.quantity,
+            note: sel.note,
           ),
       ];
       ref.read(currentTicketProvider.notifier).addItem(

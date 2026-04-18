@@ -312,7 +312,7 @@ abstract class AppLocalizations {
   /// **'Umbuchen'**
   String get tableTransfer;
 
-  /// Course (Gang) label with its 1-based index. Fixed 'Gang N' across all locales — product decision 2026-04-17.
+  /// Default course (Gang) label with its 1-based index. Text stays 'Gang N' in every locale by convention — 'Gang' is a Swiss-industry loanword. Restaurants may override per-slot via RestaurantSettings.gangLabels (e.g. Vorspeise/Hauptgang/Dessert); this l10n key is the fallback when no override is set.
   ///
   /// In de, this message translates to:
   /// **'Gang {number}'**

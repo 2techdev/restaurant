@@ -191,6 +191,8 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
               modifierId: sel.option.id,
               modifierName: sel.displayName,
               priceDelta: sel.option.priceDelta,
+              quantity: sel.quantity,
+              note: sel.note,
             ),
         ];
 

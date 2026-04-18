@@ -398,6 +398,8 @@ class _ProductTile extends ConsumerWidget {
             modifierId: sel.option.id,
             modifierName: sel.displayName,
             priceDelta: sel.option.priceDelta,
+            quantity: sel.quantity,
+            note: sel.note,
           ),
       ];
       if (context.mounted) {
