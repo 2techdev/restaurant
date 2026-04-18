@@ -18,9 +18,14 @@ final localeProvider = Provider<Locale>((ref) {
   return _toLocale(language);
 });
 
+/// Maps an [AppLanguage] to a [Locale]. Swiss German uses the `de-CH`
+/// script variant so that `intl` formatters pick the Swiss date/number
+/// conventions (e.g. thousand separators, 17.04.2026, apostrophes in
+/// grouped numbers) rather than the default German (de-DE) ones.
 Locale _toLocale(AppLanguage language) => switch (language) {
-      AppLanguage.de => const Locale('de'),
-      AppLanguage.fr => const Locale('fr'),
-      AppLanguage.it => const Locale('it'),
+      AppLanguage.de => const Locale('de', 'CH'),
+      AppLanguage.tr => const Locale('tr'),
       AppLanguage.en => const Locale('en'),
+      AppLanguage.fr => const Locale('fr', 'CH'),
+      AppLanguage.it => const Locale('it', 'CH'),
     };

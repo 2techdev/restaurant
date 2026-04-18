@@ -51,10 +51,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get orderType => 'Bestellart';
 
   @override
-  String get dineIn => 'Lieferung';
+  String get dineIn => 'Im Restaurant';
 
   @override
-  String get takeaway => 'Abholung';
+  String get takeaway => 'Zum Mitnehmen';
 
   @override
   String get tableNumber => 'Tischnummer';
@@ -213,7 +213,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get continueToCheckout => 'Weiter zur Kasse';
 
   @override
-  String get orderTypeRequired => 'Bitte Lieferung oder Abholung wählen';
+  String get orderTypeRequired => 'Bitte Tisch oder Mitnehmen wählen';
 
   @override
   String itemsInCart(String count) {

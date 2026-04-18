@@ -458,5 +458,32 @@
   "reservationCustomerName": "Kundenname",
   "reservationNameRequired": "Name ist erforderlich",
   "reservationCustomerPhone": "Telefonnummer",
-  "reservationCustomerEmail": "E-Mail-Adresse"
+  "reservationCustomerEmail": "E-Mail-Adresse",
+
+  "courseLabel": "{number, select, 1{1. Gang} 2{2. Gang} 3{3. Gang} 4{4. Gang} 5{5. Gang} other{{number}. Gang}}",
+  "@courseLabel": {
+    "description": "Course label on the adisyon (e.g. '1. Gang'). Uses select because fine-dining menus rarely go above 5 courses.",
+    "placeholders": { "number": { "type": "String" } }
+  },
+
+  "menuCategoryStarter": "Vorspeise",
+  "@menuCategoryStarter": { "description": "Menu category: starter / appetizer" },
+
+  "menuCategoryMain": "Hauptgang",
+  "@menuCategoryMain": { "description": "Menu category: main course" },
+
+  "menuCategoryDessert": "Dessert",
+  "@menuCategoryDessert": { "description": "Menu category: dessert" },
+
+  "posServiceCharge": "Service",
+  "@posServiceCharge": { "description": "Service charge line on the bill" },
+
+  "posCover": "Gäste",
+  "@posCover": { "description": "Cover count (guests at the table)" },
+
+  "settingsLocale": "Sprache & Region",
+  "@settingsLocale": { "description": "Settings: locale section header" },
+
+  "fiscalReceiptVat": "MWST",
+  "@fiscalReceiptVat": { "description": "Tax abbreviation on printed receipt" }
 }

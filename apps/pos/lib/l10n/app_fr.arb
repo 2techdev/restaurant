@@ -184,5 +184,21 @@
   "reservationCustomerName": "Nom du client",
   "reservationNameRequired": "Le nom est obligatoire",
   "reservationCustomerPhone": "Numéro de téléphone",
-  "reservationCustomerEmail": "Adresse e-mail"
+  "reservationCustomerEmail": "Adresse e-mail",
+
+  "courseLabel": "{number, select, 1{Plat 1} 2{Plat 2} 3{Plat 3} 4{Plat 4} 5{Plat 5} other{Plat {number}}}",
+  "@courseLabel": {
+    "placeholders": { "number": { "type": "String" } }
+  },
+
+  "menuCategoryStarter": "Entrée",
+  "menuCategoryMain": "Plat principal",
+  "menuCategoryDessert": "Dessert",
+
+  "posServiceCharge": "Service",
+  "posCover": "Couverts",
+
+  "settingsLocale": "Langue et région",
+
+  "fiscalReceiptVat": "TVA"
 }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/theme_provider.dart';
+import 'l10n/app_localizations.dart';
 
 class DashboardApp extends ConsumerWidget {
   const DashboardApp({super.key});
@@ -22,16 +23,12 @@ class DashboardApp extends ConsumerWidget {
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('de'),
-        Locale('en'),
-        Locale('fr'),
-        Locale('it'),
-      ],
+      supportedLocales: AppLocalizations.supportedLocales,
     );
   }
 }
