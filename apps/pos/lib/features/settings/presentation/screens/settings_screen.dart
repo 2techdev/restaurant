@@ -645,6 +645,22 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
             ),
           ],
         ),
+        _Card(
+          title: 'WORKFLOW',
+          children: [
+            _Toggle(
+              label: 'Require shift start after login',
+              subtitle:
+                  'When on, cashiers must record opening cash after PIN '
+                  'login. Turn off for card-only / fast-casual concepts '
+                  'where login drops straight into the order center.',
+              value: settingsAsync.valueOrNull?.shiftStartRequired ?? true,
+              onChanged: (v) => ref
+                  .read(restaurantSettingsProvider.notifier)
+                  .update((s) => s.copyWith(shiftStartRequired: v)),
+            ),
+          ],
+        ),
       ],
     );
   }

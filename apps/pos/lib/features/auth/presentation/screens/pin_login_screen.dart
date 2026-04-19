@@ -16,6 +16,7 @@ import 'package:go_router/go_router.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/providers/shift_provider.dart';
 
 class PinLoginScreen extends ConsumerStatefulWidget {
@@ -129,7 +130,9 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
       if (!mounted) return;
 
       final shift = ref.read(currentShiftProvider);
-      if (shift != null) {
+      final settings = ref.read(restaurantSettingsProvider).valueOrNull;
+      final shiftRequired = settings?.shiftStartRequired ?? true;
+      if (shift != null || !shiftRequired) {
         context.go(AppRoutes.orderCenter);
       } else {
         context.go(AppRoutes.shiftOpen);

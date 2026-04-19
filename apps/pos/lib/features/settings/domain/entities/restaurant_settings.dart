@@ -55,6 +55,7 @@ class RestaurantSettings {
     this.gangsEnabled = false,
     this.maxGangs = 3,
     this.gangLabels = kDefaultGangLabels,
+    this.shiftStartRequired = true,
   });
 
   /// Restaurant display name shown on receipts and the POS header.
@@ -99,6 +100,12 @@ class RestaurantSettings {
   /// length fall back to [kDefaultGangLabels].
   final List<String> gangLabels;
 
+  /// Whether the cashier must open a shift (record opening drawer cash)
+  /// after PIN login. Cash-handling restaurants keep this on; fast-casual
+  /// concepts that only take card payments turn it off so login drops
+  /// straight into the order center.
+  final bool shiftStartRequired;
+
   /// Convenience: resolve the display label for a 1-based course index,
   /// applying fallbacks in order: restaurant override → default "Gang N".
   String gangLabelFor(int oneBasedIndex) {
@@ -125,6 +132,7 @@ class RestaurantSettings {
     bool? gangsEnabled,
     int? maxGangs,
     List<String>? gangLabels,
+    bool? shiftStartRequired,
   }) {
     return RestaurantSettings(
       name: name ?? this.name,
@@ -139,6 +147,7 @@ class RestaurantSettings {
       gangsEnabled: gangsEnabled ?? this.gangsEnabled,
       maxGangs: maxGangs ?? this.maxGangs,
       gangLabels: gangLabels ?? this.gangLabels,
+      shiftStartRequired: shiftStartRequired ?? this.shiftStartRequired,
     );
   }
 
@@ -153,6 +162,7 @@ class RestaurantSettings {
         'gangsEnabled': gangsEnabled,
         'maxGangs': maxGangs,
         'gangLabels': gangLabels,
+        'shiftStartRequired': shiftStartRequired,
       };
 
   factory RestaurantSettings.fromJson(Map<String, dynamic> json) {
@@ -176,6 +186,7 @@ class RestaurantSettings {
       gangsEnabled: (json['gangsEnabled'] as bool?) ?? false,
       maxGangs: rawMax.clamp(1, kGangsUpperBound),
       gangLabels: labels,
+      shiftStartRequired: (json['shiftStartRequired'] as bool?) ?? true,
     );
   }
 
@@ -200,7 +211,8 @@ class RestaurantSettings {
         serviceChargeEnabled == other.serviceChargeEnabled &&
         serviceChargePercent == other.serviceChargePercent &&
         gangsEnabled == other.gangsEnabled &&
-        maxGangs == other.maxGangs;
+        maxGangs == other.maxGangs &&
+        shiftStartRequired == other.shiftStartRequired;
   }
 
   @override
@@ -215,5 +227,6 @@ class RestaurantSettings {
         gangsEnabled,
         maxGangs,
         Object.hashAll(gangLabels),
+        shiftStartRequired,
       );
 }
