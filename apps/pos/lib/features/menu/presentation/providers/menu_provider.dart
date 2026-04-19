@@ -45,15 +45,20 @@ final selectedCategoryProvider = StateProvider<String?>((ref) => null);
 /// Products filtered by the currently selected category (active only).
 ///
 /// When [selectedCategoryProvider] is `null`, all active products are returned.
+///
+/// Implementation note: we fetch the full tenant-scoped list once and filter
+/// locally rather than issuing a `categoryId`-only query. The local filter
+/// guarantees products always come from the current tenant and collapses two
+/// code paths (all vs. filtered) into one — so a stale `selectedCategoryProvider`
+/// value can no longer empty the grid.
 final productsProvider = FutureProvider<List<ProductEntity>>((ref) async {
   final repo = ref.watch(menuRepositoryProvider);
   final tenantId = ref.watch(tenantIdProvider);
   final categoryId = ref.watch(selectedCategoryProvider);
 
-  if (categoryId != null) {
-    return repo.getProductsByCategory(categoryId);
-  }
-  return repo.getAllProducts(tenantId);
+  final all = await repo.getAllProducts(tenantId);
+  if (categoryId == null) return all;
+  return all.where((p) => p.categoryId == categoryId).toList();
 });
 
 // ---------------------------------------------------------------------------
