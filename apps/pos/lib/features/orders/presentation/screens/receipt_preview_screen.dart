@@ -233,7 +233,9 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
   // -------------------------------------------------------------------------
 
   Widget _buildTopBar() {
-    const tabs = ['Dashboard', 'Tables', 'Orders', 'Kitchen', 'Inventory', 'Reports'];
+    // Kitchen / Inventory tabs removed — those features are not part of the
+    // pilot POS scope and should not surface Pro-upgrade gates.
+    const tabs = ['Dashboard', 'Tables', 'Orders', 'Reports'];
     const activeTab = 'Orders';
 
     return Container(
@@ -268,7 +270,6 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
             GestureDetector(
               onTap: () {
                 if (tab == 'Tables') context.go('/tables');
-                if (tab == 'Kitchen') context.go('/kitchen');
                 if (tab == 'Orders') context.go('/order-center');
               },
               child: Container(

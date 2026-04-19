@@ -62,12 +62,8 @@ const List<GcNavItem> _kNavItems = [
     label: 'Menu',
     route: '/back-office',
   ),
-  GcNavItem(
-    icon: Icons.kitchen_outlined,
-    activeIcon: Icons.kitchen,
-    label: 'KDS',
-    route: '/kitchen',
-  ),
+  // KDS is a separate flavour/app on the pilot; the nav entry has been
+  // removed from the POS sidebar so staff never hit the Pro-upgrade gate.
   GcNavItem(
     icon: Icons.bar_chart_outlined,
     activeIcon: Icons.bar_chart,

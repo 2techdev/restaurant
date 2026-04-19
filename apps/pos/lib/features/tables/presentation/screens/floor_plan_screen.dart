@@ -138,8 +138,7 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
     final navItems = [
       ('Floor Plan', Icons.grid_view_rounded),
       ('Orders', Icons.receipt_long_rounded),
-      ('Kitchen', Icons.kitchen_rounded),
-      ('Inventory', Icons.inventory_2_rounded),
+      // Kitchen & Inventory entries removed — out of scope for the pilot POS.
       ('Reports', Icons.analytics_rounded),
     ];
 
@@ -159,8 +158,6 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
                   setState(() => _selectedNavIndex = 0);
                 } else if (i == 1) {
                   context.go('/order-center');
-                } else if (i == 2) {
-                  context.go('/kitchen');
                 }
               },
               child: Container(
