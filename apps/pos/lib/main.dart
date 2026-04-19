@@ -58,6 +58,26 @@ Future<void> _bootstrap() async {
   final db = AppDatabase.create();
   await AppInitializer.initialize(db);
 
+  // Post-seed hard override. If any of the four "visible" tables is still
+  // empty after the normal seed path ran — for instance because a silent
+  // exception inside `_seed()` got swallowed somewhere upstream — force
+  // a full re-seed so the pilot tablet never boots into an empty POS.
+  //
+  // `SeedData.seedForce()` calls `clearAll()` before inserting, so there
+  // is no double-insert risk on the stable [kPilotTenantId] primary key.
+  final tBoot = (await db.select(db.tenants).get()).length;
+  final cBoot = (await db.select(db.categories).get()).length;
+  final pBoot = (await db.select(db.products).get()).length;
+  final tblBoot = (await db.select(db.restaurantTables).get()).length;
+  debugPrint(
+    '[BOOT] post-init counts tenants=$tBoot cats=$cBoot prods=$pBoot '
+    'tables=$tblBoot',
+  );
+  if (tBoot == 0 || cBoot == 0 || pBoot == 0 || tblBoot == 0) {
+    debugPrint('[BOOT] empty detected — forcing SeedData.seedForce()');
+    await SeedData(db).seedForce();
+  }
+
   // Resolve the active tenant ID.
   //
   // Seed has a stable [kPilotTenantId] for the pilot demo restaurant, so
@@ -68,6 +88,9 @@ Future<void> _bootstrap() async {
   final tenants = await db.select(db.tenants).get();
   final tenantId =
       tenants.isNotEmpty ? tenants.first.id : kPilotTenantId;
+  debugPrint(
+    '[BOOT] resolved tenantId=$tenantId (row count=${tenants.length})',
+  );
 
   // Pre-warm the license cache so the first frame knows the correct tier.
   final licenseRepo = LicenseRepositoryImpl(db);

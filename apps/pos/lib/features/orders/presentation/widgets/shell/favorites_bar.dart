@@ -351,13 +351,24 @@ class FavoritesBar extends ConsumerWidget {
     required List<ProductEntity> products,
     required List<CategoryEntity> categories,
   }) {
+    // PILOT DIAGNOSTIC — remove after the empty-favorites bug is solved.
+    debugPrint(
+      '[FAV] tap action=${button.action.name} target="${button.target}" '
+      'products=${products.length} categories=${categories.length}',
+    );
     switch (button.action) {
       case FavoriteAction.addProduct:
         final match = _matchProductByName(products, button.target);
+        debugPrint(
+          '[FAV] addProduct match=${match == null ? 'NONE' : match.name}',
+        );
         if (match == null) return; // silently skip if seed missing
         onAddProduct(match);
       case FavoriteAction.openCategory:
         final match = _matchCategoryByName(categories, button.target);
+        debugPrint(
+          '[FAV] openCategory match=${match ?? 'NONE'}',
+        );
         if (match == null) return;
         ref.read(selectedCategoryProvider.notifier).state = match;
     }

@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
 import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
@@ -31,6 +32,7 @@ import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/grid_c
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/left_nav_rail.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/order_panel.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/product_grid.dart';
+import 'package:gastrocore_pos/features/tables/presentation/providers/table_provider.dart';
 
 class FineDiningShell extends ConsumerWidget {
   const FineDiningShell({super.key});
@@ -303,6 +305,8 @@ class _TopBar extends ConsumerWidget {
               letterSpacing: -0.5,
             ),
           ),
+          const SizedBox(width: AppTokens.space12),
+          const _DiagnosticBadge(),
           const Spacer(),
           _IconButton(
             icon: Icons.sync_rounded,
@@ -342,6 +346,43 @@ class _IconButton extends StatelessWidget {
             size: 20,
             color: GcColors.primary,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// TEMPORARY pilot diagnostic — remove after the empty-screens bug is solved.
+// Shows the runtime tenantId tail, and the counts of the objects the three
+// "broken" surfaces depend on: categories, active products, favorites
+// (SharedPreferences), and all tables (DB). If the overlay shows the seed
+// tenantId with non-zero counts, the storefront bug is a rendering problem,
+// not a data-loading one. If the counts are zero the seed didn't land.
+class _DiagnosticBadge extends ConsumerWidget {
+  const _DiagnosticBadge();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tenantId = ref.watch(tenantIdProvider);
+    final tenantTail = tenantId.length > 8
+        ? tenantId.substring(tenantId.length - 8)
+        : tenantId;
+    final cats = ref.watch(categoriesProvider).asData?.value.length ?? -1;
+    final prods =
+        ref.watch(allActiveProductsProvider).asData?.value.length ?? -1;
+    final favs = ref.watch(favoritesProvider).length;
+    final tbls = ref.watch(allTablesProvider).asData?.value.length ?? -1;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      color: Colors.amber.shade100,
+      child: Text(
+        'T:$tenantTail C:$cats P:$prods F:$favs TBL:$tbls',
+        style: const TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.black,
         ),
       ),
     );

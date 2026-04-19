@@ -14,6 +14,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
@@ -108,19 +109,39 @@ class SeedData {
     final tableCount =
         (await db.select(db.restaurantTables).get()).length;
 
+    debugPrint(
+      '[SEED] pre-check tenants=$tenantCount cats=$categoryCount '
+      'prods=$productCount tables=$tableCount',
+    );
+
     final complete = tenantCount > 0 &&
         categoryCount > 0 &&
         productCount > 0 &&
         tableCount > 0;
-    if (complete) return;
+    if (complete) {
+      debugPrint('[SEED] DB complete — skipping seed');
+      return;
+    }
 
     // Anything non-empty is a partial seed — wipe before rebuilding so the
     // stable [kPilotTenantId] primary key doesn't clash.
     if (tenantCount > 0 || categoryCount > 0 || productCount > 0 ||
         tableCount > 0) {
+      debugPrint('[SEED] partial state detected — clearAll() then reseed');
       await clearAll();
     }
     await _seed();
+
+    // Post-seed verification — catches silent InsertErrors.
+    final postT = (await db.select(db.tenants).get()).length;
+    final postC = (await db.select(db.categories).get()).length;
+    final postP = (await db.select(db.products).get()).length;
+    final postTbl =
+        (await db.select(db.restaurantTables).get()).length;
+    debugPrint(
+      '[SEED] post-seed tenants=$postT cats=$postC prods=$postP '
+      'tables=$postTbl (tenantId=$_tenantId)',
+    );
   }
 
   /// Always inserts demo data (clears existing first). Used from settings UI.
@@ -171,16 +192,22 @@ class SeedData {
   // -------------------------------------------------------------------------
 
   Future<void> _seed() async {
-    await _seedTenant();
-    await _seedUsers();
-    await _seedGangs();
-    await _seedCategories();
-    await _seedProducts();
-    await _seedModifiers();
-    await _seedFloors();
-    await _seedTables();
-    await _seedTaxProfiles();
-    await _seedDemoOrders();
+    debugPrint('[SEED] _seed() starting (tenantId=$kPilotTenantId)');
+    try {
+      await _seedTenant();     debugPrint('[SEED] tenant OK');
+      await _seedUsers();      debugPrint('[SEED] users OK');
+      await _seedGangs();      debugPrint('[SEED] gangs OK');
+      await _seedCategories(); debugPrint('[SEED] categories OK');
+      await _seedProducts();   debugPrint('[SEED] products OK');
+      await _seedModifiers();  debugPrint('[SEED] modifiers OK');
+      await _seedFloors();     debugPrint('[SEED] floors OK');
+      await _seedTables();     debugPrint('[SEED] tables OK');
+      await _seedTaxProfiles();debugPrint('[SEED] tax OK');
+      await _seedDemoOrders(); debugPrint('[SEED] demoOrders OK');
+    } catch (e, st) {
+      debugPrint('[SEED] FAILED: $e\n$st');
+      rethrow;
+    }
   }
 
   // -------------------------------------------------------------------------
