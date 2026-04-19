@@ -134,15 +134,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       tipAmount: _tipAmount,
       tenderedAmount: tendered,
       receivedBy: receivedBy,
-      reference: terminalResult?.transactionId ??
-          (_voucher != null ? 'VOUCHER:${_voucher!.code}' : null),
-      terminalTransactionId: terminalResult?.transactionId,
-      authCode: terminalResult?.authCode,
-      maskedPan: terminalResult?.cardNumber,
-      cardType: terminalResult?.cardType,
-      entryMethod: terminalResult?.entryMethod,
-      terminalId: terminalResult?.terminalId,
-      terminalProvider: terminalProvider,
+      reference: _voucher != null ? 'VOUCHER:${_voucher!.code}' : null,
     );
 
     ref.read(currentTicketProvider.notifier).clear();

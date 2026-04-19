@@ -3153,3 +3153,652 @@ class _AccessDeniedPane extends StatelessWidget {
     );
   }
 }
+class _FavoritesSection extends ConsumerWidget {
+  const _FavoritesSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final favorites = ref.watch(favoritesProvider);
+
+    return _SectionScaffold(
+      title: 'Hızlı Erişim Butonları',
+      action: ElevatedButton.icon(
+        onPressed: () => _openEditor(context, ref, null),
+        icon: const Icon(Icons.add_rounded, size: 18),
+        label: const Text('Yeni Favori Ekle'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      children: [
+        _Card(
+          title: 'HAKKINDA',
+          children: const [
+            Text(
+              'Bu butonlar POS satış ekranında ürün kılavuzunun üstünde '
+              'yatay şerit olarak görünür. Her buton bir ürünü sepete '
+              'ekleyebilir ya da bir kategoriye geçiş yapabilir. Aşağıdaki '
+              'sıralama satış ekranına birebir yansır.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        _Card(
+          title: 'FAVORİLER (${favorites.length})',
+          children: [
+            if (favorites.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'Henüz favori yok. Yukarıdaki "Yeni Favori Ekle" ile başla.',
+                    style:
+                        TextStyle(color: AppColors.textDim, fontSize: 13),
+                  ),
+                ),
+              )
+            else
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: favorites.length,
+                itemBuilder: (ctx, i) {
+                  final fav = favorites[i];
+                  return _FavoriteRow(
+                    key: ValueKey(fav.id),
+                    index: i,
+                    favorite: fav,
+                    onEdit: () => _openEditor(context, ref, fav),
+                    onDelete: () => _confirmDelete(context, ref, fav),
+                  );
+                },
+                onReorder: (oldIndex, newIndex) {
+                  final ordered = favorites
+                      .map((b) => b.id)
+                      .toList();
+                  final idx =
+                      newIndex > oldIndex ? newIndex - 1 : newIndex;
+                  final moved = ordered.removeAt(oldIndex);
+                  ordered.insert(idx, moved);
+                  ref.read(favoritesProvider.notifier).reorder(ordered);
+                },
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openEditor(
+    BuildContext context,
+    WidgetRef ref,
+    FavoriteButton? existing,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _FavoriteEditorDialog(existing: existing),
+    );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    FavoriteButton fav,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(
+          'Favoriyi sil?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          '"${fav.label}" butonu favorilerden kaldırılacak.',
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('İptal',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child:
+                const Text('Sil', style: TextStyle(color: AppColors.red)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(favoritesProvider.notifier).remove(fav.id);
+    }
+  }
+}
+class _FavoriteRow extends StatelessWidget {
+  const _FavoriteRow({
+    super.key,
+    required this.index,
+    required this.favorite,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final int index;
+  final FavoriteButton favorite;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = favorite.color ??
+        (favorite.action == FavoriteAction.addProduct
+            ? AppColors.green
+            : AppColors.orange);
+    final icon = favorite.action == FavoriteAction.addProduct
+        ? Icons.fastfood_rounded
+        : Icons.category_rounded;
+    final typeLabel = favorite.action == FavoriteAction.addProduct
+        ? 'Ürün'
+        : 'Kategori';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          ReorderableDragStartListener(
+            index: index,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.drag_indicator_rounded,
+                  size: 20, color: AppColors.textDim),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: tint,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, size: 18, color: Colors.white),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  favorite.label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$typeLabel · ${favorite.target}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_rounded,
+                size: 18, color: AppColors.primary),
+            onPressed: onEdit,
+            tooltip: 'Düzenle',
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded,
+                size: 18, color: AppColors.red),
+            onPressed: onDelete,
+            tooltip: 'Sil',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FavoriteEditorDialog extends ConsumerStatefulWidget {
+  const _FavoriteEditorDialog({this.existing});
+
+  final FavoriteButton? existing;
+
+  @override
+  ConsumerState<_FavoriteEditorDialog> createState() =>
+      _FavoriteEditorDialogState();
+}
+
+class _FavoriteEditorDialogState
+    extends ConsumerState<_FavoriteEditorDialog> {
+  late FavoriteAction _action;
+  late TextEditingController _label;
+  late TextEditingController _search;
+  String? _targetName;
+  Color? _color;
+
+  static const List<Color> _palette = [
+    Color(0xFF43A047), // catGreen
+    Color(0xFFF57C00), // catOrange
+    Color(0xFFE53935), // catRed
+    Color(0xFFFBC02D), // catYellow
+    Color(0xFF00838F), // catTeal
+    Color(0xFF7B1FA2), // catPurple
+    Color(0xFF3841E9), // primary
+    Color(0xFF2E7D32), // catDarkGreen
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final ex = widget.existing;
+    _action = ex?.action ?? FavoriteAction.addProduct;
+    _label = TextEditingController(text: ex?.label ?? '');
+    _search = TextEditingController();
+    _targetName = ex?.target;
+    _color = ex?.color;
+  }
+
+  @override
+  void dispose() {
+    _label.dispose();
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final productsAsync = ref.watch(allActiveProductsProvider);
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final products = productsAsync.valueOrNull ?? const <ProductEntity>[];
+    final categories =
+        categoriesAsync.valueOrNull ?? const <CategoryEntity>[];
+
+    final query = _search.text.trim().toLowerCase();
+    final filteredProducts = query.isEmpty
+        ? products
+        : products.where((p) => p.name.toLowerCase().contains(query)).toList();
+    final filteredCategories = query.isEmpty
+        ? categories
+        : categories
+            .where((c) => c.name.toLowerCase().contains(query))
+            .toList();
+
+    final isEdit = widget.existing != null;
+
+    return Dialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        width: 520,
+        constraints: const BoxConstraints(maxHeight: 640),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isEdit ? 'Favoriyi Düzenle' : 'Yeni Favori',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Type picker
+            const Text('Tip',
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: _TypePill(
+                    label: 'Ürün Shortcut',
+                    icon: Icons.fastfood_rounded,
+                    selected: _action == FavoriteAction.addProduct,
+                    onTap: () => setState(() {
+                      _action = FavoriteAction.addProduct;
+                      _targetName = null;
+                    }),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _TypePill(
+                    label: 'Kategori Shortcut',
+                    icon: Icons.category_rounded,
+                    selected: _action == FavoriteAction.openCategory,
+                    onTap: () => setState(() {
+                      _action = FavoriteAction.openCategory;
+                      _targetName = null;
+                    }),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Target search
+            const Text('Hedef',
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _search,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(
+                  fontSize: 14, color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Ara…',
+                hintStyle: const TextStyle(
+                    color: AppColors.textDim, fontSize: 14),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    size: 18, color: AppColors.textDim),
+                filled: true,
+                fillColor: AppColors.bgInput,
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Target list
+            Container(
+              height: 180,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: _action == FavoriteAction.addProduct
+                  ? (filteredProducts.isEmpty
+                      ? const Center(
+                          child: Text('Ürün bulunamadı',
+                              style: TextStyle(color: AppColors.textDim)))
+                      : ListView.separated(
+                          itemCount: filteredProducts.length,
+                          separatorBuilder: (_, __) => const Divider(
+                              height: 1, color: AppColors.border),
+                          itemBuilder: (_, i) {
+                            final p = filteredProducts[i];
+                            final sel = _targetName == p.name;
+                            return ListTile(
+                              dense: true,
+                              selected: sel,
+                              selectedTileColor: AppColors.accentDim,
+                              title: Text(p.name,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textPrimary)),
+                              onTap: () => setState(() {
+                                _targetName = p.name;
+                                if (_label.text.trim().isEmpty) {
+                                  _label.text = p.name;
+                                }
+                              }),
+                            );
+                          },
+                        ))
+                  : (filteredCategories.isEmpty
+                      ? const Center(
+                          child: Text('Kategori bulunamadı',
+                              style: TextStyle(color: AppColors.textDim)))
+                      : ListView.separated(
+                          itemCount: filteredCategories.length,
+                          separatorBuilder: (_, __) => const Divider(
+                              height: 1, color: AppColors.border),
+                          itemBuilder: (_, i) {
+                            final c = filteredCategories[i];
+                            final sel = _targetName == c.name;
+                            return ListTile(
+                              dense: true,
+                              selected: sel,
+                              selectedTileColor: AppColors.accentDim,
+                              title: Text(c.name,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textPrimary)),
+                              onTap: () => setState(() {
+                                _targetName = c.name;
+                                if (_label.text.trim().isEmpty) {
+                                  _label.text = c.name;
+                                }
+                              }),
+                            );
+                          },
+                        )),
+            ),
+            const SizedBox(height: 16),
+
+            // Label
+            const Text('Buton Yazısı',
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _label,
+              style: const TextStyle(
+                  fontSize: 14, color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'örn. Cola Zero',
+                hintStyle: const TextStyle(
+                    color: AppColors.textDim, fontSize: 14),
+                filled: true,
+                fillColor: AppColors.bgInput,
+                contentPadding: const EdgeInsets.symmetric(
+                    vertical: 10, horizontal: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Color
+            const Text('Renk (opsiyonel)',
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _ColorSwatch(
+                  color: null,
+                  selected: _color == null,
+                  onTap: () => setState(() => _color = null),
+                ),
+                for (final c in _palette)
+                  _ColorSwatch(
+                    color: c,
+                    selected: _color?.toARGB32() == c.toARGB32(),
+                    onTap: () => setState(() => _color = c),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Actions
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('İptal',
+                      style: TextStyle(color: AppColors.textSecondary)),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _canSave() ? _save : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Kaydet',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _canSave() {
+    return (_targetName ?? '').isNotEmpty && _label.text.trim().isNotEmpty;
+  }
+
+  Future<void> _save() async {
+    final notifier = ref.read(favoritesProvider.notifier);
+    final existing = widget.existing;
+    final label = _label.text.trim();
+    final target = _targetName!;
+
+    if (existing == null) {
+      await notifier.add(
+        action: _action,
+        target: target,
+        label: label,
+        color: _color,
+      );
+    } else {
+      await notifier.update(
+        existing.id,
+        action: _action,
+        target: target,
+        label: label,
+        color: _color,
+        clearColor: _color == null,
+      );
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+}
+
+class _TypePill extends StatelessWidget {
+  const _TypePill({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accentDim : AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                size: 16,
+                color:
+                    selected ? AppColors.primary : AppColors.textSecondary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color:
+                    selected ? AppColors.primary : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorSwatch extends StatelessWidget {
+  const _ColorSwatch({
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Color? color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color ?? AppColors.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+            width: selected ? 3 : 1,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: color == null
+            ? const Text(
+                'Oto',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary),
+              )
+            : (selected
+                ? const Icon(Icons.check_rounded,
+                    color: Colors.white, size: 18)
+                : null),
+      ),
+    );
+  }
+}

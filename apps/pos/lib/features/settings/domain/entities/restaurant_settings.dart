@@ -52,7 +52,7 @@ class RestaurantSettings {
     this.logoPath,
     this.serviceChargeEnabled = false,
     this.serviceChargePercent = 10.0,
-    this.gangsEnabled = false,
+    this.gangsEnabled = true,
     this.maxGangs = 3,
     this.gangLabels = kDefaultGangLabels,
     this.shiftStartRequired = true,
@@ -183,7 +183,7 @@ class RestaurantSettings {
           (json['serviceChargeEnabled'] as bool?) ?? false,
       serviceChargePercent:
           (json['serviceChargePercent'] as num?)?.toDouble() ?? 10.0,
-      gangsEnabled: (json['gangsEnabled'] as bool?) ?? false,
+      gangsEnabled: (json['gangsEnabled'] as bool?) ?? true,
       maxGangs: rawMax.clamp(1, kGangsUpperBound),
       gangLabels: labels,
       shiftStartRequired: (json['shiftStartRequired'] as bool?) ?? true,
