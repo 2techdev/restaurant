@@ -40,6 +40,7 @@ import 'package:gastrocore_pos/features/reservations/presentation/screens/reserv
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_detail_screen.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_form_screen.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_list_screen.dart';
+import 'package:gastrocore_pos/features/tables/presentation/screens/floor_plan_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_list_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_detail_screen.dart';
 import 'package:gastrocore_pos/features/dashboard/presentation/screens/analytics_screen.dart';
@@ -218,7 +219,7 @@ GoRouter createAppRouter({
         ),
         GoRoute(
           path: AppRoutes.tables,
-          redirect: (_, __) => AppRoutes.orderCenter,
+          builder: (context, state) => const FloorPlanScreen(),
         ),
         GoRoute(
           path: AppRoutes.kitchen,
