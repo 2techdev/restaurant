@@ -298,14 +298,18 @@ class FavoritesBar extends ConsumerWidget {
     final categories =
         categoriesAsync.valueOrNull ?? const <CategoryEntity>[];
 
+    // Explicit height keeps the bar visible regardless of how the parent
+    // Column sizes intrinsic children. Without this, Flutter can resolve
+    // the Row+stretch chain to zero on some devices and the tiles vanish.
     return Container(
+      height: 64,
       color: GcColors.surfaceContainerLowest,
       padding: const EdgeInsets.symmetric(
         horizontal: AppTokens.space16,
         vertical: AppTokens.space8,
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(
             width: 64,
