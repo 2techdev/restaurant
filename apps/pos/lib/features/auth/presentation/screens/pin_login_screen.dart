@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
@@ -132,9 +133,9 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
 
       final shift = ref.read(currentShiftProvider);
       if (shift != null) {
-        context.go('/home');
+        context.go(AppRoutes.orderCenter);
       } else {
-        context.go('/shift-open');
+        context.go(AppRoutes.shiftOpen);
       }
     } else {
       setState(() {

@@ -83,10 +83,20 @@ class SeedData {
   // Public API
   // -------------------------------------------------------------------------
 
-  /// Inserts demo data only when the database is empty (no tenants).
+  /// Inserts demo data when the database is empty.
+  ///
+  /// Gate is defensive: a stale install where `tenants` was populated by a
+  /// prior seed but `products` is empty (partial seed, schema migration that
+  /// dropped rows, or manual wipe) would have been skipped under a
+  /// tenants-only check and left the pilot with categories visible but an
+  /// empty product grid. Treat that as "needs reseed" and rebuild cleanly.
   Future<void> seedIfEmpty() async {
-    final existing = await db.select(db.tenants).get();
-    if (existing.isNotEmpty) return;
+    final hasTenants = (await db.select(db.tenants).get()).isNotEmpty;
+    final hasProducts = (await db.select(db.products).get()).isNotEmpty;
+    if (hasTenants && hasProducts) return;
+    if (hasTenants) {
+      await clearAll();
+    }
     await _seed();
   }
 
