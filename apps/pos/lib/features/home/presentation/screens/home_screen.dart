@@ -24,7 +24,10 @@ import 'package:intl/intl.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
+import 'package:gastrocore_pos/core/providers/connectivity_provider.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/providers/shift_provider.dart';
 import 'package:gastrocore_pos/features/shifts/domain/entities/shift_entity.dart';
 import 'package:gastrocore_pos/features/home/presentation/providers/dashboard_provider.dart';
@@ -243,7 +246,7 @@ class _SidebarButtonState extends State<_SidebarButton> {
 // Top bar
 // ---------------------------------------------------------------------------
 
-class _TopBar extends StatelessWidget {
+class _TopBar extends ConsumerWidget {
   final String userName;
   final ShiftEntity? shift;
   final DateTime now;
@@ -251,9 +254,11 @@ class _TopBar extends StatelessWidget {
   const _TopBar({required this.userName, required this.shift, required this.now});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final shiftOpen = shift != null && shift!.isOpen;
+    final connectivity = ref.watch(connectivityProvider);
+    final isOffline = connectivity == ConnectivityState.offline;
 
     return Container(
       height: 72,
@@ -297,37 +302,69 @@ class _TopBar extends StatelessWidget {
                 )),
           ),
           const SizedBox(width: 16),
-          // Shift chip
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: shiftOpen
-                  ? AppColors.green.withValues(alpha: 0.12)
-                  : AppColors.red.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
+          // Shift chip — tap to open/close shift (Schichtwechsel).
+          InkWell(
+            key: const Key('topbar_shift_chip'),
+            onTap: () => context
+                .push(shiftOpen ? AppRoutes.shiftClose : AppRoutes.shiftOpen),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: shiftOpen
+                    ? AppColors.green.withValues(alpha: 0.12)
+                    : AppColors.red.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  width: 6, height: 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: shiftOpen ? AppColors.green : AppColors.red,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  shiftOpen
+                      ? l10n.shiftStatusOpen.toUpperCase()
+                      : l10n.shiftNoActiveShift.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700,
+                    color: shiftOpen ? AppColors.green : AppColors.red,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ]),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                width: 6, height: 6,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: shiftOpen ? AppColors.green : AppColors.red,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                shiftOpen
-                    ? l10n.shiftStatusOpen.toUpperCase()
-                    : l10n.shiftNoActiveShift.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 11, fontWeight: FontWeight.w700,
-                  color: shiftOpen ? AppColors.green : AppColors.red,
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ]),
           ),
           const Spacer(),
+          if (isOffline) ...[
+            Container(
+              key: const Key('topbar_offline_chip'),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.red.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.cloud_off_rounded, size: 12, color: AppColors.red),
+                const SizedBox(width: 6),
+                Text(
+                  l10n.statusOffline.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700,
+                    color: AppColors.red, letterSpacing: 0.8,
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(width: 12),
+          ],
+          const _LanguageSwitcher(),
+          const SizedBox(width: 8),
+          const _ReportsMenu(),
+          const SizedBox(width: 12),
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -344,6 +381,166 @@ class _TopBar extends StatelessWidget {
           const SizedBox(width: 16),
           const SyncStatusWidget(),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Language switcher (DE / FR / IT / EN / TR) — popup menu in top bar.
+// ---------------------------------------------------------------------------
+
+class _LanguageSwitcher extends ConsumerWidget {
+  const _LanguageSwitcher();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settingsAsync = ref.watch(appSettingsProvider);
+    final current = settingsAsync.valueOrNull?.language ?? AppLanguage.de;
+
+    return PopupMenuButton<AppLanguage>(
+      key: const Key('topbar_language_switcher'),
+      tooltip: 'Dil / Sprache',
+      position: PopupMenuPosition.under,
+      initialValue: current,
+      onSelected: (lang) =>
+          ref.read(appSettingsProvider.notifier).setLanguage(lang),
+      itemBuilder: (_) => [
+        for (final lang in AppLanguage.values)
+          PopupMenuItem<AppLanguage>(
+            value: lang,
+            child: Row(children: [
+              Text(lang.flag, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 10),
+              Text(
+                lang.label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight:
+                      lang == current ? FontWeight.w700 : FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              if (lang == current) ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.check_rounded,
+                    size: 14, color: AppColors.primary),
+              ],
+            ]),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.language_rounded,
+              size: 14, color: AppColors.textSecondary),
+          const SizedBox(width: 6),
+          Text(
+            current.name.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(Icons.arrow_drop_down_rounded,
+              size: 16, color: AppColors.textSecondary),
+        ]),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reports menu (Z-Bericht / X-Bericht / Gün Sonu) — popup menu in top bar.
+// ---------------------------------------------------------------------------
+
+class _ReportsMenu extends StatelessWidget {
+  const _ReportsMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      key: const Key('topbar_reports_menu'),
+      tooltip: 'Raporlar',
+      position: PopupMenuPosition.under,
+      onSelected: (value) {
+        switch (value) {
+          case 'z':
+            context.push(AppRoutes.zReport);
+          case 'x':
+            // Z-Report screen also exposes the X-Report print button
+            // (Zwischenbericht, no register reset).
+            context.push(AppRoutes.zReport);
+          case 'dayclose':
+            context.go(AppRoutes.dayClose);
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem<String>(
+          key: Key('menu_z_report'),
+          value: 'z',
+          child: Row(children: [
+            Icon(Icons.assessment_rounded,
+                size: 16, color: AppColors.primary),
+            SizedBox(width: 10),
+            Text('Z-Raporu',
+                style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+          ]),
+        ),
+        PopupMenuItem<String>(
+          key: Key('menu_x_report'),
+          value: 'x',
+          child: Row(children: [
+            Icon(Icons.receipt_long_rounded,
+                size: 16, color: AppColors.orange),
+            SizedBox(width: 10),
+            Text('X-Raporu',
+                style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+          ]),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem<String>(
+          key: Key('menu_day_close'),
+          value: 'dayclose',
+          child: Row(children: [
+            Icon(Icons.lock_clock_rounded,
+                size: 16, color: AppColors.orange),
+            SizedBox(width: 10),
+            Text('Gün Sonu / Kassensturz',
+                style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+          ]),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: const [
+          Icon(Icons.bar_chart_rounded,
+              size: 14, color: AppColors.textSecondary),
+          SizedBox(width: 6),
+          Text(
+            'RAPORLAR',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: 0.5,
+            ),
+          ),
+          SizedBox(width: 4),
+          Icon(Icons.arrow_drop_down_rounded,
+              size: 16, color: AppColors.textSecondary),
+        ]),
       ),
     );
   }

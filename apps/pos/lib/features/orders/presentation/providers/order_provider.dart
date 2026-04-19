@@ -13,12 +13,15 @@ import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_p
 import 'package:gastrocore_pos/features/orders/data/repositories/order_repository_impl.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/features/orders/presentation/providers/storno_log_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/core/services/fare_engine.dart';
 import 'package:gastrocore_pos/core/services/fare_models.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 import 'package:gastrocore_pos/features/overrides/domain/entities/override_action.dart';
 import 'package:gastrocore_pos/features/overrides/presentation/providers/override_provider.dart';
+import 'package:gastrocore_pos/features/pricing/application/happy_hour_evaluator.dart';
+import 'package:gastrocore_pos/features/pricing/providers/happy_hour_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Swiss VAT configuration (effective 2024-01-01)
@@ -198,7 +201,7 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
       orderType: state!.orderType,
     );
 
-    final item = OrderItemEntity(
+    final rawItem = OrderItemEntity(
       id: itemId,
       tenantId: state!.tenantId,
       ticketId: state!.id,
@@ -215,6 +218,21 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
       modifiers: modifiers,
       taxGroup: product.taxGroup,
     );
+
+    // Thin happy-hour hook: if a time-based rule matches, swap in a
+    // discounted unit price + re-extract tax from the new gross.
+    // The evaluator is a pure function; no-op when no rule fires.
+    final hhRules = _ref.read(happyHourRulesProvider);
+    final evaluated = applyHappyHour(rawItem, product, hhRules, DateTime.now());
+    final item = identical(evaluated, rawItem)
+        ? rawItem
+        : evaluated.copyWith(
+            taxAmount: _extractItemTax(
+              grossPrice: evaluated.subtotal,
+              taxGroup: product.taxGroup,
+              orderType: state!.orderType,
+            ),
+          );
 
     state = state!.addItem(item);
   }
@@ -523,6 +541,69 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
 
   /// Clear the current ticket (e.g. after payment).
   void clear() {
+    state = null;
+  }
+
+  /// Mark an item as "İkram" (on-the-house / complimentary).
+  ///
+  /// Zeroes the unit price, subtotal and tax for that line, tags the notes
+  /// with `[İKRAM]` so the receipt and KDS print clearly flag it, and
+  /// recalculates the ticket totals.
+  void markOnTheHouse(String itemId) {
+    if (state == null) return;
+    final updatedItems = state!.items.map((item) {
+      if (item.id != itemId) return item;
+      final rawNote = (item.notes ?? '').replaceFirst(
+        RegExp(r'^\[İKRAM\]\s*'),
+        '',
+      ).trim();
+      final newNote = rawNote.isEmpty ? '[İKRAM]' : '[İKRAM] $rawNote';
+      return item.copyWith(
+        unitPrice: 0,
+        subtotal: 0,
+        taxAmount: 0,
+        notes: () => newNote,
+      );
+    }).toList();
+    state = state!.copyWith(items: updatedItems).calculateTotals();
+  }
+
+  /// Void the current ticket entirely.
+  ///
+  /// If the ticket has been persisted, its status is moved to `cancelled`
+  /// (pre-payment cancellation); in-memory draft state is always cleared so
+  /// the POS returns to an empty slate ready for the next order.
+  ///
+  /// [reason] and [userId] are persisted to [stornoLogProvider] so auditors
+  /// can review every cancellation with who/when/why/how-much. Both are
+  /// required — the calling UI must collect a non-empty reason before
+  /// invoking this method.
+  Future<void> voidTicket({
+    required String reason,
+    required String userId,
+  }) async {
+    if (state == null) return;
+    final ticket = state!;
+    if (ticket.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.updateTicketStatus(ticket.id, TicketStatus.cancelled);
+    }
+
+    // Log the cancellation before clearing state so the entry captures the
+    // ticket's final totals.
+    final user = _ref.read(currentUserProvider);
+    _ref.read(stornoLogProvider.notifier).append(
+          StornoLogEntry(
+            ticketId: ticket.id,
+            orderNumber: ticket.orderNumber,
+            reason: reason,
+            userId: userId,
+            userName: user?.name ?? 'Bilinmiyor',
+            amountCents: ticket.total,
+            timestamp: DateTime.now(),
+          ),
+        );
+
     state = null;
   }
 }

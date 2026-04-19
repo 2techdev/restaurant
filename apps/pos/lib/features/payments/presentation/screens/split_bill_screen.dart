@@ -39,7 +39,7 @@ class SplitBillScreen extends ConsumerStatefulWidget {
   ConsumerState<SplitBillScreen> createState() => _SplitBillScreenState();
 }
 
-enum _SplitMode { seat, item, amount }
+enum _SplitMode { seat, item, amount, percent }
 
 class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
   _SplitMode _mode = _SplitMode.seat;
@@ -53,10 +53,12 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
   /// Tenders collected under the Custom Amount tab, in cents.
   final List<int> _customTenders = <int>[];
   final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _percentController = TextEditingController();
 
   @override
   void dispose() {
     _amountController.dispose();
+    _percentController.dispose();
     super.dispose();
   }
 
@@ -190,8 +192,13 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
   // -------------------------------------------------------------------------
 
   Widget _buildTabSelector() {
-    const labels = ['Koltuk', 'Ürün', 'Tutar'];
-    const modes = [_SplitMode.seat, _SplitMode.item, _SplitMode.amount];
+    const labels = ['Koltuk', 'Ürün', 'Tutar', 'Yüzde'];
+    const modes = [
+      _SplitMode.seat,
+      _SplitMode.item,
+      _SplitMode.amount,
+      _SplitMode.percent,
+    ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(40, 24, 40, 0),
       child: Align(
@@ -254,6 +261,8 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
         return _buildItemMode(ticket);
       case _SplitMode.amount:
         return _buildAmountMode(ticket);
+      case _SplitMode.percent:
+        return _buildPercentMode(ticket);
     }
   }
 
@@ -696,6 +705,169 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
   }
 
   // -------------------------------------------------------------------------
+  // Percent mode
+  // -------------------------------------------------------------------------
+
+  Widget _buildPercentMode(TicketEntity ticket) {
+    final outstanding = _outstanding(ticket);
+    final raw = _percentController.text.trim().replaceAll(',', '.');
+    final parsedPercent = double.tryParse(raw);
+    final previewCents = (parsedPercent != null && parsedPercent > 0)
+        ? (ticket.total * parsedPercent / 100).round()
+        : 0;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(40, 24, 40, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainer,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        key: const Key('split_percent_field'),
+                        controller: _percentController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'[0-9.,]')),
+                        ],
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary),
+                        decoration: const InputDecoration(
+                          hintText: '0',
+                          hintStyle: TextStyle(color: AppColors.textDim),
+                          labelText: 'Yüzde (%)',
+                          labelStyle: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w700),
+                          suffixText: '%',
+                          suffixStyle: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary),
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    ElevatedButton(
+                      key: const Key('split_percent_add'),
+                      onPressed:
+                          outstanding > 0 && previewCents > 0
+                              ? () => _addPercentTender(
+                                  ticket.total, outstanding)
+                              : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Tenderle',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Tutar: ${_formatCHF(previewCents)}',
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Tahsil edilenler',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary.withValues(alpha: 0.9)),
+          ),
+          const SizedBox(height: 8),
+          if (_customTenders.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text('Henüz yüzde eklenmedi.',
+                  style:
+                      TextStyle(color: AppColors.textDim, fontSize: 13)),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: _customTenders.length,
+                itemBuilder: (context, index) {
+                  final cents = _customTenders[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Text('Tender #${index + 1}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary)),
+                        const Spacer(),
+                        Text(_formatCHF(cents),
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textPrimary)),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          color: AppColors.textSecondary,
+                          onPressed: () => setState(
+                              () => _customTenders.removeAt(index)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _addPercentTender(int ticketTotal, int outstanding) {
+    final raw = _percentController.text.trim().replaceAll(',', '.');
+    final parsed = double.tryParse(raw);
+    if (parsed == null || parsed <= 0) return;
+    final cents = (ticketTotal * parsed / 100).round();
+    if (cents <= 0) return;
+    final capped = cents.clamp(0, outstanding);
+    setState(() {
+      _customTenders.add(capped);
+      _percentController.clear();
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // Footer
   // -------------------------------------------------------------------------
 
@@ -764,6 +936,7 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
               _paidItems.clear();
               _customTenders.clear();
               _amountController.clear();
+              _percentController.clear();
             }),
             child: Container(
               height: 56,
@@ -837,6 +1010,8 @@ class _SplitBillScreenState extends ConsumerState<SplitBillScreen> {
           if (_paidItems.contains(item.id)) settled += item.subtotal;
         }
       case _SplitMode.amount:
+        settled = _customTenders.fold<int>(0, (s, v) => s + v);
+      case _SplitMode.percent:
         settled = _customTenders.fold<int>(0, (s, v) => s + v);
     }
     final remaining = ticket.total - settled;

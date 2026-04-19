@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:gastrocore_pos/features/auth/domain/entities/permission.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 
 /// Outcome of a PIN-only login attempt. [success] resolves to a user;
@@ -69,6 +70,31 @@ class CurrentUserNotifier extends StateNotifier<UserEntity?> {
     state = null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Role + permission gates
+// ---------------------------------------------------------------------------
+
+/// Effective role of the currently authenticated user.
+///
+/// Defaults to [UserRole.cashier] (kasiyer) when no user is logged in — this
+/// matches the pilot expectation that ungated surfaces behave like a cashier
+/// terminal rather than an admin one.  Derived from [currentUserProvider].
+final currentUserRoleProvider = Provider<UserRole>((ref) {
+  final user = ref.watch(currentUserProvider);
+  return user?.role ?? UserRole.cashier;
+});
+
+/// Returns `true` when the current user's role is permitted to perform [p].
+///
+/// Usage in widgets:
+/// ```dart
+/// final allowed = ref.watch(canProvider(Permission.storno));
+/// ```
+final canProvider = Provider.family<bool, Permission>((ref, p) {
+  final role = ref.watch(currentUserRoleProvider);
+  return roleCan(role, p);
+});
 
 // ---------------------------------------------------------------------------
 // Users list (for login screen)

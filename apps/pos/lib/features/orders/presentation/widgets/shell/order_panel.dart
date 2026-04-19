@@ -508,18 +508,17 @@ class _OrderItemRow extends ConsumerWidget {
               ),
             ),
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.space12,
-            vertical: 8,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 28,
-                child: Text(
-                  '${item.quantity.toStringAsFixed(0)}×',
-                  style: GcText.price.copyWith(
+          _GangBadge(course: item.course),
+          const SizedBox(width: AppTokens.space4),
+          _ItemStatusDot(status: item.status, sent: item.sentToKitchen),
+          const SizedBox(width: AppTokens.space8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.productName,
+                  style: const TextStyle(
                     fontSize: 14,
                     color: qtyFg,
                     decoration:
@@ -848,6 +847,84 @@ class _StatusBadge extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Tiny numeric GANG badge rendered on each line-item row.
+///
+/// Gives the operator an at-a-glance reminder of which course a line belongs
+/// to even after the list has been scrolled past its section header. Kept
+/// intentionally small so it doesn't crowd the product name.
+class _GangBadge extends StatelessWidget {
+  const _GangBadge({required this.course});
+  final int course;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 20,
+      height: 20,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.primaryContainer.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '$course',
+        key: ValueKey('gang_badge_$course'),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: AppColors.primary,
+          height: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+/// 8px status dot for a line-item's kitchen lifecycle.
+///
+/// Colour map (minimal — matches the statuses the KDS actually advances
+/// through today; future states fall back to "pending" grey):
+///   * orange — pending / ordered (not yet sent)
+///   * primary — sent / preparing (in the kitchen queue)
+///   * green — ready / served (done)
+class _ItemStatusDot extends StatelessWidget {
+  const _ItemStatusDot({required this.status, required this.sent});
+
+  final OrderItemStatus status;
+  final bool sent;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _colorFor(status, sent);
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  static Color _colorFor(OrderItemStatus status, bool sent) {
+    switch (status) {
+      case OrderItemStatus.ready:
+      case OrderItemStatus.served:
+        return AppColors.green;
+      case OrderItemStatus.sent:
+      case OrderItemStatus.preparing:
+        return AppColors.primary;
+      case OrderItemStatus.voidStatus:
+        return AppColors.red;
+      case OrderItemStatus.ordered:
+        // Fallback: if the DB flag says sent but the enum hasn't caught up
+        // yet, still show the "in kitchen" tint so the operator isn't
+        // misled about an unsent line.
+        return sent ? AppColors.primary : AppColors.orange;
+    }
   }
 }
 

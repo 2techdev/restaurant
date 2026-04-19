@@ -459,7 +459,16 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
         child: Text('Error: $err',
             style: const TextStyle(color: AppColors.textDim)),
       ),
-      data: (tables) {
+      data: (allTables) {
+        // Apply pilot zone filter (Hepsi = no filter).
+        final selectedZone = ref.watch(selectedTableZoneProvider);
+        final assignments = ref.watch(tableZoneAssignmentsProvider);
+        final tables = selectedZone == TableZone.hepsi
+            ? allTables
+            : allTables
+                .where((t) =>
+                    tableZoneForId(assignments, t.id) == selectedZone)
+                .toList();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -526,6 +535,10 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
               ),
             ),
 
+            // Zone filter chips (Turkish labels). Hidden in edit mode
+            // because drag positions are scoped to a floor, not a zone.
+            if (!editMode) _buildZoneFilterBar(selectedZone),
+
             // Table area
             Expanded(
               child: Padding(
@@ -544,6 +557,58 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
           ],
         );
       },
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Zone filter bar (Hepsi / İç Salon / Teras / Bar)
+  // -------------------------------------------------------------------------
+
+  Widget _buildZoneFilterBar(TableZone selected) {
+    const zones = TableZone.values;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+      child: SizedBox(
+        height: 34,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: zones.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (_, i) {
+            final zone = zones[i];
+            final isActive = zone == selected;
+            return GestureDetector(
+              onTap: () => ref
+                  .read(selectedTableZoneProvider.notifier)
+                  .state = zone,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppColors.accentDim
+                      : AppColors.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(999),
+                  border: isActive
+                      ? Border.all(color: AppColors.accent, width: 1)
+                      : null,
+                ),
+                child: Text(
+                  tableZoneLabel(zone),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight:
+                        isActive ? FontWeight.w600 : FontWeight.w400,
+                    color: isActive
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 

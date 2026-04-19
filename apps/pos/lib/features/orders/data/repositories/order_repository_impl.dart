@@ -205,6 +205,35 @@ class OrderRepositoryImpl {
         .write(companion);
   }
 
+  /// Reassign a ticket to a different table.
+  ///
+  /// Used by the waiter table-transfer flow. The caller is responsible for
+  /// updating old/new table statuses — this method only rewrites the ticket
+  /// row itself.
+  Future<void> updateTicketTable(String id, String newTableId) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
+      TicketsCompanion(
+        tableId: Value(newTableId),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// Overwrite the free-text [notes] field on a ticket.
+  ///
+  /// Used by the merge / split flows to stamp a reason like
+  /// `Merge to <target>` or `Split to <target>` onto the source ticket so
+  /// audit logs and receipts carry the justification. Pure DB write — no
+  /// network dependency, safe offline.
+  Future<void> updateTicketNotes(String id, String? notes) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
+      TicketsCompanion(
+        notes: Value(notes),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   // =========================================================================
   // Order items
   // =========================================================================

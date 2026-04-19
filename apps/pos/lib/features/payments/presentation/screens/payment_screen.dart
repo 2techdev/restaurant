@@ -17,7 +17,12 @@ import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/payments/domain/entities/payment_entity.dart';
+import 'package:gastrocore_pos/features/payments/domain/entities/voucher_entity.dart';
 import 'package:gastrocore_pos/features/payments/presentation/providers/refund_provider.dart';
+import 'package:gastrocore_pos/features/payments/presentation/widgets/tip_selector.dart';
+import 'package:gastrocore_pos/features/payments/presentation/widgets/voucher_dialog.dart';
+import 'package:gastrocore_pos/features/payments/providers/hardware_payment_providers.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 
 // ---------------------------------------------------------------------------
 // Payment Screen
@@ -39,13 +44,27 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String _amountStr = '';
   bool _paymentComplete = false;
 
+  // Terminal-flow state (only active for card / debit).
+  bool _isProcessing = false;
+  String _processingMessage = '';
+  bool _isCancelling = false;
+  String? _terminalError;
+
+  int _tipAmount = 0;
+  VoucherEntity? _voucher;
+
   /// Cached ticket — updated whenever the async provider emits a new value.
   TicketEntity? _ticket;
 
   // Derived from real ticket data.
   int get _subtotal => _ticket?.subtotal ?? 0;
   int get _taxAmount => _ticket?.taxAmount ?? 0;
-  int get _grandTotal => _ticket?.total ?? 0;
+  int get _baseTotal => _ticket?.total ?? 0;
+  int get _voucherDiscount => _voucher?.discountAmount ?? 0;
+  int get _grandTotal {
+    final total = _baseTotal + _tipAmount - _voucherDiscount;
+    return total < 0 ? 0 : total;
+  }
   List<OrderItemEntity> get _items => _ticket?.items ?? [];
 
   int get _enteredAmount {
@@ -112,8 +131,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       tenantId: tenantId,
       paymentMethod: domainMethod,
       amount: _grandTotal,
+      tipAmount: _tipAmount,
       tenderedAmount: tendered,
       receivedBy: receivedBy,
+      reference: terminalResult?.transactionId ??
+          (_voucher != null ? 'VOUCHER:${_voucher!.code}' : null),
+      terminalTransactionId: terminalResult?.transactionId,
+      authCode: terminalResult?.authCode,
+      maskedPan: terminalResult?.cardNumber,
+      cardType: terminalResult?.cardType,
+      entryMethod: terminalResult?.entryMethod,
+      terminalId: terminalResult?.terminalId,
+      terminalProvider: terminalProvider,
     );
 
     ref.read(currentTicketProvider.notifier).clear();
@@ -436,6 +465,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 _buildTotalRow('Subtotal', 'CHF${_formatCents(_subtotal)}', false),
                 const SizedBox(height: 12),
                 _buildTotalRow('KDV (dahil)', 'CHF${_formatCents(_taxAmount)}', false),
+                if (_voucher != null) ...[
+                  const SizedBox(height: 12),
+                  _buildTotalRow(
+                    'Hediye Çeki (${_voucher!.code})',
+                    '-CHF${_formatCents(_voucherDiscount)}',
+                    false,
+                  ),
+                ],
+                if (_tipAmount > 0) ...[
+                  const SizedBox(height: 12),
+                  _buildTotalRow(
+                    'Bahşiş',
+                    '+CHF${_formatCents(_tipAmount)}',
+                    false,
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Container(height: 1, color: const Color(0xFF424753).withValues(alpha: 0.2)),
                 const SizedBox(height: 12),
@@ -661,6 +706,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    TipSelector(
+                      key: const Key('tip_selector'),
+                      tipAmount: _tipAmount,
+                      baseAmount: _baseTotal,
+                      onChanged: (cents) => setState(() => _tipAmount = cents),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildVoucherButton(),
+                    const SizedBox(height: 12),
                     // Quick amounts
                     Row(
                       children: [
@@ -787,6 +841,67 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVoucherButton() {
+    final hasVoucher = _voucher != null;
+    return GestureDetector(
+      key: const Key('voucher_btn'),
+      onTap: () async {
+        if (hasVoucher) {
+          setState(() => _voucher = null);
+          return;
+        }
+        final applied = await showVoucherDialog(context);
+        if (applied != null && mounted) {
+          setState(() => _voucher = applied);
+        }
+      },
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          color: hasVoucher
+              ? const Color(0xFF528DFF).withValues(alpha: 0.15)
+              : const Color(0xFF1D1F26),
+          borderRadius: BorderRadius.circular(12),
+          border: hasVoucher
+              ? Border.all(color: const Color(0xFF528DFF), width: 1.5)
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              hasVoucher ? Icons.card_giftcard : Icons.redeem,
+              size: 18,
+              color: hasVoucher
+                  ? const Color(0xFF528DFF)
+                  : const Color(0xFFC3C6D7),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                hasVoucher
+                    ? 'Hediye Çeki: ${_voucher!.code}'
+                    : 'Hediye Çeki Kullan',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: hasVoucher
+                      ? const Color(0xFF528DFF)
+                      : const Color(0xFFE2E2EB),
+                ),
+              ),
+            ),
+            if (hasVoucher) ...[
+              const SizedBox(width: 8),
+              const Icon(Icons.close, size: 14, color: Color(0xFFFFB4AB)),
+            ],
+          ],
         ),
       ),
     );
