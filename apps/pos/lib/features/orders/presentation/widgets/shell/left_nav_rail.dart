@@ -17,7 +17,6 @@ import 'package:gastrocore_pos/core/theme/app_tokens.dart';
 import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
-import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/order_panel.dart';
 
 class LeftNavRail extends ConsumerWidget {
   const LeftNavRail({super.key});
@@ -29,9 +28,6 @@ class LeftNavRail extends ConsumerWidget {
     final canPay = hasItems &&
         ticket.status != TicketStatus.completed &&
         ticket.status != TicketStatus.voided;
-    final selectedItemId = ref.watch(selectedTicketItemProvider);
-    final hasSelection = selectedItemId != null;
-
     return Container(
       width: AppTokens.leftNavRailWidth,
       color: GcColors.surfaceContainerLow,
@@ -93,8 +89,12 @@ class LeftNavRail extends ConsumerWidget {
           _ActionButton(
             icon: Icons.redeem_rounded,
             label: 'İKRAM',
-            enabled: hasSelection,
-            onTap: () => _showComingSoon(context, 'İkram'),
+            enabled: hasItems,
+            onTap: () {
+              if (ticket != null) {
+                _showIkramSheet(context, ref, ticket);
+              }
+            },
           ),
           _ActionButton(
             icon: Icons.lock_rounded,
@@ -114,10 +114,77 @@ class LeftNavRail extends ConsumerWidget {
     );
   }
 
-  void _showComingSoon(BuildContext ctx, String label) {
-    ScaffoldMessenger.of(ctx).showSnackBar(
+  Future<void> _showIkramSheet(
+    BuildContext context,
+    WidgetRef ref,
+    TicketEntity ticket,
+  ) async {
+    final itemId = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: GcColors.surfaceContainer,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(AppTokens.space16),
+                child: Text(
+                  'İkram edilecek kalem',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: GcColors.onSurface,
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: ticket.items.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final item = ticket.items[i];
+                    final isAlready = item.subtotal == 0 ||
+                        (item.notes ?? '').startsWith('[İKRAM]');
+                    return ListTile(
+                      enabled: !isAlready,
+                      leading: Text(
+                        '${item.quantity.toStringAsFixed(0)}×',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                      title: Text(item.productName),
+                      subtitle:
+                          isAlready ? const Text('(zaten İKRAM)') : null,
+                      trailing: Text(
+                        'CHF ${(item.subtotal / 100).toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      onTap: () => Navigator.of(ctx).pop(item.id),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: AppTokens.space8),
+            ],
+          ),
+        );
+      },
+    );
+    if (itemId == null) return;
+    ref.read(currentTicketProvider.notifier).markOnTheHouse(itemId);
+    if (!context.mounted) return;
+    final item = ticket.items.firstWhere(
+      (it) => it.id == itemId,
+      orElse: () => ticket.items.first,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$label — ileriki sprint\'te.'),
+        content: Text('${item.productName} ikram edildi.'),
         duration: const Duration(seconds: 2),
       ),
     );
