@@ -739,27 +739,41 @@ class _TotalsFooter extends StatelessWidget {
     final serviceFee = ticket?.serviceFeeAmount ?? 0;
     final tax = ticket?.taxAmount ?? 0;
 
+    // POS v2: show Netto / MWST (8.1% inkl.) / Zu bezahlen as an inline
+    // three-row block. The subtotal field already stores the gross (MWST
+    // included), so Netto = subtotal − tax. Keeping this math in the view
+    // avoids another domain field for pilot; a later sprint can compute it
+    // on the entity.
+    final netto = subtotal - tax;
     return Container(
       color: GcColors.surfaceContainerHigh,
       padding: AppInsets.h16v12,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _row('Ara toplam', subtotal),
-          if (serviceFee > 0) _row('Servis', serviceFee),
-          if (tax > 0) _row('MWST (dahil)', tax, dim: true),
+          _row('Netto', netto),
+          if (serviceFee > 0) _row('Service', serviceFee),
+          if (tax > 0) _row('MWST 8.1 % (inkl.)', tax, dim: true),
           const SizedBox(height: AppTokens.space8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text('ÖDENECEK', style: GcText.labelTiny),
-              const Spacer(),
-              Text(
-                _formatCHF(total),
-                style: GcText.displayBlack,
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: GcColors.ghostBorder, width: 1),
               ),
-            ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text('Zu bezahlen', style: GcText.labelTiny),
+                const Spacer(),
+                Text(
+                  _formatCHF(total),
+                  style: GcText.displayBlack,
+                ),
+              ],
+            ),
           ),
         ],
       ),
