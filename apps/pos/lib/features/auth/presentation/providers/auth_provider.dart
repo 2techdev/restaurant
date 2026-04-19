@@ -11,6 +11,11 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 
+/// Outcome of a PIN-only login attempt. [success] resolves to a user;
+/// [invalidPin] means the PIN did not match any active user; [pinCollision]
+/// means multiple users share the same PIN — admin must reassign.
+enum LoginResult { success, invalidPin, pinCollision }
+
 // ---------------------------------------------------------------------------
 // Repository
 // ---------------------------------------------------------------------------
@@ -38,16 +43,20 @@ class CurrentUserNotifier extends StateNotifier<UserEntity?> {
 
   CurrentUserNotifier(this._ref) : super(null);
 
-  /// Attempt to log in with a [pinHash]. Returns `true` on success.
-  Future<bool> loginWithPin(String pinHash) async {
+  /// Attempt to log in with a [pinHash]. Returns a [LoginResult] so the UI
+  /// can distinguish an invalid PIN from a PIN collision (two users sharing
+  /// the same PIN — admin must resolve).
+  Future<LoginResult> loginWithPin(String pinHash) async {
     final repo = _ref.read(authRepositoryProvider);
     final tenantId = _ref.read(tenantIdProvider);
-    final user = await repo.getUserByPin(tenantId, pinHash);
-    if (user != null) {
+    try {
+      final user = await repo.getUserByPin(tenantId, pinHash);
+      if (user == null) return LoginResult.invalidPin;
       state = user;
-      return true;
+      return LoginResult.success;
+    } on PinCollisionException {
+      return LoginResult.pinCollision;
     }
-    return false;
   }
 
   /// Set the current user directly (e.g. from a saved session).

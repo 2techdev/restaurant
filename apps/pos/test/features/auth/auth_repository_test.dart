@@ -284,7 +284,7 @@ void main() {
       expect(container.read(currentUserProvider), isNull);
     });
 
-    test('loginWithPin returns true and sets user on success', () async {
+    test('loginWithPin returns LoginResult.success and sets user', () async {
       final container = makeContainer();
       addTearDown(container.dispose);
 
@@ -294,18 +294,32 @@ void main() {
 
       final result =
           await container.read(currentUserProvider.notifier).loginWithPin('good-pin');
-      expect(result, isTrue);
+      expect(result, equals(LoginResult.success));
       expect(container.read(currentUserProvider), isNotNull);
       expect(container.read(currentUserProvider)!.id, equals(user.id));
     });
 
-    test('loginWithPin returns false for wrong pin', () async {
+    test('loginWithPin returns LoginResult.invalidPin for wrong pin', () async {
       final container = makeContainer();
       addTearDown(container.dispose);
 
       final result =
           await container.read(currentUserProvider.notifier).loginWithPin('bad-pin');
-      expect(result, isFalse);
+      expect(result, equals(LoginResult.invalidPin));
+      expect(container.read(currentUserProvider), isNull);
+    });
+
+    test('loginWithPin returns LoginResult.pinCollision when 2 users share a PIN', () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final repo = container.read(authRepositoryProvider);
+      await repo.createUser(_makeUser(id: 'u1', name: 'A', pinHash: 'dup-pin'));
+      await repo.createUser(_makeUser(id: 'u2', name: 'B', pinHash: 'dup-pin'));
+
+      final result =
+          await container.read(currentUserProvider.notifier).loginWithPin('dup-pin');
+      expect(result, equals(LoginResult.pinCollision));
       expect(container.read(currentUserProvider), isNull);
     });
 
