@@ -18,6 +18,15 @@ import 'package:drift/drift.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
 
+/// Stable demo tenant ID baked into the seed so every fresh pilot install
+/// — and every boot that re-reads it via `tenants.first.id` — agrees on the
+/// same value. The previous random UUID path caused the runtime
+/// `tenantIdProvider` to drift from whichever UUID seed last minted, leaving
+/// products/tables/favorites queries filtering on the wrong tenant and the
+/// sales grid visibly empty. Hard-coding this constant means the seed, the
+/// bootstrap reader, and the per-feature queries all land on the same row.
+const String kPilotTenantId = 'pilot-zurich-001';
+
 /// Populates the database with realistic Swiss restaurant demo data.
 ///
 /// Demo Restaurant: "Demo Restaurant Zürich"
@@ -35,7 +44,7 @@ class SeedData {
   // Well-known IDs used across seed methods
   // -------------------------------------------------------------------------
 
-  String _tenantId = '';
+  String _tenantId = kPilotTenantId;
 
   // Category IDs
   String _catVorspeisedId = '';
@@ -83,18 +92,32 @@ class SeedData {
   // Public API
   // -------------------------------------------------------------------------
 
-  /// Inserts demo data when the database is empty.
+  /// Inserts demo data when the database is incomplete.
   ///
-  /// Gate is defensive: a stale install where `tenants` was populated by a
-  /// prior seed but `products` is empty (partial seed, schema migration that
-  /// dropped rows, or manual wipe) would have been skipped under a
-  /// tenants-only check and left the pilot with categories visible but an
-  /// empty product grid. Treat that as "needs reseed" and rebuild cleanly.
+  /// Gate counts rows on every table the POS shells need to render:
+  /// `tenants`, `categories`, `products`, and `restaurantTables`. If ANY
+  /// of them is empty the DB is treated as partially seeded — wipe and
+  /// rebuild cleanly. A prior version only checked `tenants` + `products`,
+  /// which left a window where the Tables screen could come up empty on
+  /// a fresh install that crashed mid-seed. Aggressive here is fine: the
+  /// only caller is the pilot demo-data fixture.
   Future<void> seedIfEmpty() async {
-    final hasTenants = (await db.select(db.tenants).get()).isNotEmpty;
-    final hasProducts = (await db.select(db.products).get()).isNotEmpty;
-    if (hasTenants && hasProducts) return;
-    if (hasTenants) {
+    final tenantCount = (await db.select(db.tenants).get()).length;
+    final categoryCount = (await db.select(db.categories).get()).length;
+    final productCount = (await db.select(db.products).get()).length;
+    final tableCount =
+        (await db.select(db.restaurantTables).get()).length;
+
+    final complete = tenantCount > 0 &&
+        categoryCount > 0 &&
+        productCount > 0 &&
+        tableCount > 0;
+    if (complete) return;
+
+    // Anything non-empty is a partial seed — wipe before rebuilding so the
+    // stable [kPilotTenantId] primary key doesn't clash.
+    if (tenantCount > 0 || categoryCount > 0 || productCount > 0 ||
+        tableCount > 0) {
       await clearAll();
     }
     await _seed();
@@ -175,7 +198,7 @@ class SeedData {
   // -------------------------------------------------------------------------
 
   Future<void> _seedTenant() async {
-    _tenantId = IdGenerator.generateId();
+    _tenantId = kPilotTenantId;
     final now = DateTime.now();
     await db.into(db.tenants).insert(
       TenantsCompanion(

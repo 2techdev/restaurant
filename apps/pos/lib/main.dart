@@ -20,6 +20,7 @@ import 'package:uuid/uuid.dart';
 import 'package:gastrocore_pos/app.dart';
 import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/core/data/app_initializer.dart';
+import 'package:gastrocore_pos/core/data/seed_data.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/features/brand_auth/presentation/providers/brand_auth_provider.dart';
@@ -57,9 +58,16 @@ Future<void> _bootstrap() async {
   final db = AppDatabase.create();
   await AppInitializer.initialize(db);
 
-  // Read the tenant ID from the (now-seeded) database.
+  // Resolve the active tenant ID.
+  //
+  // Seed has a stable [kPilotTenantId] for the pilot demo restaurant, so
+  // the bootstrap reader and the per-feature queries can't drift apart.
+  // If the DB somehow comes up empty (seed skipped by an upstream gate,
+  // crash mid-seed) we still hand a usable ID to the ProviderScope so
+  // queries return empty instead of throwing on `tenants.first`.
   final tenants = await db.select(db.tenants).get();
-  final tenantId = tenants.first.id;
+  final tenantId =
+      tenants.isNotEmpty ? tenants.first.id : kPilotTenantId;
 
   // Pre-warm the license cache so the first frame knows the correct tier.
   final licenseRepo = LicenseRepositoryImpl(db);
