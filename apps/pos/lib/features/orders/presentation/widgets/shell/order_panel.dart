@@ -51,7 +51,7 @@ class OrderPanel extends ConsumerWidget {
     final ticket = ref.watch(currentTicketProvider);
     final activeGang = ref.watch(activeGangProvider);
     final settings = ref.watch(restaurantSettingsProvider).valueOrNull;
-    final gangsEnabled = settings?.gangsEnabled ?? true;
+    final gangsEnabled = settings?.gangsEnabled ?? false;
     final slots = _gangSlots(settings);
 
     return Container(
@@ -60,7 +60,7 @@ class OrderPanel extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _CoverHeader(ticket: ticket),
+          if (ticket != null) _CoverHeader(ticket: ticket),
           if (gangsEnabled)
             _GangChipRow(
               slots: slots,

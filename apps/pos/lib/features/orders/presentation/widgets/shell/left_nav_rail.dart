@@ -38,9 +38,10 @@ class LeftNavRail extends ConsumerWidget {
       child: Column(
         children: [
           const SizedBox(height: AppTokens.space12),
-          const _TerminalBadge(),
+          _TerminalBadge(onTap: () => _openAdminSheet(context)),
           const SizedBox(height: AppTokens.space16),
-          // Nav stack
+          // Nav stack — operasyonel aksiyonlar. "MENÜ" ve "RAPOR" admin
+          // sheet'ine taşındı (TERMİNAL 01/ADMIN badge'ine dokunarak açılır).
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
@@ -64,16 +65,6 @@ class LeftNavRail extends ConsumerWidget {
                   icon: Icons.account_balance_wallet_rounded,
                   label: 'KASA',
                   onTap: () => context.push(AppRoutes.zReport),
-                ),
-                _NavButton(
-                  icon: Icons.inventory_2_rounded,
-                  label: 'MENÜ',
-                  onTap: () => context.push(AppRoutes.menuManagement),
-                ),
-                _NavButton(
-                  icon: Icons.assessment_rounded,
-                  label: 'RAPOR',
-                  onTap: () => context.push(AppRoutes.analytics),
                 ),
               ],
             ),
@@ -131,30 +122,127 @@ class LeftNavRail extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _openAdminSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: GcColors.surfaceContainerLowest,
+      barrierColor: Colors.black54,
+      builder: (sheetCtx) {
+        Widget tile({
+          required IconData icon,
+          required String label,
+          required String route,
+        }) {
+          return InkWell(
+            onTap: () {
+              Navigator.of(sheetCtx).pop();
+              context.push(route);
+            },
+            child: Container(
+              height: 64,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: AppTokens.space16),
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: GcColors.outlineVariant),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, size: 22, color: GcColors.onSurface),
+                  const SizedBox(width: AppTokens.space16),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontFamily: 'WorkSans',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: GcColors.onSurface,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                height: 48,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppTokens.space16),
+                alignment: Alignment.centerLeft,
+                color: GcColors.surfaceContainer,
+                child: const Text(
+                  'TERMİNAL / ADMIN',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: GcColors.onSurfaceVariant,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              tile(
+                icon: Icons.inventory_2_rounded,
+                label: 'MENÜ YÖNETİMİ',
+                route: AppRoutes.menuManagement,
+              ),
+              tile(
+                icon: Icons.assessment_rounded,
+                label: 'RAPORLAR',
+                route: AppRoutes.analytics,
+              ),
+              tile(
+                icon: Icons.settings_rounded,
+                label: 'AYARLAR',
+                route: AppRoutes.settings,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _TerminalBadge extends StatelessWidget {
-  const _TerminalBadge();
+  const _TerminalBadge({this.onTap});
+
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: AppTokens.space4),
-      child: Column(
-        children: [
-          Text('TERMİNAL 01', style: GcText.labelTiny),
-          SizedBox(height: 2),
-          Text(
-            'ADMIN',
-            style: TextStyle(
-              fontFamily: 'WorkSans',
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: GcColors.onSurfaceVariant,
-              letterSpacing: 1.0,
+    return InkWell(
+      onTap: onTap,
+      child: const Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppTokens.space4,
+          vertical: AppTokens.space8,
+        ),
+        child: Column(
+          children: [
+            Text('TERMİNAL 01', style: GcText.labelTiny),
+            SizedBox(height: 2),
+            Text(
+              'ADMIN',
+              style: TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: GcColors.onSurfaceVariant,
+                letterSpacing: 1.0,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
