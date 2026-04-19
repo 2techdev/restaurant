@@ -24,6 +24,7 @@ import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provide
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
+import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/bottom_action_bar.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/column_toggle_button.dart';
@@ -281,7 +282,18 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
 }
 
 // ---------------------------------------------------------------------------
-// Top bar — "Gastro Core" brand on a high-surface strip.
+// Top bar — POS v2 brand lockup + ticket meta + mode switch + user pill.
+//
+// Layout (left → right):
+//   * "Gastro" (upright) + "Core" (italic) — brand lockup
+//   * "POS · v2" chip
+//   * Ticket # · table meta (when a ticket is active)
+//   * mode switch: Im Haus / Takeaway / Theke
+//   * diagnostic tenant/count badge
+//   * [flex spacer]
+//   * search (owned by product area below — not duplicated here)
+//   * sync / settings icons
+//   * user pill: "Terminal · <name>"
 // ---------------------------------------------------------------------------
 
 class _TopBar extends ConsumerWidget {
@@ -289,23 +301,25 @@ class _TopBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final ticket = ref.watch(currentTicketProvider);
+    final user = ref.watch(currentUserProvider);
+
     return Container(
       height: AppTokens.topBarHeight,
       color: GcColors.surfaceContainer,
       padding: const EdgeInsets.symmetric(horizontal: AppTokens.space16),
       child: Row(
         children: [
-          const Text(
-            'Gastro Core',
-            style: TextStyle(
-              fontFamily: 'WorkSans',
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: GcColors.onSurface,
-              letterSpacing: -0.5,
-            ),
-          ),
+          const _BrandLockup(),
+          const SizedBox(width: AppTokens.space8),
+          const _PosTag(),
+          if (ticket != null) ...[
+            const SizedBox(width: AppTokens.space12),
+            _TicketMeta(ticket: ticket),
+          ],
           const SizedBox(width: AppTokens.space12),
+          const _ModeSwitch(),
+          const SizedBox(width: AppTokens.space8),
           const _DiagnosticBadge(),
           const Spacer(),
           _IconButton(
@@ -316,11 +330,236 @@ class _TopBar extends ConsumerWidget {
             icon: Icons.settings_rounded,
             onTap: () => context.push(AppRoutes.settings),
           ),
-          _IconButton(
-            icon: Icons.person_rounded,
+          const SizedBox(width: AppTokens.space4),
+          _UserPill(
+            userLabel: user?.name.split(' ').first ?? 'Kullanıcı',
             onTap: () => context.go(AppRoutes.home),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _BrandLockup extends StatelessWidget {
+  const _BrandLockup();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          'Gastro',
+          style: TextStyle(
+            fontFamily: 'WorkSans',
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: GcColors.onSurface,
+            letterSpacing: -0.5,
+          ),
+        ),
+        Text(
+          'Core',
+          style: TextStyle(
+            fontFamily: 'WorkSans',
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            fontStyle: FontStyle.italic,
+            color: GcColors.primary,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PosTag extends StatelessWidget {
+  const _PosTag();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: const BoxDecoration(color: GcColors.surfaceContainerHigh),
+      child: Text(
+        'POS · v2',
+        style: GcText.labelTiny.copyWith(
+          fontSize: 10,
+          color: GcColors.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _TicketMeta extends StatelessWidget {
+  const _TicketMeta({required this.ticket});
+  final TicketEntity ticket;
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = <String>[
+      '#${ticket.orderNumber}',
+      if (ticket.tableId != null && ticket.tableId!.isNotEmpty)
+        'T ${ticket.tableId}'
+      else
+        _orderTypeShort(ticket.orderType),
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: const BoxDecoration(
+        color: GcColors.surfaceContainerLowest,
+        border: Border(
+          left: BorderSide(color: GcColors.primary, width: 2),
+        ),
+      ),
+      child: Text(
+        parts.join(' · '),
+        style: GcText.button.copyWith(
+          fontSize: 11,
+          color: GcColors.onSurface,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
+  static String _orderTypeShort(OrderType t) {
+    switch (t) {
+      case OrderType.dineIn:
+        return 'Im Haus';
+      case OrderType.takeaway:
+        return 'Takeaway';
+      case OrderType.delivery:
+        return 'Delivery';
+      case OrderType.online:
+        return 'Online';
+    }
+  }
+}
+
+class _ModeSwitch extends ConsumerWidget {
+  const _ModeSwitch();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ticket = ref.watch(currentTicketProvider);
+    final current = ticket?.orderType ?? OrderType.dineIn;
+    final hasTicket = ticket != null;
+
+    return DecoratedBox(
+      decoration: const BoxDecoration(color: GcColors.surfaceContainerLowest),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ModeChip(
+            label: 'Im Haus',
+            active: current == OrderType.dineIn,
+            enabled: hasTicket,
+            onTap: () => ref
+                .read(currentTicketProvider.notifier)
+                .updateOrderType(OrderType.dineIn),
+          ),
+          _ModeChip(
+            label: 'Takeaway',
+            active: current == OrderType.takeaway,
+            enabled: hasTicket,
+            onTap: () => ref
+                .read(currentTicketProvider.notifier)
+                .updateOrderType(OrderType.takeaway),
+          ),
+          _ModeChip(
+            label: 'Theke',
+            // POS v2 "Theke" ≈ counter / quick-serve. Maps to delivery slot
+            // internally — it's the fastest takeaway bucket the domain has
+            // and preserves the tax path (takeaway MWST).
+            active: current == OrderType.delivery,
+            enabled: hasTicket,
+            onTap: () => ref
+                .read(currentTicketProvider.notifier)
+                .updateOrderType(OrderType.delivery),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({
+    required this.label,
+    required this.active,
+    required this.enabled,
+    required this.onTap,
+  });
+  final String label;
+  final bool active;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = active ? GcColors.primary : Colors.transparent;
+    final fg = active
+        ? GcColors.onPrimary
+        : (enabled ? GcColors.onSurface : GcColors.outline);
+    return Material(
+      color: bg,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text(
+            label,
+            style: GcText.button.copyWith(
+              fontSize: 11,
+              color: fg,
+              letterSpacing: 0.6,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UserPill extends StatelessWidget {
+  const _UserPill({required this.userLabel, required this.onTap});
+  final String userLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: GcColors.surfaceContainerLowest,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.person_rounded,
+                size: 14,
+                color: GcColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'T·01 · $userLabel',
+                style: GcText.button.copyWith(
+                  fontSize: 11,
+                  color: GcColors.onSurface,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -339,8 +578,8 @@ class _IconButton extends StatelessWidget {
         onTap: onTap,
         hoverColor: GcColors.surfaceContainerHigh,
         child: SizedBox(
-          width: 44,
-          height: 44,
+          width: 40,
+          height: 40,
           child: Icon(
             icon,
             size: 20,
