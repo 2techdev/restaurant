@@ -80,16 +80,19 @@ Future<void> _bootstrap() async {
 
   // Resolve the active tenant ID.
   //
-  // Seed has a stable [kPilotTenantId] for the pilot demo restaurant, so
-  // the bootstrap reader and the per-feature queries can't drift apart.
-  // If the DB somehow comes up empty (seed skipped by an upstream gate,
-  // crash mid-seed) we still hand a usable ID to the ProviderScope so
-  // queries return empty instead of throwing on `tenants.first`.
+  // Pilot safeguard: hard-pin to [kPilotTenantId] instead of reading
+  // `tenants.first.id`. The seed already writes this exact ID, and every
+  // per-feature provider queries through `tenantIdProvider`, so forcing
+  // the constant here makes drift architecturally impossible — no other
+  // runtime path can slip a different UUID into the query scope. Accepted
+  // as temporary for the single-tenant pilot; revisit if/when multi-
+  // tenant boot is reintroduced.
+  //
+  // Log the row count so we can still see when the DB is empty.
   final tenants = await db.select(db.tenants).get();
-  final tenantId =
-      tenants.isNotEmpty ? tenants.first.id : kPilotTenantId;
+  const tenantId = kPilotTenantId;
   debugPrint(
-    '[BOOT] resolved tenantId=$tenantId (row count=${tenants.length})',
+    '[BOOT] hard-pinned tenantId=$tenantId (tenants row count=${tenants.length})',
   );
 
   // Pre-warm the license cache so the first frame knows the correct tier.
