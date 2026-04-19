@@ -55,9 +55,9 @@ class GridCategoryColumn extends ConsumerWidget {
     required int crossAxis,
   }) {
     final items = <_Item>[
-      const _Item(id: null, label: 'TÜMÜ', tone: CategoryTone.warm),
+      const _Item(id: null, label: 'TÜMÜ', colorHex: null),
       ...categories.map(
-        (c) => _Item(id: c.id, label: c.name, tone: categoryTone(c.name)),
+        (c) => _Item(id: c.id, label: c.name, colorHex: c.color),
       ),
     ];
 
@@ -75,7 +75,7 @@ class GridCategoryColumn extends ConsumerWidget {
         final isSelected = item.id == selectedId;
         return _CategoryTile(
           label: item.label,
-          tone: item.tone,
+          colorHex: item.colorHex,
           selected: isSelected,
           onTap: () {
             ref.read(selectedCategoryProvider.notifier).state = item.id;
@@ -87,38 +87,30 @@ class GridCategoryColumn extends ConsumerWidget {
 }
 
 class _Item {
-  const _Item({required this.id, required this.label, required this.tone});
+  const _Item({required this.id, required this.label, required this.colorHex});
   final String? id;
   final String label;
-  final CategoryTone tone;
+  final String? colorHex;
 }
 
 class _CategoryTile extends StatelessWidget {
   const _CategoryTile({
     required this.label,
-    required this.tone,
+    required this.colorHex,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
-  final CategoryTone tone;
+  final String? colorHex;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final Color bg;
-    final Color fg;
-    if (selected) {
-      final active = activeStyle(tone);
-      bg = active.bg;
-      fg = active.fg;
-    } else {
-      final style = toneStyle(tone);
-      bg = style.bg;
-      fg = style.fg;
-    }
+    final style = resolveCategoryColor(colorHex, selected: selected);
+    final bg = style.bg;
+    final fg = style.fg;
 
     return Material(
       color: bg,

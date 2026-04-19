@@ -149,6 +149,62 @@ CategoryTone categoryTone(String name) => CategoryTone.warm;
 }
 
 // ---------------------------------------------------------------------------
+// Per-category hex colours (POS v2) — driven by CategoryEntity.color.
+// ---------------------------------------------------------------------------
+
+/// Parse a "#RRGGBB" (or "#AARRGGBB") string into a [Color].
+///
+/// Returns `null` if the string is empty, malformed, or not a hex colour.
+/// Defensive: the DB column is a free-form string, so we don't throw on
+/// bad data — callers fall back to a default tone.
+Color? parseHexColor(String? hex) {
+  if (hex == null) return null;
+  var s = hex.trim();
+  if (s.isEmpty) return null;
+  if (s.startsWith('#')) s = s.substring(1);
+  if (s.length == 6) s = 'FF$s';
+  if (s.length != 8) return null;
+  final v = int.tryParse(s, radix: 16);
+  if (v == null) return null;
+  return Color(v);
+}
+
+/// Foreground colour (white / near-black) that reads well on [bg].
+///
+/// Uses [HSLColor] lightness as a perceptual proxy. Dark backgrounds get
+/// white text; light backgrounds get onSurface near-black so the rendering
+/// stays inside the Kinetic palette.
+Color onColor(Color bg) {
+  final l = HSLColor.fromColor(bg).lightness;
+  return l < 0.58 ? Colors.white : GcColors.onSurface;
+}
+
+/// Darken a colour by [amount] (0..1) — used for the pressed / selected
+/// stripe over a category tile. Keeps hue; drops toward black.
+Color darken(Color c, [double amount = 0.15]) =>
+    Color.lerp(c, Colors.black, amount.clamp(0.0, 1.0)) ?? c;
+
+/// Resolve a [CategoryEntity.color] hex string into a tile style.
+///
+/// Falls back to the warm orange default when [hex] is empty, malformed,
+/// or missing. Selected tiles get a darkened variant and an inset stripe
+/// on the rendering side — this helper only returns fill + fg.
+({Color bg, Color fg}) resolveCategoryColor(
+  String? hex, {
+  bool selected = false,
+}) {
+  final parsed = parseHexColor(hex);
+  if (parsed == null) {
+    if (selected) {
+      return (bg: GcColors.catYellow, fg: GcColors.onSurface);
+    }
+    return (bg: GcColors.catOrange, fg: GcColors.onSurface);
+  }
+  final bg = selected ? darken(parsed, 0.18) : parsed;
+  return (bg: bg, fg: onColor(bg));
+}
+
+// ---------------------------------------------------------------------------
 // GcText — typography presets. Opaque TextStyles; callers pick the size.
 // ---------------------------------------------------------------------------
 

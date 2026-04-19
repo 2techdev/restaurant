@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
 import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
+import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
 
@@ -68,6 +69,16 @@ class ProductGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final productsAsync = ref.watch(filteredProductsProvider);
+    final categoriesAsync = ref.watch(categoriesProvider);
+
+    // Per-category hex colour lookup — drives POS-v2 category tinting on the
+    // product tiles. When the DB is still loading, resolveCategoryColor falls
+    // back to the warm orange default.
+    final colorByCatId = <String, String?>{};
+    final cats = categoriesAsync.asData?.value ?? const <CategoryEntity>[];
+    for (final c in cats) {
+      colorByCatId[c.id] = c.color;
+    }
 
     return ColoredBox(
       color: GcColors.surface,
@@ -99,6 +110,7 @@ class ProductGrid extends ConsumerWidget {
                     key: ValueKey('product_card_${p.id}'),
                     product: p,
                     quantity: cartQuantities[p.id] ?? 0,
+                    categoryColorHex: colorByCatId[p.categoryId],
                     onTap: () => onProductTap(p),
                   );
                 },
@@ -132,20 +144,28 @@ class ProductCard extends StatelessWidget {
     required this.product,
     required this.onTap,
     this.quantity = 0,
+    this.categoryColorHex,
   });
 
   final ProductEntity product;
   final VoidCallback onTap;
   final int quantity;
 
+  /// Hex string from the product's [CategoryEntity.color]. When null or
+  /// malformed the card falls back to the warm default.
+  final String? categoryColorHex;
+
   @override
   Widget build(BuildContext context) {
+    final style = resolveCategoryColor(categoryColorHex);
+    final bg = style.bg;
+    final fg = style.fg;
     return Material(
-      color: GcColors.catGreen,
+      color: bg,
       child: InkWell(
         onTap: onTap,
-        splashColor: GcColors.catDarkGreen,
-        highlightColor: GcColors.catDarkGreen,
+        splashColor: darken(bg, 0.18),
+        highlightColor: darken(bg, 0.12),
         child: Stack(
           children: [
             DecoratedBox(
@@ -162,11 +182,11 @@ class ProductCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         product.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: fg,
                           height: 1.15,
                         ),
                         maxLines: 3,
@@ -177,12 +197,12 @@ class ProductCard extends StatelessWidget {
                       alignment: Alignment.bottomRight,
                       child: Text(
                         _formatCHF(product.price),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'WorkSans',
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                          color: fg,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
@@ -194,7 +214,7 @@ class ProductCard extends StatelessWidget {
               Positioned(
                 top: AppTokens.space4,
                 right: AppTokens.space4,
-                child: _QuantityBadge(quantity: quantity),
+                child: _QuantityBadge(quantity: quantity, tileColor: bg),
               ),
           ],
         ),
@@ -210,19 +230,27 @@ class ProductCard extends StatelessWidget {
 }
 
 class _QuantityBadge extends StatelessWidget {
-  const _QuantityBadge({required this.quantity});
+  const _QuantityBadge({required this.quantity, required this.tileColor});
   final int quantity;
+  final Color tileColor;
 
   @override
   Widget build(BuildContext context) {
+    // POS v2: in-cart badge is a white circle with the category colour as
+    // text — it reads as a numeric chip over the tile, not a coloured pill.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      color: GcColors.catYellow,
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
       child: Text(
-        '×$quantity',
+        quantity > 9 ? '9+' : '$quantity',
         style: GcText.button.copyWith(
           fontSize: 11,
-          color: GcColors.onSurface,
+          color: tileColor,
         ),
       ),
     );
