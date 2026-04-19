@@ -657,14 +657,17 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
 
   Widget _buildFloorGrid(List<RestaurantTableEntity> tables) {
     return LayoutBuilder(builder: (context, constraints) {
-      // Stitch: 3-4 columns for table map
-      final cols = (constraints.maxWidth / 200).floor().clamp(3, 4);
+      // Aim for ~180dp-wide square-ish tiles. On 1280-class landscape
+      // tablets this gives 6 cols; on a narrow phone it still returns 3.
+      final cols = (constraints.maxWidth / 180).floor().clamp(3, 6);
       return GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
-          childAspectRatio: 1.3,
+          // Near-square, slightly landscape — content fits without squish
+          // and tiles never render as tall vertical strips.
+          childAspectRatio: 1.1,
         ),
         itemCount: tables.length,
         itemBuilder: (_, i) => _buildTableTile(tables[i]),
