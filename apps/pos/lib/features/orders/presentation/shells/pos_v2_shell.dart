@@ -36,6 +36,8 @@ import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/favori
     show allActiveProductsProvider;
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/order_panel.dart'
     show activeGangProvider, heldGangsProvider;
+import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/features/tables/presentation/providers/table_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -79,42 +81,59 @@ class PosV2Shell extends ConsumerWidget {
 
 /// 3-column × 3-row grid: rail spans full height, topbar spans cols 2–3,
 /// order + footer stack in col 2, menu fills cols 2–3 rows 2–3 on the right.
-class _V2Layout extends StatelessWidget {
+///
+/// In left-hand mode the rail + order column flip to the right edge so a
+/// left-handed operator's tapping hand stays over the high-frequency
+/// controls. Mirroring is a straight row-children reversal — no
+/// [Directionality] swap — so text and numerals keep their natural RTL /
+/// LTR layout regardless of operator handedness.
+class _V2Layout extends ConsumerWidget {
   const _V2Layout();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appSettings = ref.watch(appSettingsProvider).valueOrNull ??
+        const AppSettings();
+    final leftHanded = appSettings.handedness == AppHandedness.left;
+
     return LayoutBuilder(
       builder: (context, bc) {
         // Responsive column widths matching the CSS breakpoints.
         final w = bc.maxWidth;
         final railW = w >= 1400 ? 80.0 : (w >= 1200 ? 72.0 : 64.0);
         final orderW = w >= 1400 ? 380.0 : (w >= 1200 ? 340.0 : 320.0);
+
+        final railSlot = SizedBox(width: railW, child: const _Rail());
+        final orderSlot = SizedBox(
+          width: orderW,
+          child: _OrderColumn(leftHanded: leftHanded),
+        );
+        const menuSlot = Expanded(child: _MenuArea());
+
+        final innerRowChildren = leftHanded
+            ? <Widget>[menuSlot, orderSlot]
+            : <Widget>[orderSlot, menuSlot];
+
+        final mainColumn = Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 60, child: _TopBar()),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: innerRowChildren,
+                ),
+              ),
+            ],
+          ),
+        );
+
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(width: railW, child: const _Rail()),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 60, child: _TopBar()),
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          width: orderW,
-                          child: const _OrderColumn(),
-                        ),
-                        const Expanded(child: _MenuArea()),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          children: leftHanded
+              ? <Widget>[mainColumn, railSlot]
+              : <Widget>[railSlot, mainColumn],
         );
       },
     );
@@ -123,15 +142,21 @@ class _V2Layout extends StatelessWidget {
 
 /// Order column = order panel stacked on top of the compact footer.
 class _OrderColumn extends StatelessWidget {
-  const _OrderColumn();
+  const _OrderColumn({this.leftHanded = false});
+
+  /// When true, the hairline divider sits on the order column's left edge
+  /// (facing the menu area on its right); the default places it on the
+  /// right edge (right-hand mode).
+  final bool leftHanded;
 
   @override
   Widget build(BuildContext context) {
     final v2 = context.v2;
+    final side = BorderSide(color: v2.line);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: v2.surface,
-        border: Border(right: BorderSide(color: v2.line)),
+        border: leftHanded ? Border(left: side) : Border(right: side),
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -257,6 +257,11 @@ class AppSettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
     final current = state.valueOrNull ?? const AppSettings();
     await save(current.copyWith(language: language));
   }
+
+  Future<void> setHandedness(AppHandedness handedness) async {
+    final current = state.valueOrNull ?? const AppSettings();
+    await save(current.copyWith(handedness: handedness));
+  }
 }
 
 final appSettingsProvider =

@@ -54,10 +54,31 @@ enum AppThemeMode {
       );
 }
 
+/// Which hand the operator uses to tap the POS. Right-handed (default)
+/// keeps the rail on the left and the order column between rail and menu.
+/// Left-handed mirrors the layout so the most-tapped controls sit under
+/// the operator's thumb without crossing their body.
+enum AppHandedness {
+  right,
+  left;
+
+  String get label => switch (this) {
+        right => 'Sağ el (varsayılan)',
+        left => 'Sol el (ayna)',
+      };
+
+  static AppHandedness fromString(String s) =>
+      AppHandedness.values.firstWhere(
+        (e) => e.name == s,
+        orElse: () => AppHandedness.right,
+      );
+}
+
 class AppSettings {
   const AppSettings({
     this.themeMode = AppThemeMode.light,
     this.language = AppLanguage.de,
+    this.handedness = AppHandedness.right,
   });
 
   /// Active color theme.
@@ -66,18 +87,24 @@ class AppSettings {
   /// Active UI language.
   final AppLanguage language;
 
+  /// Operator handedness — drives the POS shell layout mirroring.
+  final AppHandedness handedness;
+
   AppSettings copyWith({
     AppThemeMode? themeMode,
     AppLanguage? language,
+    AppHandedness? handedness,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
         language: language ?? this.language,
+        handedness: handedness ?? this.handedness,
       );
 
   Map<String, dynamic> toJson() => {
         'themeMode': themeMode.name,
         'language': language.name,
+        'handedness': handedness.name,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -85,6 +112,9 @@ class AppSettings {
             AppThemeMode.fromString((json['themeMode'] as String?) ?? 'light'),
         language:
             AppLanguage.fromString((json['language'] as String?) ?? 'de'),
+        handedness: AppHandedness.fromString(
+          (json['handedness'] as String?) ?? 'right',
+        ),
       );
 
   String toJsonString() => jsonEncode(toJson());
@@ -97,8 +127,9 @@ class AppSettings {
       identical(this, other) ||
       other is AppSettings &&
           themeMode == other.themeMode &&
-          language == other.language;
+          language == other.language &&
+          handedness == other.handedness;
 
   @override
-  int get hashCode => Object.hash(themeMode, language);
+  int get hashCode => Object.hash(themeMode, language, handedness);
 }

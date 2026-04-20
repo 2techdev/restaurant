@@ -1798,6 +1798,58 @@ class _AppearanceSection extends ConsumerWidget {
             ),
           ],
         ),
+        _Card(
+          title: 'KULLANIM ELİ',
+          children: [
+            const Text(
+              'POS yerleşimini sağ el veya sol el için aynala. Sol el modunda '
+              'şerit ve sipariş paneli sağ tarafa geçer, menü alanı sola kayar.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            RadioGroup<AppHandedness>(
+              groupValue: settings.handedness,
+              onChanged: (v) {
+                if (v != null) {
+                  ref.read(appSettingsProvider.notifier).setHandedness(v);
+                }
+              },
+              child: Column(
+                children: AppHandedness.values
+                    .map(
+                      (hand) => RadioListTile<AppHandedness>(
+                        contentPadding: EdgeInsets.zero,
+                        title: Row(
+                          children: [
+                            Icon(
+                              hand == AppHandedness.right
+                                  ? Icons.swipe_right_alt_rounded
+                                  : Icons.swipe_left_alt_rounded,
+                              size: 18,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              hand.label,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        value: hand,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
