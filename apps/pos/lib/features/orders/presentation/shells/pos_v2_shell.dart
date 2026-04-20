@@ -1828,6 +1828,7 @@ class _ItemsWrap extends ConsumerWidget {
     final allProducts =
         allProductsAsync.asData?.value ?? const <ProductEntity>[];
 
+    return LayoutBuilder(builder: (context, bc) {
     return Container(
       color: V2.bg,
       child: Column(
@@ -1839,6 +1840,7 @@ class _ItemsWrap extends ConsumerWidget {
             selectedId: selectedId,
             filteredLen: productsAsync.asData?.value.length,
             allActive: allProducts,
+            wrapConstraints: bc,
           ),
           _SchnellBar(
             products: allProducts,
@@ -1903,6 +1905,7 @@ class _ItemsWrap extends ConsumerWidget {
         ],
       ),
     );
+    });
   }
 
   static String _catName(List<CategoryEntity> cats, String id) {
@@ -1920,12 +1923,14 @@ class _ItemsHeader extends StatelessWidget {
     required this.selectedId,
     required this.filteredLen,
     required this.allActive,
+    required this.wrapConstraints,
   });
   final String catName;
   final int count;
   final String? selectedId;
   final int? filteredLen;
   final List<ProductEntity> allActive;
+  final BoxConstraints wrapConstraints;
 
   @override
   Widget build(BuildContext context) {
@@ -1950,8 +1955,14 @@ class _ItemsHeader extends StatelessWidget {
           return '$tail:${e.value}';
         })
         .join(', ');
+    final cw = wrapConstraints.maxWidth.isFinite
+        ? wrapConstraints.maxWidth.toInt().toString()
+        : 'INF';
+    final ch = wrapConstraints.maxHeight.isFinite
+        ? wrapConstraints.maxHeight.toInt().toString()
+        : 'INF';
     final debugLine =
-        '[sel=$selTail] [filt=$filt] [all=${allActive.length}] '
+        '[wrap=${cw}x$ch] [sel=$selTail] [filt=$filt] [all=${allActive.length}] '
         '[all-in-cat=$allInCat] [by-cat={$sample}]';
     return Padding(
       padding: const EdgeInsets.fromLTRB(26, 18, 26, 14),
