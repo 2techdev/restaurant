@@ -1833,7 +1833,13 @@ class _ItemsWrap extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ItemsHeader(catName: activeCatName, count: productsAsync.asData?.value.length ?? 0),
+          _ItemsHeader(
+            catName: activeCatName,
+            count: productsAsync.asData?.value.length ?? 0,
+            selectedId: selectedId,
+            filteredLen: productsAsync.asData?.value.length,
+            allActive: allProducts,
+          ),
           _SchnellBar(
             products: allProducts,
             colorByCat: colorByCat,
@@ -1884,20 +1890,73 @@ class _ItemsWrap extends ConsumerWidget {
 }
 
 class _ItemsHeader extends StatelessWidget {
-  const _ItemsHeader({required this.catName, required this.count});
+  const _ItemsHeader({
+    required this.catName,
+    required this.count,
+    required this.selectedId,
+    required this.filteredLen,
+    required this.allActive,
+  });
   final String catName;
   final int count;
+  final String? selectedId;
+  final int? filteredLen;
+  final List<ProductEntity> allActive;
+
   @override
   Widget build(BuildContext context) {
+    final byCat = <String, int>{};
+    for (final p in allActive) {
+      byCat[p.categoryId] = (byCat[p.categoryId] ?? 0) + 1;
+    }
+    final allInCat =
+        selectedId == null ? allActive.length : (byCat[selectedId] ?? 0);
+    final filt = filteredLen?.toString() ?? 'null';
+    final selTail = selectedId == null
+        ? 'null'
+        : (selectedId!.length > 10
+            ? selectedId!.substring(selectedId!.length - 10)
+            : selectedId!);
+    final sample = byCat.entries
+        .take(8)
+        .map((e) {
+          final tail = e.key.length > 10
+              ? e.key.substring(e.key.length - 10)
+              : e.key;
+          return '$tail:${e.value}';
+        })
+        .join(', ');
+    final debugLine =
+        '[sel=$selTail] [filt=$filt] [all=${allActive.length}] '
+        '[all-in-cat=$allInCat] [by-cat={$sample}]';
     return Padding(
       padding: const EdgeInsets.fromLTRB(26, 18, 26, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(catName, style: V2Text.itemsH),
-          const SizedBox(width: 14),
-          Text('$count POSITIONEN', style: V2Text.crumb),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(catName, style: V2Text.itemsH),
+              const SizedBox(width: 14),
+              Text('$count POSITIONEN', style: V2Text.crumb),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            color: const Color(0xFFFFE082),
+            child: Text(
+              debugLine,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Colors.black,
+              ),
+            ),
+          ),
         ],
       ),
     );
