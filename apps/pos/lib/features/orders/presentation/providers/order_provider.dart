@@ -166,7 +166,7 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     return null;
   }
 
-  void addItem(
+  Future<void> addItem(
     ProductEntity product, {
     double quantity = 1,
     List<OrderItemModifierEntity> selectedModifiers = const [],
@@ -178,7 +178,7 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     String? categoryGangId,
     /// Seat number (1-based) this item belongs to. Null = unassigned.
     int? seatNumber,
-  }) {
+  }) async {
     if (state == null) return;
 
     // Resolve Gang: explicit > product default > category default
@@ -238,6 +238,18 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
           );
 
     state = state!.addItem(item);
+
+    // When the ticket is already persisted (e.g. the cashier fired Gang 1
+    // and is now adding to Gang 2), the in-memory append is not enough --
+    // the next fireGang / sendToKitchen call would filter and then try to
+    // updateItemStatus on rows that never existed, and the post-fire DB
+    // refresh would wipe the in-memory item. Persist right away so every
+    // item added to an open ticket round-trips through Drift.
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.addItemToTicket(state!.id, item);
+      state = await repo.getTicketById(state!.id);
+    }
   }
 
   /// Assign [seatNumber] to an existing order item (null clears it).
