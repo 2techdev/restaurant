@@ -11,6 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
 import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
+import 'package:gastrocore_pos/features/gang/domain/entities/gang_template_entity.dart';
+import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
@@ -308,6 +310,26 @@ class _GangGroupedList extends ConsumerWidget {
     }
     final held = ref.watch(heldGangsProvider);
 
+    // Build a course → GangOrderStatus map by joining:
+    //   gang_templates.sortOrder  →  order_gang_states.gangTemplateId.status
+    // Gangs that have no state row yet fall through as null, which the
+    // section treats as "pending" / not-yet-fired.
+    final templates = ref.watch(gangTemplatesProvider).valueOrNull ?? const [];
+    final states = ref
+            .watch(orderGangStatesProvider(ticket.id))
+            .valueOrNull ??
+        const [];
+    final statusByCourse = <int, GangOrderStatus>{};
+    if (templates.isNotEmpty && states.isNotEmpty) {
+      final sortByTemplateId = <String, int>{
+        for (final t in templates) t.id: t.sortOrder,
+      };
+      for (final s in states) {
+        final course = sortByTemplateId[s.gangTemplateId];
+        if (course != null) statusByCourse[course] = s.status;
+      }
+    }
+
     return ListView(
       padding: EdgeInsets.zero,
       children: [
@@ -317,8 +339,10 @@ class _GangGroupedList extends ConsumerWidget {
             label: _resolveGangLabel(context, settings, g),
             items: byGang[g] ?? const [],
             isHeld: held.contains(g),
+            status: statusByCourse[g],
             onFire: () => _fireGang(context, ref, g),
             onHold: () => _holdGang(context, ref, g),
+            onServe: () => _serveGang(context, ref, g),
           ),
       ],
     );
@@ -343,6 +367,27 @@ class _GangGroupedList extends ConsumerWidget {
       messenger.showSnackBar(
         SnackBar(
           content: Text('$label gönderilemedi: $e'),
+          backgroundColor: GcColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _serveGang(BuildContext ctx, WidgetRef ref, int gang) async {
+    final messenger = ScaffoldMessenger.of(ctx);
+    final label = _resolveGangLabel(ctx, settings, gang);
+    try {
+      await ref.read(currentTicketProvider.notifier).markGangServed(gang);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$label servis edildi.'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$label servis edilemedi: $e'),
           backgroundColor: GcColors.error,
         ),
       );
@@ -394,21 +439,32 @@ class _GangSection extends StatelessWidget {
     required this.label,
     required this.items,
     required this.isHeld,
+    required this.status,
     required this.onFire,
     required this.onHold,
+    required this.onServe,
   });
 
   final int gang;
   final String label;
   final List<OrderItemEntity> items;
   final bool isHeld;
+  final GangOrderStatus? status;
   final VoidCallback onFire;
   final VoidCallback onHold;
+  final VoidCallback onServe;
 
   @override
   Widget build(BuildContext context) {
     final allSent = items.isNotEmpty && items.every((i) => i.sentToKitchen);
     final hasUnsent = items.any((i) => !i.sentToKitchen);
+    final isServed = status == GangOrderStatus.served;
+    // Show the SERVE action once the kitchen has acknowledged the gang
+    // (fired / inPrep / ready) and it has not yet been delivered.
+    final canServe = !isServed &&
+        allSent &&
+        status != null &&
+        status != GangOrderStatus.pending;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -424,7 +480,13 @@ class _GangSection extends StatelessWidget {
                 label.toUpperCase(),
                 style: GcText.labelTiny.copyWith(color: GcColors.onSurface),
               ),
-              if (allSent) ...[
+              if (isServed) ...[
+                const SizedBox(width: AppTokens.space8),
+                const _StatusBadge(
+                  label: 'SERVİS EDİLDİ',
+                  color: GcColors.catGreen,
+                ),
+              ] else if (allSent) ...[
                 const SizedBox(width: AppTokens.space8),
                 const _StatusBadge(
                   label: 'GÖNDERİLDİ',
@@ -439,7 +501,7 @@ class _GangSection extends StatelessWidget {
                 ),
               ],
               const Spacer(),
-              if (items.isNotEmpty) ...[
+              if (items.isNotEmpty && !isServed) ...[
                 _SmallButton(
                   label: isHeld ? 'DEVAM' : 'BEKLE',
                   onTap: onHold,
@@ -450,6 +512,12 @@ class _GangSection extends StatelessWidget {
                   _SmallButton(
                     label: 'GÖNDER',
                     onTap: onFire,
+                    tone: _SmallButtonTone.primary,
+                  )
+                else if (canServe)
+                  _SmallButton(
+                    label: 'SERVİS ET',
+                    onTap: onServe,
                     tone: _SmallButtonTone.primary,
                   ),
               ],

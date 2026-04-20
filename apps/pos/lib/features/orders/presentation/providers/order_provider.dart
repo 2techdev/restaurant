@@ -9,6 +9,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/gang/data/gang_repository.dart';
+import 'package:gastrocore_pos/features/gang/domain/entities/gang_template_entity.dart';
+import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_provider.dart';
 import 'package:gastrocore_pos/features/orders/data/repositories/order_repository_impl.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
@@ -339,6 +342,7 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
 
     final repo = _ref.read(orderRepositoryProvider);
     final kitchenRepo = _ref.read(kitchenRepositoryProvider);
+    final gangRepo = _ref.read(gangRepositoryProvider);
     final currentUser = _ref.read(currentUserProvider);
 
     // Persist draft before firing so the KDS ticket references a real row.
@@ -370,7 +374,65 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
       waiterName: currentUser?.name,
     );
 
+    // Persist the gang lifecycle: ensure a state row exists for this
+    // (ticket, gang) pair, then mark it fired. The order_panel reads this
+    // stream to render the "GÖNDERİLDİ" / "SERVİS EDİLDİ" badges.
+    final template = await _resolveGangTemplate(gang, gangRepo);
+    if (template != null) {
+      await gangRepo.ensureGangState(
+        id: IdGenerator.generateId(),
+        tenantId: state!.tenantId,
+        ticketId: state!.id,
+        gangTemplateId: template.id,
+      );
+      await gangRepo.fireGang(state!.id, template.id);
+    }
+
     state = await repo.getTicketById(state!.id);
+  }
+
+  /// Mark a Gang as served (delivered to the table).
+  ///
+  /// Transitions the OrderGangState from 'fired' (or 'ready') to 'served' so
+  /// the order panel shows it as delivered. Ensures a state row exists in
+  /// case the Gang was fired before this build shipped the lifecycle rows.
+  ///
+  /// No-op when: ticket is null, the ticket has never been persisted, or the
+  /// Gang has no items at all on this ticket.
+  Future<void> markGangServed(int gang) async {
+    if (state == null) return;
+    if (state!.status == TicketStatus.draft) return;
+
+    final hasItemsForGang = state!.items.any((item) => item.course == gang);
+    if (!hasItemsForGang) return;
+
+    final gangRepo = _ref.read(gangRepositoryProvider);
+    final template = await _resolveGangTemplate(gang, gangRepo);
+    if (template == null) return;
+
+    await gangRepo.ensureGangState(
+      id: IdGenerator.generateId(),
+      tenantId: state!.tenantId,
+      ticketId: state!.id,
+      gangTemplateId: template.id,
+    );
+    await gangRepo.markGangServed(state!.id, template.id);
+  }
+
+  /// Look up the GangTemplate whose [GangTemplateEntity.sortOrder] equals
+  /// the 1-based [course] index used by order items. Falls back to the
+  /// first active template when none matches, which keeps older tenants
+  /// (seeded before the sortOrder convention) working.
+  Future<GangTemplateEntity?> _resolveGangTemplate(
+    int course,
+    GangRepository gangRepo,
+  ) async {
+    final templates = await gangRepo.getGangTemplates(state!.tenantId);
+    if (templates.isEmpty) return null;
+    for (final t in templates) {
+      if (t.sortOrder == course) return t;
+    }
+    return templates.first;
   }
 
   /// Mark all un-sent items as "sent" and persist to the database.
@@ -382,6 +444,7 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
 
     final repo = _ref.read(orderRepositoryProvider);
     final kitchenRepo = _ref.read(kitchenRepositoryProvider);
+    final gangRepo = _ref.read(gangRepositoryProvider);
     final currentUser = _ref.read(currentUserProvider);
 
     // Persist ticket first if it is still a local draft.
@@ -411,6 +474,22 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
         items: unsentItems,
         waiterName: currentUser?.name,
       );
+
+      // Persist gang lifecycle for every distinct course in this batch so
+      // the order panel shows GÖNDERİLDİ / SERVİS EDİLDİ badges accurately
+      // even when the cashier fires all courses at once.
+      final firedCourses = unsentItems.map((i) => i.course).toSet();
+      for (final course in firedCourses) {
+        final template = await _resolveGangTemplate(course, gangRepo);
+        if (template == null) continue;
+        await gangRepo.ensureGangState(
+          id: IdGenerator.generateId(),
+          tenantId: state!.tenantId,
+          ticketId: state!.id,
+          gangTemplateId: template.id,
+        );
+        await gangRepo.fireGang(state!.id, template.id);
+      }
     }
 
     // Refresh state from DB.

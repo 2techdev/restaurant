@@ -40,6 +40,21 @@ final gangTemplateMapProvider =
 });
 
 // ---------------------------------------------------------------------------
+// Order gang states (per-ticket lifecycle)
+// ---------------------------------------------------------------------------
+
+/// Streams the live list of gang lifecycle rows for [ticketId]. The order
+/// panel watches this to render GÖNDERİLDİ / SERVİS EDİLDİ badges and to
+/// decide whether the "SERVİS ET" button should be enabled.
+final orderGangStatesProvider =
+    StreamProvider.family<List<OrderGangStateEntity>, String>(
+  (ref, ticketId) {
+    final repo = ref.watch(gangRepositoryProvider);
+    return repo.watchOrderGangStates(ticketId);
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Seed notifier
 // ---------------------------------------------------------------------------
 
