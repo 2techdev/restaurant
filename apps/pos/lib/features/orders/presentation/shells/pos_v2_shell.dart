@@ -1821,7 +1821,6 @@ class _ItemsWrap extends ConsumerWidget {
     // should never collapse when the user switches to an empty category.
     final allProductsAsync = ref.watch(allActiveProductsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
-    final selectedId = ref.watch(selectedCategoryProvider);
 
     final cats = categoriesAsync.asData?.value ?? const <CategoryEntity>[];
     final colorByCat = <String, String?>{
@@ -1831,9 +1830,6 @@ class _ItemsWrap extends ConsumerWidget {
       for (var i = 0; i < cats.length; i++) cats[i].id: i,
     };
 
-    final activeCatName =
-        selectedId == null ? 'Alle' : _catName(cats, selectedId);
-
     final allProducts =
         allProductsAsync.asData?.value ?? const <ProductEntity>[];
 
@@ -1842,16 +1838,10 @@ class _ItemsWrap extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 64,
-            child: _ItemsHeader(
-              catName: activeCatName,
-              count: productsAsync.asData?.value.length ?? 0,
-            ),
-          ),
+          const SizedBox(height: 40, child: _ItemsHeader()),
           if (allProducts.isNotEmpty)
             SizedBox(
-              height: 76,
+              height: 92,
               child: _SchnellBar(products: allProducts),
             ),
           Expanded(
@@ -1890,44 +1880,23 @@ class _ItemsWrap extends ConsumerWidget {
     );
   }
 
-  static String _catName(List<CategoryEntity> cats, String id) {
-    for (final c in cats) {
-      if (c.id == id) return c.name;
-    }
-    return 'Menü';
-  }
 }
 
 class _ItemsHeader extends StatelessWidget {
-  const _ItemsHeader({required this.catName, required this.count});
-  final String catName;
-  final int count;
+  const _ItemsHeader();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(26, 18, 14, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(catName, style: V2Text.itemsH),
-                const SizedBox(width: 14),
-                Text('$count POSITIONEN', style: V2Text.crumb),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.tune_rounded, size: 20, color: V2.ink3),
-            tooltip: 'Tweaks',
-            onPressed: () => _showTweaks(context),
-            splashRadius: 20,
-          ),
-        ],
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 12),
+        child: IconButton(
+          icon: const Icon(Icons.tune_rounded, size: 20, color: V2.ink3),
+          tooltip: 'Tweaks',
+          onPressed: () => _showTweaks(context),
+          splashRadius: 20,
+        ),
       ),
     );
   }
@@ -2086,7 +2055,7 @@ class _SchnellBar extends ConsumerWidget {
     // Pick up to 8 "quick" products: first stable slice by displayOrder.
     final picks = [...products]
       ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
-    final top = picks.take(8).toList();
+    final top = picks.take(6).toList();
 
     if (top.isEmpty) return const SizedBox.shrink();
 
@@ -2222,7 +2191,7 @@ class _ItemsGrid extends ConsumerWidget {
             crossAxisCount: cols,
             mainAxisSpacing: gap,
             crossAxisSpacing: gap,
-            mainAxisExtent: 112,
+            mainAxisExtent: 130,
           ),
           itemCount: products.length,
           itemBuilder: (context, i) {
