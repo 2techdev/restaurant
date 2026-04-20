@@ -44,6 +44,7 @@ import 'package:gastrocore_pos/features/tables/presentation/screens/floor_plan_s
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_list_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_detail_screen.dart';
 import 'package:gastrocore_pos/features/dashboard/presentation/screens/analytics_screen.dart';
+import 'package:gastrocore_pos/features/reports/presentation/screens/reports_center_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Route path constants
@@ -90,6 +91,7 @@ abstract final class AppRoutes {
   static const String customers = '/customers';
   static const String customerDetail = '/customers/:customerId';
   static const String analytics = '/analytics';
+  static const String reportsCenter = '/reports-center';
 
   /// Build a void route for a specific ticket.
   static String voidFor(String ticketId) => '/void/$ticketId';
@@ -354,6 +356,10 @@ GoRouter createAppRouter({
         GoRoute(
           path: AppRoutes.analytics,
           builder: (context, state) => const AnalyticsScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.reportsCenter,
+          builder: (context, state) => const ReportsCenterScreen(),
         ),
       ],
     );
