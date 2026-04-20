@@ -1851,10 +1851,34 @@ class _ItemsWrap extends ConsumerWidget {
                 if (products.isEmpty) {
                   return const _EmptyGrid();
                 }
-                return _ItemsGrid(
-                  products: products,
-                  colorByCat: colorByCat,
-                  colorIdx: colorIdx,
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      height: 40,
+                      color: Colors.lime,
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'LIME MARKER — Expanded renders',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: ColoredBox(
+                        color: Colors.red,
+                        child: _ItemsGrid(
+                          products: products,
+                          colorByCat: colorByCat,
+                          colorIdx: colorIdx,
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
               loading: () => const Center(
@@ -2214,7 +2238,12 @@ class _PCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final inCart = qty > 0;
-    return Material(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.purple, width: 3),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Material(
       color: palette.bg,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
@@ -2310,6 +2339,7 @@ class _PCard extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }
