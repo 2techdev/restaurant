@@ -385,6 +385,15 @@ class _TopBar extends ConsumerWidget {
           const SizedBox(width: 18),
           _ModeSwitch(ticket: ticket),
           const Spacer(),
+          _TopIcon(
+            icon: Icons.tune,
+            onTap: () => showDialog<void>(
+              context: context,
+              barrierColor: Colors.transparent,
+              builder: (_) => const _TweaksOverlay(),
+            ),
+          ),
+          const SizedBox(width: 4),
           const _TopSearchField(),
           const SizedBox(width: 8),
           const _TopIcon(icon: Icons.refresh),
@@ -1838,7 +1847,6 @@ class _ItemsWrap extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 40, child: _ItemsHeader()),
           if (allProducts.isNotEmpty)
             SizedBox(
               height: 92,
@@ -1880,34 +1888,6 @@ class _ItemsWrap extends ConsumerWidget {
     );
   }
 
-}
-
-class _ItemsHeader extends StatelessWidget {
-  const _ItemsHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 12),
-        child: IconButton(
-          icon: const Icon(Icons.tune_rounded, size: 20, color: V2.ink3),
-          tooltip: 'Tweaks',
-          onPressed: () => _showTweaks(context),
-          splashRadius: 20,
-        ),
-      ),
-    );
-  }
-
-  void _showTweaks(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.transparent,
-      builder: (_) => const _TweaksOverlay(),
-    );
-  }
 }
 
 class _TweaksOverlay extends ConsumerWidget {
