@@ -26,6 +26,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import 'package:gastrocore_pos/features/orders/presentation/theme/pos_v2_theme.dart';
+
 // ---------------------------------------------------------------------------
 // GcColors — the Kinetic palette. Static Color constants; no theme lookup.
 // ---------------------------------------------------------------------------
@@ -75,6 +77,21 @@ abstract final class GcColors {
 
   // Ambient shadow — tonal, never pure black
   static const Color ambientShadow = Color(0x142B2F31);
+
+  // ---- Dark-mode surface layering (paired with [buildKineticThemeDark])
+  //      Accent / category colours stay the same — only neutrals flip.
+
+  static const Color darkSurface = Color(0xFF0E1116);
+  static const Color darkSurfaceContainerLowest = Color(0xFF0B0D12);
+  static const Color darkSurfaceContainerLow = Color(0xFF13171D);
+  static const Color darkSurfaceContainer = Color(0xFF181C23);
+  static const Color darkSurfaceContainerHigh = Color(0xFF1E2229);
+  static const Color darkSurfaceContainerHighest = Color(0xFF242830);
+
+  static const Color darkOnSurface = Color(0xFFE6E9EE);
+  static const Color darkOnSurfaceVariant = Color(0xFFB8BDC7);
+  static const Color darkOutline = Color(0xFF3A424E);
+  static const Color darkOutlineVariant = Color(0xFF2A313B);
 
   // ---- SambaPOS warm category palette ------------------------------------
 
@@ -474,6 +491,260 @@ ThemeData buildKineticTheme() {
       labelMedium: GcText.labelTiny,
       labelSmall: GcText.labelTiny,
     ),
+
+    extensions: const <ThemeExtension<dynamic>>[
+      V2Palette.light,
+    ],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dark variant — mirrors [buildKineticTheme] but flips the neutral layer.
+// ---------------------------------------------------------------------------
+
+/// Dark [ThemeData] paired with [buildKineticTheme]. Keeps the same
+/// primary / tertiary / error accents so brand recognition survives the
+/// theme swap, and carries the dark [V2Palette] so the sales-shell surface
+/// tokens resolve correctly via `context.v2`.
+ThemeData buildKineticThemeDark() {
+  const colorScheme = ColorScheme.dark(
+    primary: GcColors.primary,
+    onPrimary: GcColors.onPrimary,
+    primaryContainer: GcColors.primaryContainer,
+    onPrimaryContainer: GcColors.onPrimary,
+    secondary: GcColors.secondary,
+    onSecondary: GcColors.onSecondary,
+    secondaryContainer: GcColors.secondaryDim,
+    tertiary: GcColors.tertiary,
+    onTertiary: GcColors.onPrimary,
+    tertiaryContainer: GcColors.tertiaryDim,
+    error: GcColors.error,
+    onError: GcColors.onPrimary,
+    surface: GcColors.darkSurface,
+    onSurface: GcColors.darkOnSurface,
+    surfaceContainerLowest: GcColors.darkSurfaceContainerLowest,
+    surfaceContainerLow: GcColors.darkSurfaceContainerLow,
+    surfaceContainer: GcColors.darkSurfaceContainer,
+    surfaceContainerHigh: GcColors.darkSurfaceContainerHigh,
+    surfaceContainerHighest: GcColors.darkSurfaceContainerHighest,
+    onSurfaceVariant: GcColors.darkOnSurfaceVariant,
+    outline: GcColors.darkOutline,
+    outlineVariant: GcColors.darkOutlineVariant,
+  );
+
+  const zero = RoundedRectangleBorder(borderRadius: BorderRadius.zero);
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: GcColors.darkSurface,
+    canvasColor: GcColors.darkSurface,
+    cardColor: GcColors.darkSurfaceContainer,
+    dividerColor: GcColors.darkOutlineVariant,
+    fontFamily: 'Inter',
+
+    cardTheme: const CardThemeData(
+      color: GcColors.darkSurfaceContainer,
+      elevation: 0,
+      shape: zero,
+      margin: EdgeInsets.zero,
+    ),
+
+    appBarTheme: const AppBarTheme(
+      backgroundColor: GcColors.darkSurfaceContainerLow,
+      foregroundColor: GcColors.darkOnSurface,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shape: zero,
+      centerTitle: false,
+    ),
+
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: GcColors.primary,
+        foregroundColor: GcColors.onPrimary,
+        elevation: 0,
+        shape: zero,
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        textStyle: GcText.button,
+      ),
+    ),
+
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: GcColors.primary,
+        foregroundColor: GcColors.onPrimary,
+        elevation: 0,
+        shape: zero,
+        minimumSize: const Size(0, 48),
+        textStyle: GcText.button,
+      ),
+    ),
+
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: GcColors.darkOnSurface,
+        side: const BorderSide(color: GcColors.darkOutline),
+        shape: zero,
+        minimumSize: const Size(0, 48),
+        textStyle: GcText.button,
+      ),
+    ),
+
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: GcColors.primaryContainer,
+        shape: zero,
+        textStyle: GcText.button,
+      ),
+    ),
+
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        shape: zero,
+        foregroundColor: GcColors.darkOnSurface,
+      ),
+    ),
+
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: GcColors.primary,
+      foregroundColor: GcColors.onPrimary,
+      elevation: 0,
+      shape: zero,
+    ),
+
+    chipTheme: const ChipThemeData(
+      backgroundColor: GcColors.darkSurfaceContainerHigh,
+      selectedColor: GcColors.primary,
+      labelStyle: GcText.button,
+      side: BorderSide(color: GcColors.darkOutlineVariant),
+      shape: zero,
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    ),
+
+    inputDecorationTheme: const InputDecorationTheme(
+      filled: true,
+      fillColor: GcColors.darkSurfaceContainer,
+      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: UnderlineInputBorder(
+        borderRadius: BorderRadius.zero,
+        borderSide: BorderSide(color: GcColors.darkOutline),
+      ),
+      enabledBorder: UnderlineInputBorder(
+        borderRadius: BorderRadius.zero,
+        borderSide: BorderSide(color: GcColors.darkOutline),
+      ),
+      focusedBorder: UnderlineInputBorder(
+        borderRadius: BorderRadius.zero,
+        borderSide: BorderSide(color: GcColors.primaryContainer, width: 2),
+      ),
+      errorBorder: UnderlineInputBorder(
+        borderRadius: BorderRadius.zero,
+        borderSide: BorderSide(color: GcColors.error),
+      ),
+      hintStyle: TextStyle(color: GcColors.darkOnSurfaceVariant, fontSize: 13),
+    ),
+
+    dialogTheme: const DialogThemeData(
+      backgroundColor: GcColors.darkSurfaceContainerHigh,
+      elevation: 0,
+      shape: zero,
+    ),
+
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: GcColors.darkSurfaceContainerHigh,
+      elevation: 0,
+      shape: zero,
+      surfaceTintColor: Colors.transparent,
+    ),
+
+    menuTheme: const MenuThemeData(
+      style: MenuStyle(
+        shape: WidgetStatePropertyAll(zero),
+      ),
+    ),
+
+    popupMenuTheme: const PopupMenuThemeData(
+      shape: zero,
+      color: GcColors.darkSurfaceContainerHigh,
+    ),
+
+    dividerTheme: const DividerThemeData(
+      color: GcColors.darkOutlineVariant,
+      thickness: 0,
+      space: 0,
+    ),
+
+    snackBarTheme: const SnackBarThemeData(
+      backgroundColor: GcColors.darkSurfaceContainerHighest,
+      contentTextStyle: TextStyle(color: GcColors.darkOnSurface),
+      shape: zero,
+      behavior: SnackBarBehavior.fixed,
+    ),
+
+    textTheme: const TextTheme(
+      displayLarge: TextStyle(
+        fontFamily: 'WorkSans',
+        fontSize: 28,
+        fontWeight: FontWeight.w900,
+        color: GcColors.darkOnSurface,
+        letterSpacing: -0.5,
+        height: 1.1,
+      ),
+      headlineMedium: TextStyle(
+        fontFamily: 'WorkSans',
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: GcColors.darkOnSurface,
+        letterSpacing: 0.6,
+      ),
+      titleMedium: TextStyle(
+        fontFamily: 'WorkSans',
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: GcColors.darkOnSurface,
+        letterSpacing: 0.6,
+      ),
+      bodyLarge: TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: GcColors.darkOnSurface,
+      ),
+      bodyMedium: TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: GcColors.darkOnSurface,
+      ),
+      bodySmall: TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        color: GcColors.darkOnSurfaceVariant,
+      ),
+      labelLarge: GcText.button,
+      labelMedium: TextStyle(
+        fontFamily: 'WorkSans',
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+        color: GcColors.darkOnSurfaceVariant,
+        letterSpacing: 1.2,
+      ),
+      labelSmall: TextStyle(
+        fontFamily: 'WorkSans',
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+        color: GcColors.darkOnSurfaceVariant,
+        letterSpacing: 1.2,
+      ),
+    ),
+
+    extensions: const <ThemeExtension<dynamic>>[
+      V2Palette.dark,
+    ],
   );
 }
 

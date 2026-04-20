@@ -50,13 +50,13 @@ enum AppThemeMode {
   static AppThemeMode fromString(String s) =>
       AppThemeMode.values.firstWhere(
         (e) => e.name == s,
-        orElse: () => AppThemeMode.dark,
+        orElse: () => AppThemeMode.light,
       );
 }
 
 class AppSettings {
   const AppSettings({
-    this.themeMode = AppThemeMode.dark,
+    this.themeMode = AppThemeMode.light,
     this.language = AppLanguage.de,
   });
 
@@ -82,7 +82,7 @@ class AppSettings {
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
         themeMode:
-            AppThemeMode.fromString((json['themeMode'] as String?) ?? 'dark'),
+            AppThemeMode.fromString((json['themeMode'] as String?) ?? 'light'),
         language:
             AppLanguage.fromString((json['language'] as String?) ?? 'de'),
       );

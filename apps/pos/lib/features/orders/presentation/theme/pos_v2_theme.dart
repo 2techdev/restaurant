@@ -419,6 +419,162 @@ abstract final class V2Text {
   );
 }
 
+// ---------------------------------------------------------------------------
+// V2Palette — theme-aware surface / line / ink tokens.
+// ---------------------------------------------------------------------------
+
+/// Subset of [V2] tokens that flip between light and dark modes.
+///
+/// The hard-coded [V2] class stays for accent colours (sel, pay, ok, warn,
+/// danger, category tiles) — those read well on both themes, so they don't
+/// need runtime resolution. Backgrounds, panel surfaces, hairlines and ink
+/// tones, on the other hand, break visually when the user switches to dark
+/// mode, so they live here and are looked up via `context.v2`.
+class V2Palette extends ThemeExtension<V2Palette> {
+  const V2Palette({
+    required this.bg,
+    required this.surface,
+    required this.surface2,
+    required this.surface3,
+    required this.line,
+    required this.lineStrong,
+    required this.ink,
+    required this.ink2,
+    required this.ink3,
+    required this.ink4,
+    required this.chrome,
+    required this.chrome2,
+    required this.chromeInk,
+    required this.chromeInkDim,
+    required this.isDark,
+  });
+
+  final Color bg;
+  final Color surface;
+  final Color surface2;
+  final Color surface3;
+  final Color line;
+  final Color lineStrong;
+  final Color ink;
+  final Color ink2;
+  final Color ink3;
+  final Color ink4;
+  final Color chrome;
+  final Color chrome2;
+  final Color chromeInk;
+  final Color chromeInkDim;
+  final bool isDark;
+
+  /// Design-system default palette — matches [V2]'s light tokens exactly.
+  static const light = V2Palette(
+    bg: V2.bg,
+    surface: V2.surface,
+    surface2: V2.surface2,
+    surface3: V2.surface3,
+    line: V2.line,
+    lineStrong: V2.lineStrong,
+    ink: V2.ink,
+    ink2: V2.ink2,
+    ink3: V2.ink3,
+    ink4: V2.ink4,
+    chrome: V2.chrome,
+    chrome2: V2.chrome2,
+    chromeInk: V2.chromeInk,
+    chromeInkDim: V2.chromeInkDim,
+    isDark: false,
+  );
+
+  /// Dark variant — hand-tuned for WCAG-AA contrast against the same accent
+  /// colours (V2.sel, V2.pay, V2.ok, V2.warn, V2.danger) that the sales
+  /// shell already uses, so only the neutral layer flips.
+  static const dark = V2Palette(
+    bg: Color(0xFF0E1116),
+    surface: Color(0xFF161A21),
+    surface2: Color(0xFF1C2129),
+    surface3: Color(0xFF232932),
+    line: Color(0xFF2A313B),
+    lineStrong: Color(0xFF3A424E),
+    ink: Color(0xFFE6E9EE),
+    ink2: Color(0xFFB8BDC7),
+    ink3: Color(0xFF8A90A0),
+    ink4: Color(0xFF5D6472),
+    // Chrome (rail + topbar) stays close to its light-mode value since it
+    // was already dark — but nudge it a touch cooler so it doesn't look
+    // neon against the surface3 panels.
+    chrome: Color(0xFF1A1F28),
+    chrome2: Color(0xFF101419),
+    chromeInk: Color(0xFFECEDEF),
+    chromeInkDim: Color(0xFF8A90A0),
+    isDark: true,
+  );
+
+  @override
+  V2Palette copyWith({
+    Color? bg,
+    Color? surface,
+    Color? surface2,
+    Color? surface3,
+    Color? line,
+    Color? lineStrong,
+    Color? ink,
+    Color? ink2,
+    Color? ink3,
+    Color? ink4,
+    Color? chrome,
+    Color? chrome2,
+    Color? chromeInk,
+    Color? chromeInkDim,
+    bool? isDark,
+  }) =>
+      V2Palette(
+        bg: bg ?? this.bg,
+        surface: surface ?? this.surface,
+        surface2: surface2 ?? this.surface2,
+        surface3: surface3 ?? this.surface3,
+        line: line ?? this.line,
+        lineStrong: lineStrong ?? this.lineStrong,
+        ink: ink ?? this.ink,
+        ink2: ink2 ?? this.ink2,
+        ink3: ink3 ?? this.ink3,
+        ink4: ink4 ?? this.ink4,
+        chrome: chrome ?? this.chrome,
+        chrome2: chrome2 ?? this.chrome2,
+        chromeInk: chromeInk ?? this.chromeInk,
+        chromeInkDim: chromeInkDim ?? this.chromeInkDim,
+        isDark: isDark ?? this.isDark,
+      );
+
+  @override
+  V2Palette lerp(ThemeExtension<V2Palette>? other, double t) {
+    if (other is! V2Palette) return this;
+    return V2Palette(
+      bg: Color.lerp(bg, other.bg, t)!,
+      surface: Color.lerp(surface, other.surface, t)!,
+      surface2: Color.lerp(surface2, other.surface2, t)!,
+      surface3: Color.lerp(surface3, other.surface3, t)!,
+      line: Color.lerp(line, other.line, t)!,
+      lineStrong: Color.lerp(lineStrong, other.lineStrong, t)!,
+      ink: Color.lerp(ink, other.ink, t)!,
+      ink2: Color.lerp(ink2, other.ink2, t)!,
+      ink3: Color.lerp(ink3, other.ink3, t)!,
+      ink4: Color.lerp(ink4, other.ink4, t)!,
+      chrome: Color.lerp(chrome, other.chrome, t)!,
+      chrome2: Color.lerp(chrome2, other.chrome2, t)!,
+      chromeInk: Color.lerp(chromeInk, other.chromeInk, t)!,
+      chromeInkDim: Color.lerp(chromeInkDim, other.chromeInkDim, t)!,
+      isDark: t < 0.5 ? isDark : other.isDark,
+    );
+  }
+}
+
+/// Pull the active [V2Palette] off a [BuildContext]. Falls back to the
+/// light palette when the theme hasn't registered one — keeps unit tests
+/// that build bare [MaterialApp]s working without extra plumbing.
+extension V2PaletteContext on BuildContext {
+  V2Palette get v2 =>
+      Theme.of(this).extension<V2Palette>() ?? V2Palette.light;
+}
+
 /// Format a Swiss-franc amount from integer cents — matches the
 /// `chf()` helper in `parts.jsx` (`toLocaleString('de-CH', { min: 2, max: 2 })`).
 String v2Chf(int cents) {

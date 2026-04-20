@@ -66,9 +66,9 @@ class PosV2Shell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const ColoredBox(
-      color: V2.bg,
-      child: SafeArea(
+    return ColoredBox(
+      color: context.v2.bg,
+      child: const SafeArea(
         child: _V2Layout(),
       ),
     );
@@ -125,10 +125,11 @@ class _OrderColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final v2 = context.v2;
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: V2.surface,
-        border: Border(right: BorderSide(color: V2.line)),
+      decoration: BoxDecoration(
+        color: v2.surface,
+        border: Border(right: BorderSide(color: v2.line)),
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,7 +153,7 @@ class _Rail extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final active = ref.watch(v2RailActiveProvider);
     return Container(
-      color: V2.brandDark,
+      color: context.v2.chrome,
       padding: const EdgeInsets.fromLTRB(0, 14, 0, 10),
       child: Column(
         children: [
@@ -267,13 +268,13 @@ class _RailLogo extends StatelessWidget {
             ],
           ),
           alignment: Alignment.center,
-          child: const Text(
+          child: Text(
             'G',
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: V2.brandDark,
+              color: context.v2.chrome,
             ),
           ),
         ),
@@ -302,7 +303,7 @@ class _RailBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = active
-        ? V2.brandCream
+        ? context.v2.chromeInk
         : danger
             ? const Color(0xFFE07070)
             : const Color(0xFFBCA087);
@@ -371,10 +372,11 @@ class _TopBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ticket = ref.watch(currentTicketProvider);
     final user = ref.watch(currentUserProvider);
+    final v2 = context.v2;
     return Container(
-      decoration: const BoxDecoration(
-        color: V2.chrome,
-        border: Border(bottom: BorderSide(color: V2.chrome2)),
+      decoration: BoxDecoration(
+        color: v2.chrome,
+        border: Border(bottom: BorderSide(color: v2.chrome2)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 22),
       child: Row(
@@ -473,7 +475,7 @@ class _ModeSwitch extends ConsumerWidget {
     final active = ticket?.orderType ?? OrderType.dineIn;
     return Container(
       decoration: BoxDecoration(
-        color: V2.chrome2,
+        color: context.v2.chrome2,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0x1AFFFFFF)),
       ),
@@ -520,11 +522,12 @@ class _TopSearchField extends StatelessWidget {
   const _TopSearchField();
   @override
   Widget build(BuildContext context) {
+    final v2 = context.v2;
     return Container(
       width: 280,
       height: 36,
       decoration: BoxDecoration(
-        color: V2.chrome2,
+        color: v2.chrome2,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0x14FFFFFF)),
       ),
@@ -533,9 +536,9 @@ class _TopSearchField extends StatelessWidget {
         children: [
           const Icon(Icons.search, size: 16, color: Color(0x73FFFFFF)),
           const SizedBox(width: 9),
-          const Expanded(
+          Expanded(
             child: TextField(
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
@@ -549,7 +552,7 @@ class _TopSearchField extends StatelessWidget {
                 ),
               ),
               style: TextStyle(
-                color: V2.chromeInk,
+                color: v2.chromeInk,
                 fontSize: 13,
                 fontFamily: 'Inter',
               ),
@@ -560,7 +563,7 @@ class _TopSearchField extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
             decoration: BoxDecoration(
-              color: V2.chrome2,
+              color: v2.chrome2,
               border: Border.all(color: const Color(0x1FFFFFFF)),
               borderRadius: BorderRadius.circular(5),
             ),
@@ -726,8 +729,8 @@ class _OrderHead extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 16, 22, 12),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: V2.line)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: context.v2.line)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -764,44 +767,45 @@ class _GuestStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final v2 = context.v2;
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Text(
+        Text(
           'Gäste',
           style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 12.5,
-            color: V2.ink2,
+            color: v2.ink2,
           ),
         ),
         const SizedBox(width: 8),
         Container(
           decoration: BoxDecoration(
-            color: V2.surface2,
+            color: v2.surface2,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: V2.line),
+            border: Border.all(color: v2.line),
           ),
           padding: const EdgeInsets.all(2),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _stepBtn(Icons.remove, () => onChanged(value - 1)),
+              _stepBtn(context, Icons.remove, () => onChanged(value - 1)),
               SizedBox(
                 width: 22,
                 child: Text(
                   '$value',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 12.5,
-                    color: V2.ink,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    color: v2.ink,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
-              _stepBtn(Icons.add, () => onChanged(value + 1)),
+              _stepBtn(context, Icons.add, () => onChanged(value + 1)),
             ],
           ),
         ),
@@ -809,7 +813,7 @@ class _GuestStepper extends StatelessWidget {
     );
   }
 
-  Widget _stepBtn(IconData icon, VoidCallback onTap) {
+  Widget _stepBtn(BuildContext context, IconData icon, VoidCallback onTap) {
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(7),
@@ -819,7 +823,7 @@ class _GuestStepper extends StatelessWidget {
         child: SizedBox(
           width: 24,
           height: 24,
-          child: Icon(icon, size: 13, color: V2.ink2),
+          child: Icon(icon, size: 13, color: context.v2.ink2),
         ),
       ),
     );
@@ -838,11 +842,12 @@ class _GangTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final v2 = context.v2;
     return Container(
       decoration: BoxDecoration(
-        color: V2.surface2,
+        color: v2.surface2,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: V2.line),
+        border: Border.all(color: v2.line),
       ),
       padding: const EdgeInsets.all(3),
       child: Row(
@@ -896,7 +901,7 @@ class _GangTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: on ? V2.chrome : Colors.transparent,
+      color: on ? context.v2.chrome : Colors.transparent,
       borderRadius: BorderRadius.circular(7),
       child: InkWell(
         onTap: onTap,
@@ -941,10 +946,10 @@ class _GangAddTab extends StatelessWidget {
       child: InkWell(
         onTap: () {},
         borderRadius: BorderRadius.circular(7),
-        child: const SizedBox(
+        child: SizedBox(
           width: 34,
           height: 34,
-          child: Icon(Icons.add, size: 16, color: V2.ink3),
+          child: Icon(Icons.add, size: 16, color: context.v2.ink3),
         ),
       ),
     );
@@ -958,14 +963,14 @@ class _OrderList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (ticket == null) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(22, 18, 22, 18),
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
         child: Text(
           'Leer — Artikel aus dem Menü hinzufügen',
           style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 12.5,
-            color: V2.ink4,
+            color: context.v2.ink4,
           ),
         ),
       );
@@ -1055,14 +1060,14 @@ class _GangSection extends ConsumerWidget {
             ),
           ),
           if (!hasItems)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(12, 10, 12, 10),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Text(
                 'Leer — Artikel aus dem Menü hinzufügen',
                 style: TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 12.5,
-                  color: V2.ink4,
+                  color: context.v2.ink4,
                 ),
               ),
             )
@@ -1080,8 +1085,9 @@ class _Chip extends StatelessWidget {
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) {
+    final v2 = context.v2;
     return Material(
-      color: V2.surface,
+      color: v2.surface,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
         onTap: onTap,
@@ -1090,7 +1096,7 @@ class _Chip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: V2.line),
+            border: Border.all(color: v2.line),
           ),
           child: Text(label, style: V2Text.chip),
         ),
@@ -1143,6 +1149,7 @@ class _LineItem extends ConsumerWidget {
     final selectedId = ref.watch(v2SelectedLineIdProvider);
     final selected = selectedId == item.id;
     final sent = item.sentToKitchen;
+    final v2 = context.v2;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1174,7 +1181,7 @@ class _LineItem extends ConsumerWidget {
                     style: V2Text.lineQty.copyWith(
                       color: selected
                           ? V2.accentInk
-                          : (sent ? V2.ink2 : V2.ink3),
+                          : (sent ? v2.ink2 : v2.ink3),
                     ),
                   ),
                 ),
@@ -1186,7 +1193,7 @@ class _LineItem extends ConsumerWidget {
                       Text(
                         item.productName,
                         style: V2Text.lineTitle.copyWith(
-                          color: sent ? V2.ink2 : V2.ink,
+                          color: sent ? v2.ink2 : v2.ink,
                         ),
                       ),
                       if (item.notes != null && item.notes!.isNotEmpty)
@@ -1213,7 +1220,7 @@ class _LineItem extends ConsumerWidget {
                 Text(
                   'CHF ${v2Chf(item.subtotal)}',
                   style: V2Text.linePrice.copyWith(
-                    color: sent ? V2.ink2 : V2.ink2,
+                    color: sent ? v2.ink2 : v2.ink2,
                   ),
                 ),
               ],
@@ -1246,7 +1253,7 @@ class _LineActions extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Row(
       children: [
-        _act('−', () {
+        _act(context, '−', () {
           final next = (item.quantity - 1).clamp(0, 999).toDouble();
           if (next == 0) {
             ref.read(currentTicketProvider.notifier).removeItem(item.id);
@@ -1258,13 +1265,13 @@ class _LineActions extends ConsumerWidget {
           }
         }),
         const SizedBox(width: 4),
-        _act('+', () {
+        _act(context, '+', () {
           ref
               .read(currentTicketProvider.notifier)
               .updateItemQuantity(item.id, item.quantity + 1);
         }),
         const SizedBox(width: 4),
-        _act('LÖSCHEN', () {
+        _act(context, 'LÖSCHEN', () {
           ref.read(currentTicketProvider.notifier).removeItem(item.id);
           ref.read(v2SelectedLineIdProvider.notifier).state = null;
         }),
@@ -1272,9 +1279,10 @@ class _LineActions extends ConsumerWidget {
     );
   }
 
-  Widget _act(String label, VoidCallback onTap) {
+  Widget _act(BuildContext context, String label, VoidCallback onTap) {
+    final v2 = context.v2;
     return Material(
-      color: V2.surface,
+      color: v2.surface,
       borderRadius: BorderRadius.circular(5),
       child: InkWell(
         onTap: onTap,
@@ -1283,16 +1291,16 @@ class _LineActions extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: V2.line),
+            border: Border.all(color: v2.line),
           ),
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 10,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.5,
-              color: V2.ink3,
+              color: v2.ink3,
             ),
           ),
         ),
@@ -1311,10 +1319,11 @@ class _OrderFoot extends StatelessWidget {
     // MWST 8.1% inclusive: net = subtotal / 1.081, mwst = subtotal - net.
     final net = (subtotal / 1.081).round();
     final mwst = subtotal - net;
+    final v2 = context.v2;
     return Container(
-      decoration: const BoxDecoration(
-        color: V2.surface,
-        border: Border(top: BorderSide(color: V2.line)),
+      decoration: BoxDecoration(
+        color: v2.surface,
+        border: Border(top: BorderSide(color: v2.line)),
       ),
       padding: const EdgeInsets.fromLTRB(22, 14, 22, 16),
       child: Column(
@@ -1326,9 +1335,9 @@ class _OrderFoot extends StatelessWidget {
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.only(top: 12),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(color: V2.line, style: BorderStyle.solid),
+                top: BorderSide(color: v2.line, style: BorderStyle.solid),
               ),
             ),
             child: Row(
@@ -1372,10 +1381,11 @@ class _Footer extends ConsumerWidget {
     final hasItems = ticket != null && ticket.items.isNotEmpty;
     final hasUnsent =
         hasItems && ticket.items.any((i) => !i.sentToKitchen);
+    final v2 = context.v2;
     return Container(
-      decoration: const BoxDecoration(
-        color: V2.surface,
-        border: Border(top: BorderSide(color: V2.line)),
+      decoration: BoxDecoration(
+        color: v2.surface,
+        border: Border(top: BorderSide(color: v2.line)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
@@ -1504,9 +1514,10 @@ class _FlatBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final v2 = context.v2;
     final fg = !enabled
-        ? V2.ink4
-        : (danger ? V2.danger : V2.ink);
+        ? v2.ink4
+        : (danger ? V2.danger : v2.ink);
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(10),
@@ -1592,10 +1603,11 @@ class _CategoryList extends ConsumerWidget {
       countBy[p.categoryId] = (countBy[p.categoryId] ?? 0) + 1;
     }
 
+    final v2 = context.v2;
     return Container(
-      decoration: const BoxDecoration(
-        color: V2.surface,
-        border: Border(right: BorderSide(color: V2.line)),
+      decoration: BoxDecoration(
+        color: v2.surface,
+        border: Border(right: BorderSide(color: v2.line)),
       ),
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
       child: Column(
@@ -1771,8 +1783,8 @@ class _CatsFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.only(top: 12),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: V2.line)),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: context.v2.line)),
       ),
       child: Material(
         color: V2.pay,
@@ -1843,7 +1855,7 @@ class _ItemsWrap extends ConsumerWidget {
         allProductsAsync.asData?.value ?? const <ProductEntity>[];
 
     return Container(
-      color: V2.bg,
+      color: context.v2.bg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1946,6 +1958,9 @@ class _TweaksOverlay extends ConsumerWidget {
   }
 }
 
+// Intentionally hard-coded to light-palette ink: the tweaks overlay sits on
+// a pinned white Material (see [_TweaksOverlay]), so it stays light in dark
+// mode. Kept as module-level `const` to preserve cheap widget construction.
 const TextStyle _tweaksHeader = TextStyle(
   fontFamily: 'Inter',
   fontSize: 11,
@@ -2010,6 +2025,7 @@ class _SegmentedPair<T> extends StatelessWidget {
               fontFamily: 'Inter',
               fontSize: 13,
               fontWeight: FontWeight.w600,
+              // V2.ink (not context.v2.ink) — parent overlay is pinned white.
               color: selected ? Colors.white : V2.ink,
             ),
           ),
@@ -2039,10 +2055,11 @@ class _SchnellBar extends ConsumerWidget {
 
     if (top.isEmpty) return const SizedBox.shrink();
 
+    final v2 = context.v2;
     return Container(
-      decoration: const BoxDecoration(
-        color: V2.surface,
-        border: Border(bottom: BorderSide(color: V2.line)),
+      decoration: BoxDecoration(
+        color: v2.surface,
+        border: Border(bottom: BorderSide(color: v2.line)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 6),
       child: Row(
@@ -2357,15 +2374,15 @@ class _EmptyGrid extends StatelessWidget {
   const _EmptyGrid();
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(40),
+        padding: const EdgeInsets.all(40),
         child: Text(
           'Keine Produkte in dieser Kategorie',
           style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 13,
-            color: V2.ink3,
+            color: context.v2.ink3,
           ),
         ),
       ),

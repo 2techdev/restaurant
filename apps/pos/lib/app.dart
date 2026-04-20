@@ -18,6 +18,8 @@ import 'package:gastrocore_pos/core/providers/locale_provider.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/brand_auth/presentation/providers/brand_auth_provider.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/features/sync/presentation/providers/sync_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
 
@@ -69,12 +71,23 @@ class _GastroCoreAppState extends ConsumerState<GastroCoreApp> {
     ref.watch(webSocketSyncClientProvider);
     ref.watch(connectivityAutoSyncProvider);
 
+    // Resolve the user's theme preference. While SharedPreferences is
+    // still loading, [AppSettings] falls back to [AppThemeMode.dark] —
+    // which matches the default on a fresh install.
+    final appSettings = ref.watch(appSettingsProvider).valueOrNull ??
+        const AppSettings();
+    final themeMode = switch (appSettings.themeMode) {
+      AppThemeMode.light => ThemeMode.light,
+      AppThemeMode.dark => ThemeMode.dark,
+      AppThemeMode.system => ThemeMode.system,
+    };
+
     return MaterialApp.router(
       title: 'GastroCore POS',
       debugShowCheckedModeBanner: false,
       theme: buildKineticTheme(),
-      darkTheme: buildKineticTheme(),
-      themeMode: ThemeMode.light,
+      darkTheme: buildKineticThemeDark(),
+      themeMode: themeMode,
 
       // ── Localization ──────────────────────────────────────────────────────
       locale: locale,
