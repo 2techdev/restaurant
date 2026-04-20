@@ -9,6 +9,7 @@ import 'package:gastrocore_pos/features/audit_log/data/daos/audit_log_dao.dart';
 import 'package:gastrocore_pos/features/inventory/data/daos/inventory_dao.dart';
 import 'package:gastrocore_pos/features/sync/data/daos/sync_event_dao.dart';
 
+import 'tables/action_buttons.dart';
 import 'tables/audit_log.dart';
 import 'tables/bills.dart';
 import 'tables/gang_templates.dart';
@@ -96,6 +97,7 @@ part 'app_database.g.dart';
     ManagerPins,
     GangTemplates,
     OrderGangStates,
+    ActionButtons,
   ],
   daos: [AuditLogDao, InventoryDao, SyncEventDao],
 )
@@ -103,7 +105,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -222,6 +224,12 @@ class AppDatabase extends _$AppDatabase {
         // quantity=1, note=NULL.
         await m.addColumn(orderItemModifiers, orderItemModifiers.quantity);
         await m.addColumn(orderItemModifiers, orderItemModifiers.note);
+      }
+      if (from < 13) {
+        // v13: SambaPOS-style user-defined function buttons. Operators can
+        // configure labelled buttons that fire actions (discount, gift, note,
+        // course change, print) against the active ticket.
+        await m.createTable(actionButtons);
       }
     },
     onCreate: (m) async {
