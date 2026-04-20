@@ -1849,7 +1849,7 @@ class _ItemsWrap extends ConsumerWidget {
         children: [
           if (allProducts.isNotEmpty)
             SizedBox(
-              height: 92,
+              height: 108,
               child: _SchnellBar(products: allProducts),
             ),
           Expanded(
@@ -2044,7 +2044,7 @@ class _SchnellBar extends ConsumerWidget {
         color: V2.surface,
         border: Border(bottom: BorderSide(color: V2.line)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 6),
       child: Row(
         children: [
           for (var i = 0; i < top.length; i++) ...[
@@ -2099,20 +2099,19 @@ class _SchnellTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: _border),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 product.name,
                 style: V2Text.schnellName,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               Row(
