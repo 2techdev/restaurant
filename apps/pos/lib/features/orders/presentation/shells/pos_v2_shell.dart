@@ -1839,19 +1839,26 @@ class _ItemsWrap extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _ItemsHeader(
-            catName: activeCatName,
-            count: productsAsync.asData?.value.length ?? 0,
-            selectedId: selectedId,
-            filteredLen: productsAsync.asData?.value.length,
-            allActive: allProducts,
-            wrapConstraints: bc,
+          SizedBox(
+            height: 80,
+            child: _ItemsHeader(
+              catName: activeCatName,
+              count: productsAsync.asData?.value.length ?? 0,
+              selectedId: selectedId,
+              filteredLen: productsAsync.asData?.value.length,
+              allActive: allProducts,
+              wrapConstraints: bc,
+            ),
           ),
-          _SchnellBar(
-            products: allProducts,
-            colorByCat: colorByCat,
-            colorIdx: colorIdx,
-          ),
+          if (allProducts.isNotEmpty)
+            SizedBox(
+              height: 160,
+              child: _SchnellBar(
+                products: allProducts,
+                colorByCat: colorByCat,
+                colorIdx: colorIdx,
+              ),
+            ),
           Expanded(
             child: LayoutBuilder(builder: (context, innerBc) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1992,6 +1999,7 @@ class _ItemsHeader extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(26, 18, 26, 14),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -2143,6 +2151,7 @@ class _SchnellTile extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
