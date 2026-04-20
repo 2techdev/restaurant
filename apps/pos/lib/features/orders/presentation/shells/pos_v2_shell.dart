@@ -48,6 +48,11 @@ final v2SelectedLineIdProvider = StateProvider<String?>((ref) => null);
 /// default is `sale` (Verkauf).
 final v2RailActiveProvider = StateProvider<String>((ref) => 'sale');
 
+/// DEBUG: inner layout constraints snapshot, written from _ItemsWrap's
+/// inner LayoutBuilder and read by _ItemsHeader's amber debug strip.
+final _innerConstraintsProvider =
+    StateProvider<BoxConstraints?>((ref) => null);
+
 // ---------------------------------------------------------------------------
 // Root shell
 // ---------------------------------------------------------------------------
@@ -1848,41 +1853,49 @@ class _ItemsWrap extends ConsumerWidget {
             colorIdx: colorIdx,
           ),
           Expanded(
-            child: productsAsync.when(
-              data: (products) {
-                if (products.isEmpty) {
-                  return const _EmptyGrid();
+            child: LayoutBuilder(builder: (context, innerBc) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                final current = ref.read(_innerConstraintsProvider);
+                if (current?.maxWidth != innerBc.maxWidth ||
+                    current?.maxHeight != innerBc.maxHeight) {
+                  ref.read(_innerConstraintsProvider.notifier).state = innerBc;
                 }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      height: 40,
-                      color: Colors.lime,
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'LIME MARKER — Expanded renders',
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
+              });
+              return productsAsync.when(
+                data: (products) {
+                  if (products.isEmpty) {
+                    return const _EmptyGrid();
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        height: 40,
+                        color: Colors.lime,
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'LIME MARKER — Expanded renders',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                          ),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: ColoredBox(
-                        color: Colors.red,
-                        child: _ItemsGrid(
-                          products: products,
-                          colorByCat: colorByCat,
-                          colorIdx: colorIdx,
+                      Expanded(
+                        child: ColoredBox(
+                          color: Colors.red,
+                          child: _ItemsGrid(
+                            products: products,
+                            colorByCat: colorByCat,
+                            colorIdx: colorIdx,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
               loading: () => const Center(
                 child: CircularProgressIndicator(color: V2.accent),
               ),
@@ -1900,7 +1913,8 @@ class _ItemsWrap extends ConsumerWidget {
                   ),
                 ),
               ),
-            ),
+            );
+            }),
           ),
         ],
       ),
@@ -1916,7 +1930,7 @@ class _ItemsWrap extends ConsumerWidget {
   }
 }
 
-class _ItemsHeader extends StatelessWidget {
+class _ItemsHeader extends ConsumerWidget {
   const _ItemsHeader({
     required this.catName,
     required this.count,
@@ -1933,7 +1947,7 @@ class _ItemsHeader extends StatelessWidget {
   final BoxConstraints wrapConstraints;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final byCat = <String, int>{};
     for (final p in allActive) {
       byCat[p.categoryId] = (byCat[p.categoryId] ?? 0) + 1;
@@ -1961,9 +1975,20 @@ class _ItemsHeader extends StatelessWidget {
     final ch = wrapConstraints.maxHeight.isFinite
         ? wrapConstraints.maxHeight.toInt().toString()
         : 'INF';
+    final innerBc = ref.watch(_innerConstraintsProvider);
+    final iw = innerBc == null
+        ? '-'
+        : (innerBc.maxWidth.isFinite
+            ? innerBc.maxWidth.toInt().toString()
+            : 'INF');
+    final ih = innerBc == null
+        ? '-'
+        : (innerBc.maxHeight.isFinite
+            ? innerBc.maxHeight.toInt().toString()
+            : 'INF');
     final debugLine =
-        '[wrap=${cw}x$ch] [sel=$selTail] [filt=$filt] [all=${allActive.length}] '
-        '[all-in-cat=$allInCat] [by-cat={$sample}]';
+        '[wrap=${cw}x$ch] [inner=${iw}x$ih] [sel=$selTail] [filt=$filt] '
+        '[all=${allActive.length}] [all-in-cat=$allInCat] [by-cat={$sample}]';
     return Padding(
       padding: const EdgeInsets.fromLTRB(26, 18, 26, 14),
       child: Column(
