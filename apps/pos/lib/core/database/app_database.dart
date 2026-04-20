@@ -51,6 +51,7 @@ import 'tables/loyalty_transactions.dart';
 import 'tables/fiscal_signatures.dart';
 import 'tables/lan_sync_peers.dart';
 import 'tables/manager_pins.dart';
+import 'tables/z_reports.dart';
 
 part 'app_database.g.dart';
 
@@ -98,6 +99,7 @@ part 'app_database.g.dart';
     GangTemplates,
     OrderGangStates,
     ActionButtons,
+    ZReports,
   ],
   daos: [AuditLogDao, InventoryDao, SyncEventDao],
 )
@@ -105,7 +107,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -230,6 +232,12 @@ class AppDatabase extends _$AppDatabase {
         // configure labelled buttons that fire actions (discount, gift, note,
         // course change, print) against the active ticket.
         await m.createTable(actionButtons);
+      }
+      if (from < 14) {
+        // v14: sealed, sequence-numbered Z-reports — sealed snapshots that
+        // back the Swiss daily-close requirement so a given day's totals
+        // can be reproduced even after downstream data edits.
+        await m.createTable(zReports);
       }
     },
     onCreate: (m) async {
