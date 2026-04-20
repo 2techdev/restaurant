@@ -22,6 +22,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
+import 'package:gastrocore_pos/features/action_buttons/domain/entities/action_button_entity.dart';
+import 'package:gastrocore_pos/features/action_buttons/presentation/widgets/action_button_strip.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
@@ -1864,6 +1866,10 @@ class _ItemsWrap extends ConsumerWidget {
               height: 108,
               child: _SchnellBar(products: allProducts),
             ),
+          const ActionButtonStrip(
+            position: ActionButtonPosition.ticketScreen,
+            label: 'FUNKTION',
+          ),
           Expanded(
             child: productsAsync.when(
               data: (products) {

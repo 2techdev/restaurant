@@ -282,6 +282,22 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     state = state!.copyWith(items: updatedItems);
   }
 
+  /// Replace the free-form notes on an existing order item.
+  ///
+  /// Pass `null` or an empty string to clear the note. Used by the action
+  /// button dispatcher so operators can attach a note to the last item
+  /// without leaving the POS shell.
+  void updateItemNotes(String itemId, String? notes) {
+    if (state == null) return;
+    final trimmed = notes?.trim();
+    final effective = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    final updatedItems = state!.items.map((item) {
+      if (item.id != itemId) return item;
+      return item.copyWith(notes: () => effective);
+    }).toList();
+    state = state!.copyWith(items: updatedItems);
+  }
+
   /// Extract the MWST amount from a tax-inclusive gross price.
   ///
   /// Formula: MwSt = gross × rate / (100 + rate)
