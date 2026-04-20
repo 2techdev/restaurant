@@ -48,10 +48,14 @@ final v2SelectedLineIdProvider = StateProvider<String?>((ref) => null);
 /// default is `sale` (Verkauf).
 final v2RailActiveProvider = StateProvider<String>((ref) => 'sale');
 
-/// DEBUG: inner layout constraints snapshot, written from _ItemsWrap's
-/// inner LayoutBuilder and read by _ItemsHeader's amber debug strip.
-final _innerConstraintsProvider =
-    StateProvider<BoxConstraints?>((ref) => null);
+/// Tweaks — show product image thumbnails on grid cards.
+final productImagesEnabledProvider = StateProvider<bool>((ref) => false);
+
+/// Tweaks — palette selector. Only Ivory styled for pilot; Midnight reserved.
+enum PosPalette { ivory, midnight }
+
+final posPaletteProvider =
+    StateProvider<PosPalette>((ref) => PosPalette.ivory);
 
 // ---------------------------------------------------------------------------
 // Root shell
@@ -1833,76 +1837,35 @@ class _ItemsWrap extends ConsumerWidget {
     final allProducts =
         allProductsAsync.asData?.value ?? const <ProductEntity>[];
 
-    return LayoutBuilder(builder: (context, bc) {
     return Container(
       color: V2.bg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: 80,
+            height: 64,
             child: _ItemsHeader(
               catName: activeCatName,
               count: productsAsync.asData?.value.length ?? 0,
-              selectedId: selectedId,
-              filteredLen: productsAsync.asData?.value.length,
-              allActive: allProducts,
-              wrapConstraints: bc,
             ),
           ),
           if (allProducts.isNotEmpty)
             SizedBox(
-              height: 160,
-              child: _SchnellBar(
-                products: allProducts,
-                colorByCat: colorByCat,
-                colorIdx: colorIdx,
-              ),
+              height: 76,
+              child: _SchnellBar(products: allProducts),
             ),
           Expanded(
-            child: LayoutBuilder(builder: (context, innerBc) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                final current = ref.read(_innerConstraintsProvider);
-                if (current?.maxWidth != innerBc.maxWidth ||
-                    current?.maxHeight != innerBc.maxHeight) {
-                  ref.read(_innerConstraintsProvider.notifier).state = innerBc;
+            child: productsAsync.when(
+              data: (products) {
+                if (products.isEmpty) {
+                  return const _EmptyGrid();
                 }
-              });
-              return productsAsync.when(
-                data: (products) {
-                  if (products.isEmpty) {
-                    return const _EmptyGrid();
-                  }
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Container(
-                        height: 40,
-                        color: Colors.lime,
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'LIME MARKER — Expanded renders',
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: ColoredBox(
-                          color: Colors.red,
-                          child: _ItemsGrid(
-                            products: products,
-                            colorByCat: colorByCat,
-                            colorIdx: colorIdx,
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                return _ItemsGrid(
+                  products: products,
+                  colorByCat: colorByCat,
+                  colorIdx: colorIdx,
+                );
+              },
               loading: () => const Center(
                 child: CircularProgressIndicator(color: V2.accent),
               ),
@@ -1920,13 +1883,11 @@ class _ItemsWrap extends ConsumerWidget {
                   ),
                 ),
               ),
-            );
-            }),
+            ),
           ),
         ],
       ),
     );
-    });
   }
 
   static String _catName(List<CategoryEntity> cats, String id) {
@@ -1937,95 +1898,173 @@ class _ItemsWrap extends ConsumerWidget {
   }
 }
 
-class _ItemsHeader extends ConsumerWidget {
-  const _ItemsHeader({
-    required this.catName,
-    required this.count,
-    required this.selectedId,
-    required this.filteredLen,
-    required this.allActive,
-    required this.wrapConstraints,
-  });
+class _ItemsHeader extends StatelessWidget {
+  const _ItemsHeader({required this.catName, required this.count});
   final String catName;
   final int count;
-  final String? selectedId;
-  final int? filteredLen;
-  final List<ProductEntity> allActive;
-  final BoxConstraints wrapConstraints;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(26, 18, 14, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(catName, style: V2Text.itemsH),
+                const SizedBox(width: 14),
+                Text('$count POSITIONEN', style: V2Text.crumb),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.tune_rounded, size: 20, color: V2.ink3),
+            tooltip: 'Tweaks',
+            onPressed: () => _showTweaks(context),
+            splashRadius: 20,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTweaks(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.transparent,
+      builder: (_) => const _TweaksOverlay(),
+    );
+  }
+}
+
+class _TweaksOverlay extends ConsumerWidget {
+  const _TweaksOverlay();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final byCat = <String, int>{};
-    for (final p in allActive) {
-      byCat[p.categoryId] = (byCat[p.categoryId] ?? 0) + 1;
-    }
-    final allInCat =
-        selectedId == null ? allActive.length : (byCat[selectedId] ?? 0);
-    final filt = filteredLen?.toString() ?? 'null';
-    final selTail = selectedId == null
-        ? 'null'
-        : (selectedId!.length > 10
-            ? selectedId!.substring(selectedId!.length - 10)
-            : selectedId!);
-    final sample = byCat.entries
-        .take(8)
-        .map((e) {
-          final tail = e.key.length > 10
-              ? e.key.substring(e.key.length - 10)
-              : e.key;
-          return '$tail:${e.value}';
-        })
-        .join(', ');
-    final cw = wrapConstraints.maxWidth.isFinite
-        ? wrapConstraints.maxWidth.toInt().toString()
-        : 'INF';
-    final ch = wrapConstraints.maxHeight.isFinite
-        ? wrapConstraints.maxHeight.toInt().toString()
-        : 'INF';
-    final innerBc = ref.watch(_innerConstraintsProvider);
-    final iw = innerBc == null
-        ? '-'
-        : (innerBc.maxWidth.isFinite
-            ? innerBc.maxWidth.toInt().toString()
-            : 'INF');
-    final ih = innerBc == null
-        ? '-'
-        : (innerBc.maxHeight.isFinite
-            ? innerBc.maxHeight.toInt().toString()
-            : 'INF');
-    final debugLine =
-        '[wrap=${cw}x$ch] [inner=${iw}x$ih] [sel=$selTail] [filt=$filt] '
-        '[all=${allActive.length}] [all-in-cat=$allInCat] [by-cat={$sample}]';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(26, 18, 26, 14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(catName, style: V2Text.itemsH),
-              const SizedBox(width: 14),
-              Text('$count POSITIONEN', style: V2Text.crumb),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            color: const Color(0xFFFFE082),
-            child: Text(
-              debugLine,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
+    final palette = ref.watch(posPaletteProvider);
+    final imagesOn = ref.watch(productImagesEnabledProvider);
+    return Align(
+      alignment: Alignment.bottomRight,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          elevation: 12,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('TWEAKS', style: _tweaksHeader),
+                const SizedBox(height: 12),
+                const Text('PALETTE', style: _tweaksLabel),
+                const SizedBox(height: 6),
+                _SegmentedPair<PosPalette>(
+                  leftLabel: 'Ivory',
+                  leftValue: PosPalette.ivory,
+                  rightLabel: 'Midnight',
+                  rightValue: PosPalette.midnight,
+                  value: palette,
+                  onChanged: (v) =>
+                      ref.read(posPaletteProvider.notifier).state = v,
+                ),
+                const SizedBox(height: 14),
+                const Text('PRODUKTBILDER', style: _tweaksLabel),
+                const SizedBox(height: 6),
+                _SegmentedPair<bool>(
+                  leftLabel: 'Aus',
+                  leftValue: false,
+                  rightLabel: 'An',
+                  rightValue: true,
+                  value: imagesOn,
+                  onChanged: (v) => ref
+                      .read(productImagesEnabledProvider.notifier)
+                      .state = v,
+                ),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+const TextStyle _tweaksHeader = TextStyle(
+  fontFamily: 'Inter',
+  fontSize: 11,
+  fontWeight: FontWeight.w700,
+  letterSpacing: 1.2,
+  color: V2.ink3,
+);
+const TextStyle _tweaksLabel = TextStyle(
+  fontFamily: 'Inter',
+  fontSize: 10,
+  fontWeight: FontWeight.w600,
+  letterSpacing: 1.1,
+  color: V2.ink4,
+);
+
+class _SegmentedPair<T> extends StatelessWidget {
+  const _SegmentedPair({
+    required this.leftLabel,
+    required this.leftValue,
+    required this.rightLabel,
+    required this.rightValue,
+    required this.value,
+    required this.onChanged,
+  });
+  final String leftLabel;
+  final T leftValue;
+  final String rightLabel;
+  final T rightValue;
+  final T value;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF2F6),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _seg(leftLabel, value == leftValue, () => onChanged(leftValue)),
+          _seg(rightLabel, value == rightValue, () => onChanged(rightValue)),
         ],
+      ),
+    );
+  }
+
+  Widget _seg(String label, bool selected, VoidCallback onTap) {
+    return Material(
+      color: selected ? V2.sel : Colors.transparent,
+      borderRadius: BorderRadius.circular(6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : V2.ink,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2038,15 +2077,9 @@ class _ItemsHeader extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _SchnellBar extends ConsumerWidget {
-  const _SchnellBar({
-    required this.products,
-    required this.colorByCat,
-    required this.colorIdx,
-  });
+  const _SchnellBar({required this.products});
 
   final List<ProductEntity> products;
-  final Map<String, String?> colorByCat;
-  final Map<String, int> colorIdx;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2063,30 +2096,18 @@ class _SchnellBar extends ConsumerWidget {
         border: Border(bottom: BorderSide(color: V2.line)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-      child: LayoutBuilder(
-        builder: (context, bc) {
-          final cols = bc.maxWidth >= 1180 ? 8 : 6;
-          final gap = 8.0;
-          final tileW = (bc.maxWidth - gap * (cols - 1)) / cols;
-          return Wrap(
-            spacing: gap,
-            runSpacing: gap,
-            children: [
-              for (final p in top)
-                SizedBox(
-                  width: tileW,
-                  child: _SchnellTile(
-                    product: p,
-                    palette: v2CategoryPalette(
-                      colorByCat[p.categoryId],
-                      colorIdx[p.categoryId] ?? 0,
-                    ),
-                    onTap: () => _onTap(context, ref, p),
-                  ),
-                ),
-            ],
-          );
-        },
+      child: Row(
+        children: [
+          for (var i = 0; i < top.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(
+              child: _SchnellTile(
+                product: top[i],
+                onTap: () => _onTap(context, ref, top[i]),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -2113,69 +2134,46 @@ class _SchnellBar extends ConsumerWidget {
 }
 
 class _SchnellTile extends StatelessWidget {
-  const _SchnellTile({
-    required this.product,
-    required this.palette,
-    required this.onTap,
-  });
+  const _SchnellTile({required this.product, required this.onTap});
   final ProductEntity product;
-  final ({Color bg, Color bgWk}) palette;
   final VoidCallback onTap;
+
+  static const Color _bg = Color(0xFFEEF4FB);
+  static const Color _border = Color(0xFFDCE6F2);
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: palette.bgWk,
-      borderRadius: BorderRadius.circular(10),
+      color: _bg,
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 62),
-          padding: const EdgeInsets.fromLTRB(8, 8, 10, 8),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0x0F000000)),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _border),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                width: 3,
-                margin: const EdgeInsets.symmetric(vertical: 2),
-                decoration: BoxDecoration(
-                  color: palette.bg,
-                  borderRadius: BorderRadius.circular(3),
-                ),
+              Text(
+                product.name,
+                style: V2Text.schnellName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      product.name,
-                      style: V2Text.schnellName,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        const Text('CHF', style: V2Text.schnellCur),
-                        const SizedBox(width: 3),
-                        Text(
-                          v2Chf(product.price),
-                          style: V2Text.schnellPrice,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  const Text('CHF', style: V2Text.schnellCur),
+                  const SizedBox(width: 3),
+                  Text(v2Chf(product.price), style: V2Text.schnellPrice),
+                ],
               ),
             ],
           ),
@@ -2267,7 +2265,7 @@ class _ItemsGrid extends ConsumerWidget {
   }
 }
 
-class _PCard extends StatelessWidget {
+class _PCard extends ConsumerWidget {
   const _PCard({
     required this.product,
     required this.qty,
@@ -2281,14 +2279,15 @@ class _PCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final inCart = qty > 0;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.purple, width: 3),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Material(
+    final imagesOn = ref.watch(productImagesEnabledProvider);
+    final hasImage = imagesOn &&
+        product.imagePath != null &&
+        product.imagePath!.isNotEmpty;
+    final subtitle = product.description ?? '';
+
+    return Material(
       color: palette.bg,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
@@ -2297,59 +2296,77 @@ class _PCard extends StatelessWidget {
         splashColor: const Color(0x22FFFFFF),
         child: Stack(
           children: [
+            if (hasImage)
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.asset(
+                    product.imagePath!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            if (hasImage)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        palette.bg.withValues(alpha: 0.35),
+                        palette.bg.withValues(alpha: 0.85),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                border: inCart
-                    ? Border.all(color: V2.sel, width: 3)
-                    : null,
+                border: inCart ? Border.all(color: V2.sel, width: 3) : null,
                 boxShadow: const [
                   BoxShadow(
                     color: Color(0x24000000),
                     offset: Offset(0, 1),
-                    blurRadius: 0,
                   ),
                 ],
               ),
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-              child: Stack(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Positioned(
-                    left: 0,
-                    right: 0,
-                    top: 0,
-                    child: SizedBox(
-                      height: 1,
-                      child: ColoredBox(color: Color(0x24FFFFFF)),
-                    ),
-                  ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         product.name,
                         style: V2Text.pName,
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Spacer(),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              const Text('CHF', style: V2Text.pCurrency),
-                              const SizedBox(width: 3),
-                              Text(v2Chf(product.price),
-                                  style: V2Text.pPrice),
-                            ],
-                          ),
-                        ],
-                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: V2Text.pSub,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      const Text('CHF', style: V2Text.pCurrency),
+                      const SizedBox(width: 3),
+                      Text(v2Chf(product.price), style: V2Text.pPrice),
                     ],
                   ),
                 ],
@@ -2384,7 +2401,6 @@ class _PCard extends StatelessWidget {
           ],
         ),
       ),
-    ),
     );
   }
 }
