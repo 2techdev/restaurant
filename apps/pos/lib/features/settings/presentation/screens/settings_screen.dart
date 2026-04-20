@@ -38,6 +38,8 @@ import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provide
 import 'package:gastrocore_pos/features/action_buttons/domain/entities/action_button_entity.dart';
 import 'package:gastrocore_pos/features/action_buttons/presentation/providers/action_button_provider.dart';
 import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
+import 'package:gastrocore_pos/features/orders/presentation/theme/pos_v2_theme.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/favorites_bar.dart';
 import 'package:gastrocore_pos/core/services/backup_service.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/permission.dart';
@@ -66,6 +68,7 @@ enum _Section {
   functionButtons('Fonksiyon Butonları', Icons.flash_on_rounded),
   reports('Reports', Icons.assessment_rounded),
   appearance('Appearance', Icons.palette_rounded),
+  themeColors('Tema Renkleri', Icons.color_lens_rounded),
   backup('Backup & Restore', Icons.backup_rounded),
   auditLog('Audit Log', Icons.history_rounded),
   demoData('Demo Data', Icons.science_outlined),
@@ -138,6 +141,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _Section.functionButtons => const _FunctionButtonsSection(),
       _Section.reports => _ReportsSection(onNavigate: _navigateBack),
       _Section.appearance => const _AppearanceSection(),
+      _Section.themeColors => const _ThemeColorsSection(),
       _Section.backup => const _BackupSection(),
       _Section.auditLog => _AuditLogLinkSection(onNavigate: _navigateBack),
       _Section.demoData => const _DemoDataSection(),
@@ -4469,6 +4473,254 @@ class _IconSwatch extends StatelessWidget {
                 size: 16, color: AppColors.textDim)
             : Icon(icon, size: 18, color: AppColors.textPrimary),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Theme colours section — operator-picked light/dark accent + surface
+// ---------------------------------------------------------------------------
+
+const List<Color> _kThemePresetPrimaries = <Color>[
+  Color(0xFF3841E9), // Kinetic default (matches GcColors.primary)
+  Color(0xFF486BE1), // POS v2 selection blue
+  Color(0xFF2BAE66), // Pay green
+  Color(0xFFD3543E), // Haupt red
+  Color(0xFFD88B3C), // Pasta orange
+  Color(0xFFC4539A), // Dessert magenta
+  Color(0xFF467DCB), // Drink azure
+  Color(0xFF5E35B1), // Deep purple
+  Color(0xFF00838F), // Teal 800
+  Color(0xFF2B2E38), // Graphite ink
+];
+
+const List<Color> _kThemePresetLightSurfaces = <Color>[
+  Color(0xFFFFFFFF),
+  Color(0xFFF4F5F7),
+  Color(0xFFFDF6EC),
+  Color(0xFFECEFF4),
+  Color(0xFFFFF8F0),
+  Color(0xFFF0F7F4),
+];
+
+const List<Color> _kThemePresetDarkSurfaces = <Color>[
+  Color(0xFF0E1116),
+  Color(0xFF161A21),
+  Color(0xFF10141B),
+  Color(0xFF1A1320),
+  Color(0xFF121826),
+  Color(0xFF0D1410),
+];
+
+String _colorToHex(Color c) {
+  final rgb = c.toARGB32() & 0x00FFFFFF;
+  return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+}
+
+class _ThemeColorsSection extends ConsumerWidget {
+  const _ThemeColorsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(themeCustomizationProvider);
+    final custom = async.valueOrNull ?? const ThemeCustomization();
+    final notifier = ref.read(themeCustomizationProvider.notifier);
+
+    return _SectionScaffold(
+      title: 'Tema Renkleri',
+      action: custom.isDefault
+          ? null
+          : OutlinedButton.icon(
+              onPressed: () async {
+                await notifier.restoreDefaults();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Varsayılan renklere dönüldü'),
+                      duration: Duration(milliseconds: 1500),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.restart_alt_rounded, size: 18),
+              label: const Text('Varsayılana Dön'),
+            ),
+      children: [
+        const _Card(
+          title: 'HAKKINDA',
+          children: [
+            Text(
+              'Vurgu rengi butonlar, seçili durumlar ve form odaklarında '
+              'kullanılır. Yüzey rengi uygulamanın arka planını etkiler. '
+              'Değişiklikler anında uygulanır.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+        _Card(
+          title: 'VURGU RENGI — AÇIK MOD',
+          children: [
+            _ColorPickerRow(
+              selectedHex: custom.lightPrimaryHex,
+              presets: _kThemePresetPrimaries,
+              onPick: notifier.setLightPrimary,
+            ),
+          ],
+        ),
+        _Card(
+          title: 'VURGU RENGI — KARANLIK MOD',
+          children: [
+            _ColorPickerRow(
+              selectedHex: custom.darkPrimaryHex,
+              presets: _kThemePresetPrimaries,
+              onPick: notifier.setDarkPrimary,
+            ),
+          ],
+        ),
+        _Card(
+          title: 'YUZEY — AÇIK MOD',
+          children: [
+            _ColorPickerRow(
+              selectedHex: custom.lightSurfaceHex,
+              presets: _kThemePresetLightSurfaces,
+              onPick: notifier.setLightSurface,
+            ),
+          ],
+        ),
+        _Card(
+          title: 'YUZEY — KARANLIK MOD',
+          children: [
+            _ColorPickerRow(
+              selectedHex: custom.darkSurfaceHex,
+              presets: _kThemePresetDarkSurfaces,
+              onPick: notifier.setDarkSurface,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ColorPickerRow extends StatefulWidget {
+  const _ColorPickerRow({
+    required this.selectedHex,
+    required this.presets,
+    required this.onPick,
+  });
+
+  final String? selectedHex;
+  final List<Color> presets;
+  final ValueChanged<String?> onPick;
+
+  @override
+  State<_ColorPickerRow> createState() => _ColorPickerRowState();
+}
+
+class _ColorPickerRowState extends State<_ColorPickerRow> {
+  late final TextEditingController _hexController;
+
+  @override
+  void initState() {
+    super.initState();
+    _hexController = TextEditingController(text: widget.selectedHex ?? '');
+  }
+
+  @override
+  void didUpdateWidget(_ColorPickerRow old) {
+    super.didUpdateWidget(old);
+    if (old.selectedHex != widget.selectedHex) {
+      _hexController.text = widget.selectedHex ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = v2ParseHex(widget.selectedHex);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _ColorSwatch(
+              color: null,
+              selected: widget.selectedHex == null,
+              onTap: () => widget.onPick(null),
+            ),
+            for (final c in widget.presets)
+              _ColorSwatch(
+                color: c,
+                selected: selected != null &&
+                    (c.toARGB32() & 0x00FFFFFF) ==
+                        (selected.toARGB32() & 0x00FFFFFF),
+                onTap: () => widget.onPick(_colorToHex(c)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _hexController,
+                decoration: const InputDecoration(
+                  labelText: 'Özel HEX (#RRGGBB)',
+                  hintText: '#3841E9',
+                  prefixIcon: Icon(Icons.tag_rounded, size: 18),
+                ),
+                onSubmitted: (value) {
+                  final trimmed = value.trim();
+                  if (trimmed.isEmpty) {
+                    widget.onPick(null);
+                    return;
+                  }
+                  final parsed = v2ParseHex(trimmed);
+                  if (parsed == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Geçersiz HEX. Örnek: #3841E9'),
+                        duration: Duration(milliseconds: 1500),
+                      ),
+                    );
+                    return;
+                  }
+                  widget.onPick(_colorToHex(parsed));
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            OutlinedButton(
+              onPressed: () {
+                final parsed = v2ParseHex(_hexController.text.trim());
+                if (parsed == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Geçersiz HEX. Örnek: #3841E9'),
+                      duration: Duration(milliseconds: 1500),
+                    ),
+                  );
+                  return;
+                }
+                widget.onPick(_colorToHex(parsed));
+              },
+              child: const Text('Uygula'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
