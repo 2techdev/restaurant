@@ -17,6 +17,7 @@ import 'package:gastrocore_pos/features/settings/domain/entities/printer_setting
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
 import 'package:gastrocore_pos/features/settings/domain/repositories/settings_repository.dart';
 
 /// SharedPreferences keys — prefixed to avoid collisions with other features.
@@ -27,6 +28,7 @@ abstract final class _Keys {
   static const receipt = 'settings.v1.receipt';
   static const tax = 'settings.v1.tax';
   static const app = 'settings.v1.app';
+  static const themeColors = 'settings.v1.themeColors';
 }
 
 class SettingsRepositoryImpl implements SettingsRepository {
@@ -155,6 +157,26 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Theme customization
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<ThemeCustomization> loadThemeCustomization() async {
+    final raw = _prefs.getString(_Keys.themeColors);
+    if (raw == null) return const ThemeCustomization();
+    try {
+      return ThemeCustomization.fromJsonString(raw);
+    } catch (_) {
+      return const ThemeCustomization();
+    }
+  }
+
+  @override
+  Future<void> saveThemeCustomization(ThemeCustomization customization) async {
+    await _prefs.setString(_Keys.themeColors, customization.toJsonString());
+  }
+
+  // ---------------------------------------------------------------------------
   // Backup & Restore
   // ---------------------------------------------------------------------------
 
@@ -222,6 +244,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       _prefs.remove(_Keys.receipt),
       _prefs.remove(_Keys.tax),
       _prefs.remove(_Keys.app),
+      _prefs.remove(_Keys.themeColors),
     ]);
   }
 }

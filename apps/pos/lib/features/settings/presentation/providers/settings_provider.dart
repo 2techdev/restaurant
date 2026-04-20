@@ -15,6 +15,7 @@ import 'package:gastrocore_pos/features/settings/domain/entities/printer_setting
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
 import 'package:gastrocore_pos/features/settings/domain/repositories/settings_repository.dart';
 
 // ---------------------------------------------------------------------------
@@ -266,6 +267,74 @@ final appSettingsProvider =
 });
 
 // ---------------------------------------------------------------------------
+// Theme customization (operator-picked accent + surface colours)
+// ---------------------------------------------------------------------------
+
+class ThemeCustomizationNotifier
+    extends StateNotifier<AsyncValue<ThemeCustomization>> {
+  ThemeCustomizationNotifier(this._repository)
+      : super(const AsyncValue.loading()) {
+    _load();
+  }
+
+  final SettingsRepository _repository;
+
+  Future<void> _load() async {
+    state = await AsyncValue.guard(_repository.loadThemeCustomization);
+  }
+
+  Future<void> save(ThemeCustomization customization) async {
+    await _repository.saveThemeCustomization(customization);
+    state = AsyncValue.data(customization);
+  }
+
+  Future<void> setLightPrimary(String? hex) async {
+    final current = state.valueOrNull ?? const ThemeCustomization();
+    await save(current.copyWith(
+      lightPrimaryHex: hex,
+      clearLightPrimary: hex == null,
+    ));
+  }
+
+  Future<void> setDarkPrimary(String? hex) async {
+    final current = state.valueOrNull ?? const ThemeCustomization();
+    await save(current.copyWith(
+      darkPrimaryHex: hex,
+      clearDarkPrimary: hex == null,
+    ));
+  }
+
+  Future<void> setLightSurface(String? hex) async {
+    final current = state.valueOrNull ?? const ThemeCustomization();
+    await save(current.copyWith(
+      lightSurfaceHex: hex,
+      clearLightSurface: hex == null,
+    ));
+  }
+
+  Future<void> setDarkSurface(String? hex) async {
+    final current = state.valueOrNull ?? const ThemeCustomization();
+    await save(current.copyWith(
+      darkSurfaceHex: hex,
+      clearDarkSurface: hex == null,
+    ));
+  }
+
+  Future<void> restoreDefaults() async {
+    await save(const ThemeCustomization());
+  }
+}
+
+final themeCustomizationProvider = StateNotifierProvider<
+    ThemeCustomizationNotifier, AsyncValue<ThemeCustomization>>((ref) {
+  final repo = ref.watch(settingsRepositoryProvider).valueOrNull;
+  if (repo == null) {
+    return ThemeCustomizationNotifier(_PlaceholderRepository());
+  }
+  return ThemeCustomizationNotifier(repo);
+});
+
+// ---------------------------------------------------------------------------
 // Backup provider (one-shot async operations)
 // ---------------------------------------------------------------------------
 
@@ -310,6 +379,11 @@ class _PlaceholderRepository implements SettingsRepository {
   Future<AppSettings> loadAppSettings() async => const AppSettings();
   @override
   Future<void> saveAppSettings(AppSettings s) async {}
+  @override
+  Future<ThemeCustomization> loadThemeCustomization() async =>
+      const ThemeCustomization();
+  @override
+  Future<void> saveThemeCustomization(ThemeCustomization c) async {}
   @override
   Future<String> getDatabasePath() async => '';
   @override

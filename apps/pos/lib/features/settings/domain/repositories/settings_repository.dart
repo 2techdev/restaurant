@@ -10,6 +10,7 @@ import 'package:gastrocore_pos/features/settings/domain/entities/printer_setting
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
 
 abstract interface class SettingsRepository {
   // ---------------------------------------------------------------------------
@@ -53,6 +54,13 @@ abstract interface class SettingsRepository {
 
   Future<AppSettings> loadAppSettings();
   Future<void> saveAppSettings(AppSettings settings);
+
+  // ---------------------------------------------------------------------------
+  // Theme customization (operator-picked accent + surface colours)
+  // ---------------------------------------------------------------------------
+
+  Future<ThemeCustomization> loadThemeCustomization();
+  Future<void> saveThemeCustomization(ThemeCustomization customization);
 
   // ---------------------------------------------------------------------------
   // Backup & Restore

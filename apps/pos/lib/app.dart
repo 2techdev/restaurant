@@ -18,7 +18,9 @@ import 'package:gastrocore_pos/core/providers/locale_provider.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/brand_auth/presentation/providers/brand_auth_provider.dart';
+import 'package:gastrocore_pos/features/orders/presentation/theme/pos_v2_theme.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/features/sync/presentation/providers/sync_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
@@ -82,11 +84,25 @@ class _GastroCoreAppState extends ConsumerState<GastroCoreApp> {
       AppThemeMode.system => ThemeMode.system,
     };
 
+    final themeOverrides =
+        ref.watch(themeCustomizationProvider).valueOrNull ??
+            const ThemeCustomization();
+
     return MaterialApp.router(
       title: 'GastroCore POS',
       debugShowCheckedModeBanner: false,
-      theme: buildKineticTheme(),
-      darkTheme: buildKineticThemeDark(),
+      theme: _applyOverrides(
+        buildKineticTheme(),
+        primaryHex: themeOverrides.lightPrimaryHex,
+        surfaceHex: themeOverrides.lightSurfaceHex,
+        isDark: false,
+      ),
+      darkTheme: _applyOverrides(
+        buildKineticThemeDark(),
+        primaryHex: themeOverrides.darkPrimaryHex,
+        surfaceHex: themeOverrides.darkSurfaceHex,
+        isDark: true,
+      ),
       themeMode: themeMode,
 
       // ── Localization ──────────────────────────────────────────────────────
@@ -103,6 +119,41 @@ class _GastroCoreAppState extends ConsumerState<GastroCoreApp> {
       routerConfig: _router,
     );
   }
+}
+
+/// Layers operator-picked theme overrides on top of a base [ThemeData].
+///
+/// Rebuilding the whole Kinetic theme with branching is heavyweight; a
+/// shallow [copyWith] on the colour scheme plus swapping the [V2Palette]
+/// extension is enough for the picker surfaces we expose today (primary
+/// accent + bg canvas). Null hex values fall through to the base palette
+/// unchanged so a fresh install renders exactly like before.
+ThemeData _applyOverrides(
+  ThemeData base, {
+  required String? primaryHex,
+  required String? surfaceHex,
+  required bool isDark,
+}) {
+  final primary = v2ParseHex(primaryHex);
+  final surface = v2ParseHex(surfaceHex);
+  if (primary == null && surface == null) return base;
+
+  final scheme = base.colorScheme.copyWith(
+    primary: primary,
+    surface: surface,
+  );
+  final basePalette =
+      base.extension<V2Palette>() ?? (isDark ? V2Palette.dark : V2Palette.light);
+  final palette = surface == null
+      ? basePalette
+      : basePalette.copyWith(bg: surface, surface: surface);
+
+  return base.copyWith(
+    colorScheme: scheme,
+    scaffoldBackgroundColor: surface ?? base.scaffoldBackgroundColor,
+    canvasColor: surface ?? base.canvasColor,
+    extensions: <ThemeExtension<dynamic>>[palette],
+  );
 }
 
 // ---------------------------------------------------------------------------
