@@ -25,7 +25,13 @@ import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/produc
 // Helpers
 // ---------------------------------------------------------------------------
 
-ProductEntity _product(String id, String name, int price) => ProductEntity(
+ProductEntity _product(
+  String id,
+  String name,
+  int price, {
+  bool isAvailable = true,
+}) =>
+    ProductEntity(
       id: id,
       tenantId: 'T1',
       categoryId: 'C1',
@@ -34,6 +40,7 @@ ProductEntity _product(String id, String name, int price) => ProductEntity(
       costPrice: 0,
       taxGroup: 'standard',
       isActive: true,
+      isAvailable: isAvailable,
       displayOrder: 0,
       printerGroup: 'kitchen',
     );
@@ -160,6 +167,83 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(RegExp(r'Kalbsbraten.*CHF 48\.00')),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Sold-out / 86'd visual and tap-guard end-to-end.
+  //
+  // These tests pin the user-facing behaviour of the isAvailable flag added
+  // in schema v15: sold-out tiles must be clearly labelled, must not add to
+  // the cart on tap, and must carry a discoverable semantics hint so
+  // TalkBack announces the state.
+  // -------------------------------------------------------------------------
+
+  group('ProductGrid sold-out behaviour', () {
+    testWidgets('renders SATIŞTA DEĞİL ribbon on an unavailable tile',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        width: 620,
+        onTap: (_) {},
+        products: [
+          _product('p1', 'Forelle Müllerin', 3200),
+          _product('p2', 'Kalbsbraten', 4800, isAvailable: false),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // Only the sold-out tile shows the ribbon.
+      expect(find.text('SATIŞTA DEĞİL'), findsOneWidget);
+    });
+
+    testWidgets('tap on a sold-out tile does not fire onProductTap',
+        (tester) async {
+      final tapped = <String>[];
+      await tester.pumpWidget(_harness(
+        width: 620,
+        onTap: (p) => tapped.add(p.id),
+        products: [
+          _product('p1', 'Forelle Müllerin', 3200),
+          _product('p2', 'Kalbsbraten', 4800, isAvailable: false),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // Tapping the sold-out tile routes through _showUnavailableSnackbar
+      // which calls ScaffoldMessenger.showSnackBar, but must NOT add the
+      // product to the cart.
+      await tester.tap(find.byKey(const ValueKey('product_card_p2')));
+      await tester.pump();
+      expect(tapped, isEmpty,
+          reason: 'Sold-out tap must not propagate to cart handler.');
+
+      // An available tile still works.
+      await tester.tap(find.byKey(const ValueKey('product_card_p1')));
+      await tester.pump();
+      expect(tapped, ['p1']);
+    });
+
+    testWidgets(
+        'sold-out semantics label carries the "satışta değil" hint',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.pumpWidget(_harness(
+        width: 620,
+        onTap: (_) {},
+        products: [
+          _product('p1', 'Kalbsbraten', 4800, isAvailable: false),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(
+            RegExp(r'Kalbsbraten.*CHF 48\.00.*satışta değil')),
         findsOneWidget,
       );
 
