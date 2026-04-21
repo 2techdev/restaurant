@@ -877,15 +877,25 @@ class _SmallButton extends StatelessWidget {
     final fg = tone == _SmallButtonTone.primary
         ? GcColors.onPrimary
         : GcColors.onSurface;
-    return Material(
-      color: bg,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text(
-            label,
-            style: GcText.button.copyWith(fontSize: 11, color: fg),
+    // a11y: the gang-row buttons (GÖNDER, SERVİS ET, BEKLE, DEVAM) are
+    // styled as Material + InkWell without a default button semantic.
+    // Mark them explicitly so TalkBack / VoiceOver announces them as
+    // buttons and exposes the onTap action.
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: bg,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: ExcludeSemantics(
+              child: Text(
+                label,
+                style: GcText.button.copyWith(fontSize: 11, color: fg),
+              ),
+            ),
           ),
         ),
       ),

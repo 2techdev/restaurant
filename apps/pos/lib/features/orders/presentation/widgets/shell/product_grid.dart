@@ -160,63 +160,73 @@ class ProductCard extends StatelessWidget {
     final style = resolveCategoryColor(categoryColorHex);
     final bg = style.bg;
     final fg = style.fg;
-    return Material(
-      color: bg,
-      child: InkWell(
-        onTap: onTap,
-        splashColor: darken(bg, 0.18),
-        highlightColor: darken(bg, 0.12),
-        child: Stack(
-          children: [
-            DecoratedBox(
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: kInsetHighlight, width: 2),
+    // a11y: flatten the product tile to a single button node with a
+    // readable announcement ("Espresso, CHF 4.50, 2 im Warenkorb").
+    // excludeSemantics: true on the wrapper prevents the three internal
+    // Text widgets from showing up as separate leaves in the a11y tree.
+    final cartHint = quantity > 0 ? ', $quantity im Warenkorb' : '';
+    return Semantics(
+      button: true,
+      label: '${product.name}, ${_formatCHF(product.price)}$cartHint',
+      excludeSemantics: true,
+      child: Material(
+        color: bg,
+        child: InkWell(
+          onTap: onTap,
+          splashColor: darken(bg, 0.18),
+          highlightColor: darken(bg, 0.12),
+          child: Stack(
+            children: [
+              DecoratedBox(
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: kInsetHighlight, width: 2),
+                  ),
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppTokens.space8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        product.name,
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: fg,
-                          height: 1.15,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Text(
-                        _formatCHF(product.price),
-                        style: TextStyle(
-                          fontFamily: 'WorkSans',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: fg,
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                child: Padding(
+                  padding: const EdgeInsets.all(AppTokens.space8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.name,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: fg,
+                            height: 1.15,
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                  ],
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Text(
+                          _formatCHF(product.price),
+                          style: TextStyle(
+                            fontFamily: 'WorkSans',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: fg,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (quantity > 0)
-              Positioned(
-                top: AppTokens.space4,
-                right: AppTokens.space4,
-                child: _QuantityBadge(quantity: quantity, tileColor: bg),
-              ),
-          ],
+              if (quantity > 0)
+                Positioned(
+                  top: AppTokens.space4,
+                  right: AppTokens.space4,
+                  child: _QuantityBadge(quantity: quantity, tileColor: bg),
+                ),
+            ],
+          ),
         ),
       ),
     );

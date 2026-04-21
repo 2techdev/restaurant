@@ -321,41 +321,52 @@ class _PayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: enabled ? GcColors.catGreen : GcColors.surfaceContainerHighest,
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        child: Container(
-          height: AppTokens.touchLarge,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            gradient: enabled ? kCashGradient : null,
-            border: enabled
-                ? const Border(
-                    top: BorderSide(color: kInsetHighlight, width: 2),
-                  )
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.payments_rounded,
-                size: 20,
-                color: enabled ? Colors.white : GcColors.outlineVariant,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'BEZAHLEN',
-                style: TextStyle(
-                  fontFamily: 'WorkSans',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
+    // a11y: the primary CTA gets a screen-reader label that includes the
+    // amount so operators hear "Bezahlen, CHF 42.50" rather than just
+    // "Bezahlen". The disabled state is exposed via enabled=false so
+    // assistive tech can skip it when there's no active ticket.
+    final chf = (totalCents / 100).toStringAsFixed(2);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: 'Bezahlen, CHF $chf',
+      excludeSemantics: true,
+      child: Material(
+        color: enabled ? GcColors.catGreen : GcColors.surfaceContainerHighest,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          child: Container(
+            height: AppTokens.touchLarge,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              gradient: enabled ? kCashGradient : null,
+              border: enabled
+                  ? const Border(
+                      top: BorderSide(color: kInsetHighlight, width: 2),
+                    )
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.payments_rounded,
+                  size: 20,
                   color: enabled ? Colors.white : GcColors.outlineVariant,
-                  letterSpacing: 0.8,
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  'BEZAHLEN',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: enabled ? Colors.white : GcColors.outlineVariant,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

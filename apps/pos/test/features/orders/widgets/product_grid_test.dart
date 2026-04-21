@@ -142,6 +142,29 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('product_card_p1')));
       expect(tapped, ['p1']);
     });
+
+    testWidgets(
+        'ProductCard exposes a single button-labelled semantics node per tile',
+        (tester) async {
+      // a11y guard: the tile must collapse to one semantic button with a
+      // readable label so TalkBack / VoiceOver announces the whole tile
+      // as one tap target, not three separate text leaves.
+      final handle = tester.ensureSemantics();
+
+      await tester.pumpWidget(_harness(width: 620, onTap: (_) {}));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'Forelle Müllerin.*CHF 32\.00')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(RegExp(r'Kalbsbraten.*CHF 48\.00')),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    });
   });
 }
 

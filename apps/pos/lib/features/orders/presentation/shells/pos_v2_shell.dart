@@ -2140,38 +2140,50 @@ class _SchnellTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: _bg,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
+    // a11y: Schnellverkauf tiles live in a grid of many small cards. We
+    // flatten each card into a single button node with a readable label
+    // so screen readers announce "Espresso, CHF 4.50" instead of walking
+    // through the name, currency, and price as three separate leaves.
+    return Semantics(
+      button: true,
+      label: 'Schnellverkauf ${product.name}, CHF ${v2Chf(product.price)}',
+      child: Material(
+        color: _bg,
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                product.name,
-                style: V2Text.schnellName,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  const Text('CHF', style: V2Text.schnellCur),
-                  const SizedBox(width: 3),
-                  Text(v2Chf(product.price), style: V2Text.schnellPrice),
-                ],
-              ),
-            ],
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ExcludeSemantics(
+                  child: Text(
+                    product.name,
+                    style: V2Text.schnellName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                ExcludeSemantics(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      const Text('CHF', style: V2Text.schnellCur),
+                      const SizedBox(width: 3),
+                      Text(v2Chf(product.price), style: V2Text.schnellPrice),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2283,14 +2295,26 @@ class _PCard extends ConsumerWidget {
         product.imagePath!.isNotEmpty;
     final subtitle = product.description ?? '';
 
-    return Material(
-      color: palette.bg,
-      borderRadius: BorderRadius.circular(6),
-      child: InkWell(
-        onTap: onTap,
+    // a11y: flatten the product card to a single button node. Screen
+    // readers announce "Espresso, CHF 4.50, 2 im Warenkorb" rather than
+    // walking through the name, description, currency, price, and badge
+    // as five separate leaves. excludeSemantics: true on the Semantics
+    // wrapper suppresses every descendant's natural semantic tree.
+    final cartHint = inCart ? ', $qty im Warenkorb' : '';
+    final subtitleHint = subtitle.isNotEmpty ? ', $subtitle' : '';
+    return Semantics(
+      button: true,
+      label:
+          '${product.name}$subtitleHint, CHF ${v2Chf(product.price)}$cartHint',
+      excludeSemantics: true,
+      child: Material(
+        color: palette.bg,
         borderRadius: BorderRadius.circular(6),
-        splashColor: const Color(0x22FFFFFF),
-        child: Stack(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          splashColor: const Color(0x22FFFFFF),
+          child: Stack(
           children: [
             if (hasImage)
               Positioned.fill(
@@ -2396,6 +2420,7 @@ class _PCard extends ConsumerWidget {
               ),
           ],
         ),
+      ),
       ),
     );
   }
