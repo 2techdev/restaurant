@@ -7,6 +7,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
+
 /// Where on the POS a button renders.
 enum ActionButtonPosition {
   /// Beside the 6 Schnell quick-picks at the top of the items area.
@@ -94,6 +96,20 @@ class ActionButtonEntity {
   final List<String>? roleFilter;
 
   Color? get color => colorValue == null ? null : Color(colorValue!);
+
+  /// Whether this button should be rendered for an operator with [role].
+  ///
+  /// A null or empty [roleFilter] means the button is available to
+  /// everyone — the historical default that existed before role gating
+  /// was wired up. A non-empty list gates the button to the named
+  /// roles; anything else stays hidden. Admin always sees everything
+  /// so operators can't lock themselves out of the POS by misconfiguring
+  /// the filter.
+  bool isVisibleForRole(UserRole role) {
+    if (role == UserRole.admin) return true;
+    if (roleFilter == null || roleFilter!.isEmpty) return true;
+    return roleFilter!.contains(role.name);
+  }
 
   ActionButtonEntity copyWith({
     String? label,

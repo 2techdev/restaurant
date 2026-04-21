@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/features/action_buttons/data/repositories/action_button_repository.dart';
 import 'package:gastrocore_pos/features/action_buttons/domain/entities/action_button_entity.dart';
+import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Repository
@@ -36,6 +37,20 @@ final actionButtonsByPositionProvider = StreamProvider.family<
   final repo = ref.watch(actionButtonRepositoryProvider);
   final tenantId = ref.watch(tenantIdProvider);
   return repo.watchByPosition(tenantId, position);
+});
+
+/// Active buttons for [position] that the currently logged-in user is
+/// actually allowed to see. Layers [currentUserRoleProvider] on top of
+/// [actionButtonsByPositionProvider] so role-gated buttons disappear
+/// from the strip when a lower-privilege user logs in. Admin always
+/// sees every button; a null / empty roleFilter behaves like the pre-
+/// gating default and is visible to everyone.
+final visibleActionButtonsByPositionProvider = Provider.family<
+    List<ActionButtonEntity>, ActionButtonPosition>((ref, position) {
+  final async = ref.watch(actionButtonsByPositionProvider(position));
+  final all = async.valueOrNull ?? const <ActionButtonEntity>[];
+  final role = ref.watch(currentUserRoleProvider);
+  return all.where((b) => b.isVisibleForRole(role)).toList(growable: false);
 });
 
 // ---------------------------------------------------------------------------
@@ -71,6 +86,7 @@ class ActionButtonActionsNotifier extends StateNotifier<AsyncValue<void>> {
     Map<String, dynamic> actionPayload = const <String, dynamic>{},
     int? colorValue,
     String? iconName,
+    List<String>? roleFilter,
   }) async {
     state = const AsyncLoading();
     try {
@@ -89,6 +105,7 @@ class ActionButtonActionsNotifier extends StateNotifier<AsyncValue<void>> {
         colorValue: colorValue,
         iconName: iconName,
         sortOrder: nextSort,
+        roleFilter: roleFilter,
       );
       await _repo.insert(entity);
       state = const AsyncData(null);

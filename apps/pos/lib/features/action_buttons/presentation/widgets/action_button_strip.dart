@@ -27,9 +27,11 @@ class ActionButtonStrip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final buttonsAsync =
-        ref.watch(actionButtonsByPositionProvider(position));
-    final buttons = buttonsAsync.valueOrNull ?? const <ActionButtonEntity>[];
+    // visibleActionButtonsByPositionProvider layers the current user's
+    // role filter on top of the position stream so role-gated buttons
+    // disappear automatically when a waiter takes over a terminal that
+    // was showing admin-only overrides.
+    final buttons = ref.watch(visibleActionButtonsByPositionProvider(position));
 
     if (buttons.isEmpty) {
       return const SizedBox.shrink();

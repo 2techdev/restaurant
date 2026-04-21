@@ -36,6 +36,7 @@ import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dar
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
 import 'package:gastrocore_pos/features/action_buttons/domain/entities/action_button_entity.dart';
+import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 import 'package:gastrocore_pos/features/action_buttons/presentation/providers/action_button_provider.dart';
 import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/theme/pos_v2_theme.dart';
@@ -4253,6 +4254,10 @@ class _ActionButtonEditorDialogState
   int _amountCents = 500;
   String? _gangId;
 
+  /// Roles allowed to see this button. Empty = visible to every role
+  /// (the historical default before role gating was wired up).
+  late Set<UserRole> _allowedRoles;
+
   static const List<Color> _palette = [
     Color(0xFFE53935),
     Color(0xFFF57C00),
@@ -4295,6 +4300,16 @@ class _ActionButtonEditorDialogState
     if (amt is int) _amountCents = amt;
     final gid = payload['gangId'];
     if (gid is String) _gangId = gid;
+
+    // Seed role filter from the stored list. Unknown / legacy names are
+    // dropped silently so a stale seed from a future build can't crash
+    // the editor when that role enum value doesn't exist here yet.
+    final stored = ex?.roleFilter ?? const <String>[];
+    _allowedRoles = {
+      for (final name in stored)
+        for (final r in UserRole.values)
+          if (r.name == name) r,
+    };
   }
 
   @override
@@ -4393,6 +4408,42 @@ class _ActionButtonEditorDialogState
                       icon: opt.icon,
                       selected: _iconName == opt.name,
                       onTap: () => setState(() => _iconName = opt.name),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _FieldLabel('Görünürlük (rol filtresi)'),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'Hiçbirini seçmezsen buton herkese görünür. Bir veya '
+                  'birkaç rol seçersen buton sadece o rollerde oturum '
+                  'açan kullanıcılara gösterilir. Admin rolü her butonu '
+                  'daima görür.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textDim,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final role in UserRole.values)
+                    FilterChip(
+                      label: Text(_labelForRole(role)),
+                      selected: _allowedRoles.contains(role),
+                      onSelected: (sel) {
+                        setState(() {
+                          if (sel) {
+                            _allowedRoles.add(role);
+                          } else {
+                            _allowedRoles.remove(role);
+                          }
+                        });
+                      },
                     ),
                 ],
               ),
@@ -4528,6 +4579,14 @@ class _ActionButtonEditorDialogState
     final notifier = ref.read(actionButtonActionsProvider.notifier);
     final navigator = Navigator.of(context);
     final ex = widget.existing;
+
+    // An empty selection serialises as null (historical "visible to all"
+    // sentinel); a non-empty set is persisted as a sorted list of role
+    // names so two buttons with the same filter serialize identically.
+    final rolesList = _allowedRoles.isEmpty
+        ? null
+        : (_allowedRoles.map((r) => r.name).toList()..sort());
+
     bool ok;
     if (ex == null) {
       ok = await notifier.create(
@@ -4537,6 +4596,7 @@ class _ActionButtonEditorDialogState
         actionPayload: payload,
         colorValue: _color?.toARGB32(),
         iconName: _iconName,
+        roleFilter: rolesList,
       );
     } else {
       ok = await notifier.update(
@@ -4549,12 +4609,22 @@ class _ActionButtonEditorDialogState
           clearColor: _color == null,
           iconName: _iconName,
           clearIcon: _iconName == null,
+          roleFilter: rolesList,
+          clearRoleFilter: rolesList == null,
         ),
       );
     }
     if (!ok) return;
     if (mounted) navigator.pop();
   }
+
+  String _labelForRole(UserRole role) => switch (role) {
+        UserRole.admin => 'Admin',
+        UserRole.manager => 'Müdür',
+        UserRole.waiter => 'Garson',
+        UserRole.cashier => 'Kasiyer',
+        UserRole.kitchen => 'Mutfak',
+      };
 }
 
 class _IconOption {
