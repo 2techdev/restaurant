@@ -58,8 +58,10 @@ void main() {
       }
     });
 
-    test('covers 21 distinct actions', () {
-      expect(AuditAction.values.length, equals(21));
+    test('covers 25 distinct actions', () {
+      // Baseline of 21 has grown with product availability, customer/ticket
+      // linking, loyalty redemption, and receipt reprint compliance.
+      expect(AuditAction.values.length, equals(25));
     });
   });
 

@@ -38,6 +38,12 @@ enum AuditAction {
   // the daily close report can explain every revenue deduction.
   loyaltyRedeemed('Loyalty Redeemed'),
 
+  // Receipt reprint — Swiss tax compliance trail for every extra copy of a
+  // settled receipt. The first print fired directly out of the payment flow
+  // is NOT audited here; only reprints (repeated prints or prints of an
+  // already-completed ticket opened from history) fire this action.
+  receiptReprinted('Receipt Reprinted'),
+
   // Auth
   userLoggedIn('User Logged In'),
   userLoggedOut('User Logged Out'),
