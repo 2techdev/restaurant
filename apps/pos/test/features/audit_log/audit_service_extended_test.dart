@@ -58,10 +58,11 @@ void main() {
       }
     });
 
-    test('covers 25 distinct actions', () {
+    test('covers 27 distinct actions', () {
       // Baseline of 21 has grown with product availability, customer/ticket
-      // linking, loyalty redemption, and receipt reprint compliance.
-      expect(AuditAction.values.length, equals(25));
+      // linking, loyalty redemption, receipt reprint compliance, and per-
+      // waiter clock-in / clock-out time tracking.
+      expect(AuditAction.values.length, equals(27));
     });
   });
 

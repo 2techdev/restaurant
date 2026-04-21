@@ -48,6 +48,13 @@ enum AuditAction {
   userLoggedIn('User Logged In'),
   userLoggedOut('User Logged Out'),
 
+  // Shift clock — waiter-level time tracking, separate from session login.
+  // A single terminal session can span many clock-in / clock-out cycles
+  // (lock screen, cash relief, etc.), so these actions are ONLY emitted
+  // by explicit Mesai (shift) buttons, never by PIN login/logout.
+  userClockedIn('User Clocked In'),
+  userClockedOut('User Clocked Out'),
+
   // Manager operations
   managerOverride('Manager Override'),
 

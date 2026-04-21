@@ -277,6 +277,32 @@ class AuditService {
         userName: name,
       );
 
+  /// Explicit Mesai (shift) start — distinct from login. Emitted by the
+  /// clock panel only; login does NOT auto-clock so operators can share a
+  /// session across relief breaks without polluting time sheets.
+  Future<void> logUserClockedIn(String userId, String name) => log(
+        action: AuditAction.userClockedIn,
+        entityType: 'user',
+        entityId: userId,
+        userId: userId,
+        userName: name,
+      );
+
+  /// Explicit Mesai (shift) end — distinct from logout.
+  Future<void> logUserClockedOut(
+    String userId,
+    String name, {
+    String? reason,
+  }) =>
+      log(
+        action: AuditAction.userClockedOut,
+        entityType: 'user',
+        entityId: userId,
+        userId: userId,
+        userName: name,
+        reason: reason,
+      );
+
   Future<void> logManagerOverride(
     String entityId, {
     String? reason,

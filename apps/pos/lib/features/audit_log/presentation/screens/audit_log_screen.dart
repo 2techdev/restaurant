@@ -500,6 +500,8 @@ class _ActionBadge extends StatelessWidget {
         (AppColors.purple, Icons.access_time_rounded),
       AuditAction.userLoggedIn || AuditAction.userLoggedOut =>
         (AppColors.primary, Icons.person_rounded),
+      AuditAction.userClockedIn || AuditAction.userClockedOut =>
+        (AppColors.purple, Icons.schedule_rounded),
       AuditAction.managerOverride =>
         (AppColors.yellow, Icons.admin_panel_settings_rounded),
       AuditAction.cashDrawerOpened =>
