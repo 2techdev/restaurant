@@ -107,7 +107,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -245,6 +245,13 @@ class AppDatabase extends _$AppDatabase {
         // tile out and blocks taps until the product is re-opened.
         // Default true so every existing row stays sellable.
         await m.addColumn(products, products.isAvailable);
+      }
+      if (from < 16) {
+        // v16: nullable customer_id FK on tickets. Lets the POS topbar
+        // attach a loyalty account to an open ticket so the payment
+        // screen can surface puan balance and redemption. Existing
+        // rows stay null (walk-in orders) — additive, non-breaking.
+        await m.addColumn(tickets, tickets.customerId);
       }
     },
     onCreate: (m) async {

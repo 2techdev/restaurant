@@ -9,6 +9,12 @@ class Tickets extends Table {
   TextColumn get tableId => text().nullable()();
   TextColumn get waiterId => text().nullable()();
   TextColumn get customerName => text().nullable()();
+
+  /// FK to `customers.id`. Nullable because walk-in orders don't carry a
+  /// loyalty account; takeaway/delivery tickets often do. When non-null
+  /// the POS topbar shows a customer chip and payments can redeem the
+  /// linked account's loyalty balance.
+  TextColumn get customerId => text().nullable()();
   IntColumn get guestCount => integer().withDefault(const Constant(1))();
   TextColumn get status => text().withDefault(const Constant('open'))(); // open, items_added, sent_to_kitchen, partially_served, fully_served, bill_requested, partially_paid, fully_paid, closed, void
   TextColumn get channel => text().withDefault(const Constant('pos'))(); // pos, waiter, qr, kiosk, web

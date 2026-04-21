@@ -232,6 +232,20 @@ class OrderRepositoryImpl {
     );
   }
 
+  /// Link a loyalty customer to an open ticket (or clear the link when
+  /// [customerId] is null). Lightweight write — only touches customer_id
+  /// + updatedAt so the POS topbar can flip the chip without re-stamping
+  /// totals or items. Paired with AuditAction.customerLinkedToTicket at
+  /// the call site.
+  Future<void> setTicketCustomer(String ticketId, String? customerId) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId))).write(
+      TicketsCompanion(
+        customerId: Value(customerId),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   /// Overwrite the free-text [notes] field on a ticket.
   ///
   /// Used by the merge / split flows to stamp a reason like
@@ -519,6 +533,7 @@ class OrderRepositoryImpl {
       tableId: row.tableId,
       waiterId: row.waiterId,
       customerName: row.customerName,
+      customerId: row.customerId,
       guestCount: row.guestCount,
       status: _parseTicketStatus(row.status),
       channel: _parseOrderChannel(row.channel),
@@ -545,6 +560,7 @@ class OrderRepositoryImpl {
       tableId: Value(entity.tableId),
       waiterId: Value(entity.waiterId),
       customerName: Value(entity.customerName),
+      customerId: Value(entity.customerId),
       guestCount: Value(entity.guestCount),
       status: Value(_ticketStatusToString(entity.status)),
       channel: Value(_orderChannelToString(entity.channel)),

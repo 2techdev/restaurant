@@ -31,6 +31,13 @@ enum AuditAction {
   // because it can hide revenue-bearing products from the POS grid).
   productAvailabilityChanged('Product Availability Changed'),
 
+  // CRM — customer attached to an open ticket or detached from it.
+  customerLinkedToTicket('Customer Linked To Ticket'),
+
+  // Loyalty — puan cashed at settlement. Logged against the customer so
+  // the daily close report can explain every revenue deduction.
+  loyaltyRedeemed('Loyalty Redeemed'),
+
   // Auth
   userLoggedIn('User Logged In'),
   userLoggedOut('User Logged Out'),
