@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
+import 'package:gastrocore_pos/features/inventory/presentation/providers/inventory_provider.dart';
 import 'package:gastrocore_pos/features/overrides/domain/entities/override_action.dart';
 import 'package:gastrocore_pos/features/overrides/presentation/providers/override_provider.dart';
 import 'package:gastrocore_pos/features/payments/data/repositories/payment_repository_impl.dart';
@@ -15,9 +16,15 @@ import 'package:gastrocore_pos/features/payments/data/repositories/refund_reposi
 // ---------------------------------------------------------------------------
 
 /// Singleton [PaymentRepositoryImpl] backed by the app database.
+///
+/// The inventory repo is injected so closing a ticket can deduct stock in
+/// the same transaction that marks the bill fully paid. Keep the inventory
+/// dependency here (not inside the repo constructor default) so unit tests
+/// can construct a PaymentRepositoryImpl without pulling in inventory DI.
 final paymentRepositoryProvider = Provider<PaymentRepositoryImpl>((ref) {
   final db = ref.watch(databaseProvider);
-  return PaymentRepositoryImpl(db);
+  final inventory = ref.watch(inventoryRepositoryProvider);
+  return PaymentRepositoryImpl(db, inventory: inventory);
 });
 
 final refundRepositoryProvider = Provider<RefundRepositoryImpl>((ref) {
