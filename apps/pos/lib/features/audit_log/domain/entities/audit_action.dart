@@ -27,6 +27,10 @@ enum AuditAction {
   // Prices
   priceChanged('Price Changed'),
 
+  // Menu availability (sold-out / 86'd toggle — operator-facing and loggable
+  // because it can hide revenue-bearing products from the POS grid).
+  productAvailabilityChanged('Product Availability Changed'),
+
   // Auth
   userLoggedIn('User Logged In'),
   userLoggedOut('User Logged Out'),
