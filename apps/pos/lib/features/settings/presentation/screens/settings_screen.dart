@@ -1850,6 +1850,96 @@ class _AppearanceSection extends ConsumerWidget {
             ),
           ],
         ),
+        _Card(
+          title: 'YÜKSEK KONTRAST',
+          children: [
+            const Text(
+              'Açık veya koyu temanın üzerine saf siyah / beyaz bir palet '
+              'bindirir. Parlak ortamlarda ve düşük görüşlü operatörler için '
+              'metin, kenar ve ayırıcılar daha okunaklı olur.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Yüksek kontrast modu',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                settings.highContrast ? 'Açık' : 'Kapalı',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              value: settings.highContrast,
+              onChanged: (v) => ref
+                  .read(appSettingsProvider.notifier)
+                  .setHighContrast(v),
+            ),
+          ],
+        ),
+        _Card(
+          title: 'YAZI BOYUTU',
+          children: [
+            const Text(
+              'Tüm ekranlardaki metin boyutunu ölçekler. iOS / Android '
+              'erişilebilirlik ayarlarıyla aynı mantık; yazı büyüdükçe '
+              'sıra yükseklikleri de otomatik büyür.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            RadioGroup<AppTextScale>(
+              groupValue: settings.textScale,
+              onChanged: (v) {
+                if (v != null) {
+                  ref.read(appSettingsProvider.notifier).setTextScale(v);
+                }
+              },
+              child: Column(
+                children: AppTextScale.values
+                    .map(
+                      (scale) => RadioListTile<AppTextScale>(
+                        contentPadding: EdgeInsets.zero,
+                        title: Row(
+                          children: [
+                            Text(
+                              scale.label,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '×${scale.scale.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        value: scale,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }

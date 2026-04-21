@@ -88,22 +88,46 @@ class _GastroCoreAppState extends ConsumerState<GastroCoreApp> {
         ref.watch(themeCustomizationProvider).valueOrNull ??
             const ThemeCustomization();
 
-    return MaterialApp.router(
-      title: 'GastroCore POS',
-      debugShowCheckedModeBanner: false,
-      theme: _applyOverrides(
+    final lightTheme = _applyA11y(
+      _applyOverrides(
         buildKineticTheme(),
         primaryHex: themeOverrides.lightPrimaryHex,
         surfaceHex: themeOverrides.lightSurfaceHex,
         isDark: false,
       ),
-      darkTheme: _applyOverrides(
+      highContrast: appSettings.highContrast,
+      isDark: false,
+    );
+    final darkTheme = _applyA11y(
+      _applyOverrides(
         buildKineticThemeDark(),
         primaryHex: themeOverrides.darkPrimaryHex,
         surfaceHex: themeOverrides.darkSurfaceHex,
         isDark: true,
       ),
+      highContrast: appSettings.highContrast,
+      isDark: true,
+    );
+
+    return MaterialApp.router(
+      title: 'GastroCore POS',
+      debugShowCheckedModeBanner: false,
+      theme: lightTheme,
+      darkTheme: darkTheme,
       themeMode: themeMode,
+
+      // ── A11y text-scale override ─────────────────────────────────────────
+      // Riverpod-driven size preset is applied at the MediaQuery boundary
+      // so every screen — GoRouter pages, modal routes, system dialogs —
+      // sees the same scaler. Uses TextScaler.linear so existing font-size
+      // math in the theme still composes.
+      builder: (context, child) {
+        final scaler = TextScaler.linear(appSettings.textScale.scale);
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: scaler),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
 
       // ── Localization ──────────────────────────────────────────────────────
       locale: locale,
@@ -119,6 +143,34 @@ class _GastroCoreAppState extends ConsumerState<GastroCoreApp> {
       routerConfig: _router,
     );
   }
+}
+
+/// Overlays an a11y-focused ColorScheme on top of the resolved theme when
+/// the operator has toggled high contrast on. We push primary / onSurface
+/// to the palette extremes and drive dividers toward full opacity so
+/// thin-border widgets (chip rows, table lines) stay perceivable.
+ThemeData _applyA11y(
+  ThemeData base, {
+  required bool highContrast,
+  required bool isDark,
+}) {
+  if (!highContrast) return base;
+  final black = const Color(0xFF000000);
+  final white = const Color(0xFFFFFFFF);
+  final scheme = base.colorScheme.copyWith(
+    primary: isDark ? white : black,
+    onPrimary: isDark ? black : white,
+    surface: isDark ? black : white,
+    onSurface: isDark ? white : black,
+    outline: isDark ? white : black,
+    outlineVariant: isDark ? white : black,
+  );
+  return base.copyWith(
+    colorScheme: scheme,
+    dividerColor: isDark ? white : black,
+    scaffoldBackgroundColor: isDark ? black : white,
+    canvasColor: isDark ? black : white,
+  );
 }
 
 /// Layers operator-picked theme overrides on top of a base [ThemeData].

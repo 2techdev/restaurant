@@ -262,6 +262,16 @@ class AppSettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
     final current = state.valueOrNull ?? const AppSettings();
     await save(current.copyWith(handedness: handedness));
   }
+
+  Future<void> setHighContrast(bool enabled) async {
+    final current = state.valueOrNull ?? const AppSettings();
+    await save(current.copyWith(highContrast: enabled));
+  }
+
+  Future<void> setTextScale(AppTextScale scale) async {
+    final current = state.valueOrNull ?? const AppSettings();
+    await save(current.copyWith(textScale: scale));
+  }
 }
 
 final appSettingsProvider =
