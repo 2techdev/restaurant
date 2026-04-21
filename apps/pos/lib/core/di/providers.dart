@@ -16,10 +16,19 @@ import 'package:gastrocore_pos/core/database/app_database.dart';
 /// Singleton [AppDatabase] instance shared across the entire application.
 ///
 /// Overridden in `main()` with the real instance created before app start.
+///
+/// For tests, import `test/helpers/test_provider_overrides.dart` and spread
+/// `testProviderOverrides()` into your `ProviderScope.overrides` — that
+/// wires an in-memory database and a fixture tenant id in one call.
 final databaseProvider = Provider<AppDatabase>((ref) {
-  // This will be overridden via ProviderScope.overrides in main.dart.
-  throw UnimplementedError(
-    'databaseProvider must be overridden in ProviderScope',
+  // Not overridden — surface a concrete action item instead of a cryptic
+  // UnimplementedError so test failures point at the missing wiring.
+  throw StateError(
+    'databaseProvider has no value. Either (a) in production, pass '
+    '`databaseProvider.overrideWithValue(AppDatabase(...))` via '
+    'ProviderScope in main.dart before runApp, or (b) in tests, '
+    'spread `testProviderOverrides()` from '
+    'test/helpers/test_provider_overrides.dart into your ProviderScope.',
   );
 });
 
@@ -32,10 +41,16 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 /// Overridden in `main()` with the actual tenant ID loaded from the
 /// database after seeding. All feature providers depend on this value
 /// to scope queries to the correct tenant.
+///
+/// For tests, see [databaseProvider] — `testProviderOverrides()`
+/// wires both providers together with a fixture tenant id.
 final tenantIdProvider = Provider<String>((ref) {
-  // This will be overridden via ProviderScope.overrides in main.dart.
-  throw UnimplementedError(
-    'tenantIdProvider must be overridden in ProviderScope',
+  throw StateError(
+    'tenantIdProvider has no value. Either (a) in production, pass '
+    '`tenantIdProvider.overrideWithValue(<id>)` via ProviderScope in '
+    'main.dart after loading the active tenant, or (b) in tests, '
+    'spread `testProviderOverrides()` from '
+    'test/helpers/test_provider_overrides.dart into your ProviderScope.',
   );
 });
 
