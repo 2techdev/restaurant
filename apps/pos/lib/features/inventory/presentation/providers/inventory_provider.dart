@@ -58,6 +58,44 @@ final stockAlertCountProvider = FutureProvider.autoDispose<int>((ref) async {
   return items.length;
 });
 
+/// Map from productId -> current [StockStatus] for every tracked inventory
+/// item that has a product link. Used by the product grid to decorate
+/// tiles with a "low" / "bitti" badge without re-querying per tile.
+///
+/// Uses the live stream so a ticket-close deduction (which happens on the
+/// database layer) propagates to the visible grid in real time. Items
+/// without a productId are skipped — the grid is keyed by productId, not
+/// inventory id. If the stream is still loading the map is empty, which
+/// means the grid degrades to "no badges" rather than flashing wrong data.
+final stockStatusByProductIdProvider =
+    Provider.autoDispose<Map<String, StockStatus>>((ref) {
+  final async = ref.watch(inventoryItemsStreamProvider);
+  final items = async.valueOrNull ?? const <InventoryItemEntity>[];
+  final out = <String, StockStatus>{};
+  for (final item in items) {
+    final pid = item.productId;
+    if (pid == null || pid.isEmpty) continue;
+    // If a product is tracked by multiple inventory rows, surface the
+    // worst status — "out" wins over "low" wins over "normal". Rare in
+    // practice but it prevents a second restocked row from masking a
+    // truly empty one.
+    final existing = out[pid];
+    final next = item.stockStatus;
+    if (existing == null) {
+      out[pid] = next;
+    } else if (_severity(next) > _severity(existing)) {
+      out[pid] = next;
+    }
+  }
+  return out;
+});
+
+int _severity(StockStatus s) => switch (s) {
+      StockStatus.out => 2,
+      StockStatus.low => 1,
+      StockStatus.normal => 0,
+    };
+
 // ---------------------------------------------------------------------------
 // Single item detail
 // ---------------------------------------------------------------------------
