@@ -191,6 +191,11 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
   late final TextEditingController _displayOrderCtrl;
   bool _isActive = true;
 
+  /// Sold-out / 86'd flag. Default true = sellable. When the operator flips
+  /// this off the product stays listed on the menu but the POS grid greys
+  /// it out and blocks taps.
+  bool _isAvailable = true;
+
   // Cached async data
   List<CategoryEntity> _categories = [];
   List<ProductEntity> _allProducts = [];
@@ -237,6 +242,7 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
     _displayOrderCtrl =
         TextEditingController(text: e?.displayOrder.toString() ?? '0');
     _isActive = e?.isActive ?? true;
+    _isAvailable = e?.isAvailable ?? true;
 
     _loadData();
   }
@@ -1543,6 +1549,18 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
               _isActive,
               (v) => setState(() => _isActive = v),
             ),
+            const SizedBox(height: 12),
+            // Sold-out / 86'd toggle. Labels are Turkish because this is an
+            // operator-facing control the pilot asked for in Turkish ("Satışta"
+            // / "Satışta Değil"). The toggle value is the positive form so
+            // "on = sellable", matching every other toggle's ON-means-enabled
+            // convention and mapping 1:1 to the DB default of true.
+            _buildToggleRow(
+              'Satışta',
+              'Kapalıysa ürün POS ızgarasında gri görünür ve siparişe alınamaz',
+              _isAvailable,
+              (v) => setState(() => _isAvailable = v),
+            ),
           ],
         ),
       ],
@@ -1720,6 +1738,7 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
               _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
           taxGroup: _taxGroup,
           isActive: _isActive,
+          isAvailable: _isAvailable,
           printerGroup: _printerGroup,
           barcode: () =>
               _barcodeCtrl.text.trim().isEmpty
@@ -1744,6 +1763,7 @@ class _ProductFormPageState extends ConsumerState<_ProductFormPage> {
           costPrice: 0,
           taxGroup: _taxGroup,
           isActive: _isActive,
+          isAvailable: _isAvailable,
           displayOrder: int.tryParse(_displayOrderCtrl.text) ?? 0,
           printerGroup: _printerGroup,
           description: _descCtrl.text.trim().isEmpty
