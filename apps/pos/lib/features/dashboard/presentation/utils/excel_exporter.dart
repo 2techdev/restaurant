@@ -72,8 +72,7 @@ class ExcelExporter {
     _row(sheet, ['Dönem', r.dateRange.label]);
     _row(sheet, [
       'Tarih Aralığı',
-      '${_dateFmt.format(r.dateRange.start)} – '
-          '${_dateFmt.format(r.dateRange.end.subtract(const Duration(days: 1)))}'
+      '${_dateFmt.format(r.dateRange.start)} – ${_dateFmt.format(r.dateRange.end.subtract(const Duration(days: 1)))}'
     ]);
     _blank(sheet);
     _header(sheet, ['KPI', 'Değer']);
@@ -201,7 +200,7 @@ class ExcelExporter {
   }
 
   static void _header(Sheet sheet, List<String> cols) {
-    sheet.appendRow(cols.map((c) => TextCellValue(c)).toList());
+    sheet.appendRow(cols.map(TextCellValue.new).toList());
   }
 
   static void _row(Sheet sheet, List<dynamic> values) {

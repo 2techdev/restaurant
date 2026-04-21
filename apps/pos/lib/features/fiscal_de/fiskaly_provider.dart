@@ -108,21 +108,21 @@ class TseStateNotifier extends AsyncNotifier<TseLifecycleState> {
   Future<void> initialize() async {
     state = const AsyncLoading();
     final lifecycle = ref.read(tseLifecycleServiceProvider);
-    state = await AsyncValue.guard(() => lifecycle.initialize());
+    state = await AsyncValue.guard(lifecycle.initialize);
   }
 
   /// Triggers a TSE self-test and updates state.
   Future<void> runSelfTest() async {
     state = const AsyncLoading();
     final lifecycle = ref.read(tseLifecycleServiceProvider);
-    state = await AsyncValue.guard(() => lifecycle.runSelfTest());
+    state = await AsyncValue.guard(lifecycle.runSelfTest);
   }
 
   /// Refreshes TSE state from the Fiskaly API.
   Future<void> refresh() async {
     state = const AsyncLoading();
     final lifecycle = ref.read(tseLifecycleServiceProvider);
-    state = await AsyncValue.guard(() => lifecycle.getState());
+    state = await AsyncValue.guard(lifecycle.getState);
   }
 }
 

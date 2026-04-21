@@ -212,7 +212,7 @@ void main() {
       );
       final svc = TseLifecycleService(service: fake);
       expect(
-        () => svc.runSelfTest(),
+        svc.runSelfTest,
         throwsA(isA<FiskalyException>()),
       );
     });

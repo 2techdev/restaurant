@@ -34,7 +34,7 @@ class SupplierListScreen extends ConsumerWidget {
         ),
         title: const Text(
           'Suppliers',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,

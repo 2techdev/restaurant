@@ -225,5 +225,5 @@ class AuditLogExportNotifier extends StateNotifier<AuditExportState> {
 
 final auditLogExportProvider =
     StateNotifierProvider<AuditLogExportNotifier, AuditExportState>(
-  (ref) => AuditLogExportNotifier(ref),
+  AuditLogExportNotifier.new,
 );

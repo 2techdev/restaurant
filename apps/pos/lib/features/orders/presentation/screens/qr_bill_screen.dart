@@ -247,10 +247,14 @@ class _QRBillScreenState extends ConsumerState<QRBillScreen> {
     w(''); // zip
     w(''); // city
     w('CH');
-    for (var i = 0; i < 7; i++) w(''); // ultimate creditor (reserved)
+    for (var i = 0; i < 7; i++) {
+      w(''); // ultimate creditor (reserved)
+    }
     w(amount > 0 ? amount.toStringAsFixed(2) : '');
     w('CHF');
-    for (var i = 0; i < 7; i++) w(''); // debtor
+    for (var i = 0; i < 7; i++) {
+      w(''); // debtor
+    }
     w('NON'); // reference type
     w(''); // reference
     w(message); // additional info
@@ -433,7 +437,7 @@ class _QRBillScreenState extends ConsumerState<QRBillScreen> {
       child: Column(
         children: [
           // Slip container — white background like actual paper
-          Container(
+          DecoratedBox(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),

@@ -36,7 +36,7 @@ class StockAlertScreen extends ConsumerWidget {
             const SizedBox(width: 8),
             const Text(
               'Alerts',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -79,7 +79,7 @@ class StockAlertScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   const Text(
                     'All stock levels are OK',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       color: AppColors.textDim,
                     ),

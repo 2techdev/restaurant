@@ -1881,7 +1881,7 @@ class _ItemsWrap extends ConsumerWidget {
     final allProducts =
         allProductsAsync.asData?.value ?? const <ProductEntity>[];
 
-    return Container(
+    return ColoredBox(
       color: context.v2.bg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

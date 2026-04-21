@@ -421,7 +421,7 @@ void main() {
   // =========================================================================
 
   group('SyncEventEntity — Domain Model', () {
-    SyncEventEntity _makeEntity({
+    SyncEventEntity makeEntity({
       int id = 1,
       String tableName = 'tickets',
       SyncOperation operation = SyncOperation.insert,
@@ -440,15 +440,15 @@ void main() {
     }
 
     test('default status is pending', () {
-      expect(_makeEntity().status, equals(SyncEventStatus.pending));
+      expect(makeEntity().status, equals(SyncEventStatus.pending));
     });
 
     test('default retryCount is 0', () {
-      expect(_makeEntity().retryCount, equals(0));
+      expect(makeEntity().retryCount, equals(0));
     });
 
     test('copyWith overrides only specified fields', () {
-      final entity = _makeEntity();
+      final entity = makeEntity();
       final updated = entity.copyWith(
         status: SyncEventStatus.uploaded,
         retryCount: 2,
@@ -461,7 +461,7 @@ void main() {
     });
 
     test('copyWith with no arguments returns equivalent entity', () {
-      final entity = _makeEntity(status: SyncEventStatus.uploading);
+      final entity = makeEntity(status: SyncEventStatus.uploading);
       final copy = entity.copyWith();
 
       expect(copy.id, equals(entity.id));
