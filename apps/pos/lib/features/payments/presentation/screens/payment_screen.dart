@@ -11,6 +11,8 @@
 /// card turns green via its status-coloured provider.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,7 +22,11 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
 import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
+import 'package:gastrocore_pos/features/audit_log/domain/entities/audit_action.dart';
+import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_log_provider.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/customers/domain/entities/customer_entity.dart';
+import 'package:gastrocore_pos/features/customers/presentation/providers/customer_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
@@ -48,6 +54,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   int? _selectedTipPercent;
   VoucherEntity? _voucher;
 
+  /// Staged loyalty redemption. Points are only debited from the customer
+  /// (and the audit log emitted) on a successful payment; cancelling the
+  /// screen before PAY leaves the balance untouched. 1 point == 1 cent.
+  int _loyaltyPointsToRedeem = 0;
+
+  /// Customer linked to the current ticket, loaded once after the ticket
+  /// arrives. Null when the ticket has no linked customer.
+  CustomerEntity? _linkedCustomer;
+  String? _customerLoadedFor; // ticket.customerId we already fetched for
+
   bool _paymentComplete = false;
   bool _submitting = false;
 
@@ -60,9 +76,27 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   int get _baseTotal => _ticket?.total ?? 0;
   int get _voucherDiscount => _voucher?.discountAmount ?? 0;
 
+  /// Loyalty discount in cents. Points redeem 1:1 as cents
+  /// (100 points = CHF 1.00).
+  int get _loyaltyDiscount => _loyaltyPointsToRedeem;
+
   int get _grandTotal {
-    final total = _baseTotal + _tipAmount - _voucherDiscount;
+    final total =
+        _baseTotal + _tipAmount - _voucherDiscount - _loyaltyDiscount;
     return total < 0 ? 0 : total;
+  }
+
+  /// Maximum points that can be redeemed on this ticket: capped by the
+  /// customer's balance and by the ticket total (we never allow the bill
+  /// to go negative via puan).
+  int get _maxRedeemablePoints {
+    final customer = _linkedCustomer;
+    if (customer == null) return 0;
+    final billRoom = _baseTotal + _tipAmount - _voucherDiscount;
+    if (billRoom <= 0) return 0;
+    return customer.loyaltyPoints < billRoom
+        ? customer.loyaltyPoints
+        : billRoom;
   }
 
   List<OrderItemEntity> get _items => _ticket?.items ?? const [];
@@ -173,6 +207,57 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   void _clearVoucher() => setState(() => _voucher = null);
 
+  // --- Loyalty redemption --------------------------------------------------
+
+  /// Resolve the customer entity once per ticket.customerId change. We don't
+  /// want to refetch on every rebuild, so we cache by the id we loaded for.
+  Future<void> _maybeLoadLinkedCustomer(String? customerId) async {
+    if (customerId == _customerLoadedFor) return;
+    _customerLoadedFor = customerId;
+    if (customerId == null) {
+      setState(() {
+        _linkedCustomer = null;
+        _loyaltyPointsToRedeem = 0;
+      });
+      return;
+    }
+    try {
+      final repo = ref.read(customerRepositoryProvider);
+      final c = await repo.getCustomerById(customerId);
+      if (!mounted) return;
+      setState(() {
+        _linkedCustomer = c;
+        // If the balance dropped below what we had staged, clamp.
+        if (c != null && _loyaltyPointsToRedeem > c.loyaltyPoints) {
+          _loyaltyPointsToRedeem = c.loyaltyPoints;
+        }
+      });
+    } catch (_) {
+      // Non-fatal: we just won't render the puan affordance.
+    }
+  }
+
+  void _clearLoyalty() => setState(() => _loyaltyPointsToRedeem = 0);
+
+  Future<void> _openLoyaltyDialog() async {
+    final customer = _linkedCustomer;
+    if (customer == null) return;
+    final maxPoints = _maxRedeemablePoints;
+    if (maxPoints <= 0) return;
+
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => _LoyaltyRedeemDialog(
+        balance: customer.loyaltyPoints,
+        maxRedeemable: maxPoints,
+        initial: _loyaltyPointsToRedeem,
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _loyaltyPointsToRedeem = result.clamp(0, maxPoints));
+    }
+  }
+
   // --- Payment -------------------------------------------------------------
 
   Future<void> _submit() async {
@@ -202,6 +287,32 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     };
 
     try {
+      // Debit loyalty points first — if that fails the payment should NOT
+      // be written. The customer repo throws "Insufficient points" if the
+      // balance is stale; catching forces the cashier to re-check the chip.
+      final customer = _linkedCustomer;
+      final redeemed = _loyaltyPointsToRedeem;
+      if (customer != null && redeemed > 0) {
+        await ref.read(customerRepositoryProvider).redeemPoints(
+              customer.id,
+              points: redeemed,
+              orderId: widget.ticketId,
+            );
+        ref.invalidate(customerByIdProvider(customer.id));
+
+        final audit = ref.read(auditServiceProvider);
+        unawaited(
+          audit.log(
+            action: AuditAction.loyaltyRedeemed,
+            entityType: 'customer',
+            entityId: customer.id,
+            newValueJson:
+                '{"points":$redeemed,"orderId":"${widget.ticketId}","discountCents":$redeemed}',
+            reason: '${customer.name} · $redeemed puan',
+          ),
+        );
+      }
+
       final paymentRepo = ref.read(paymentRepositoryProvider);
       await paymentRepo.processPayment(
         ticketId: widget.ticketId,
@@ -235,7 +346,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget build(BuildContext context) {
     ref.listen(ticketByIdProvider(widget.ticketId), (_, next) {
       next.whenData((t) {
-        if (t != null && mounted) setState(() => _ticket = t);
+        if (t != null && mounted) {
+          setState(() => _ticket = t);
+          _maybeLoadLinkedCustomer(t.customerId);
+        }
       });
     });
 
@@ -422,6 +536,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     '-${_fmt(_voucherDiscount)}',
                     valueColor: GcColors.tertiary,
                   ),
+                if (_loyaltyPointsToRedeem > 0)
+                  _totalLine(
+                    'Puan (${_loyaltyPointsToRedeem}P)',
+                    '-${_fmt(_loyaltyDiscount)}',
+                    valueColor: GcColors.tertiary,
+                  ),
                 const SizedBox(height: AppTokens.space8),
                 const Divider(color: GcColors.outlineVariant, height: 1),
                 const SizedBox(height: AppTokens.space8),
@@ -490,10 +610,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   // --- RIGHT — Payment -----------------------------------------------------
 
   Widget _buildPaymentSide() {
+    final showLoyalty = _linkedCustomer != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _methodRow(),
+        if (showLoyalty) ...[
+          const SizedBox(height: AppTokens.space12),
+          _loyaltyRow(),
+        ],
         const SizedBox(height: AppTokens.space12),
         _tipRow(),
         const SizedBox(height: AppTokens.space12),
@@ -503,6 +628,85 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         const SizedBox(height: AppTokens.space12),
         _buildPayCta(),
       ],
+    );
+  }
+
+  Widget _loyaltyRow() {
+    final customer = _linkedCustomer!;
+    final hasRedemption = _loyaltyPointsToRedeem > 0;
+    final maxPoints = _maxRedeemablePoints;
+    final canRedeem = maxPoints > 0;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.space8),
+      decoration: BoxDecoration(
+        color: hasRedemption
+            ? GcColors.tertiary.withValues(alpha: 0.08)
+            : GcColors.surfaceContainerLowest,
+        border: Border.all(
+          color: hasRedemption
+              ? GcColors.tertiary
+              : GcColors.outlineVariant,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppTokens.space8),
+            child: Icon(
+              Icons.stars_rounded,
+              size: 18,
+              color: GcColors.tertiary,
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PUAN · ${customer.name.toUpperCase()}',
+                  style: const TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: GcColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasRedemption
+                      ? '${_loyaltyPointsToRedeem}P uygulandı · ${_fmt(_loyaltyDiscount)} indirim'
+                      : 'Mevcut ${customer.loyaltyPoints}P · en fazla ${maxPoints}P kullanılabilir',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: GcColors.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasRedemption) ...[
+            TextButton(
+              onPressed: _clearLoyalty,
+              child: const Text('KALDIR'),
+            ),
+            const SizedBox(width: AppTokens.space4),
+          ],
+          FilledButton(
+            onPressed: canRedeem ? _openLoyaltyDialog : null,
+            style: FilledButton.styleFrom(
+              backgroundColor: GcColors.tertiary,
+              foregroundColor: GcColors.onPrimary,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+              ),
+            ),
+            child: Text(hasRedemption ? 'DEĞİŞTİR' : 'KULLAN'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1015,6 +1219,153 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Numeric dialog for choosing how many loyalty points to redeem.
+///
+/// Enforces a hard cap at [maxRedeemable] (= min(balance, bill room)) so
+/// the operator can't accidentally debit more points than the bill or the
+/// customer carries. Popping with a non-null int commits the selection;
+/// popping with null cancels. 1 point redeems 1 cent.
+class _LoyaltyRedeemDialog extends StatefulWidget {
+  const _LoyaltyRedeemDialog({
+    required this.balance,
+    required this.maxRedeemable,
+    required this.initial,
+  });
+
+  final int balance;
+  final int maxRedeemable;
+  final int initial;
+
+  @override
+  State<_LoyaltyRedeemDialog> createState() => _LoyaltyRedeemDialogState();
+}
+
+class _LoyaltyRedeemDialogState extends State<_LoyaltyRedeemDialog> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.initial > 0 ? widget.initial.toString() : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _fmtCents(int cents) {
+    final whole = (cents.abs() ~/ 100).toString();
+    final frac = (cents.abs() % 100).toString().padLeft(2, '0');
+    return 'CHF $whole.$frac';
+  }
+
+  void _commit() {
+    final raw = _controller.text.trim();
+    if (raw.isEmpty) {
+      Navigator.of(context).pop(0);
+      return;
+    }
+    final v = int.tryParse(raw);
+    if (v == null || v < 0) {
+      setState(() => _error = 'Geçerli bir sayı girin.');
+      return;
+    }
+    if (v > widget.maxRedeemable) {
+      setState(() =>
+          _error = 'En fazla ${widget.maxRedeemable} puan kullanılabilir.');
+      return;
+    }
+    Navigator.of(context).pop(v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: GcColors.surfaceContainerLowest,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+        side: BorderSide(color: GcColors.outlineVariant),
+      ),
+      title: const Text('Puan Kullan', style: GcText.headline),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Mevcut bakiye: ${widget.balance} puan',
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color: GcColors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Bu bilette en fazla ${widget.maxRedeemable} puan '
+            '(${_fmtCents(widget.maxRedeemable)}) kullanılabilir.',
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 12,
+              color: GcColors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppTokens.space12),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+            ],
+            decoration: InputDecoration(
+              labelText: 'Kullanılacak puan',
+              errorText: _error,
+              border: const OutlineInputBorder(),
+              suffixText: 'P',
+            ),
+            onSubmitted: (_) => _commit(),
+          ),
+          const SizedBox(height: AppTokens.space8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () {
+                  _controller.text = widget.maxRedeemable.toString();
+                  setState(() => _error = null);
+                },
+                child: const Text('TÜMÜNÜ KULLAN'),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('İptal'),
+        ),
+        FilledButton(
+          onPressed: _commit,
+          style: FilledButton.styleFrom(
+            backgroundColor: GcColors.tertiary,
+            foregroundColor: GcColors.onPrimary,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+            ),
+          ),
+          child: const Text('Uygula'),
+        ),
+      ],
     );
   }
 }
