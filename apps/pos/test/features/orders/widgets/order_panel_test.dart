@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/order_panel.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -76,6 +77,11 @@ class _InMemorySettingsRepository implements SettingsRepository {
       const ThemeCustomization();
   @override
   Future<void> saveThemeCustomization(ThemeCustomization settings) async {}
+  @override
+  Future<HappyHourSettings> loadHappyHourSettings() async =>
+      const HappyHourSettings();
+  @override
+  Future<void> saveHappyHourSettings(HappyHourSettings settings) async {}
 
   @override
   Future<String> getDatabasePath() async => '';

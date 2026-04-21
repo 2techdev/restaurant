@@ -96,4 +96,81 @@ class HappyHourRule {
     }
     return true;
   }
+
+  HappyHourRule copyWith({
+    String? id,
+    String? name,
+    String? categoryId,
+    bool clearCategoryId = false,
+    String? productNameContains,
+    bool clearProductNameContains = false,
+    int? discountPercent,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    List<int>? daysOfWeek,
+    bool? active,
+  }) {
+    return HappyHourRule(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      categoryId: clearCategoryId ? null : (categoryId ?? this.categoryId),
+      productNameContains: clearProductNameContains
+          ? null
+          : (productNameContains ?? this.productNameContains),
+      discountPercent: discountPercent ?? this.discountPercent,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      daysOfWeek: daysOfWeek ?? this.daysOfWeek,
+      active: active ?? this.active,
+    );
+  }
+
+  /// JSON map for persistence. [TimeOfDay] is encoded as `HH:mm` so the stored
+  /// shape stays stable if Flutter ever changes the class internals.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'categoryId': categoryId,
+        'productNameContains': productNameContains,
+        'discountPercent': discountPercent,
+        'startTime': _fmtTime(startTime),
+        'endTime': _fmtTime(endTime),
+        'daysOfWeek': daysOfWeek,
+        'active': active,
+      };
+
+  /// Inverse of [toJson]. Unknown / missing fields fall back to safe defaults
+  /// so a partially-written blob never crashes the POS grid evaluator.
+  factory HappyHourRule.fromJson(Map<String, dynamic> json) {
+    final days = (json['daysOfWeek'] as List?)
+            ?.map((e) => (e as num).toInt())
+            .toList(growable: false) ??
+        const <int>[];
+    return HappyHourRule(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      categoryId: json['categoryId']?.toString(),
+      productNameContains: json['productNameContains']?.toString(),
+      discountPercent: (json['discountPercent'] as num?)?.toInt() ?? 0,
+      startTime: _parseTime(json['startTime']?.toString()) ??
+          const TimeOfDay(hour: 0, minute: 0),
+      endTime: _parseTime(json['endTime']?.toString()) ??
+          const TimeOfDay(hour: 0, minute: 0),
+      daysOfWeek: days,
+      active: json['active'] as bool? ?? true,
+    );
+  }
+
+  static String _fmtTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  static TimeOfDay? _parseTime(String? value) {
+    if (value == null) return null;
+    final parts = value.split(':');
+    if (parts.length != 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    return TimeOfDay(hour: h.clamp(0, 23), minute: m.clamp(0, 59));
+  }
 }

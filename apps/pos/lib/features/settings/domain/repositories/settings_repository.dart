@@ -5,6 +5,7 @@
 library;
 
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -61,6 +62,13 @@ abstract interface class SettingsRepository {
 
   Future<ThemeCustomization> loadThemeCustomization();
   Future<void> saveThemeCustomization(ThemeCustomization customization);
+
+  // ---------------------------------------------------------------------------
+  // Happy hour — time-based discount rules edited in the back office
+  // ---------------------------------------------------------------------------
+
+  Future<HappyHourSettings> loadHappyHourSettings();
+  Future<void> saveHappyHourSettings(HappyHourSettings settings);
 
   // ---------------------------------------------------------------------------
   // Backup & Restore

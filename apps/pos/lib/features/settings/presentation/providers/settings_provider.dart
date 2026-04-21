@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gastrocore_pos/features/settings/data/repositories/settings_repository_impl.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -399,6 +400,11 @@ class _PlaceholderRepository implements SettingsRepository {
       const ThemeCustomization();
   @override
   Future<void> saveThemeCustomization(ThemeCustomization c) async {}
+  @override
+  Future<HappyHourSettings> loadHappyHourSettings() async =>
+      const HappyHourSettings();
+  @override
+  Future<void> saveHappyHourSettings(HappyHourSettings s) async {}
   @override
   Future<String> getDatabasePath() async => '';
   @override

@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -29,6 +30,7 @@ abstract final class _Keys {
   static const tax = 'settings.v1.tax';
   static const app = 'settings.v1.app';
   static const themeColors = 'settings.v1.themeColors';
+  static const happyHour = 'settings.v1.happyHour';
 }
 
 class SettingsRepositoryImpl implements SettingsRepository {
@@ -174,6 +176,26 @@ class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<void> saveThemeCustomization(ThemeCustomization customization) async {
     await _prefs.setString(_Keys.themeColors, customization.toJsonString());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Happy hour
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<HappyHourSettings> loadHappyHourSettings() async {
+    final raw = _prefs.getString(_Keys.happyHour);
+    if (raw == null) return const HappyHourSettings();
+    try {
+      return HappyHourSettings.fromJsonString(raw);
+    } catch (_) {
+      return const HappyHourSettings();
+    }
+  }
+
+  @override
+  Future<void> saveHappyHourSettings(HappyHourSettings settings) async {
+    await _prefs.setString(_Keys.happyHour, settings.toJsonString());
   }
 
   // ---------------------------------------------------------------------------
