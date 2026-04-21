@@ -20,11 +20,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'dart:async';
+
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/features/action_buttons/domain/entities/action_button_entity.dart';
 import 'package:gastrocore_pos/features/action_buttons/presentation/widgets/action_button_strip.dart';
+import 'package:gastrocore_pos/features/audit_log/domain/entities/audit_action.dart';
+import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_log_provider.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/customers/domain/entities/customer_entity.dart';
+import 'package:gastrocore_pos/features/customers/presentation/providers/customer_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
@@ -411,7 +417,9 @@ class _TopBar extends ConsumerWidget {
           const _BrandLockup(),
           const SizedBox(width: 18),
           _TicketMeta(ticket: ticket, user: user?.name),
-          const SizedBox(width: 18),
+          const SizedBox(width: 14),
+          _CustomerChip(ticket: ticket),
+          const SizedBox(width: 14),
           _ModeSwitch(ticket: ticket),
           const Spacer(),
           _TopIcon(
@@ -541,6 +549,513 @@ class _ModeSwitch extends ConsumerWidget {
           child: Text(label, style: on ? V2Text.modeOn : V2Text.modeOff),
         ),
       ),
+    );
+  }
+}
+
+/// Topbar chip that attaches a loyalty customer to the current ticket.
+///
+/// Empty state (no customer linked): renders a dashed-outline "+ Kunde"
+/// affordance. Tapping it opens [_CustomerSearchDialog]; selecting a
+/// customer persists the link (`setCustomer`) and fires a
+/// [AuditAction.customerLinkedToTicket] audit entry.
+///
+/// Linked state: renders name + puan balance. Tapping the chip unlinks
+/// the customer (also audited) so the operator can re-pick or clear.
+///
+/// Disabled when no ticket is active — mirrors [_ModeSwitch] behaviour.
+class _CustomerChip extends ConsumerWidget {
+  const _CustomerChip({required this.ticket});
+  final TicketEntity? ticket;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final customerId = ticket?.customerId;
+    if (customerId == null) {
+      return _buildEmpty(context, ref);
+    }
+    final customerAsync = ref.watch(customerByIdProvider(customerId));
+    return customerAsync.when(
+      loading: () => _buildShell(
+        context: context,
+        ref: ref,
+        onTap: null,
+        child: const _LoadingChipContent(),
+      ),
+      error: (_, __) => _buildEmpty(context, ref),
+      data: (customer) {
+        if (customer == null) return _buildEmpty(context, ref);
+        return _buildLinked(context, ref, customer);
+      },
+    );
+  }
+
+  Widget _buildEmpty(BuildContext context, WidgetRef ref) {
+    return _buildShell(
+      context: context,
+      ref: ref,
+      onTap: ticket == null
+          ? null
+          : () => _openSearchDialog(context, ref, ticket!),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.person_add_alt_1,
+              size: 14, color: Color(0xB3FFFFFF)),
+          SizedBox(width: 6),
+          Text(
+            'Müşteri Ekle',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: Color(0xCCFFFFFF),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLinked(
+    BuildContext context,
+    WidgetRef ref,
+    CustomerEntity customer,
+  ) {
+    return _buildShell(
+      context: context,
+      ref: ref,
+      onTap: () => _openLinkedSheet(context, ref, customer),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.person, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 140),
+            child: Text(
+              customer.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0x33FFFFFF),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '${customer.loyaltyPoints}P',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w700,
+                fontSize: 10.5,
+                color: Colors.white,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShell({
+    required BuildContext context,
+    required WidgetRef ref,
+    required VoidCallback? onTap,
+    required Widget child,
+  }) {
+    final v2 = context.v2;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: v2.chrome2,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0x1AFFFFFF)),
+          ),
+          child: Center(child: child),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLinkedSheet(
+    BuildContext context,
+    WidgetRef ref,
+    CustomerEntity customer,
+  ) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  customer.name,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    color: V2.ink,
+                  ),
+                ),
+                if (customer.phone != null && customer.phone!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    customer.phone!,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 13,
+                      color: V2.ink2,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: V2.selWeak,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${customer.loyaltyPoints} puan',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: V2.selInk,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  icon: const Icon(Icons.person_remove_alt_1),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: V2.danger,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => Navigator.of(sheetCtx).pop('unlink'),
+                  label: const Text('Müşteriyi Kaldır'),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(sheetCtx).pop(),
+                  child: const Text('Kapat'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!context.mounted) return;
+    if (action == 'unlink') {
+      await _unlinkCustomer(context, ref, customer);
+    }
+  }
+
+  Future<void> _unlinkCustomer(
+    BuildContext context,
+    WidgetRef ref,
+    CustomerEntity customer,
+  ) async {
+    final ticketValue = ticket;
+    if (ticketValue == null) return;
+
+    await ref.read(currentTicketProvider.notifier).setCustomer(null);
+
+    final audit = ref.read(auditServiceProvider);
+    unawaited(
+      audit.log(
+        action: AuditAction.customerLinkedToTicket,
+        entityType: 'ticket',
+        entityId: ticketValue.id,
+        oldValueJson: '{"customerId":"${customer.id}"}',
+        newValueJson: '{"customerId":null}',
+        reason: 'Unlinked: ${customer.name}',
+      ),
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text('${customer.name} bu biletten kaldırıldı.')),
+      );
+    }
+  }
+}
+
+class _LoadingChipContent extends StatelessWidget {
+  const _LoadingChipContent();
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 14,
+      height: 14,
+      child: CircularProgressIndicator(
+        strokeWidth: 1.6,
+        valueColor: AlwaysStoppedAnimation<Color>(Color(0xCCFFFFFF)),
+      ),
+    );
+  }
+}
+
+/// Open the customer-search dialog, link the picked customer to [ticket],
+/// and audit the action. No-op when the dialog is dismissed.
+Future<void> _openSearchDialog(
+  BuildContext context,
+  WidgetRef ref,
+  TicketEntity ticket,
+) async {
+  final picked = await showDialog<CustomerEntity>(
+    context: context,
+    builder: (_) => const _CustomerSearchDialog(),
+  );
+  if (picked == null) return;
+
+  await ref.read(currentTicketProvider.notifier).setCustomer(picked.id);
+
+  final audit = ref.read(auditServiceProvider);
+  unawaited(
+    audit.log(
+      action: AuditAction.customerLinkedToTicket,
+      entityType: 'ticket',
+      entityId: ticket.id,
+      oldValueJson:
+          '{"customerId":${ticket.customerId == null ? 'null' : '"${ticket.customerId}"'}}',
+      newValueJson: '{"customerId":"${picked.id}"}',
+      reason: picked.name,
+    ),
+  );
+
+  if (context.mounted) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text('${picked.name} bilete eklendi.')),
+    );
+  }
+}
+
+/// Modal search dialog: type 2+ chars to filter by name / phone / e-mail.
+/// Picking a row pops the dialog with the chosen [CustomerEntity].
+class _CustomerSearchDialog extends ConsumerStatefulWidget {
+  const _CustomerSearchDialog();
+
+  @override
+  ConsumerState<_CustomerSearchDialog> createState() =>
+      _CustomerSearchDialogState();
+}
+
+class _CustomerSearchDialogState
+    extends ConsumerState<_CustomerSearchDialog> {
+  final _controller = TextEditingController();
+  Timer? _debounce;
+  String _query = '';
+  bool _loading = false;
+  List<CustomerEntity> _results = const [];
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _runQuery('');
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 200), () {
+      _runQuery(value);
+    });
+  }
+
+  Future<void> _runQuery(String value) async {
+    setState(() {
+      _query = value;
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final repo = ref.read(customerRepositoryProvider);
+      final tenantId = ref.read(tenantIdProvider);
+      final rows = value.trim().isEmpty
+          ? await repo.getAllCustomers(tenantId)
+          : await repo.searchCustomers(tenantId, value.trim());
+      if (!mounted) return;
+      setState(() {
+        _results = rows;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 48),
+      child: SizedBox(
+        width: 520,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Müşteri Ara',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 17,
+                  color: V2.ink,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                onChanged: _onChanged,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'İsim, telefon veya e-posta',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 320,
+                child: _buildBody(context),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Vazgeç'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    if (_error != null) {
+      return Center(
+        child: Text(
+          'Arama başarısız: $_error',
+          style: const TextStyle(color: V2.danger),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+    if (_results.isEmpty) {
+      return Center(
+        child: Text(
+          _query.trim().isEmpty
+              ? 'Henüz müşteri yok. Müşteriler ekranından kayıt oluşturabilirsiniz.'
+              : '"$_query" için eşleşme bulunamadı.',
+          style: const TextStyle(color: V2.ink3, fontSize: 13),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+    return ListView.separated(
+      itemCount: _results.length,
+      separatorBuilder: (_, __) => const Divider(height: 1, color: V2.line),
+      itemBuilder: (ctx, i) {
+        final c = _results[i];
+        return ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          title: Text(
+            c.name,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: V2.ink,
+            ),
+          ),
+          subtitle: Text(
+            [
+              if (c.phone != null && c.phone!.isNotEmpty) c.phone!,
+              if (c.email != null && c.email!.isNotEmpty) c.email!,
+            ].join(' · '),
+            style: const TextStyle(fontSize: 12, color: V2.ink3),
+          ),
+          trailing: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: V2.selWeak,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '${c.loyaltyPoints}P',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+                color: V2.selInk,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          onTap: () => Navigator.of(ctx).pop(c),
+        );
+      },
     );
   }
 }

@@ -646,6 +646,22 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     }
   }
 
+  /// Attach or detach a loyalty customer to the current ticket.
+  ///
+  /// Pass the customer id to link, or `null` to unlink. Persists the change
+  /// immediately when the ticket is past the draft stage so the topbar chip
+  /// survives app restarts; draft tickets pick the value up at first save.
+  Future<void> setCustomer(String? customerId) async {
+    if (state == null) return;
+    state = state!.copyWith(customerId: () => customerId);
+
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.setTicketCustomer(state!.id, customerId);
+      state = await repo.getTicketById(state!.id);
+    }
+  }
+
   /// Clear the current ticket (e.g. after payment).
   void clear() {
     state = null;
