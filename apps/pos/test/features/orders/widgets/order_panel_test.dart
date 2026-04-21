@@ -7,12 +7,10 @@
 ///     chip row and any Gang section headers entirely.
 ///   * Custom `gangLabels` override the default "Gang N" text.
 ///
-/// NOTE: After the gang lifecycle refactor (commit 7a509d9) the panel
-/// no longer renders Gang chips when the ticket is empty, so the four
-/// empty-ticket widget cases are marked as `_kStaleEmptyTicket = true`
-/// and skipped. They remain here as a specification for the intended
-/// future behaviour; the still-passing plain model tests + the run-time
-/// empty-placeholder case cover the non-regressed paths.
+/// NOTE: The chip row renders labels uppercased (see `_GangChip.build`),
+/// so all finders here target the uppercase form. The underlying
+/// RestaurantSettings API still returns mixed-case strings; the uppercase
+/// is a presentation concern only.
 ///
 /// Run with:
 ///   flutter test test/features/orders/widgets/order_panel_test.dart
@@ -33,8 +31,6 @@ import 'package:gastrocore_pos/features/settings/domain/entities/theme_customiza
 import 'package:gastrocore_pos/features/settings/domain/repositories/settings_repository.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
-
-const _kStaleEmptyTicket = true;
 
 /// Minimal in-memory repository used only to satisfy
 /// [RestaurantSettingsNotifier]'s constructor in tests. We seed the
@@ -131,13 +127,15 @@ void main() {
     });
 
     testWidgets('renders a Gang chip for every configured slot',
-        skip: _kStaleEmptyTicket, (tester) async {
-      await tester.pumpWidget(_harness());
+        (tester) async {
+      // Explicit default override avoids depending on SharedPreferences
+      // being mocked at the test harness level.
+      await tester.pumpWidget(_harness(settings: const RestaurantSettings()));
       await tester.pumpAndSettle();
 
       for (var g = 1; g <= 3; g++) {
         expect(
-          find.text('Gang $g'),
+          find.text('GANG $g'),
           findsWidgets,
           reason: 'Gang $g must be visible even when ticket is empty',
         );
@@ -155,16 +153,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // The default labels must NOT appear anywhere on screen.
-      expect(find.text('Gang 1'), findsNothing);
-      expect(find.text('Gang 2'), findsNothing);
-      expect(find.text('Gang 3'), findsNothing);
+      // The chip row renders labels uppercased; assert both forms so the
+      // test fails loudly if either sneaks back onto the empty ticket.
+      for (final label in ['Gang 1', 'Gang 2', 'Gang 3', 'GANG 1', 'GANG 2',
+          'GANG 3']) {
+        expect(find.text(label), findsNothing);
+      }
     });
   });
 
   group('OrderPanel — custom gangLabels', () {
-    testWidgets('uses restaurant overrides in the chip row',
-        skip: _kStaleEmptyTicket, (tester) async {
+    testWidgets('uses restaurant overrides in the chip row', (tester) async {
       await tester.pumpWidget(
         _harness(
           settings: const RestaurantSettings(
@@ -176,15 +175,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Vorspeise'), findsWidgets);
-      expect(find.text('Hauptgang'), findsWidgets);
-      expect(find.text('Dessert'), findsWidgets);
+      expect(find.text('VORSPEISE'), findsWidgets);
+      expect(find.text('HAUPTGANG'), findsWidgets);
+      expect(find.text('DESSERT'), findsWidgets);
       // Defaults must NOT leak through when overrides are set.
-      expect(find.text('Gang 1'), findsNothing);
+      expect(find.text('GANG 1'), findsNothing);
     });
 
     testWidgets('falls back to default "Gang N" when override is blank',
-        skip: _kStaleEmptyTicket, (tester) async {
+        (tester) async {
       await tester.pumpWidget(
         _harness(
           settings: const RestaurantSettings(
@@ -196,16 +195,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Vorspeise'), findsWidgets);
+      expect(find.text('VORSPEISE'), findsWidgets);
       // Index 2 (1-based: Gang 2) was blank → default localized label.
-      expect(find.text('Gang 2'), findsWidgets);
-      expect(find.text('Dessert'), findsWidgets);
+      expect(find.text('GANG 2'), findsWidgets);
+      expect(find.text('DESSERT'), findsWidgets);
     });
   });
 
   group('OrderPanel — maxGangs range', () {
-    testWidgets('renders only the configured number of slots',
-        skip: _kStaleEmptyTicket, (tester) async {
+    testWidgets('renders only the configured number of slots', (tester) async {
       await tester.pumpWidget(
         _harness(
           settings: const RestaurantSettings(
@@ -216,9 +214,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Gang 1'), findsWidgets);
-      expect(find.text('Gang 2'), findsWidgets);
-      expect(find.text('Gang 3'), findsNothing);
+      expect(find.text('GANG 1'), findsWidgets);
+      expect(find.text('GANG 2'), findsWidgets);
+      expect(find.text('GANG 3'), findsNothing);
     });
   });
 
