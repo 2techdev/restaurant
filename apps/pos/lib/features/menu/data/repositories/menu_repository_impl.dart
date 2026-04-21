@@ -188,6 +188,7 @@ class MenuRepositoryImpl {
       imagePath: Value(entity.imagePath),
       barcode: Value(entity.barcode),
       isActive: Value(entity.isActive),
+      isAvailable: Value(entity.isAvailable),
       displayOrder: Value(entity.displayOrder),
       prepTimeMinutes: Value(entity.prepTimeMinutes),
       printerGroup: Value(entity.printerGroup),
@@ -217,6 +218,24 @@ class MenuRepositoryImpl {
         .write(
       ProductsCompanion(
         isActive: Value(isActive),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// Flip the "sold out / 86'd" flag on a product. Lightweight companion
+  /// to [toggleProductActive]: only touches [isAvailable], does not
+  /// re-stamp any other field, and is cheap enough to wire to a long-
+  /// press gesture on the POS product tile.
+  Future<void> setProductAvailable(
+    String productId, {
+    required bool isAvailable,
+  }) async {
+    await (_db.update(_db.products)
+          ..where((p) => p.id.equals(productId)))
+        .write(
+      ProductsCompanion(
+        isAvailable: Value(isAvailable),
         updatedAt: Value(DateTime.now()),
       ),
     );
@@ -584,6 +603,7 @@ class MenuRepositoryImpl {
       imagePath: row.imagePath,
       barcode: row.barcode,
       isActive: row.isActive,
+      isAvailable: row.isAvailable,
       displayOrder: row.displayOrder,
       prepTimeMinutes: row.prepTimeMinutes,
       printerGroup: row.printerGroup,
@@ -605,6 +625,7 @@ class MenuRepositoryImpl {
       imagePath: Value(entity.imagePath),
       barcode: Value(entity.barcode),
       isActive: Value(entity.isActive),
+      isAvailable: Value(entity.isAvailable),
       displayOrder: Value(entity.displayOrder),
       prepTimeMinutes: Value(entity.prepTimeMinutes),
       printerGroup: Value(entity.printerGroup),

@@ -31,6 +31,13 @@ class ProductEntity {
   final String? barcode;
 
   final bool isActive;
+
+  /// Operator-facing "sold out / 86'd" flag. When false the product is
+  /// still on the menu (isActive) but temporarily cannot be ordered —
+  /// the POS grid greys it out and blocks taps until the cashier flips
+  /// it back on. Default true so existing rows stay sellable.
+  final bool isAvailable;
+
   final int displayOrder;
 
   /// Estimated preparation time in minutes (shown on kitchen display).
@@ -74,6 +81,7 @@ class ProductEntity {
     this.imagePath,
     this.barcode,
     required this.isActive,
+    this.isAvailable = true,
     required this.displayOrder,
     this.prepTimeMinutes,
     required this.printerGroup,
@@ -101,6 +109,7 @@ class ProductEntity {
     String? Function()? imagePath,
     String? Function()? barcode,
     bool? isActive,
+    bool? isAvailable,
     int? displayOrder,
     int? Function()? prepTimeMinutes,
     String? printerGroup,
@@ -123,6 +132,7 @@ class ProductEntity {
       imagePath: imagePath != null ? imagePath() : this.imagePath,
       barcode: barcode != null ? barcode() : this.barcode,
       isActive: isActive ?? this.isActive,
+      isAvailable: isAvailable ?? this.isAvailable,
       displayOrder: displayOrder ?? this.displayOrder,
       prepTimeMinutes:
           prepTimeMinutes != null ? prepTimeMinutes() : this.prepTimeMinutes,
@@ -153,6 +163,7 @@ class ProductEntity {
           imagePath == other.imagePath &&
           barcode == other.barcode &&
           isActive == other.isActive &&
+          isAvailable == other.isAvailable &&
           displayOrder == other.displayOrder &&
           prepTimeMinutes == other.prepTimeMinutes &&
           printerGroup == other.printerGroup &&
@@ -174,6 +185,7 @@ class ProductEntity {
         imagePath,
         barcode,
         isActive,
+        isAvailable,
         displayOrder,
         prepTimeMinutes,
         printerGroup,

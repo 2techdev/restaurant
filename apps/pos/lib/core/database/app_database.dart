@@ -107,7 +107,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -238,6 +238,13 @@ class AppDatabase extends _$AppDatabase {
         // back the Swiss daily-close requirement so a given day's totals
         // can be reproduced even after downstream data edits.
         await m.createTable(zReports);
+      }
+      if (from < 15) {
+        // v15: sold-out / 86'd flag on products. Operators can toggle a
+        // product "satışta değil" without delisting it — POS greys the
+        // tile out and blocks taps until the product is re-opened.
+        // Default true so every existing row stays sellable.
+        await m.addColumn(products, products.isAvailable);
       }
     },
     onCreate: (m) async {

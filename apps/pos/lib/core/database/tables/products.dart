@@ -13,6 +13,13 @@ class Products extends Table {
   TextColumn get imagePath => text().nullable()();
   TextColumn get barcode => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// Operator-facing "sold out / 86'd" flag. When false the product is
+  /// still listed on the menu (isActive), but temporarily cannot be
+  /// ordered — the POS grid greys it out and blocks taps. Default true
+  /// so existing rows behave as before.
+  BoolColumn get isAvailable => boolean().withDefault(const Constant(true))();
+
   IntColumn get displayOrder => integer().withDefault(const Constant(0))();
   IntColumn get prepTimeMinutes => integer().nullable()();
   TextColumn get printerGroup => text().withDefault(const Constant('kitchen'))();
