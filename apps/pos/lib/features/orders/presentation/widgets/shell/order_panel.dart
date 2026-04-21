@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
 import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
+import 'package:gastrocore_pos/core/utils/error_handler.dart';
 import 'package:gastrocore_pos/features/gang/domain/entities/gang_template_entity.dart';
 import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
@@ -349,49 +350,29 @@ class _GangGroupedList extends ConsumerWidget {
   }
 
   Future<void> _fireGang(BuildContext ctx, WidgetRef ref, int gang) async {
-    final messenger = ScaffoldMessenger.of(ctx);
     final label = _resolveGangLabel(ctx, settings, gang);
-    try {
-      await ref.read(currentTicketProvider.notifier).fireGang(gang);
+    final ok = await ErrorHandler.run(
+      ctx,
+      () => ref.read(currentTicketProvider.notifier).fireGang(gang),
+      onSuccess: '$label mutfağa gönderildi.',
+      failureLabel: '$label gönderilemedi',
+    );
+    if (ok) {
       final held = ref.read(heldGangsProvider);
       if (held.contains(gang)) {
         ref.read(heldGangsProvider.notifier).state = {...held}..remove(gang);
       }
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('$label mutfağa gönderildi.'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('$label gönderilemedi: $e'),
-          backgroundColor: GcColors.error,
-        ),
-      );
     }
   }
 
   Future<void> _serveGang(BuildContext ctx, WidgetRef ref, int gang) async {
-    final messenger = ScaffoldMessenger.of(ctx);
     final label = _resolveGangLabel(ctx, settings, gang);
-    try {
-      await ref.read(currentTicketProvider.notifier).markGangServed(gang);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('$label servis edildi.'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('$label servis edilemedi: $e'),
-          backgroundColor: GcColors.error,
-        ),
-      );
-    }
+    await ErrorHandler.run(
+      ctx,
+      () => ref.read(currentTicketProvider.notifier).markGangServed(gang),
+      onSuccess: '$label servis edildi.',
+      failureLabel: '$label servis edilemedi',
+    );
   }
 
   void _holdGang(BuildContext ctx, WidgetRef ref, int gang) {
