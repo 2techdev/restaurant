@@ -14,6 +14,8 @@
 ///      opened (handled by [currentShiftProvider] returning null).
 library;
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +24,7 @@ import 'package:go_router/go_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/printing/models/print_models.dart';
+import 'package:gastrocore_pos/features/audit_log/domain/entities/audit_action.dart';
 import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_log_provider.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
@@ -49,6 +52,11 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
+
+  /// JSON-encode a string value so it can be safely embedded inside the
+  /// hand-built audit JSON blobs. Delegates to [jsonEncode] which produces
+  /// a double-quoted, escaped string literal (e.g. `"line 1\nline 2"`).
+  String _jsonEncodeString(String value) => jsonEncode(value);
 
   String _initials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
@@ -82,6 +90,11 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
     final user = ref.read(currentUserProvider);
     final cashierName = user?.name ?? 'Unknown';
 
+    // Capture cashier notes before submit — submitClose forwards them to the
+    // shift row but does not surface them on the returned summary, so we
+    // grab them here to embed in the audit trail.
+    final cashierNotes = ref.read(dayCloseNotifierProvider).notes;
+
     try {
       final summary = await notifier.submitClose(
         cashierName: cashierName,
@@ -92,13 +105,48 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
       // Z-report printing (best-effort).
       await _printZReport(summary);
 
-      // Audit: day closed
+      // Audit: day closed — expanded payload so Swiss tax review can read
+      // the full cash reconciliation (counted / expected / variance) out of
+      // a single audit row without re-joining to day_close_summaries.
       final audit = ref.read(auditServiceProvider);
+      final withinThreshold = summary.isWithinThreshold;
+      final notesFragment = cashierNotes.isEmpty
+          ? ''
+          : ',"notes":${_jsonEncodeString(cashierNotes)}';
+      final newValueJson =
+          '{"cashier":"${summary.cashierName}",'
+          '"revenue":${summary.totalRevenueCents},'
+          '"orders":${summary.totalOrders},'
+          '"cash":{'
+          '"counted":${summary.countedCashCents},'
+          '"expected":${summary.expectedCashCents},'
+          '"discrepancy":${summary.discrepancyCents},'
+          '"within_threshold":$withinThreshold'
+          '}'
+          '$notesFragment'
+          '}';
+      final reason = withinThreshold
+          ? null
+          : (summary.discrepancyCents > 0
+              ? 'Kassenüberschuss ${summary.discrepancyLabel}'
+              : 'Kassenfehlbetrag ${summary.discrepancyLabel}');
       await audit.logDayClosed(
         summary.shiftId,
-        newValueJson:
-            '{"cashier":"${summary.cashierName}","revenue":${summary.totalRevenueCents},"orders":${summary.totalOrders}}',
+        newValueJson: newValueJson,
       );
+      if (reason != null) {
+        // Additional row tagged as managerOverride flags the out-of-tolerance
+        // close so a manager-level review can filter Kassendifferenz events
+        // directly from the Audit Log screen.
+        await audit.log(
+          action: AuditAction.managerOverride,
+          entityType: 'shift',
+          entityId: summary.shiftId,
+          reason: reason,
+          newValueJson:
+              '{"type":"cash_variance","discrepancy":${summary.discrepancyCents}}',
+        );
+      }
 
       if (mounted) {
         ref.read(currentUserProvider.notifier).logout();
