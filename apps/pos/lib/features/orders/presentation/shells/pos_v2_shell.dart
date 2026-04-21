@@ -228,20 +228,6 @@ class _Rail extends ConsumerWidget {
             onTap: () =>
                 ref.read(v2RailActiveProvider.notifier).state = 'menu',
           ),
-          // Inventory sits between Menu and Report so operators walking
-          // down the rail hit "what I sell → what's in stock → what I
-          // earned". The route is gated by FeatureFlag.inventory so
-          // free / starter licenses get a paywall card instead.
-          _RailBtn(
-            id: 'inventory',
-            label: 'Lager',
-            icon: Icons.inventory_2_outlined,
-            active: active == 'inventory',
-            onTap: () {
-              ref.read(v2RailActiveProvider.notifier).state = 'inventory';
-              context.push(AppRoutes.inventory);
-            },
-          ),
           _RailBtn(
             id: 'report',
             label: 'Bericht',

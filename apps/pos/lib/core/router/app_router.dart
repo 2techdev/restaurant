@@ -30,7 +30,6 @@ import 'package:gastrocore_pos/features/orders/presentation/screens/order_histor
 import 'package:gastrocore_pos/features/backoffice/presentation/screens/back_office_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_history_screen.dart';
 import 'package:gastrocore_pos/features/audit_log/presentation/screens/audit_log_screen.dart';
-import 'package:gastrocore_pos/features/inventory/presentation/screens/inventory_list_screen.dart';
 import 'package:gastrocore_pos/features/menu/presentation/screens/menu_management_screen.dart';
 import 'package:gastrocore_pos/features/license/flag_gate_widget.dart';
 import 'package:gastrocore_pos/features/license/license_models.dart';
@@ -93,7 +92,6 @@ abstract final class AppRoutes {
   static const String customerDetail = '/customers/:customerId';
   static const String analytics = '/analytics';
   static const String reportsCenter = '/reports-center';
-  static const String inventory = '/inventory';
 
   /// Build a void route for a specific ticket.
   static String voidFor(String ticketId) => '/void/$ticketId';
@@ -231,14 +229,6 @@ GoRouter createAppRouter({
           builder: (context, state) => const FlagGate(
             flag: FeatureFlag.kds,
             child: KitchenDisplayScreen(),
-          ),
-        ),
-        GoRoute(
-          path: AppRoutes.inventory,
-          // Inventory management requires the Pro plan or higher.
-          builder: (context, state) => const FlagGate(
-            flag: FeatureFlag.inventory,
-            child: InventoryListScreen(),
           ),
         ),
         GoRoute(

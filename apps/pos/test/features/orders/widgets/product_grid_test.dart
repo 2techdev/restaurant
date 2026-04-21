@@ -17,7 +17,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:gastrocore_pos/features/inventory/domain/entities/inventory_item_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/product_grid.dart';
@@ -164,71 +163,6 @@ void main() {
         findsOneWidget,
       );
 
-      handle.dispose();
-    });
-  });
-
-  group('ProductCard stock badge', () {
-    Widget cardHarness({StockStatus? status}) {
-      return MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: SizedBox(
-              width: 200,
-              height: 120,
-              child: ProductCard(
-                product: _product('p1', 'Forelle', 3200),
-                onTap: () {},
-                stockStatus: status,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    testWidgets('renders no badge when stockStatus is null (untracked)',
-        (tester) async {
-      await tester.pumpWidget(cardHarness());
-      await tester.pumpAndSettle();
-      expect(find.text('Az'), findsNothing);
-      expect(find.text('Bitti'), findsNothing);
-    });
-
-    testWidgets('renders no badge when stockStatus is normal', (tester) async {
-      await tester.pumpWidget(cardHarness(status: StockStatus.normal));
-      await tester.pumpAndSettle();
-      expect(find.text('Az'), findsNothing);
-      expect(find.text('Bitti'), findsNothing);
-    });
-
-    testWidgets('renders "Az" badge when stockStatus is low', (tester) async {
-      await tester.pumpWidget(cardHarness(status: StockStatus.low));
-      await tester.pumpAndSettle();
-      expect(find.text('Az'), findsOneWidget);
-      expect(find.text('Bitti'), findsNothing);
-    });
-
-    testWidgets('renders "Bitti" badge when stockStatus is out',
-        (tester) async {
-      await tester.pumpWidget(cardHarness(status: StockStatus.out));
-      await tester.pumpAndSettle();
-      expect(find.text('Bitti'), findsOneWidget);
-      expect(find.text('Az'), findsNothing);
-    });
-
-    testWidgets('out-of-stock status surfaces in the semantics label',
-        (tester) async {
-      // a11y: a sighted operator sees the red "Bitti" pill, but a screen
-      // reader needs the stock hint folded into the one-button label so
-      // it lands in the same announcement as the name and price.
-      final handle = tester.ensureSemantics();
-      await tester.pumpWidget(cardHarness(status: StockStatus.out));
-      await tester.pumpAndSettle();
-      expect(
-        find.bySemanticsLabel(RegExp(r'Forelle.*stokta yok')),
-        findsOneWidget,
-      );
       handle.dispose();
     });
   });

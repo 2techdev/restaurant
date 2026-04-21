@@ -16,8 +16,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
 import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
-import 'package:gastrocore_pos/features/inventory/domain/entities/inventory_item_entity.dart';
-import 'package:gastrocore_pos/features/inventory/presentation/providers/inventory_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
@@ -72,7 +70,6 @@ class ProductGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final productsAsync = ref.watch(filteredProductsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
-    final stockByProductId = ref.watch(stockStatusByProductIdProvider);
 
     // Per-category hex colour lookup — drives POS-v2 category tinting on the
     // product tiles. When the DB is still loading, resolveCategoryColor falls
@@ -114,7 +111,6 @@ class ProductGrid extends ConsumerWidget {
                     product: p,
                     quantity: cartQuantities[p.id] ?? 0,
                     categoryColorHex: colorByCatId[p.categoryId],
-                    stockStatus: stockByProductId[p.id],
                     onTap: () => onProductTap(p),
                   );
                 },
@@ -149,7 +145,6 @@ class ProductCard extends StatelessWidget {
     required this.onTap,
     this.quantity = 0,
     this.categoryColorHex,
-    this.stockStatus,
   });
 
   final ProductEntity product;
@@ -159,10 +154,6 @@ class ProductCard extends StatelessWidget {
   /// Hex string from the product's [CategoryEntity.color]. When null or
   /// malformed the card falls back to the warm default.
   final String? categoryColorHex;
-
-  /// Current inventory status for the tracked product, or null when the
-  /// product has no inventory row (untracked, show nothing).
-  final StockStatus? stockStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -174,15 +165,9 @@ class ProductCard extends StatelessWidget {
     // excludeSemantics: true on the wrapper prevents the three internal
     // Text widgets from showing up as separate leaves in the a11y tree.
     final cartHint = quantity > 0 ? ', $quantity im Warenkorb' : '';
-    final stockHint = switch (stockStatus) {
-      StockStatus.out => ', stokta yok',
-      StockStatus.low => ', stok azalıyor',
-      _ => '',
-    };
     return Semantics(
       button: true,
-      label:
-          '${product.name}, ${_formatCHF(product.price)}$cartHint$stockHint',
+      label: '${product.name}, ${_formatCHF(product.price)}$cartHint',
       excludeSemantics: true,
       child: Material(
         color: bg,
@@ -234,13 +219,6 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (stockStatus == StockStatus.low ||
-                  stockStatus == StockStatus.out)
-                Positioned(
-                  top: AppTokens.space4,
-                  left: AppTokens.space4,
-                  child: _StockBadge(status: stockStatus!),
-                ),
               if (quantity > 0)
                 Positioned(
                   top: AppTokens.space4,
@@ -258,41 +236,6 @@ class ProductCard extends StatelessWidget {
     final whole = cents ~/ 100;
     final frac = (cents % 100).toString().padLeft(2, '0');
     return 'CHF $whole.$frac';
-  }
-}
-
-/// Compact pill shown on a product tile when its linked inventory row is
-/// low or out of stock. Sits in the top-left corner opposite the quantity
-/// badge so a product that is both low AND in the cart reads correctly.
-class _StockBadge extends StatelessWidget {
-  const _StockBadge({required this.status});
-  final StockStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final isOut = status == StockStatus.out;
-    // Out = hard red so it cannot be missed; low = warm amber so the
-    // tile still looks actionable (the kitchen can still take the
-    // order, we're just warning the operator).
-    final bg = isOut ? const Color(0xFFC62828) : const Color(0xFFF57C00);
-    final label = isOut ? 'Bitti' : 'Az';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: 'Inter',
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-          height: 1.1,
-        ),
-      ),
-    );
   }
 }
 

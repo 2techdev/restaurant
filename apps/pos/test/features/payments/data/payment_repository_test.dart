@@ -16,8 +16,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
-import 'package:gastrocore_pos/features/inventory/data/repositories/inventory_repository_impl.dart';
-import 'package:gastrocore_pos/features/inventory/domain/entities/inventory_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/data/repositories/order_repository_impl.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
@@ -381,128 +379,6 @@ void main() {
       );
 
       expect(payment.reference, equals(ref));
-    });
-  });
-
-  // =========================================================================
-  // Inventory deduction on ticket close
-  // =========================================================================
-
-  group('PaymentRepositoryImpl — inventory deduction', () {
-    late AppDatabase db;
-    late InventoryRepositoryImpl inventoryRepo;
-    late PaymentRepositoryImpl payRepo;
-
-    setUp(() async {
-      db = AppDatabase.createInMemory();
-      inventoryRepo = InventoryRepositoryImpl(db);
-      payRepo = PaymentRepositoryImpl(db, inventory: inventoryRepo);
-    });
-
-    tearDown(() async => db.close());
-
-    Future<InventoryItemEntity> seedInventoryFor({
-      required String productId,
-      double quantity = 10.0,
-    }) async {
-      final now = DateTime(2026, 3, 20, 8, 0);
-      return inventoryRepo.createItem(
-        InventoryItemEntity(
-          id: IdGenerator.generateId(),
-          tenantId: _tenantId,
-          productId: productId,
-          name: 'Stock-$productId',
-          quantity: quantity,
-          minQuantity: 2.0,
-          unit: 'pcs',
-          costPriceCents: 100,
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-    }
-
-    test('Fully paid ticket deducts inventory for every tracked line',
-        () async {
-      final ticket = await _seedTicket(db, itemCount: 2, unitPrice: 2500);
-      // _seedTicket uses productIds 'prod-0', 'prod-1' at quantity 1 each.
-      final stock0 = await seedInventoryFor(productId: 'prod-0');
-      final stock1 = await seedInventoryFor(productId: 'prod-1');
-
-      await payRepo.processPayment(
-        ticketId: ticket.id,
-        tenantId: _tenantId,
-        paymentMethod: PaymentMethod.cash,
-        amount: 5000,
-        tenderedAmount: 5000,
-        receivedBy: _userId,
-      );
-
-      final after0 = await inventoryRepo.getItemById(stock0.id);
-      final after1 = await inventoryRepo.getItemById(stock1.id);
-      expect(after0!.quantity, equals(9.0));
-      expect(after1!.quantity, equals(9.0));
-    });
-
-    test('Untracked products do not block ticket close', () async {
-      // No inventory row for prod-0 / prod-1 — processPayment must still
-      // succeed and the ticket must still transition to completed.
-      final ticket = await _seedTicket(db, itemCount: 1, unitPrice: 3000);
-
-      await payRepo.processPayment(
-        ticketId: ticket.id,
-        tenantId: _tenantId,
-        paymentMethod: PaymentMethod.cash,
-        amount: 3000,
-        tenderedAmount: 3000,
-        receivedBy: _userId,
-      );
-
-      final ticketRow = await (db.select(db.tickets)
-            ..where((t) => t.id.equals(ticket.id)))
-          .getSingle();
-      expect(ticketRow.status, equals('completed'));
-    });
-
-    test('Partial payment does not deduct inventory yet', () async {
-      final ticket = await _seedTicket(db, itemCount: 2, unitPrice: 3000);
-      // Total = 6000.
-      final stock0 = await seedInventoryFor(productId: 'prod-0');
-
-      await payRepo.processPayment(
-        ticketId: ticket.id,
-        tenantId: _tenantId,
-        paymentMethod: PaymentMethod.cash,
-        amount: 3000,
-        tenderedAmount: 3000,
-        receivedBy: _userId,
-      );
-
-      final stillFull = await inventoryRepo.getItemById(stock0.id);
-      expect(stillFull!.quantity, equals(10.0),
-          reason: 'partial payment must not touch stock');
-    });
-
-    test('Repository without inventory injection skips deduction safely',
-        () async {
-      // Fresh repo with no inventory dep — used by older call sites and
-      // unit tests that don't wire inventory DI.
-      final barePayRepo = PaymentRepositoryImpl(db);
-      final ticket = await _seedTicket(db, itemCount: 1, unitPrice: 1500);
-      final stock = await seedInventoryFor(productId: 'prod-0');
-
-      await barePayRepo.processPayment(
-        ticketId: ticket.id,
-        tenantId: _tenantId,
-        paymentMethod: PaymentMethod.cash,
-        amount: 1500,
-        tenderedAmount: 1500,
-        receivedBy: _userId,
-      );
-
-      final untouched = await inventoryRepo.getItemById(stock.id);
-      expect(untouched!.quantity, equals(10.0));
     });
   });
 

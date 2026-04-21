@@ -10,20 +10,12 @@ import 'package:drift/drift.dart';
 
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
-import 'package:gastrocore_pos/features/inventory/data/repositories/inventory_repository_impl.dart';
 import 'package:gastrocore_pos/features/payments/domain/entities/payment_entity.dart';
 
 class PaymentRepositoryImpl {
   final AppDatabase _db;
 
-  /// Optional — only present in the DI-wired provider. Keeping it nullable
-  /// lets test fixtures that construct this repo directly (without going
-  /// through the inventory module) stay compiling. When null, inventory
-  /// deduction on ticket close is simply skipped.
-  final InventoryRepositoryImpl? _inventory;
-
-  PaymentRepositoryImpl(this._db, {InventoryRepositoryImpl? inventory})
-      : _inventory = inventory;
+  PaymentRepositoryImpl(this._db);
 
   // =========================================================================
   // Bills
@@ -235,37 +227,6 @@ class PaymentRepositoryImpl {
             flags: const Value(''),
             updatedAt: Value(now),
           ));
-        }
-
-        // Deduct inventory for every non-void line on the ticket. This is
-        // advisory bookkeeping: products that aren't tracked in inventory
-        // silently no-op inside deductForSale, and any unexpected error
-        // is swallowed so a bad inventory row can never block a paid
-        // ticket from closing. Runs inside the same transaction so the
-        // payment + stock move are atomic together.
-        final inventory = _inventory;
-        if (inventory != null) {
-          final lines = await (_db.select(_db.orderItems)
-                ..where(
-                  (i) =>
-                      i.ticketId.equals(ticketId) &
-                      i.isDeleted.equals(false) &
-                      i.status.isNotIn(['void']),
-                ))
-              .get();
-          for (final line in lines) {
-            try {
-              await inventory.deductForSale(
-                tenantId: tenantId,
-                productId: line.productId,
-                quantity: line.quantity,
-                ticketId: ticketId,
-                userId: receivedBy,
-              );
-            } catch (_) {
-              // Never let an inventory glitch fail a closed sale.
-            }
-          }
         }
       }
 
