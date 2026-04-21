@@ -1,20 +1,33 @@
-/// Drift-backed repository for refund (iade) operations.
+/// Drift-backed repository for refund (iade / Swiss "Storno") operations.
 ///
 /// Supports partial refunds (selected items) and full order refunds.
 /// Every refund:
-///  1. Calculates the refund total from selected items.
-///  2. Creates a negative payment record (refund transaction).
-///  3. Writes a receipt record with type='refund'.
-///  4. Writes an audit log entry.
-///  5. Returns a [RefundResult] for caller use.
+///  1. Validates inputs — reason must be non-blank, approver must be set.
+///  2. Calculates the refund total from selected items.
+///  3. Creates a negative payment record (refund transaction).
+///  4. Writes a storno receipt record with type='refund' that references
+///     the original bill / receipt number (Swiss MWST audit requirement —
+///     every storno slip must trace back to the original sale receipt).
+///  5. Writes an [AuditAction.paymentRefunded] or [AuditAction.itemRefunded]
+///     row with BOTH requester + approver populated (managerId/managerName),
+///     so downstream CSV export and report filters pick it up under the
+///     proper enum category rather than a raw string bucket.
+///  6. Returns a [RefundResult] for caller use.
 ///
 /// Manager override must be verified **before** calling [processRefund].
+/// The caller is also expected to invoke
+/// [ManagerOverrideNotifier.logOverride] for the per-tenant override log —
+/// this repository does NOT write to that table, only the audit log.
 library;
+
+import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
+import 'package:gastrocore_pos/features/audit_log/domain/entities/audit_action.dart';
+import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 
 // ---------------------------------------------------------------------------
 // Refund reason constants
@@ -30,6 +43,16 @@ const kRefundReasons = [
 ];
 
 // ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
+class RefundReasonRequiredException implements Exception {
+  const RefundReasonRequiredException();
+  @override
+  String toString() => 'Refund reason is required (Swiss storno compliance)';
+}
+
+// ---------------------------------------------------------------------------
 // RefundResult
 // ---------------------------------------------------------------------------
 
@@ -38,6 +61,8 @@ class RefundResult {
   final int refundAmount; // cents, positive value
   final List<String> refundedItemIds;
   final String receiptId;
+  final String stornoReceiptNumber;
+  final String? originalReceiptNumber;
   final String auditLogId;
 
   const RefundResult({
@@ -45,6 +70,8 @@ class RefundResult {
     required this.refundAmount,
     required this.refundedItemIds,
     required this.receiptId,
+    required this.stornoReceiptNumber,
+    required this.originalReceiptNumber,
     required this.auditLogId,
   });
 }
@@ -65,10 +92,13 @@ class RefundRepositoryImpl {
   /// Process a refund for the given [ticketId].
   ///
   /// - [orderItemIds]: item IDs to refund. Empty list = full order refund.
-  /// - [reason]: mandatory reason string.
+  /// - [reason]: MANDATORY reason string. A blank / whitespace-only reason
+  ///   throws [RefundReasonRequiredException] — required for Swiss storno
+  ///   compliance.
   /// - [refundMethodStr]: 'original' | 'cash'. Recorded in the payment row.
-  /// - [approvedByUserId]: verified manager/admin who authorised this.
-  /// - [requestedByUserId]: cashier who initiated the request.
+  /// - [approver]: manager/admin who verified the PIN. Both id and name
+  ///   are written into the audit log row for traceability.
+  /// - [requester]: cashier who initiated the request.
   Future<RefundResult> processRefund({
     required String ticketId,
     required String tenantId,
@@ -76,11 +106,14 @@ class RefundRepositoryImpl {
     required List<String> orderItemIds,
     required String reason,
     required String refundMethodStr,
-    required String approvedByUserId,
-    required String requestedByUserId,
+    required UserEntity approver,
+    required UserEntity requester,
     String? notes,
-    double taxRate = 0.10,
   }) async {
+    if (reason.trim().isEmpty) {
+      throw const RefundReasonRequiredException();
+    }
+
     late RefundResult result;
 
     await _db.transaction(() async {
@@ -157,6 +190,19 @@ class RefundRepositoryImpl {
             );
       }
 
+      // 4b. Look up the ORIGINAL sale receipt for this bill so the storno
+      //     slip can reference it. Missing original is non-fatal (offline
+      //     receipt might not yet have been created) — we just omit the
+      //     cross-reference in that case.
+      final originalReceipts = await (_db.select(_db.receipts)
+            ..where((r) =>
+                r.billId.equals(billId) &
+                r.receiptType.equals('sale'))
+            ..orderBy([(r) => OrderingTerm.asc(r.createdAt)]))
+          .get();
+      final originalReceipt =
+          originalReceipts.isNotEmpty ? originalReceipts.first : null;
+
       // 5. Create a refund payment record (negative amount convention:
       //    we store the absolute value and use receipt type to denote refund).
       final paymentId = IdGenerator.generateId();
@@ -172,8 +218,9 @@ class RefundRepositoryImpl {
               tipAmount: const Value(0),
               tenderedAmount: Value(refundTotal),
               changeAmount: const Value(0),
-              reference: Value('REFUND-${IdGenerator.generateId().substring(0, 8).toUpperCase()}'),
-              receivedBy: Value(approvedByUserId),
+              reference: Value(
+                  'STORNO-${IdGenerator.generateId().substring(0, 8).toUpperCase()}'),
+              receivedBy: Value(approver.id),
               paidAt: Value(now),
               createdAt: Value(now),
               updatedAt: Value(now),
@@ -182,14 +229,35 @@ class RefundRepositoryImpl {
             ),
           );
 
-      // 6. Create a receipt record.
+      // 6. Create a storno receipt record that references the original sale.
       final receiptId = IdGenerator.generateId();
-      final receiptContent = _buildReceiptJson(
+      final stornoReceiptNumber = IdGenerator.generateReceiptNumber(
+        now,
+        paymentId.hashCode.abs() % 9999 + 1,
+      );
+      final receiptContent = buildStornoReceiptJson(
         ticketId: ticketId,
-        items: items,
+        billId: billId,
+        originalReceiptId: originalReceipt?.id,
+        originalReceiptNumber: originalReceipt?.receiptNumber,
+        stornoReceiptNumber: stornoReceiptNumber,
+        items: items
+            .map((i) => StornoLineJson(
+                  productName: i.productName,
+                  quantity: i.quantity,
+                  subtotal: i.subtotal,
+                  taxAmount: i.taxAmount,
+                ))
+            .toList(growable: false),
+        subtotal: refundSubtotal,
+        taxAmount: refundTax,
         refundTotal: refundTotal,
-        reason: reason,
-        approvedBy: approvedByUserId,
+        reason: reason.trim(),
+        notes: notes?.trim().isEmpty ?? true ? null : notes!.trim(),
+        approvedByUserId: approver.id,
+        approvedByName: approver.name,
+        requestedByUserId: requester.id,
+        requestedByName: requester.name,
         method: refundMethodStr,
         timestamp: now,
       );
@@ -200,8 +268,7 @@ class RefundRepositoryImpl {
               tenantId: Value(tenantId),
               ticketId: Value(ticketId),
               billId: Value(billId),
-              receiptNumber: Value(
-                  IdGenerator.generateReceiptNumber(now, paymentId.hashCode.abs() % 9999 + 1)),
+              receiptNumber: Value(stornoReceiptNumber),
               receiptType: const Value('refund'),
               content: Value(receiptContent),
               printedAt: Value(now),
@@ -211,29 +278,40 @@ class RefundRepositoryImpl {
             ),
           );
 
-      // 7. Audit log.
+      // 7. Audit log — enum action + manager fields populated.
       final auditId = IdGenerator.generateId();
+      final auditAction = orderItemIds.isEmpty
+          ? AuditAction.paymentRefunded
+          : AuditAction.itemRefunded;
       await _db.into(_db.auditLog).insert(
             AuditLogCompanion(
               id: Value(auditId),
               tenantId: Value(tenantId),
               deviceId: Value(deviceId),
-              userId: Value(approvedByUserId),
-              userName: Value(approvedByUserId),
+              // The requester acted; the manager authorised.
+              userId: Value(requester.id),
+              userName: Value(requester.name),
+              managerId: Value(approver.id),
+              managerName: Value(approver.name),
+              action: Value(auditAction.name),
               entityType: Value(
                   orderItemIds.isEmpty ? 'ticket' : 'order_item'),
               entityId: Value(ticketId),
-              action: Value(orderItemIds.isEmpty
-                  ? 'override:refund_ticket'
-                  : 'override:refund_item'),
-              newValueJson: Value(_encodeJson({
-                'requestedBy': requestedByUserId,
-                'approvedBy': approvedByUserId,
-                'reason': reason,
-                if (notes != null) 'notes': notes,
+              reason: Value(reason.trim()),
+              newValueJson: Value(jsonEncode({
+                'ticketId': ticketId,
+                'billId': billId,
+                'originalReceiptId': originalReceipt?.id,
+                'originalReceiptNumber': originalReceipt?.receiptNumber,
+                'stornoReceiptId': receiptId,
+                'stornoReceiptNumber': stornoReceiptNumber,
                 'refundTotal': refundTotal,
+                'refundSubtotal': refundSubtotal,
+                'refundTax': refundTax,
                 'itemCount': items.length,
                 'method': refundMethodStr,
+                if (notes != null && notes.trim().isNotEmpty)
+                  'notes': notes.trim(),
               })),
               timestamp: Value(now),
             ),
@@ -244,6 +322,8 @@ class RefundRepositoryImpl {
         refundAmount: refundTotal,
         refundedItemIds: items.map((i) => i.id).toList(),
         receiptId: receiptId,
+        stornoReceiptNumber: stornoReceiptNumber,
+        originalReceiptNumber: originalReceipt?.receiptNumber,
         auditLogId: auditId,
       );
     });
@@ -252,43 +332,83 @@ class RefundRepositoryImpl {
   }
 
   // =========================================================================
-  // Helpers
+  // Public helpers (exposed for unit testing the serialisation shape)
   // =========================================================================
 
-  String _buildReceiptJson({
+  /// Build the storno receipt content JSON. Pure function, no DB access.
+  ///
+  /// Swiss MWST audit rules require the storno slip to carry:
+  ///   * the storno receipt number (own running number),
+  ///   * the ORIGINAL receipt number / id (traceability),
+  ///   * the refund reason,
+  ///   * the cashier who requested + the manager who authorised,
+  ///   * per-line items plus subtotal + tax + total,
+  ///   * timestamp in ISO-8601.
+  static String buildStornoReceiptJson({
     required String ticketId,
-    required List<OrderItem> items,
+    required String billId,
+    required String? originalReceiptId,
+    required String? originalReceiptNumber,
+    required String stornoReceiptNumber,
+    required List<StornoLineJson> items,
+    required int subtotal,
+    required int taxAmount,
     required int refundTotal,
     required String reason,
-    required String approvedBy,
+    required String? notes,
+    required String approvedByUserId,
+    required String approvedByName,
+    required String requestedByUserId,
+    required String requestedByName,
     required String method,
     required DateTime timestamp,
   }) {
-    final itemList = items
-        .map((i) =>
-            '{"name":"${i.productName}","qty":${i.quantity},"amount":${i.subtotal}}')
-        .join(',');
-
-    return '{"type":"refund","ticketId":"$ticketId","reason":"${reason.replaceAll('"', '\\"')}",'
-        '"method":"$method","approvedBy":"$approvedBy",'
-        '"total":$refundTotal,"items":[$itemList],'
-        '"timestamp":"${timestamp.toIso8601String()}"}';
+    return jsonEncode({
+      'type': 'storno',
+      'stornoReceiptNumber': stornoReceiptNumber,
+      'originalReceiptId': originalReceiptId,
+      'originalReceiptNumber': originalReceiptNumber,
+      'ticketId': ticketId,
+      'billId': billId,
+      'reason': reason,
+      if (notes != null) 'notes': notes,
+      'requestedBy': {
+        'id': requestedByUserId,
+        'name': requestedByName,
+      },
+      'approvedBy': {
+        'id': approvedByUserId,
+        'name': approvedByName,
+      },
+      'method': method,
+      'items': items
+          .map((l) => {
+                'name': l.productName,
+                'qty': l.quantity,
+                'subtotal': l.subtotal,
+                'tax': l.taxAmount,
+              })
+          .toList(),
+      'subtotal': subtotal,
+      'tax': taxAmount,
+      'total': refundTotal,
+      'timestamp': timestamp.toIso8601String(),
+    });
   }
+}
 
-  static String _encodeJson(Map<String, dynamic> map) {
-    final buffer = StringBuffer('{');
-    var first = true;
-    for (final entry in map.entries) {
-      if (!first) buffer.write(',');
-      first = false;
-      final value = entry.value;
-      if (value is String) {
-        buffer.write('"${entry.key}":"${value.replaceAll('"', '\\"')}"');
-      } else {
-        buffer.write('"${entry.key}":$value');
-      }
-    }
-    buffer.write('}');
-    return buffer.toString();
-  }
+/// Single line item used when constructing the storno receipt payload.
+/// Declared outside the repository so unit tests can build fixtures.
+class StornoLineJson {
+  const StornoLineJson({
+    required this.productName,
+    required this.quantity,
+    required this.subtotal,
+    required this.taxAmount,
+  });
+
+  final String productName;
+  final double quantity;
+  final int subtotal;
+  final int taxAmount;
 }
