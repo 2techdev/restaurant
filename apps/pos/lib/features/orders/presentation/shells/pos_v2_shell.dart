@@ -1064,11 +1064,57 @@ class _CustomerSearchDialogState
   }
 }
 
-class _TopSearchField extends StatelessWidget {
+/// Topbar product / ticket search box. Pushes the trimmed query straight
+/// into [productSearchProvider] so [filteredProductsProvider] — the source
+/// the items grid watches — reapplies its case-insensitive name match on
+/// every keystroke. The field keeps its own [TextEditingController] so it
+/// also surfaces whatever was cleared from the provider externally (e.g.
+/// a pilot reset).
+class _TopSearchField extends ConsumerStatefulWidget {
   const _TopSearchField();
+
+  @override
+  ConsumerState<_TopSearchField> createState() => _TopSearchFieldState();
+}
+
+class _TopSearchFieldState extends ConsumerState<_TopSearchField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        TextEditingController(text: ref.read(productSearchProvider));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String value) {
+    ref.read(productSearchProvider.notifier).state = value;
+  }
+
+  void _clear() {
+    _controller.clear();
+    ref.read(productSearchProvider.notifier).state = '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final v2 = context.v2;
+    // Keep the controller aligned when some other widget writes to the
+    // provider (e.g. Escape-to-clear affordance post-pilot).
+    final currentQuery = ref.watch(productSearchProvider);
+    if (currentQuery != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: currentQuery,
+        selection: TextSelection.collapsed(offset: currentQuery.length),
+      );
+    }
+    final hasQuery = currentQuery.isNotEmpty;
     return Container(
       width: 280,
       height: 36,
@@ -1084,6 +1130,9 @@ class _TopSearchField extends StatelessWidget {
           const SizedBox(width: 9),
           Expanded(
             child: TextField(
+              controller: _controller,
+              onChanged: _onChanged,
+              textInputAction: TextInputAction.search,
               decoration: const InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
@@ -1106,23 +1155,40 @@ class _TopSearchField extends StatelessWidget {
               cursorWidth: 1.2,
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            decoration: BoxDecoration(
-              color: v2.chrome2,
-              border: Border.all(color: const Color(0x1FFFFFFF)),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: const Text(
-              '⌘K',
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                color: Color(0x8CFFFFFF),
+          if (hasQuery)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: InkWell(
+                onTap: _clear,
+                borderRadius: BorderRadius.circular(12),
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.close,
+                    size: 14,
+                    color: Color(0xB3FFFFFF),
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: v2.chrome2,
+                border: Border.all(color: const Color(0x1FFFFFFF)),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: const Text(
+                '⌘K',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0x8CFFFFFF),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
