@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:gastrocore_pos/features/audit_log/data/daos/audit_log_dao.dart';
 import 'package:gastrocore_pos/features/inventory/data/daos/inventory_dao.dart';
+import 'package:gastrocore_pos/features/payments/data/daos/receipt_counter_dao.dart';
 import 'package:gastrocore_pos/features/sync/data/daos/sync_event_dao.dart';
 
 import 'tables/action_buttons.dart';
@@ -31,6 +32,7 @@ import 'tables/product_modifier_groups.dart';
 import 'tables/product_prices.dart';
 import 'tables/product_specifications.dart';
 import 'tables/products.dart';
+import 'tables/receipt_counters.dart';
 import 'tables/receipts.dart';
 import 'tables/restaurant_tables.dart';
 import 'tables/shifts.dart';
@@ -76,6 +78,7 @@ part 'app_database.g.dart';
     KitchenTickets,
     KitchenTicketItems,
     Receipts,
+    ReceiptCounters,
     SyncQueue,
     SyncMetadata,
     AuditLog,
@@ -101,13 +104,13 @@ part 'app_database.g.dart';
     ActionButtons,
     ZReports,
   ],
-  daos: [AuditLogDao, InventoryDao, SyncEventDao],
+  daos: [AuditLogDao, InventoryDao, ReceiptCounterDao, SyncEventDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -252,6 +255,20 @@ class AppDatabase extends _$AppDatabase {
         // screen can surface puan balance and redemption. Existing
         // rows stay null (walk-in orders) — additive, non-breaking.
         await m.addColumn(tickets, tickets.customerId);
+      }
+      if (from < 17) {
+        // v17: per-tenant atomic receipt counter + UNIQUE index on
+        // receipts(tenant_id, receipt_number). Swiss fiscal audit rules
+        // forbid duplicate receipt numbers; the counter table lets the
+        // DAO increment inside a transaction and the partial-unique
+        // index is a last-resort guardrail if something bypasses the
+        // DAO. Existing rows stay intact — additive.
+        await m.createTable(receiptCounters);
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_receipts_tenant_number '
+          'ON receipts (tenant_id, receipt_number) '
+          'WHERE is_deleted = 0',
+        );
       }
     },
     onCreate: (m) async {

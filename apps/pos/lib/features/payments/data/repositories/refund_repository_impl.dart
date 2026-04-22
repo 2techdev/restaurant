@@ -230,11 +230,12 @@ class RefundRepositoryImpl {
           );
 
       // 6. Create a storno receipt record that references the original sale.
+      //    Reserve the receipt number from the per-tenant atomic counter
+      //    (Swiss fiscal compliance — no duplicates, no gaps by accident).
       final receiptId = IdGenerator.generateId();
-      final stornoReceiptNumber = IdGenerator.generateReceiptNumber(
-        now,
-        paymentId.hashCode.abs() % 9999 + 1,
-      );
+      final sequence = await _db.receiptCounterDao.nextReceiptNumber(tenantId);
+      final stornoReceiptNumber =
+          IdGenerator.generateReceiptNumber(now, sequence);
       final receiptContent = buildStornoReceiptJson(
         ticketId: ticketId,
         billId: billId,
