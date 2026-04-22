@@ -152,9 +152,30 @@ class SyncRepositoryImpl implements SyncRepository {
   }
 
   /// Reset events that have failed (up to [maxRetries]) back to pending so
-  /// the next push cycle will retry them.
-  Future<void> resetFailedEvents({int maxRetries = 5}) =>
-      _dao.resetFailedForRetry(maxRetries: maxRetries);
+  /// the next push cycle will retry them. Events that are already over the
+  /// budget are parked in the DLQ first so they do not starve the queue.
+  Future<void> resetFailedEvents({int maxRetries = 5}) async {
+    await _dao.parkExceededFailures(maxRetries: maxRetries);
+    await _dao.resetFailedForRetry(maxRetries: maxRetries);
+  }
+
+  @override
+  Future<List<SyncEventEntity>> getDeadLetterEvents() async {
+    final rows = await _dao.getDeadEvents();
+    return rows.map(_rowToEntity).toList();
+  }
+
+  @override
+  Future<int> getDeadLetterCount() => _dao.getDeadCount();
+
+  @override
+  Future<void> requeueDeadLetterEvent(int id) =>
+      _dao.requeueDeadEvent(id);
+
+  @override
+  Future<void> purgeDeadLetterEvent(int id) async {
+    await _dao.purgeDeadEvent(id);
+  }
 
   // ---------------------------------------------------------------------------
   // Private helpers
@@ -226,6 +247,7 @@ class SyncRepositoryImpl implements SyncRepository {
       'uploading' => SyncEventStatus.uploading,
       'uploaded' => SyncEventStatus.uploaded,
       'failed' => SyncEventStatus.failed,
+      'dead' => SyncEventStatus.dead,
       _ => SyncEventStatus.pending,
     };
   }

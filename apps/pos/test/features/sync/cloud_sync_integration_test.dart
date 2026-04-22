@@ -478,13 +478,14 @@ void main() {
       ]));
     });
 
-    test('SyncEventStatus enum covers all four values', () {
-      expect(SyncEventStatus.values.length, equals(4));
+    test('SyncEventStatus enum covers all five values', () {
+      expect(SyncEventStatus.values.length, equals(5));
       expect(SyncEventStatus.values, containsAll([
         SyncEventStatus.pending,
         SyncEventStatus.uploading,
         SyncEventStatus.uploaded,
         SyncEventStatus.failed,
+        SyncEventStatus.dead,
       ]));
     });
   });

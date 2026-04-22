@@ -52,6 +52,8 @@ import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_
 import 'package:gastrocore_pos/features/updates/domain/app_version.dart';
 import 'package:gastrocore_pos/features/updates/domain/entities/update_manifest.dart';
 import 'package:gastrocore_pos/features/updates/presentation/providers/update_provider.dart';
+import 'package:gastrocore_pos/features/sync/domain/entities/sync_event_entity.dart';
+import 'package:gastrocore_pos/features/sync/presentation/providers/sync_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
 import 'package:gastrocore_pos/features/licensing/domain/entities/app_feature.dart';
 import 'package:gastrocore_pos/features/licensing/domain/entities/license_tier.dart';
@@ -81,6 +83,7 @@ enum _Section {
   demoData('Demo Data', Icons.science_outlined),
   upgrade('License & Upgrade', Icons.workspace_premium_rounded),
   updates('Güncelleme', Icons.system_update_alt_rounded),
+  syncDlq('Senkron DLQ', Icons.error_outline_rounded),
   about('About', Icons.info_outline_rounded);
 
   const _Section(this.label, this.icon);
@@ -156,6 +159,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _Section.demoData => const _DemoDataSection(),
       _Section.upgrade => const _UpgradeSection(),
       _Section.updates => const _UpdatesSection(),
+      _Section.syncDlq => const _SyncDlqSection(),
       _Section.about => const _AboutSection(),
     };
   }
@@ -5610,6 +5614,152 @@ class _UpdateAvailableCard extends StatelessWidget {
               icon: const Icon(Icons.download_rounded, size: 18),
               label: const Text('İndir'),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sync dead-letter queue (DLQ) section
+// ---------------------------------------------------------------------------
+
+class _SyncDlqSection extends ConsumerWidget {
+  const _SyncDlqSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final eventsAsync = ref.watch(deadLetterEventsProvider);
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Senkronizasyon — Ölü Mesaj Kuyruğu',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Yeniden deneme limiti dolmuş ve otomatik sıradan çıkarılmış '
+            'olay kayıtları. Her birini yeniden kuyruğa alabilir veya '
+            'kalıcı olarak silebilirsiniz.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: eventsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Text('DLQ okunamadı: $e'),
+              ),
+              data: (events) {
+                if (events.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'DLQ boş. Tüm olaylar normal kuyruktan geçiyor.',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  );
+                }
+                return ListView.separated(
+                  itemCount: events.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) => _DlqTile(event: events[i]),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DlqTile extends ConsumerWidget {
+  const _DlqTile({required this.event});
+
+  final SyncEventEntity event;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final createdAt = DateFormat('dd.MM.yyyy HH:mm').format(event.createdAt);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${event.tableName} · ${event.operation.name}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Kayıt: ${event.recordId}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Oluşturuldu: $createdAt · Deneme: ${event.retryCount}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (event.errorMessage != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Hata: ${event.errorMessage}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFEF4444),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            children: [
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await ref
+                      .read(syncRepositoryProvider)
+                      .requeueDeadLetterEvent(event.id);
+                  ref.invalidate(deadLetterEventsProvider);
+                  ref.invalidate(deadLetterCountProvider);
+                },
+                icon: const Icon(Icons.replay_rounded, size: 16),
+                label: const Text('Tekrar Dene'),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () async {
+                  await ref
+                      .read(syncRepositoryProvider)
+                      .purgeDeadLetterEvent(event.id);
+                  ref.invalidate(deadLetterEventsProvider);
+                  ref.invalidate(deadLetterCountProvider);
+                },
+                icon: const Icon(Icons.delete_outline, size: 16),
+                label: const Text('Sil'),
+              ),
+            ],
+          ),
         ],
       ),
     );

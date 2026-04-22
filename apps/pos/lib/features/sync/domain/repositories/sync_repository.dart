@@ -36,4 +36,25 @@ abstract class SyncRepository {
 
   /// Get the last pull cursor (empty string if never synced).
   Future<String> getLastCursor();
+
+  // ---------------------------------------------------------------------------
+  // Dead-letter queue (DLQ)
+  //
+  // Poison events that have exhausted their retry budget end up here. The
+  // DLQ is a manual-intervention surface: the operator can inspect the
+  // error message, requeue an event if the cause was transient, or purge
+  // it if the payload is corrupted.
+  // ---------------------------------------------------------------------------
+
+  /// List every event currently in the DLQ.
+  Future<List<SyncEventEntity>> getDeadLetterEvents();
+
+  /// Count of events in the DLQ.
+  Future<int> getDeadLetterCount();
+
+  /// Move a DLQ entry back to `pending` so the next sync cycle retries it.
+  Future<void> requeueDeadLetterEvent(int id);
+
+  /// Delete a DLQ entry permanently.
+  Future<void> purgeDeadLetterEvent(int id);
 }

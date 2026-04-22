@@ -82,6 +82,85 @@ class SyncEventDao extends DatabaseAccessor<AppDatabase>
   }
 
   // ---------------------------------------------------------------------------
+  // Dead-letter queue (DLQ)
+  // ---------------------------------------------------------------------------
+
+  /// Move events that have exhausted their retry budget into the DLQ.
+  ///
+  /// Returns the number of rows that transitioned to the terminal `dead`
+  /// status. Runs every push cycle so poison events stop blocking the
+  /// outbox head.
+  Future<int> parkExceededFailures({
+    int maxRetries = 5,
+    String reason = 'retry budget exhausted',
+  }) async {
+    final affected = await (update(syncQueue)
+          ..where(
+            (t) =>
+                t.status.equals('failed') &
+                t.retryCount.isBiggerOrEqualValue(maxRetries),
+          ))
+        .write(
+      SyncQueueCompanion(
+        status: const Value('dead'),
+        errorMessage: Value(reason),
+      ),
+    );
+    return affected;
+  }
+
+  /// Force a single event into the DLQ regardless of its retry count.
+  /// Used for non-retryable server rejections (schema mismatch, etc.).
+  Future<void> markAsDead(int id, String reason) async {
+    await (update(syncQueue)..where((t) => t.id.equals(id))).write(
+      SyncQueueCompanion(
+        status: const Value('dead'),
+        errorMessage: Value(reason),
+      ),
+    );
+  }
+
+  /// List every event currently in the DLQ, newest first.
+  Future<List<SyncQueueEntry>> getDeadEvents() {
+    return (select(syncQueue)
+          ..where((t) => t.status.equals('dead'))
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .get();
+  }
+
+  /// Count events in the DLQ.
+  Future<int> getDeadCount() async {
+    final countExpr = syncQueue.id.count();
+    final result = await (selectOnly(syncQueue)
+          ..addColumns([countExpr])
+          ..where(syncQueue.status.equals('dead')))
+        .getSingle();
+    return result.read(countExpr) ?? 0;
+  }
+
+  /// Requeue a single DLQ entry back to `pending` with a zeroed retry
+  /// count so the next sync cycle gives it another chance.
+  Future<void> requeueDeadEvent(int id) async {
+    await (update(syncQueue)
+          ..where((t) => t.id.equals(id) & t.status.equals('dead')))
+        .write(
+      const SyncQueueCompanion(
+        status: Value('pending'),
+        retryCount: Value(0),
+        errorMessage: Value(null),
+      ),
+    );
+  }
+
+  /// Purge a single DLQ entry permanently. Used when the operator
+  /// decides the event is not worth replaying (corrupted payload).
+  Future<int> purgeDeadEvent(int id) async {
+    return await (delete(syncQueue)
+          ..where((t) => t.id.equals(id) & t.status.equals('dead')))
+        .go();
+  }
+
+  // ---------------------------------------------------------------------------
   // Metadata / cursor (sync_metadata)
   // ---------------------------------------------------------------------------
 

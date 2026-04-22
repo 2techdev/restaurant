@@ -187,6 +187,20 @@ final pendingEventCountProvider = Provider<int>((ref) {
   return ref.watch(syncProvider).pendingCount;
 });
 
+/// Count of events parked in the DLQ. Refreshes on every read so the
+/// Settings → Sync screen shows a live badge.
+final deadLetterCountProvider = FutureProvider<int>((ref) async {
+  final repo = ref.watch(syncRepositoryProvider);
+  return repo.getDeadLetterCount();
+});
+
+/// Full list of DLQ entries for the operator-facing inspection screen.
+final deadLetterEventsProvider =
+    FutureProvider.autoDispose((ref) async {
+  final repo = ref.watch(syncRepositoryProvider);
+  return repo.getDeadLetterEvents();
+});
+
 /// WebSocket sync client for real-time notifications.
 ///
 /// Connects automatically and triggers a pull sync when the server pushes a

@@ -2,7 +2,13 @@
 library;
 
 /// The current state of a sync event in the outbox.
-enum SyncEventStatus { pending, uploading, uploaded, failed }
+///
+/// `dead` is the terminal state for poison events: those that have
+/// failed more than the retry budget (default 5 attempts) or were
+/// rejected with a non-retryable error. Dead events stay in the outbox
+/// for forensic inspection and can be manually requeued or purged from
+/// the DLQ (dead-letter queue) screen in Settings.
+enum SyncEventStatus { pending, uploading, uploaded, failed, dead }
 
 /// The operation that was performed on the record.
 enum SyncOperation { insert, update, delete }
