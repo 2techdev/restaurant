@@ -78,6 +78,42 @@ class AuditLogDao extends DatabaseAccessor<AppDatabase>
   }
 
   // ---------------------------------------------------------------------------
+  // Retention / purge
+  // ---------------------------------------------------------------------------
+
+  /// Delete audit rows older than [cutoff]. Scoped to [tenantId] when
+  /// provided, otherwise purges every tenant.
+  ///
+  /// Returns the number of rows removed so callers can surface the number
+  /// in operator dashboards and verify the scheduled job ran.
+  ///
+  /// Swiss legal retention is 10 years (OR Art. 958f); the default is
+  /// defined in [kAuditLogRetentionYears]. Callers should compute the
+  /// cutoff with [auditLogRetentionCutoff] rather than hand-rolling.
+  Future<int> purgeOlderThan(DateTime cutoff, {String? tenantId}) async {
+    final stmt = delete(auditLog)
+      ..where((t) => t.timestamp.isSmallerThanValue(cutoff));
+    if (tenantId != null && tenantId.isNotEmpty) {
+      stmt.where((t) => t.tenantId.equals(tenantId));
+    }
+    return stmt.go();
+  }
+
+  /// Count rows older than [cutoff] without deleting them. Used by the
+  /// settings screen to preview how many rows a purge would remove.
+  Future<int> countOlderThan(DateTime cutoff, {String? tenantId}) async {
+    final countExpr = auditLog.id.count();
+    final query = selectOnly(auditLog)
+      ..addColumns([countExpr])
+      ..where(auditLog.timestamp.isSmallerThanValue(cutoff));
+    if (tenantId != null && tenantId.isNotEmpty) {
+      query.where(auditLog.tenantId.equals(tenantId));
+    }
+    final row = await query.getSingle();
+    return row.read(countExpr) ?? 0;
+  }
+
+  // ---------------------------------------------------------------------------
   // Mapper
   // ---------------------------------------------------------------------------
 
