@@ -66,6 +66,7 @@ class ReportsRepository {
     // Payments — join by ticketId, group by method + sum tips.
     int tipTotal = 0;
     final payments = <String, List<int>>{};
+    final tipsByTicket = <String, int>{};
     if (ticketIds.isNotEmpty) {
       final payQuery = _db.select(_db.payments)
         ..where(
@@ -77,6 +78,8 @@ class ReportsRepository {
       final payRows = await payQuery.get();
       for (final p in payRows) {
         tipTotal += p.tipAmount;
+        tipsByTicket[p.ticketId] =
+            (tipsByTicket[p.ticketId] ?? 0) + p.tipAmount;
         payments.putIfAbsent(p.paymentMethod, () => <int>[]).add(p.amount);
       }
     }
@@ -227,6 +230,39 @@ class ReportsRepository {
         .toList()
       ..sort((a, b) => a.hour.compareTo(b.hour));
 
+    // Waiter breakdown — group paid tickets by waiterId, join user names,
+    // sum tips via the per-ticket map collected above.
+    final waiterAgg =
+        <String, ({int count, int revenue, int tips})>{};
+    for (final t in paidTickets) {
+      final wid = t.waiterId;
+      if (wid == null || wid.isEmpty) continue;
+      final existing = waiterAgg[wid];
+      waiterAgg[wid] = (
+        count: (existing?.count ?? 0) + 1,
+        revenue: (existing?.revenue ?? 0) + t.total,
+        tips: (existing?.tips ?? 0) + (tipsByTicket[t.id] ?? 0),
+      );
+    }
+    final waiterNames = <String, String>{};
+    if (waiterAgg.isNotEmpty) {
+      final userQuery = _db.select(_db.users)
+        ..where((u) => u.id.isIn(waiterAgg.keys));
+      for (final u in await userQuery.get()) {
+        waiterNames[u.id] = u.name;
+      }
+    }
+    final waiters = waiterAgg.entries
+        .map((e) => WaiterBreakdownEntry(
+              waiterId: e.key,
+              waiterName: waiterNames[e.key] ?? e.key,
+              ticketCount: e.value.count,
+              revenueCents: e.value.revenue,
+              tipCents: e.value.tips,
+            ))
+        .toList()
+      ..sort((a, b) => b.revenueCents.compareTo(a.revenueCents));
+
     return ReportSnapshot(
       fromTs: from,
       toTs: to,
@@ -243,6 +279,7 @@ class ReportsRepository {
       topProducts: top10,
       categories: categoryList,
       hourly: hourly,
+      waiters: waiters,
     );
   }
 

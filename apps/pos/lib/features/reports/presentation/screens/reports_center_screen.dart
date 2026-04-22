@@ -408,7 +408,12 @@ class _SnapshotBody extends StatelessWidget {
           const SizedBox(height: 12),
           _SectionCard(
             title: 'Stundenverlauf',
-            child: _HourlyTable(hourly: snapshot.hourly),
+            child: _HourlyHeatmap(hourly: snapshot.hourly),
+          ),
+          const SizedBox(height: 12),
+          _SectionCard(
+            title: 'Mitarbeiter',
+            child: _WaiterTable(waiters: snapshot.waiters),
           ),
         ],
       ),
@@ -637,22 +642,142 @@ class _CategoriesTable extends StatelessWidget {
   }
 }
 
-class _HourlyTable extends StatelessWidget {
-  const _HourlyTable({required this.hourly});
+/// Colour-scaled 24-hour heatmap. Operator scans for rush windows at a
+/// glance — darker cells mean higher revenue. Each cell also prints its
+/// ticket count so the slow hours are still readable.
+class _HourlyHeatmap extends StatelessWidget {
+  const _HourlyHeatmap({required this.hourly});
   final List<HourlyBreakdownEntry> hourly;
 
   @override
   Widget build(BuildContext context) {
     if (hourly.isEmpty) return const _EmptyRow();
+    final byHour = {for (final h in hourly) h.hour: h};
+    final maxRevenue =
+        hourly.fold<int>(0, (m, h) => h.revenueCents > m ? h.revenueCents : m);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const columns = 12;
+        final spacing = 4.0;
+        final cellSize =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: List.generate(24, (h) {
+                final entry = byHour[h];
+                final revenue = entry?.revenueCents ?? 0;
+                final intensity =
+                    maxRevenue == 0 ? 0.0 : (revenue / maxRevenue);
+                final fill = Color.lerp(
+                      const Color(0xFFF1F5F9),
+                      AppColors.primary,
+                      intensity,
+                    ) ??
+                    AppColors.surfaceContainer;
+                final textColor =
+                    intensity > 0.55 ? Colors.white : const Color(0xFF111827);
+                return SizedBox(
+                  width: cellSize,
+                  height: cellSize,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: fill,
+                      borderRadius: BorderRadius.circular(6),
+                      border:
+                          Border.all(color: AppColors.surfaceContainer),
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          h.toString().padLeft(2, '0'),
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: textColor),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          entry == null
+                              ? '—'
+                              : entry.ticketCount.toString(),
+                          style:
+                              TextStyle(fontSize: 10, color: textColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Text('weniger',
+                    style: TextStyle(
+                        fontSize: 10, color: Color(0xFF6B7280))),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(3),
+                      gradient: LinearGradient(colors: [
+                        const Color(0xFFF1F5F9),
+                        AppColors.primary,
+                      ]),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Text('mehr',
+                    style: TextStyle(
+                        fontSize: 10, color: Color(0xFF6B7280))),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _WaiterTable extends StatelessWidget {
+  const _WaiterTable({required this.waiters});
+  final List<WaiterBreakdownEntry> waiters;
+
+  @override
+  Widget build(BuildContext context) {
+    if (waiters.isEmpty) return const _EmptyRow();
+    final totalRevenue = waiters.fold<int>(0, (a, w) => a + w.revenueCents);
     return Table(
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      columnWidths: const {
+        0: FlexColumnWidth(2),
+        1: FlexColumnWidth(),
+        2: FlexColumnWidth(),
+        3: FlexColumnWidth(),
+        4: FlexColumnWidth(),
+      },
       children: [
-        _headerRow(['Stunde', 'Bons', 'Umsatz']),
-        ...hourly.map((h) => _row([
-              '${h.hour.toString().padLeft(2, '0')}:00',
-              h.ticketCount.toString(),
-              _chf(h.revenueCents),
-            ])),
+        _headerRow(['Mitarbeiter', 'Bons', 'Umsatz', 'Trinkgeld', 'Anteil']),
+        ...waiters.map((w) {
+          final share = totalRevenue == 0
+              ? 0.0
+              : (w.revenueCents / totalRevenue) * 100.0;
+          return _row([
+            w.waiterName,
+            w.ticketCount.toString(),
+            _chf(w.revenueCents),
+            _chf(w.tipCents),
+            '${share.toStringAsFixed(1)}%',
+          ]);
+        }),
       ],
     );
   }

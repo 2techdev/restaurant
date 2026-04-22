@@ -86,6 +86,9 @@ class ReportsPdfExporter {
           pw.SizedBox(height: 14),
           _section('Stundenverlauf'),
           _hourlyTable(snapshot),
+          pw.SizedBox(height: 14),
+          _section('Mitarbeiter'),
+          _waiterTable(snapshot),
           if (seal != null) ...[
             pw.SizedBox(height: 18),
             _sealFooter(seal),
@@ -271,6 +274,21 @@ class ReportsPdfExporter {
             h.ticketCount.toString(),
             _fChf(h.revenueCents),
           ]).toList(),
+    );
+  }
+
+  static pw.Widget _waiterTable(ReportSnapshot s) {
+    if (s.waiters.isEmpty) return _empty();
+    return _table(
+      headers: ['Mitarbeiter', 'Bons', 'Umsatz', 'Trinkgeld'],
+      rows: s.waiters
+          .map((w) => [
+                w.waiterName,
+                w.ticketCount.toString(),
+                _fChf(w.revenueCents),
+                _fChf(w.tipCents),
+              ])
+          .toList(),
     );
   }
 

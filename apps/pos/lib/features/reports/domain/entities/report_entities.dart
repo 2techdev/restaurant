@@ -124,6 +124,42 @@ class CategoryBreakdownEntry {
       );
 }
 
+/// Per-waiter performance line. [waiterId] is the user id on the tickets
+/// table; [waiterName] is pre-joined from the users table so the UI can
+/// render it without a second round trip.
+class WaiterBreakdownEntry {
+  const WaiterBreakdownEntry({
+    required this.waiterId,
+    required this.waiterName,
+    required this.ticketCount,
+    required this.revenueCents,
+    required this.tipCents,
+  });
+
+  final String waiterId;
+  final String waiterName;
+  final int ticketCount;
+  final int revenueCents;
+  final int tipCents;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'waiterId': waiterId,
+        'waiterName': waiterName,
+        'ticketCount': ticketCount,
+        'revenueCents': revenueCents,
+        'tipCents': tipCents,
+      };
+
+  factory WaiterBreakdownEntry.fromJson(Map<String, dynamic> json) =>
+      WaiterBreakdownEntry(
+        waiterId: json['waiterId'] as String,
+        waiterName: json['waiterName'] as String,
+        ticketCount: (json['ticketCount'] as num).toInt(),
+        revenueCents: (json['revenueCents'] as num).toInt(),
+        tipCents: (json['tipCents'] as num).toInt(),
+      );
+}
+
 class HourlyBreakdownEntry {
   const HourlyBreakdownEntry({
     required this.hour,
@@ -168,6 +204,7 @@ class ReportSnapshot {
     required this.topProducts,
     required this.categories,
     required this.hourly,
+    this.waiters = const [],
   });
 
   final DateTime fromTs;
@@ -185,6 +222,7 @@ class ReportSnapshot {
   final List<TopProductEntry> topProducts;
   final List<CategoryBreakdownEntry> categories;
   final List<HourlyBreakdownEntry> hourly;
+  final List<WaiterBreakdownEntry> waiters;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'fromTs': fromTs.toIso8601String(),
@@ -202,6 +240,7 @@ class ReportSnapshot {
         'topProducts': topProducts.map((t) => t.toJson()).toList(),
         'categories': categories.map((c) => c.toJson()).toList(),
         'hourly': hourly.map((h) => h.toJson()).toList(),
+        'waiters': waiters.map((w) => w.toJson()).toList(),
       };
 
   String toJsonString() => jsonEncode(toJson());
@@ -234,6 +273,10 @@ class ReportSnapshot {
         hourly: (json['hourly'] as List<dynamic>)
             .map((e) =>
                 HourlyBreakdownEntry.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        waiters: (json['waiters'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) =>
+                WaiterBreakdownEntry.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 
