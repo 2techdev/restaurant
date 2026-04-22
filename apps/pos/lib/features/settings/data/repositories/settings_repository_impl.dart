@@ -20,6 +20,7 @@ import 'package:gastrocore_pos/features/settings/domain/entities/receipt_setting
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/repositories/settings_repository.dart';
 
 /// SharedPreferences keys — prefixed to avoid collisions with other features.
@@ -33,6 +34,7 @@ abstract final class _Keys {
   static const themeColors = 'settings.v1.themeColors';
   static const happyHour = 'settings.v1.happyHour';
   static const loyalty = 'settings.v1.loyalty';
+  static const updateChannel = 'settings.v1.updateChannel';
 }
 
 class SettingsRepositoryImpl implements SettingsRepository {
@@ -221,6 +223,26 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Update channel
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<UpdateChannelSettings> loadUpdateChannelSettings() async {
+    final raw = _prefs.getString(_Keys.updateChannel);
+    if (raw == null) return const UpdateChannelSettings();
+    try {
+      return UpdateChannelSettings.fromJsonString(raw);
+    } catch (_) {
+      return const UpdateChannelSettings();
+    }
+  }
+
+  @override
+  Future<void> saveUpdateChannelSettings(UpdateChannelSettings settings) async {
+    await _prefs.setString(_Keys.updateChannel, settings.toJsonString());
+  }
+
+  // ---------------------------------------------------------------------------
   // Backup & Restore
   // ---------------------------------------------------------------------------
 
@@ -291,6 +313,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       _prefs.remove(_Keys.themeColors),
       _prefs.remove(_Keys.happyHour),
       _prefs.remove(_Keys.loyalty),
+      _prefs.remove(_Keys.updateChannel),
     ]);
   }
 }

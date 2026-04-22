@@ -24,6 +24,7 @@ import 'package:gastrocore_pos/features/settings/domain/entities/receipt_setting
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/repositories/settings_repository.dart';
 
 // ---------------------------------------------------------------------------
@@ -91,6 +92,11 @@ class _FakeSettingsRepository implements SettingsRepository {
       const LoyaltySettings();
   @override
   Future<void> saveLoyaltySettings(LoyaltySettings s) async {}
+  @override
+  Future<UpdateChannelSettings> loadUpdateChannelSettings() async =>
+      const UpdateChannelSettings();
+  @override
+  Future<void> saveUpdateChannelSettings(UpdateChannelSettings s) async {}
 
   @override
   Future<String> getDatabasePath() async => '';

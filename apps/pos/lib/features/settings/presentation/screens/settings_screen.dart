@@ -48,6 +48,10 @@ import 'package:gastrocore_pos/features/auth/domain/entities/permission.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/backup_provider.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_settings.dart';
+import 'package:gastrocore_pos/features/updates/domain/app_version.dart';
+import 'package:gastrocore_pos/features/updates/domain/entities/update_manifest.dart';
+import 'package:gastrocore_pos/features/updates/presentation/providers/update_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
 import 'package:gastrocore_pos/features/licensing/domain/entities/app_feature.dart';
 import 'package:gastrocore_pos/features/licensing/domain/entities/license_tier.dart';
@@ -76,6 +80,7 @@ enum _Section {
   loyalty('Treueprogramm', Icons.card_giftcard_rounded),
   demoData('Demo Data', Icons.science_outlined),
   upgrade('License & Upgrade', Icons.workspace_premium_rounded),
+  updates('Güncelleme', Icons.system_update_alt_rounded),
   about('About', Icons.info_outline_rounded);
 
   const _Section(this.label, this.icon);
@@ -150,6 +155,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _Section.loyalty => const _LoyaltySection(),
       _Section.demoData => const _DemoDataSection(),
       _Section.upgrade => const _UpgradeSection(),
+      _Section.updates => const _UpdatesSection(),
       _Section.about => const _AboutSection(),
     };
   }
@@ -5277,4 +5283,335 @@ class _LoyaltySectionState extends ConsumerState<_LoyaltySection> {
           borderSide: BorderSide.none,
         ),
       );
+}
+
+// ---------------------------------------------------------------------------
+// Updates section — manifest-based OTA check
+// ---------------------------------------------------------------------------
+
+class _UpdatesSection extends ConsumerStatefulWidget {
+  const _UpdatesSection();
+
+  @override
+  ConsumerState<_UpdatesSection> createState() => _UpdatesSectionState();
+}
+
+class _UpdatesSectionState extends ConsumerState<_UpdatesSection> {
+  late final TextEditingController _urlController;
+  bool _dirty = false;
+  bool _bootstrapped = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    super.dispose();
+  }
+
+  void _syncFromState(UpdateChannelSettings settings) {
+    if (_bootstrapped) return;
+    _urlController.text = settings.manifestUrl;
+    _bootstrapped = true;
+  }
+
+  Future<void> _save(UpdateChannelSettings current) async {
+    await ref.read(updateChannelSettingsProvider.notifier).save(
+          current.copyWith(manifestUrl: _urlController.text.trim()),
+        );
+    if (!mounted) return;
+    setState(() => _dirty = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Güncelleme kanalı kaydedildi.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _check() async {
+    final manifest =
+        await ref.read(updateCheckControllerProvider.notifier).checkNow();
+    if (!mounted) return;
+    final state = ref.read(updateCheckControllerProvider);
+    if (state.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.errorMessage!),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    if (manifest == null) return;
+    final msg = manifest.isNewerThan(appBuildNumber)
+        ? 'Yeni sürüm bulundu: ${manifest.versionName} (build ${manifest.buildNumber}).'
+        : 'Uygulama güncel. Son sürüm: ${manifest.versionName}.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _download() async {
+    final ok =
+        await ref.read(updateCheckControllerProvider.notifier).openDownload();
+    if (!mounted || ok) return;
+    final state = ref.read(updateCheckControllerProvider);
+    if (state.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.errorMessage!),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final asyncChannel = ref.watch(updateChannelSettingsProvider);
+    final checkState = ref.watch(updateCheckControllerProvider);
+
+    final settings =
+        asyncChannel.valueOrNull ?? const UpdateChannelSettings();
+    _syncFromState(settings);
+
+    return _SectionScaffold(
+      title: 'Güncelleme',
+      children: [
+        _Card(
+          title: 'GEÇERLİ SÜRÜM',
+          children: [
+            _AboutRow(
+              label: 'Uygulama',
+              value: 'GastroCore POS',
+            ),
+            _AboutRow(
+              label: 'Sürüm',
+              value: '$appVersionName (build $appBuildNumber)',
+            ),
+            _AboutRow(
+              label: 'Kanal',
+              value: settings.channel.label,
+            ),
+          ],
+        ),
+        _Card(
+          title: 'MANİFEST URL',
+          children: [
+            const Text(
+              'Güncelleme kontrolü için manifest JSON URL\'i. Boş bırakılırsa kontrol çalışmaz.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _urlController,
+              decoration: InputDecoration(
+                hintText: 'https://...',
+                isDense: true,
+                filled: true,
+                fillColor: AppColors.bgInput,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: (_) => setState(() => _dirty = true),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                DropdownButton<UpdateChannel>(
+                  value: settings.channel,
+                  onChanged: (value) {
+                    if (value == null) return;
+                    ref
+                        .read(updateChannelSettingsProvider.notifier)
+                        .update((s) => s.copyWith(channel: value));
+                  },
+                  items: UpdateChannel.values
+                      .map(
+                        (c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(c.label),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: _dirty ? () => _save(settings) : null,
+                  icon: const Icon(Icons.save_rounded, size: 18),
+                  label: const Text('Kaydet'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        _Card(
+          title: 'GÜNCELLEME KONTROLÜ',
+          children: [
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: checkState.isChecking ? null : _check,
+                  icon: checkState.isChecking
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.refresh_rounded, size: 18),
+                  label: Text(
+                    checkState.isChecking
+                        ? 'Kontrol ediliyor...'
+                        : 'Güncellemeleri kontrol et',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (checkState.checkedAt != null)
+                  Text(
+                    'Son: ${DateFormat('dd.MM.yyyy HH:mm').format(checkState.checkedAt!.toLocal())}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+            if (checkState.manifest != null) ...[
+              const SizedBox(height: 16),
+              _UpdateAvailableCard(
+                manifest: checkState.manifest!,
+                onDownload: _download,
+              ),
+            ] else if (checkState.errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                checkState.errorMessage!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _UpdateAvailableCard extends StatelessWidget {
+  const _UpdateAvailableCard({
+    required this.manifest,
+    required this.onDownload,
+  });
+
+  final UpdateManifest manifest;
+  final VoidCallback onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    final newer = manifest.isNewerThan(appBuildNumber);
+    final mandatory = manifest.isMandatoryFor(appBuildNumber);
+    final accent = mandatory
+        ? AppColors.error
+        : (newer ? AppColors.primary : AppColors.textSecondary);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                mandatory
+                    ? Icons.warning_amber_rounded
+                    : newer
+                        ? Icons.system_update_alt_rounded
+                        : Icons.check_circle_rounded,
+                color: accent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                mandatory
+                    ? 'Zorunlu güncelleme'
+                    : newer
+                        ? 'Yeni sürüm mevcut'
+                        : 'Uygulama güncel',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Sürüm: ${manifest.versionName} (build ${manifest.buildNumber})',
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+          ),
+          if (manifest.changelog.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              manifest.changelog,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ],
+          if (manifest.sha256 != null && manifest.sha256!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'SHA256: ${manifest.sha256}',
+              style: const TextStyle(
+                fontSize: 11,
+                fontFamily: 'monospace',
+                color: AppColors.textSecondary,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 12),
+          if (newer)
+            FilledButton.icon(
+              onPressed: onDownload,
+              style: FilledButton.styleFrom(backgroundColor: accent),
+              icon: const Icon(Icons.download_rounded, size: 18),
+              label: const Text('İndir'),
+            ),
+        ],
+      ),
+    );
+  }
 }

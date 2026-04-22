@@ -13,6 +13,7 @@ import 'package:gastrocore_pos/features/settings/domain/entities/receipt_setting
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_settings.dart';
 
 abstract interface class SettingsRepository {
   // ---------------------------------------------------------------------------
@@ -77,6 +78,13 @@ abstract interface class SettingsRepository {
 
   Future<LoyaltySettings> loadLoyaltySettings();
   Future<void> saveLoyaltySettings(LoyaltySettings settings);
+
+  // ---------------------------------------------------------------------------
+  // Update channel — manifest URL + stable/beta selection
+  // ---------------------------------------------------------------------------
+
+  Future<UpdateChannelSettings> loadUpdateChannelSettings();
+  Future<void> saveUpdateChannelSettings(UpdateChannelSettings settings);
 
   // ---------------------------------------------------------------------------
   // Backup & Restore
