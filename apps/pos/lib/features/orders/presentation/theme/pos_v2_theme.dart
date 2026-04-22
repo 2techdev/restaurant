@@ -573,6 +573,41 @@ class V2Palette extends ThemeExtension<V2Palette> {
 extension V2PaletteContext on BuildContext {
   V2Palette get v2 =>
       Theme.of(this).extension<V2Palette>() ?? V2Palette.light;
+  V2TextTheme get v2t => V2TextTheme(v2);
+}
+
+// ---------------------------------------------------------------------------
+// V2TextTheme — theme-aware variants of the ink-flavoured [V2Text] styles.
+// ---------------------------------------------------------------------------
+
+/// Palette-aware wrapper around [V2Text] that swaps in the active
+/// [V2Palette]'s ink tones. [V2Text] itself stays as light-mode `const`
+/// constants so chip-on-chrome / label-on-coloured-tile styles that pin to
+/// white or a brand accent don't need a rebuild — only the neutral-ink
+/// styles flow through here.
+class V2TextTheme {
+  const V2TextTheme(this._p);
+  final V2Palette _p;
+
+  TextStyle get orderH2 => V2Text.orderH2.copyWith(color: _p.ink);
+  TextStyle get gangLabel => V2Text.gangLabel.copyWith(color: _p.ink2);
+  TextStyle get gangCount => V2Text.gangCount.copyWith(color: _p.ink4);
+  TextStyle get gangHead => V2Text.gangHead.copyWith(color: _p.ink3);
+  TextStyle get chip => V2Text.chip.copyWith(color: _p.ink2);
+  TextStyle get lineQty => V2Text.lineQty.copyWith(color: _p.ink3);
+  TextStyle get lineTitle => V2Text.lineTitle.copyWith(color: _p.ink);
+  TextStyle get lineNote => V2Text.lineNote.copyWith(color: _p.ink3);
+  TextStyle get linePrice => V2Text.linePrice.copyWith(color: _p.ink2);
+  TextStyle get kv => V2Text.kv.copyWith(color: _p.ink3);
+  TextStyle get kvTotalK => V2Text.kvTotalK.copyWith(color: _p.ink3);
+  TextStyle get kvTotalV => V2Text.kvTotalV.copyWith(color: _p.ink);
+  TextStyle get catH => V2Text.catH.copyWith(color: _p.ink4);
+  TextStyle get schnellName => V2Text.schnellName.copyWith(color: _p.ink);
+  TextStyle get schnellPrice => V2Text.schnellPrice.copyWith(color: _p.ink);
+  TextStyle get schnellCur => V2Text.schnellCur.copyWith(color: _p.ink4);
+  TextStyle get itemsH => V2Text.itemsH.copyWith(color: _p.ink);
+  TextStyle get crumb => V2Text.crumb.copyWith(color: _p.ink3);
+  TextStyle get btn => V2Text.btn.copyWith(color: _p.ink);
 }
 
 /// Format a Swiss-franc amount from integer cents — matches the

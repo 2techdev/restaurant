@@ -701,6 +701,8 @@ class _CustomerChip extends ConsumerWidget {
   ) async {
     final action = await showModalBottomSheet<String>(
       context: context,
+      // Sheet is pinned white regardless of app theme — so ink colours
+      // below stay on the light palette on purpose (matches [_tweaksHeader]).
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -929,6 +931,7 @@ class _CustomerSearchDialogState
 
   @override
   Widget build(BuildContext context) {
+    final v2 = context.v2;
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 48),
@@ -940,13 +943,13 @@ class _CustomerSearchDialogState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Müşteri Ara',
                 style: TextStyle(
                   fontFamily: 'Inter',
                   fontWeight: FontWeight.w700,
                   fontSize: 17,
-                  color: V2.ink,
+                  color: v2.ink,
                 ),
               ),
               const SizedBox(height: 12),
@@ -1000,20 +1003,21 @@ class _CustomerSearchDialogState
         ),
       );
     }
+    final v2 = context.v2;
     if (_results.isEmpty) {
       return Center(
         child: Text(
           _query.trim().isEmpty
               ? 'Henüz müşteri yok. Müşteriler ekranından kayıt oluşturabilirsiniz.'
               : '"$_query" için eşleşme bulunamadı.',
-          style: const TextStyle(color: V2.ink3, fontSize: 13),
+          style: TextStyle(color: v2.ink3, fontSize: 13),
           textAlign: TextAlign.center,
         ),
       );
     }
     return ListView.separated(
       itemCount: _results.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: V2.line),
+      separatorBuilder: (_, __) => Divider(height: 1, color: v2.line),
       itemBuilder: (ctx, i) {
         final c = _results[i];
         return ListTile(
@@ -1021,11 +1025,11 @@ class _CustomerSearchDialogState
           contentPadding: const EdgeInsets.symmetric(horizontal: 4),
           title: Text(
             c.name,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Inter',
               fontWeight: FontWeight.w600,
               fontSize: 14,
-              color: V2.ink,
+              color: v2.ink,
             ),
           ),
           subtitle: Text(
@@ -1033,7 +1037,7 @@ class _CustomerSearchDialogState
               if (c.phone != null && c.phone!.isNotEmpty) c.phone!,
               if (c.email != null && c.email!.isNotEmpty) c.email!,
             ].join(' · '),
-            style: const TextStyle(fontSize: 12, color: V2.ink3),
+            style: TextStyle(fontSize: 12, color: v2.ink3),
           ),
           trailing: Container(
             padding:
@@ -1279,7 +1283,7 @@ class _OrderHead extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Text('BESTELLUNG', style: V2Text.orderH2),
+              Text('BESTELLUNG', style: context.v2t.orderH2),
               const Spacer(),
               _GuestStepper(
                 value: guests,
@@ -1458,15 +1462,16 @@ class _GangTab extends StatelessWidget {
                 label,
                 style: on
                     ? V2Text.gangOn
-                    : V2Text.gangLabel.copyWith(fontWeight: FontWeight.w500),
+                    : context.v2t.gangLabel
+                        .copyWith(fontWeight: FontWeight.w500),
               ),
               const SizedBox(width: 6),
               Text(
                 '$count',
-                style: V2Text.gangCount.copyWith(
+                style: context.v2t.gangCount.copyWith(
                   color: on
                       ? const Color(0xB3FFFFFF)
-                      : V2Text.gangCount.color,
+                      : context.v2t.gangCount.color,
                 ),
               ),
             ],
@@ -1559,7 +1564,7 @@ class _GangSection extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     'GANG $gang · ${items.length} POS.',
-                    style: V2Text.gangHead,
+                    style: context.v2t.gangHead,
                   ),
                 ),
                 if (allSent)
@@ -1640,7 +1645,7 @@ class _Chip extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: v2.line),
           ),
-          child: Text(label, style: V2Text.chip),
+          child: Text(label, style: context.v2t.chip),
         ),
       ),
     );
@@ -1741,7 +1746,7 @@ class _LineItem extends ConsumerWidget {
                       if (item.notes != null && item.notes!.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
-                          child: Text(item.notes!, style: V2Text.lineNote),
+                          child: Text(item.notes!, style: context.v2t.lineNote),
                         ),
                       if (item.modifiers.isNotEmpty)
                         Padding(
@@ -1750,7 +1755,7 @@ class _LineItem extends ConsumerWidget {
                             item.modifiers
                                 .map((m) => m.modifierName)
                                 .join(', '),
-                            style: V2Text.lineNote,
+                            style: context.v2t.lineNote,
                           ),
                         ),
                       if (selected) const SizedBox(height: 6),
@@ -1871,9 +1876,9 @@ class _OrderFoot extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _kvRow('Netto', 'CHF ${v2Chf(net)}'),
+          _kvRow(context, 'Netto', 'CHF ${v2Chf(net)}'),
           const SizedBox(height: 6),
-          _kvRow('MWST (8.1 %, inkl.)', 'CHF ${v2Chf(mwst)}'),
+          _kvRow(context, 'MWST (8.1 %, inkl.)', 'CHF ${v2Chf(mwst)}'),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.only(top: 12),
@@ -1886,10 +1891,10 @@ class _OrderFoot extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                const Expanded(
-                  child: Text('ZU BEZAHLEN', style: V2Text.kvTotalK),
+                Expanded(
+                  child: Text('ZU BEZAHLEN', style: context.v2t.kvTotalK),
                 ),
-                Text('CHF ${v2Chf(subtotal)}', style: V2Text.kvTotalV),
+                Text('CHF ${v2Chf(subtotal)}', style: context.v2t.kvTotalV),
               ],
             ),
           ),
@@ -1898,13 +1903,14 @@ class _OrderFoot extends StatelessWidget {
     );
   }
 
-  Widget _kvRow(String k, String v) {
+  Widget _kvRow(BuildContext context, String k, String v) {
+    final style = context.v2t.kv;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Expanded(child: Text(k, style: V2Text.kv)),
-        Text(v, style: V2Text.kv),
+        Expanded(child: Text(k, style: style)),
+        Text(v, style: style),
       ],
     );
   }
