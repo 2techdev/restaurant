@@ -32,6 +32,7 @@ Orders:
 
 Menu:
 - [Menu Feature](02-features/menu/menu-feature.md)
+- [Sold-Out (Ürün Yok)](02-features/menu/sold-out.md)
 
 Payment:
 - [Payment Flow](02-features/payment/payment-flow.md)
@@ -41,16 +42,27 @@ Kitchen:
 
 Customer:
 - [Customers + Reservations + Tables](02-features/customer/customer-ekosistemi.md)
+- [Loyalty ve Müşteri Bağlama](02-features/customer/loyalty-ve-musteri-baglama.md)
+
+Pricing:
+- [Happy Hour](02-features/pricing/happy-hour.md)
+
+Shifts:
+- [Mesai (Clock In / Out)](02-features/shifts/mesai-clock.md)
+
+Orders (ek):
+- [Receipt Reprint ve KOPIE Banner](02-features/orders/reprint-ve-kopie.md)
 
 Reporting:
 - [Reports](02-features/reporting/reports.md)
 
 ### 03 - Swiss Compliance
-İsviçre pazarı için kritik: KDV, TWINT / Wallee, Swiss QR-Bill, makbuz formatları.
+İsviçre pazarı için kritik: KDV, TWINT / Wallee, Swiss QR-Bill, makbuz formatları, storno.
 - [İsviçre KDV Kuralları](03-swiss-compliance/vat-isvicre.md)
 - [Swiss QR-Bill](03-swiss-compliance/swiss-qr-bill.md)
 - [Wallee / TWINT Entegrasyonu](03-swiss-compliance/wallee-twint.md)
 - [Makbuz (Receipt)](03-swiss-compliance/receipt.md)
+- [Storno / İade](03-swiss-compliance/storno-refund.md)
 
 ### 04 - Dev Workflow
 Günlük geliştirme akışı: build, worktrees, debug ipuçları, testler.
@@ -64,6 +76,7 @@ Geçmiş deneyim, kararlar, yanıltıcı bug'ler.
 - [POS v2 Redesign Tarihi](05-kararlar-ve-bilinmesi-gerekenler/pos-v2-redesign-tarihi.md)
 - [MainAxisSize Leak (inner=1160x0)](05-kararlar-ve-bilinmesi-gerekenler/mainaxis-size-leak.md)
 - [Tasarım Kararları](05-kararlar-ve-bilinmesi-gerekenler/tasarim-kararlari.md)
+- [Tenant Switcher Ertelendi](05-kararlar-ve-bilinmesi-gerekenler/tenant-switcher-ertelendi.md)
 
 ## Nasıl Okumalı
 
@@ -74,4 +87,4 @@ Geçmiş deneyim, kararlar, yanıltıcı bug'ler.
 
 ## Versiyon
 
-Bu kılavuz `claude/pilot-final` branch'inin `a20acc3` commit'ine göre hazırlandı. Kod değiştikçe satır numaraları kayabilir, sınıf adları sabit kalır.
+Bu kılavuz `claude/pilot-final` branch'inin pilot-hazır final kesintisine göre hazırlandı (E-refund commit `0823d48` üstüne docs sync). Sonraki pilot iterasyonlarında bu satır güncellenmeli, satır numaraları kayabilir, sınıf adları sabit kalır.
