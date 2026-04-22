@@ -10,6 +10,12 @@ enum AuditAction {
   orderVoided('Order Voided'),
   itemVoided('Item Voided'),
 
+  // Dispatch to kitchen — the waiter pressed "Sipariş Ver" on a table ticket.
+  // Distinct from orderCreated (which fires when the draft is first persisted)
+  // because table orders can sit for a long time between creation and the
+  // first kitchen fire, and auditors need both moments on the trail.
+  orderSentToKitchen('Order Sent To Kitchen'),
+
   // Tables — merge one occupied table's ticket into another. Needs its
   // own action because a merge touches two tickets + two tables and the
   // reason text carries the source/target pair.

@@ -14,7 +14,7 @@
 /// every colour, padding, and font explicitly to guarantee the visual match.
 library;
 
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1986,6 +1986,11 @@ class _OrderFoot extends StatelessWidget {
 // FOOTER  — parts.jsx `Footer`
 // ===========================================================================
 
+/// Public builder so widget tests can pump the footer in isolation without
+/// wiring the entire shell (topbar, rail, menu area, DI, ...).
+@visibleForTesting
+Widget buildPosV2FooterForTest() => const _Footer();
+
 class _Footer extends ConsumerWidget {
   const _Footer();
 
@@ -1995,6 +2000,12 @@ class _Footer extends ConsumerWidget {
     final hasItems = ticket != null && ticket.items.isNotEmpty;
     final hasUnsent =
         hasItems && ticket.items.any((i) => !i.sentToKitchen);
+    // A table ticket is a parked order — the waiter wants to send items to
+    // the kitchen without closing the bon. Surface a "Sipariş Ver" primary
+    // plus a separate "Zur Kasse" so the two intents never collide. In
+    // takeaway/counter mode the ticket settles on the same screen, so the
+    // original close / new / send triad still applies.
+    final isTableTicket = ticket?.tableId != null;
     final v2 = context.v2;
     return Container(
       decoration: BoxDecoration(
@@ -2003,28 +2014,50 @@ class _Footer extends ConsumerWidget {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
-        children: [
-          _FlatBtn(
-            icon: Icons.close,
-            label: 'Schliessen',
-            danger: true,
-            onTap: () => _onClose(context, ref, hasItems: hasItems),
-          ),
-          const SizedBox(width: 4),
-          _FlatBtn(
-            icon: Icons.add,
-            label: 'Neuer Bon',
-            onTap: () => _onNewTicket(context, ref, hasItems: hasItems),
-          ),
-          const SizedBox(width: 4),
-          _FlatBtn(
-            icon: Icons.local_fire_department_outlined,
-            label: 'Senden',
-            enabled: hasUnsent,
-            onTap: hasUnsent ? () => _onSend(context, ref) : null,
-          ),
-          const Spacer(),
-        ],
+        children: isTableTicket
+            ? [
+                _FlatBtn(
+                  icon: Icons.send_rounded,
+                  label: 'Sipariş Ver',
+                  enabled: hasItems,
+                  onTap: hasItems
+                      ? () => _onOrderAndReturn(context, ref)
+                      : null,
+                ),
+                const SizedBox(width: 4),
+                _FlatBtn(
+                  icon: Icons.point_of_sale_outlined,
+                  label: 'Zur Kasse',
+                  enabled: hasItems,
+                  onTap: hasItems
+                      ? () => _onOpenCheckout(context, ref)
+                      : null,
+                ),
+                const Spacer(),
+              ]
+            : [
+                _FlatBtn(
+                  icon: Icons.close,
+                  label: 'Schliessen',
+                  danger: true,
+                  onTap: () => _onClose(context, ref, hasItems: hasItems),
+                ),
+                const SizedBox(width: 4),
+                _FlatBtn(
+                  icon: Icons.add,
+                  label: 'Neuer Bon',
+                  onTap: () =>
+                      _onNewTicket(context, ref, hasItems: hasItems),
+                ),
+                const SizedBox(width: 4),
+                _FlatBtn(
+                  icon: Icons.local_fire_department_outlined,
+                  label: 'Senden',
+                  enabled: hasUnsent,
+                  onTap: hasUnsent ? () => _onSend(context, ref) : null,
+                ),
+                const Spacer(),
+              ],
       ),
     );
   }
@@ -2034,7 +2067,12 @@ class _Footer extends ConsumerWidget {
     WidgetRef ref, {
     required bool hasItems,
   }) async {
-    if (hasItems) {
+    final ticket = ref.read(currentTicketProvider);
+    // Table tickets are parked unpaid on purpose — closing the view is not
+    // discarding the bon, so the "nicht bezahlt" warning is wrong. Silent-
+    // approve and fall through to the navigation.
+    final isTableTicket = ticket?.tableId != null;
+    if (hasItems && !isTableTicket) {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -2070,7 +2108,9 @@ class _Footer extends ConsumerWidget {
     WidgetRef ref, {
     required bool hasItems,
   }) async {
-    if (hasItems) {
+    final ticket = ref.read(currentTicketProvider);
+    final isTableTicket = ticket?.tableId != null;
+    if (hasItems && !isTableTicket) {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -2109,6 +2149,44 @@ class _Footer extends ConsumerWidget {
         duration: Duration(seconds: 2),
       ),
     );
+  }
+
+  /// Table mode: persist the ticket, fire items to the kitchen, audit the
+  /// dispatch, then return to the floor plan. The bon stays open — the
+  /// guest is still seated — so no payment screen, no "nicht bezahlt"
+  /// dialog, no Schliessen semantics.
+  Future<void> _onOrderAndReturn(BuildContext context, WidgetRef ref) async {
+    final ticket = ref.read(currentTicketProvider);
+    if (ticket == null) return;
+    await ref.read(currentTicketProvider.notifier).sendToKitchen();
+    final saved = ref.read(currentTicketProvider);
+    final audit = ref.read(auditServiceProvider);
+    unawaited(
+      audit.log(
+        action: AuditAction.orderSentToKitchen,
+        entityType: 'ticket',
+        entityId: saved?.id ?? ticket.id,
+        reason: 'Table ${ticket.tableId}',
+      ),
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sipariş mutfağa gönderildi'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    context.go(AppRoutes.tables);
+  }
+
+  /// Table mode secondary: persist the ticket (so unsent items are not lost
+  /// mid-flow) and jump to the payment screen.
+  Future<void> _onOpenCheckout(BuildContext context, WidgetRef ref) async {
+    final ticket = ref.read(currentTicketProvider);
+    if (ticket == null) return;
+    await ref.read(currentTicketProvider.notifier).saveCurrentTicket();
+    if (!context.mounted) return;
+    context.push(AppRoutes.paymentFor(ticket.id));
   }
 }
 

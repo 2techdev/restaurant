@@ -107,7 +107,11 @@ class BottomActionBar extends ConsumerWidget {
     WidgetRef ref, {
     required bool hasItems,
   }) async {
-    if (hasItems) {
+    // Parked table tickets are allowed to sit unpaid — starting a new bon
+    // from a table view never discards work (the bon is safely linked to
+    // the table), so skip the warning dialog in that mode.
+    final isTableTicket = ref.read(currentTicketProvider)?.tableId != null;
+    if (hasItems && !isTableTicket) {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
