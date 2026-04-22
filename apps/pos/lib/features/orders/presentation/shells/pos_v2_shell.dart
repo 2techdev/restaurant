@@ -114,7 +114,7 @@ class _V2Layout extends ConsumerWidget {
           width: orderW,
           child: _OrderColumn(leftHanded: leftHanded),
         );
-        const menuSlot = Expanded(child: _MenuArea());
+        final menuSlot = Expanded(child: _MenuArea(leftHanded: leftHanded));
 
         final innerRowChildren = leftHanded
             ? <Widget>[menuSlot, orderSlot]
@@ -2097,19 +2097,28 @@ class _FlatBtn extends StatelessWidget {
 // ===========================================================================
 
 class _MenuArea extends StatelessWidget {
-  const _MenuArea();
+  const _MenuArea({this.leftHanded = false});
+
+  /// When true, the category rail swaps to the right so the menu area
+  /// mirrors the outer layout flip — keeps the operator's categories and
+  /// order panel on the same side of the grid.
+  final bool leftHanded;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, bc) {
         final catW = bc.maxWidth >= 1400 ? 300.0 : (bc.maxWidth >= 1200 ? 280.0 : 240.0);
+        final cats = SizedBox(
+          width: catW,
+          child: _CategoryList(leftHanded: leftHanded),
+        );
+        const items = Expanded(child: _ItemsWrap());
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(width: catW, child: const _CategoryList()),
-            const Expanded(child: _ItemsWrap()),
-          ],
+          children: leftHanded
+              ? <Widget>[items, cats]
+              : <Widget>[cats, items],
         );
       },
     );
@@ -2121,7 +2130,12 @@ class _MenuArea extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _CategoryList extends ConsumerWidget {
-  const _CategoryList();
+  const _CategoryList({this.leftHanded = false});
+
+  /// In left-hand mode the category rail sits on the right of the menu area
+  /// — flip its hairline divider to the left edge so it still faces the
+  /// item grid.
+  final bool leftHanded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2146,10 +2160,11 @@ class _CategoryList extends ConsumerWidget {
     }
 
     final v2 = context.v2;
+    final side = BorderSide(color: v2.line);
     return Container(
       decoration: BoxDecoration(
         color: v2.surface,
-        border: Border(right: BorderSide(color: v2.line)),
+        border: leftHanded ? Border(left: side) : Border(right: side),
       ),
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
       child: Column(
