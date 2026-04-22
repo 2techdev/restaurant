@@ -32,6 +32,7 @@ import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dar
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/payments/domain/entities/payment_entity.dart';
 import 'package:gastrocore_pos/features/payments/domain/entities/voucher_entity.dart';
+import 'package:gastrocore_pos/features/payments/domain/mixed_tender_calculator.dart';
 import 'package:gastrocore_pos/features/payments/presentation/providers/refund_provider.dart';
 import 'package:gastrocore_pos/features/payments/presentation/widgets/voucher_dialog.dart';
 
@@ -53,6 +54,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   int _tipAmount = 0; // In cents.
   int? _selectedTipPercent;
   VoucherEntity? _voucher;
+
+  /// Running mixed-tender state. Stays empty in the common single-method
+  /// flow; the list only grows when the cashier taps EKLE to stage a
+  /// partial tender (e.g. CHF 20 cash toward a CHF 57 bill, rest card).
+  MixedTenderCalculator _calc = const MixedTenderCalculator(grandTotalCents: 0);
 
   /// Staged loyalty redemption. Points are only debited from the customer
   /// (and the audit log emitted) on a successful payment; cancelling the
@@ -86,6 +92,52 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     return total < 0 ? 0 : total;
   }
 
+  /// Outstanding balance when at least one tender has been staged.
+  /// Falls back to the grand total for the empty-list flow so the
+  /// existing single-method UX keeps working unchanged.
+  int get _outstanding {
+    if (!_calc.hasTenders) return _grandTotal;
+    return _liveCalc.outstandingCents;
+  }
+
+  /// Calculator kept in lockstep with the live grand total so tip /
+  /// voucher / loyalty changes after the first tender don't leave the
+  /// outstanding balance stale.
+  MixedTenderCalculator get _liveCalc =>
+      _calc.withGrandTotal(_grandTotal);
+
+  PaymentMethod _domainMethodFor(_Method m) {
+    return switch (m) {
+      _Method.bar => PaymentMethod.cash,
+      _Method.karte => PaymentMethod.creditCard,
+      _Method.twint => PaymentMethod.other,
+      _Method.gutschein => PaymentMethod.other,
+    };
+  }
+
+  String? _referenceFor(_Method m) {
+    return switch (m) {
+      _Method.twint => 'TWINT',
+      _Method.gutschein =>
+        _voucher != null ? 'VOUCHER:${_voucher!.code}' : 'GUTSCHEIN',
+      _ when _voucher != null => 'VOUCHER:${_voucher!.code}',
+      _ => null,
+    };
+  }
+
+  /// Map a persisted tender entry back to a UI method enum for the strip
+  /// label. Twint/Gutschein share PaymentMethod.other so we disambiguate
+  /// via the reference.
+  _Method _uiMethodFor(TenderEntry t) {
+    if (t.method == PaymentMethod.cash) return _Method.bar;
+    if (t.method == PaymentMethod.creditCard ||
+        t.method == PaymentMethod.debitCard) {
+      return _Method.karte;
+    }
+    if (t.reference == 'TWINT') return _Method.twint;
+    return _Method.gutschein;
+  }
+
   /// Maximum points that can be redeemed on this ticket: capped by the
   /// customer's balance and by the ticket total (we never allow the bill
   /// to go negative via puan).
@@ -109,14 +161,30 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   int get _changeAmount {
     if (_method != _Method.bar) return 0;
-    if (_enteredCents <= _grandTotal) return 0;
-    return _enteredCents - _grandTotal;
+    final target = _outstanding;
+    if (_enteredCents <= target) return 0;
+    return _enteredCents - target;
   }
 
   bool get _canPay {
     if (_submitting || _grandTotal <= 0) return false;
-    if (_method == _Method.bar) return _enteredCents >= _grandTotal;
-    return true; // Non-cash methods assume exact-total tender.
+    if (_calc.hasTenders && _liveCalc.isFullyPaid) return true;
+    final target = _outstanding;
+    if (_method == _Method.bar) return _enteredCents >= target;
+    return true; // Non-cash methods assume exact-outstanding tender.
+  }
+
+  /// Whether the "+ EKLE" (stage partial) button should be enabled.
+  ///
+  /// Active whenever the cashier has entered a non-zero amount that's
+  /// still below the outstanding balance. Covers mixed-method flows:
+  /// CHF 20 cash + card, or CHF 30 card + TWINT, etc.
+  bool get _canStage {
+    if (_submitting || _grandTotal <= 0) return false;
+    if (_calc.hasTenders && _liveCalc.isFullyPaid) return false;
+    final target = _outstanding;
+    if (target <= 0) return false;
+    return _enteredCents > 0 && _enteredCents < target;
   }
 
   String _fmt(int cents) {
@@ -268,23 +336,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final currentUser = ref.read(currentUserProvider);
     final receivedBy = currentUser?.name ?? 'POS';
 
-    final domainMethod = switch (_method) {
-      _Method.bar => PaymentMethod.cash,
-      _Method.karte => PaymentMethod.creditCard,
-      _Method.twint => PaymentMethod.other,
-      _Method.gutschein => PaymentMethod.other,
-    };
-
-    final tendered =
-        _method == _Method.bar ? _enteredCents : _grandTotal;
-
-    final reference = switch (_method) {
-      _Method.twint => 'TWINT',
-      _Method.gutschein =>
-        _voucher != null ? 'VOUCHER:${_voucher!.code}' : 'GUTSCHEIN',
-      _ when _voucher != null => 'VOUCHER:${_voucher!.code}',
-      _ => null,
-    };
+    // Build the final tender list. When the cashier staged partials via
+    // EKLE we process them in order; otherwise we fall through to the
+    // single-tender path identical to the pre-mixed flow.
+    final tenders = _buildFinalTenders();
 
     try {
       // Debit loyalty points first — if that fails the payment should NOT
@@ -314,16 +369,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       }
 
       final paymentRepo = ref.read(paymentRepositoryProvider);
-      await paymentRepo.processPayment(
-        ticketId: widget.ticketId,
-        tenantId: tenantId,
-        paymentMethod: domainMethod,
-        amount: _grandTotal,
-        tipAmount: _tipAmount,
-        tenderedAmount: tendered,
-        receivedBy: receivedBy,
-        reference: reference,
-      );
+      // Apply the whole tip to the FINAL tender so it isn't multiplied
+      // across rows. Sum of `amount` across rows equals grand total
+      // (tip already included in grand total). Tendered amount equals
+      // the row's contribution except for the final cash row where we
+      // pass the raw cash handed over so change can be computed.
+      for (int i = 0; i < tenders.length; i++) {
+        final t = tenders[i];
+        final isLast = i == tenders.length - 1;
+        final tip = isLast ? _tipAmount : 0;
+        await paymentRepo.processPayment(
+          ticketId: widget.ticketId,
+          tenantId: tenantId,
+          paymentMethod: t.method,
+          amount: t.amountCents,
+          tipAmount: tip,
+          tenderedAmount: t.amountCents,
+          receivedBy: receivedBy,
+          reference: t.reference,
+        );
+      }
 
       ref.read(currentTicketProvider.notifier).clear();
       if (!mounted) return;
@@ -338,6 +403,46 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         SnackBar(content: Text('Ödeme hatası: $e')),
       );
     }
+  }
+
+  /// Resolve the tender list that will actually hit the repository.
+  ///
+  /// Two shapes exist:
+  ///   * Mixed flow — cashier staged some tenders via EKLE. If the bill
+  ///     is already fully paid by the staged list, use it as-is; if
+  ///     there's outstanding balance, append one final tender using the
+  ///     currently selected method + entered (or outstanding) amount.
+  ///   * Single flow — tenders list empty: emit one entry matching the
+  ///     current method/amount.
+  List<TenderEntry> _buildFinalTenders() {
+    final live = _liveCalc;
+    if (_calc.hasTenders) {
+      if (live.isFullyPaid) return List<TenderEntry>.from(live.tenders);
+      final outstanding = live.outstandingCents;
+      final method = _domainMethodFor(_method);
+      final amount = _method == _Method.bar
+          ? (_enteredCents > outstanding ? outstanding : _enteredCents)
+          : outstanding;
+      return [
+        ...live.tenders,
+        TenderEntry(
+          method: method,
+          amountCents: amount,
+          reference: _referenceFor(_method),
+        ),
+      ];
+    }
+    final method = _domainMethodFor(_method);
+    final amount = _method == _Method.bar
+        ? (_enteredCents > _grandTotal ? _grandTotal : _enteredCents)
+        : _grandTotal;
+    return [
+      TenderEntry(
+        method: method,
+        amountCents: amount,
+        reference: _referenceFor(_method),
+      ),
+    ];
   }
 
   // --- Build ---------------------------------------------------------------
@@ -611,6 +716,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   Widget _buildPaymentSide() {
     final showLoyalty = _linkedCustomer != null;
+    final showTenders = _calc.hasTenders;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -623,6 +729,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         _tipRow(),
         const SizedBox(height: AppTokens.space12),
         _extraRow(),
+        if (showTenders) ...[
+          const SizedBox(height: AppTokens.space12),
+          _buildTenderStrip(),
+        ],
         const SizedBox(height: AppTokens.space12),
         Expanded(child: _buildMethodBody()),
         const SizedBox(height: AppTokens.space12),
@@ -924,8 +1034,75 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Widget _buildMethodBody() {
+    // Always show the numpad — for non-cash methods the entered amount
+    // represents an optional *partial* tender (e.g. CHF 30 on card).
+    // Leaving the numpad empty means "pay the full outstanding via this
+    // method", which keeps the single-tap UX for the common case.
     if (_method == _Method.bar) return _buildNumpad();
-    return _buildTerminalHint();
+    return Column(
+      children: [
+        _buildTerminalBanner(),
+        const SizedBox(height: AppTokens.space8),
+        Expanded(child: _buildNumpad()),
+      ],
+    );
+  }
+
+  /// Compact banner shown above the numpad for non-cash methods. Tells
+  /// the cashier which terminal to use while keeping the numpad visible
+  /// so partial tenders can be staged.
+  Widget _buildTerminalBanner() {
+    final label = switch (_method) {
+      _Method.karte => 'KARTENTERMINAL',
+      _Method.twint => 'TWINT',
+      _Method.gutschein => 'GUTSCHEIN',
+      _Method.bar => '',
+    };
+    final icon = switch (_method) {
+      _Method.karte => Icons.credit_card_rounded,
+      _Method.twint => Icons.phone_iphone_rounded,
+      _Method.gutschein => Icons.confirmation_number_rounded,
+      _Method.bar => Icons.payments_rounded,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTokens.space16,
+        vertical: AppTokens.space8,
+      ),
+      decoration: BoxDecoration(
+        color: GcColors.surfaceContainerLow,
+        border: Border.all(color: GcColors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: GcColors.onSurfaceVariant),
+          const SizedBox(width: AppTokens.space8),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: GcColors.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Text(
+            _amountStr.isEmpty
+                ? 'Tam ödeme: ${_fmt(_outstanding)}'
+                : 'Kısmi: ${_fmt(_enteredCents)}',
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: GcColors.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // --- Cash numpad ---------------------------------------------------------
@@ -1068,60 +1245,133 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
-  // --- Terminal hint (card / twint / gutschein) -----------------------------
+  // --- Mixed tender strip ---------------------------------------------------
 
-  Widget _buildTerminalHint() {
-    final label = switch (_method) {
-      _Method.karte => 'Kartenterminal',
-      _Method.twint => 'TWINT QR / Tel.',
-      _Method.gutschein => 'Gutschein',
-      _Method.bar => '',
-    };
-    final detail = switch (_method) {
-      _Method.karte =>
-        'Tutarı müşterinin kartıyla terminalden işleyin ve onay aldıktan sonra ÖDE tuşuna basın.',
-      _Method.twint =>
-        'TWINT QR\'ını müşteriye gösterin, ödeme onayı alındıktan sonra ÖDE tuşuna basın.',
-      _Method.gutschein =>
-        'Gutschein kullanıyorsanız GUTSCHEIN alanından kodu girin, sonra ÖDE tuşuna basın.',
-      _Method.bar => '',
-    };
-
+  Widget _buildTenderStrip() {
+    if (!_calc.hasTenders) return const SizedBox.shrink();
+    final live = _liveCalc;
     return Container(
-      padding: const EdgeInsets.all(AppTokens.space24),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTokens.space12,
+        vertical: AppTokens.space8,
+      ),
       decoration: BoxDecoration(
-        color: GcColors.surfaceContainerLowest,
-        border: Border.all(color: GcColors.outlineVariant),
+        color: GcColors.tertiary.withValues(alpha: 0.08),
+        border: Border.all(color: GcColors.tertiary),
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            switch (_method) {
-              _Method.karte => Icons.credit_card_rounded,
-              _Method.twint => Icons.phone_iphone_rounded,
-              _Method.gutschein => Icons.confirmation_number_rounded,
-              _Method.bar => Icons.payments_rounded,
-            },
-            size: 56,
-            color: GcColors.onSurfaceVariant,
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'KISMİ ÖDEMELER',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: GcColors.tertiary,
+                  ),
+                ),
+              ),
+              Text(
+                'Kalan: ${_fmt(live.outstandingCents)}',
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: GcColors.tertiary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppTokens.space16),
-          Text(
-            label.toUpperCase(),
-            textAlign: TextAlign.center,
-            style: GcText.headline,
-          ),
-          const SizedBox(height: AppTokens.space8),
-          Text(
-            detail,
-            textAlign: TextAlign.center,
-            style: GcText.body,
+          const SizedBox(height: AppTokens.space4),
+          Wrap(
+            spacing: AppTokens.space8,
+            runSpacing: AppTokens.space4,
+            children: [
+              for (int i = 0; i < _calc.tenders.length; i++)
+                _tenderChip(i, _calc.tenders[i]),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Widget _tenderChip(int index, TenderEntry t) {
+    final uiMethod = _uiMethodFor(t);
+    final label = switch (uiMethod) {
+      _Method.bar => 'BAR',
+      _Method.karte => 'KARTE',
+      _Method.twint => 'TWINT',
+      _Method.gutschein => 'GUTSCHEIN',
+    };
+    return InkWell(
+      onTap: () => _removeTender(index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.space8,
+          vertical: 4,
+        ),
+        decoration: BoxDecoration(
+          color: GcColors.surfaceContainerLowest,
+          border: Border.all(color: GcColors.tertiary),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$label · ${_fmt(t.amountCents)}',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: GcColors.onSurface,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.close_rounded, size: 14, color: GcColors.tertiary),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _stageTender() {
+    if (!_canStage) return;
+    final result = _liveCalc.addTender(
+      method: _domainMethodFor(_method),
+      amountCents: _enteredCents,
+      reference: _referenceFor(_method),
+    );
+    if (!result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_stageErrorMessage(result.error!))),
+      );
+      return;
+    }
+    setState(() {
+      _calc = result.calculator!;
+      _amountStr = '';
+      // Keep method as-is so rapid same-method partials are easy; the
+      // cashier can tap another chip for the next tender if needed.
+    });
+  }
+
+  void _removeTender(int index) {
+    setState(() => _calc = _calc.removeTenderAt(index));
+  }
+
+  String _stageErrorMessage(AddTenderError e) {
+    return switch (e) {
+      AddTenderError.nonPositive => 'Geçerli bir tutar girin.',
+      AddTenderError.overPayNonCash =>
+        'Kart/TWINT/kuponla kalan tutardan fazlası alınamaz.',
+      AddTenderError.alreadyFullyPaid => 'Adisyon zaten ödendi.',
+    };
   }
 
   // --- Pay CTA -------------------------------------------------------------
@@ -1129,58 +1379,119 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget _buildPayCta() {
     return SizedBox(
       height: AppTokens.touchLarge + 8,
-      child: Material(
-        color: _canPay
-            ? GcColors.primary
-            : GcColors.surfaceContainerHighest,
-        child: InkWell(
-          onTap: _canPay ? _submit : null,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: _canPay ? kPrimaryGradient : null,
-              border: Border(
-                top: BorderSide(
-                  color: _canPay ? kInsetHighlight : Colors.transparent,
-                  width: 2,
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: _stageButton(),
+          ),
+          const SizedBox(width: AppTokens.space8),
+          Expanded(
+            flex: 5,
+            child: _payButton(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stageButton() {
+    final enabled = _canStage;
+    return Material(
+      color: enabled ? GcColors.tertiary : GcColors.surfaceContainerHighest,
+      child: InkWell(
+        onTap: enabled ? _stageTender : null,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: enabled ? GcColors.tertiary : GcColors.outlineVariant,
+            ),
+          ),
+          child: Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.add_rounded,
+                  size: 20,
+                  color: enabled
+                      ? GcColors.onPrimary
+                      : GcColors.outlineVariant,
                 ),
+                const SizedBox(width: AppTokens.space4),
+                Text(
+                  'EKLE',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.0,
+                    color: enabled
+                        ? GcColors.onPrimary
+                        : GcColors.outlineVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _payButton() {
+    final displayAmount = _calc.hasTenders ? _outstanding : _grandTotal;
+    return Material(
+      color: _canPay
+          ? GcColors.primary
+          : GcColors.surfaceContainerHighest,
+      child: InkWell(
+        onTap: _canPay ? _submit : null,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: _canPay ? kPrimaryGradient : null,
+            border: Border(
+              top: BorderSide(
+                color: _canPay ? kInsetHighlight : Colors.transparent,
+                width: 2,
               ),
             ),
-            child: Center(
-              child: _submitting
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
+          ),
+          child: Center(
+            child: _submitting
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 22,
+                        color: _canPay
+                            ? GcColors.onPrimary
+                            : GcColors.outlineVariant,
                       ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.check_circle_rounded,
-                          size: 22,
+                      const SizedBox(width: AppTokens.space8),
+                      Text(
+                        'ÖDE · ${_fmt(displayAmount)}',
+                        style: TextStyle(
+                          fontFamily: 'WorkSans',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
                           color: _canPay
                               ? GcColors.onPrimary
                               : GcColors.outlineVariant,
                         ),
-                        const SizedBox(width: AppTokens.space8),
-                        Text(
-                          'ÖDE · ${_fmt(_grandTotal)}',
-                          style: TextStyle(
-                            fontFamily: 'WorkSans',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.8,
-                            color: _canPay
-                                ? GcColors.onPrimary
-                                : GcColors.outlineVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ),
