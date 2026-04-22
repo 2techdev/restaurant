@@ -49,6 +49,12 @@ enum AuditAction {
   // already-completed ticket opened from history) fire this action.
   receiptReprinted('Receipt Reprinted'),
 
+  // Digital receipt — customer-facing PDF sent through the share sheet
+  // (email, WhatsApp, AirDrop, ...). Separate from a reprint because the
+  // delivery channel is different and GDPR expects a record of any PII
+  // leaving the till (an email address, a phone number).
+  receiptSentDigital('Receipt Sent Digitally'),
+
   // Auth
   userLoggedIn('User Logged In'),
   userLoggedOut('User Logged Out'),

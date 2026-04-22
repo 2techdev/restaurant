@@ -6,10 +6,12 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
@@ -21,6 +23,7 @@ import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_l
 import 'package:gastrocore_pos/features/orders/domain/calculations/calculation_pipeline.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/features/orders/services/digital_receipt_service.dart';
 
 // ---------------------------------------------------------------------------
 // Receipt Preview Screen
@@ -182,11 +185,80 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
     final ticket = _ticket;
     if (ticket == null) return;
     final data = _buildReceiptData(ticket);
-    final text = _buildShareText(data);
-    await Share.share(
-      text,
-      subject: '${data.restaurantName} - Fiş #${data.receiptNo}',
+    final email = await _promptEmail();
+    if (!mounted) return;
+    if (email == null) {
+      // User bailed out — fall back to legacy text share so the button
+      // still behaves predictably.
+      final text = _buildShareText(data);
+      await Share.share(
+        text,
+        subject: '${data.restaurantName} - Fiş #${data.receiptNo}',
+      );
+      return;
+    }
+    const service = DigitalReceiptService();
+    await service.share(data, recipientEmail: email.isEmpty ? null : email);
+    if (!mounted) return;
+    final audit = ref.read(auditServiceProvider);
+    unawaited(
+      audit.log(
+        action: AuditAction.receiptSentDigital,
+        entityType: 'ticket',
+        entityId: ticket.id,
+        newValueJson:
+            '{"channel":"digital","orderNumber":"${ticket.orderNumber}","recipient":"${email.isEmpty ? '' : email}","total":${ticket.total}}',
+        reason: 'Dijital fiş · #${ticket.orderNumber}',
+      ),
     );
+  }
+
+  /// Simple modal asking for an optional recipient email. Returning
+  /// `null` means the user cancelled — the caller falls back to a plain
+  /// text share. An empty string means "share the PDF with no
+  /// pre-filled recipient" (e.g. AirDrop, WhatsApp, Files app).
+  Future<String?> _promptEmail() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Dijital fiş gönder'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'QR kodlu PDF fiş oluşturulur. E-posta adresini girerseniz '
+              'alıcı otomatik doldurulur; boş bırakılırsa paylaş menüsü açılır.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'E-posta (opsiyonel)',
+                hintText: 'musteri@example.ch',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('Gönder'),
+          ),
+        ],
+      ),
+    );
+    return result;
   }
 
   String _buildShareText(SwissReceiptData data) {
@@ -717,22 +789,19 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // QR code placeholder
+                // QR code — scannable by the customer to fetch the
+                // digital receipt payload (receipt no, total, timestamp).
                 Center(
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0F0F0),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.qr_code_2_rounded,
-                        size: 48,
-                        color: Color(0xFFAAAAAA),
-                      ),
-                    ),
+                  child: QrImageView(
+                    data: jsonEncode(<String, dynamic>{
+                      'v': 1,
+                      'receiptNo': ticket.orderNumber,
+                      'total': ticket.total,
+                      'currency': 'CHF',
+                    }),
+                    size: 80,
+                    backgroundColor: Colors.white,
+                    version: QrVersions.auto,
                   ),
                 ),
                 const SizedBox(height: 16),
