@@ -9,6 +9,13 @@
 /// reducer lives in [ClockRepository] so tests can exercise it directly.
 library;
 
+/// Standard paid-labour threshold (Swiss default). Hours worked in a
+/// single day beyond this accrue as [ClockStatus.overtimeToday]. Kept as
+/// a top-level constant so both the reducer and widget tests can agree
+/// on a single source of truth; operators can override it per tenant
+/// later via settings.
+const Duration kDailyRegularHours = Duration(hours: 8);
+
 class ClockStatus {
   const ClockStatus({
     required this.userId,
@@ -17,6 +24,9 @@ class ClockStatus {
     this.clockedInAt,
     this.clockedOutAt,
     this.workedToday = Duration.zero,
+    this.breakedToday = Duration.zero,
+    this.isOnBreak = false,
+    this.breakStartedAt,
   });
 
   /// Stable user id the audit rows refer to.
@@ -40,16 +50,41 @@ class ClockStatus {
   final DateTime? clockedOutAt;
 
   /// Sum of all completed clock-in → clock-out intervals inside the
-  /// calendar day under inspection. If [isClockedIn] is true, the open
-  /// interval (clockedInAt → now) is NOT added here — the UI formats it
+  /// calendar day under inspection. Break intervals are already excluded
+  /// by the reducer. If [isClockedIn] is true, the open interval
+  /// (clockedInAt → now) is NOT added here — the UI formats it
   /// separately so the "live" portion can be styled differently.
   final Duration workedToday;
+
+  /// Sum of all completed break intervals inside today. Shown next to
+  /// the worked time so operators can see their unpaid time at a glance
+  /// and managers can reconcile against Schwarzarbeit rules (BKStG).
+  final Duration breakedToday;
+
+  /// True when the last break event is a start without a matching end.
+  /// While this is true the live accrual ticker is frozen.
+  final bool isOnBreak;
+
+  /// Timestamp of the currently-open break. Used by the UI to show the
+  /// live break-duration counter alongside the frozen worked time.
+  final DateTime? breakStartedAt;
+
+  /// Overtime accumulated today: `max(0, workedToday - kDailyRegularHours)`.
+  /// Read-only derivation — the reducer does not split the `workedToday`
+  /// bucket so every consumer computes overtime the same way.
+  Duration get overtimeToday {
+    final delta = workedToday - kDailyRegularHours;
+    return delta.isNegative ? Duration.zero : delta;
+  }
 
   ClockStatus copyWith({
     bool? isClockedIn,
     DateTime? clockedInAt,
     DateTime? clockedOutAt,
     Duration? workedToday,
+    Duration? breakedToday,
+    bool? isOnBreak,
+    DateTime? breakStartedAt,
   }) =>
       ClockStatus(
         userId: userId,
@@ -58,5 +93,8 @@ class ClockStatus {
         clockedInAt: clockedInAt ?? this.clockedInAt,
         clockedOutAt: clockedOutAt ?? this.clockedOutAt,
         workedToday: workedToday ?? this.workedToday,
+        breakedToday: breakedToday ?? this.breakedToday,
+        isOnBreak: isOnBreak ?? this.isOnBreak,
+        breakStartedAt: breakStartedAt ?? this.breakStartedAt,
       );
 }

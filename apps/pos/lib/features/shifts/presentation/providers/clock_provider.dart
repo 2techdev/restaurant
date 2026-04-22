@@ -58,6 +58,26 @@ class ClockStatusesNotifier extends AsyncNotifier<List<ClockStatus>> {
     state = await AsyncValue.guard(_load);
   }
 
+  /// Pause / resume the current paid interval. Writes either a
+  /// [AuditAction.userBreakStarted] or [AuditAction.userBreakEnded] and
+  /// refreshes the list. A no-op if the user is not currently clocked
+  /// in — the UI should hide the button in that case anyway.
+  Future<void> toggleBreak({
+    required String userId,
+    required String userName,
+    required bool currentlyOnBreak,
+    String? reason,
+  }) async {
+    final audit = ref.read(auditServiceProvider);
+    if (currentlyOnBreak) {
+      await audit.logUserBreakEnded(userId, userName, reason: reason);
+    } else {
+      await audit.logUserBreakStarted(userId, userName, reason: reason);
+    }
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(_load);
+  }
+
   /// Force-reload without mutating.
   Future<void> refresh() async {
     state = const AsyncValue.loading();
@@ -78,19 +98,53 @@ class ClockTileViewModel {
   final ClockStatus status;
   final DateTime now;
 
-  /// Total worked time including the currently-open interval (if any).
+  /// Total worked time including the currently-open interval (if any)
+  /// minus any currently-open break. The "live" ticker subtracts the
+  /// live break duration so the worked counter freezes while the
+  /// operator is on break.
   Duration get totalWorked {
     final base = status.workedToday;
     final openedAt = status.clockedInAt;
     if (status.isClockedIn && openedAt != null && now.isAfter(openedAt)) {
-      return base + now.difference(openedAt);
+      var live = base + now.difference(openedAt);
+      final bStart = status.breakStartedAt;
+      if (status.isOnBreak && bStart != null && now.isAfter(bStart)) {
+        final liveBreak = now.difference(bStart);
+        live = live > liveBreak ? live - liveBreak : Duration.zero;
+      }
+      return live;
     }
     return base;
   }
 
+  /// Total paused time today including an open break.
+  Duration get totalBreak {
+    final base = status.breakedToday;
+    final bStart = status.breakStartedAt;
+    if (status.isOnBreak && bStart != null && now.isAfter(bStart)) {
+      return base + now.difference(bStart);
+    }
+    return base;
+  }
+
+  /// Overtime derived from the live [totalWorked] against the configured
+  /// threshold — recomputed on every tick so the UI can colour-flip the
+  /// moment the operator crosses 8 hours.
+  Duration get overtime {
+    final delta = totalWorked - kDailyRegularHours;
+    return delta.isNegative ? Duration.zero : delta;
+  }
+
   /// Short "H:MM" worked-time label.
-  String get workedLabel {
-    final d = totalWorked;
+  String get workedLabel => _fmt(totalWorked);
+
+  /// Short "H:MM" paused-time label.
+  String get breakLabel => _fmt(totalBreak);
+
+  /// Short "H:MM" overtime label.
+  String get overtimeLabel => _fmt(overtime);
+
+  static String _fmt(Duration d) {
     final h = d.inHours;
     final m = d.inMinutes.remainder(60);
     return '${h}h ${m.toString().padLeft(2, '0')}m';

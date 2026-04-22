@@ -66,6 +66,16 @@ enum AuditAction {
   userClockedIn('User Clocked In'),
   userClockedOut('User Clocked Out'),
 
+  // Paid pause / unpaid break — Mesai'nin alt-durumlarını audit'lar.
+  //  * breakStarted  → "Pause beginnt" (time NOT counted toward the worked
+  //                    total while the break is open).
+  //  * breakEnded    → "Pause endet"   (resume accrual).
+  // The reducer in [ClockRepository] replays these actions in order so a
+  // break that crosses midnight or spans a crash is still accounted for
+  // correctly.
+  userBreakStarted('User Break Started'),
+  userBreakEnded('User Break Ended'),
+
   // Manager operations
   managerOverride('Manager Override'),
 

@@ -181,7 +181,13 @@ class _ClockManagementTabState extends ConsumerState<ClockManagementTab> {
       now: DateTime.now(),
     );
 
-    final accent = isOn ? AppColors.green : AppColors.textDim;
+    final isOnBreak = status?.isOnBreak ?? false;
+    final hasOvertime = tile.overtime > Duration.zero;
+    final accent = isOnBreak
+        ? AppColors.yellow
+        : isOn
+            ? AppColors.green
+            : AppColors.textDim;
     final initials = userName.isNotEmpty
         ? userName
             .split(' ')
@@ -238,28 +244,19 @@ class _ClockManagementTabState extends ConsumerState<ClockManagementTab> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        isOn ? 'MESAIDE' : 'OFF',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: accent,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                    _chip(
+                      isOnBreak
+                          ? 'PAUSE'
+                          : isOn
+                              ? 'MESAIDE'
+                              : 'OFF',
+                      accent,
                     ),
-                    const SizedBox(width: 8),
                     Text(
                       'Bugun: ${tile.workedLabel}',
                       style: const TextStyle(
@@ -267,12 +264,54 @@ class _ClockManagementTabState extends ConsumerState<ClockManagementTab> {
                         color: AppColors.textSecondary,
                       ),
                     ),
+                    if (tile.totalBreak > Duration.zero)
+                      Text(
+                        'Mola: ${tile.breakLabel}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.yellow,
+                        ),
+                      ),
+                    if (hasOvertime)
+                      _chip('+${tile.overtimeLabel} OT', AppColors.red),
                   ],
                 ),
               ],
             ),
           ),
-          // Toggle button
+          // Break toggle — only visible while clocked in.
+          if (isOn) ...[
+            OutlinedButton.icon(
+              onPressed: () =>
+                  _toggleBreak(userId, userName, isOnBreak),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.yellow,
+                side: BorderSide(
+                  color: AppColors.yellow.withValues(alpha: 0.6),
+                ),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              icon: Icon(
+                isOnBreak
+                    ? Icons.play_circle_outline_rounded
+                    : Icons.pause_circle_outline_rounded,
+                size: 18,
+              ),
+              label: Text(
+                isOnBreak ? 'Devam' : 'Mola',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          // Clock toggle
           ElevatedButton.icon(
             onPressed: () => _toggle(userId, userName, isOn),
             style: ElevatedButton.styleFrom(
@@ -301,6 +340,24 @@ class _ClockManagementTabState extends ConsumerState<ClockManagementTab> {
     );
   }
 
+  Widget _chip(String label, Color color) => Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: color,
+            letterSpacing: 0.5,
+          ),
+        ),
+      );
+
   Future<void> _toggle(String userId, String userName, bool isOn) async {
     await ref.read(clockStatusesProvider.notifier).toggle(
           userId: userId,
@@ -313,6 +370,25 @@ class _ClockManagementTabState extends ConsumerState<ClockManagementTab> {
         content: Text(isOn
             ? '$userName mesaiden cikti'
             : '$userName mesaiye girdi'),
+        backgroundColor: AppColors.surfaceContainer,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _toggleBreak(
+      String userId, String userName, bool onBreak) async {
+    await ref.read(clockStatusesProvider.notifier).toggleBreak(
+          userId: userId,
+          userName: userName,
+          currentlyOnBreak: onBreak,
+        );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(onBreak
+            ? '$userName molayi bitirdi'
+            : '$userName molaya cikti'),
         backgroundColor: AppColors.surfaceContainer,
         duration: const Duration(seconds: 2),
       ),

@@ -303,6 +303,40 @@ class AuditService {
         reason: reason,
       );
 
+  /// Open an unpaid break for [userId]. Accrual stops until the matching
+  /// [logUserBreakEnded] fires. The reducer swallows paired break events
+  /// so worked-today only counts active time.
+  Future<void> logUserBreakStarted(
+    String userId,
+    String name, {
+    String? reason,
+  }) =>
+      log(
+        action: AuditAction.userBreakStarted,
+        entityType: 'user',
+        entityId: userId,
+        userId: userId,
+        userName: name,
+        reason: reason,
+      );
+
+  /// Close the currently-open break for [userId]. No-op downstream if no
+  /// break is open (the reducer drops orphans but still records the
+  /// audit trail).
+  Future<void> logUserBreakEnded(
+    String userId,
+    String name, {
+    String? reason,
+  }) =>
+      log(
+        action: AuditAction.userBreakEnded,
+        entityType: 'user',
+        entityId: userId,
+        userId: userId,
+        userName: name,
+        reason: reason,
+      );
+
   Future<void> logManagerOverride(
     String entityId, {
     String? reason,

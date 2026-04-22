@@ -43,8 +43,10 @@ class ClockRepository {
   /// machine without a database.
   ///
   /// [rows] must be ordered newest-first (as [AuditLogDao.getEntries]
-  /// returns them). Rows whose action is neither clock-in nor clock-out
-  /// are ignored.
+  /// returns them). Rows whose action is not a clock or break event
+  /// are ignored. The reducer walks events chronologically and
+  /// subtracts break intervals from the corresponding worked interval
+  /// so [ClockStatus.workedToday] reflects billable time only.
   static List<ClockStatus> reduceStatuses({
     required List<AuditLogEntryEntity> rows,
     required DateTime now,
@@ -53,7 +55,9 @@ class ClockRepository {
     final chron = rows.reversed
         .where((r) =>
             r.action == AuditAction.userClockedIn ||
-            r.action == AuditAction.userClockedOut)
+            r.action == AuditAction.userClockedOut ||
+            r.action == AuditAction.userBreakStarted ||
+            r.action == AuditAction.userBreakEnded)
         .toList(growable: false);
 
     final dayStart = DateTime(now.year, now.month, now.day);
@@ -67,27 +71,52 @@ class ClockRepository {
         () => _Acc(userId: r.userId, userName: r.userName),
       );
       acc.userName = r.userName; // keep most recent display name
-      if (r.action == AuditAction.userClockedIn) {
-        // A clock-in while already clocked in is a double-tap — keep the
-        // most recent so downstream reports do not over-count.
-        acc.openSince = r.timestamp;
-      } else {
-        // clockOut — if we have an open interval, close it and add to
-        // today's total (if the interval overlaps today).
-        final openedAt = acc.openSince;
-        if (openedAt != null) {
-          acc.addInterval(
-            from: openedAt,
-            to: r.timestamp,
-            dayStart: dayStart,
-          );
-          acc.openSince = null;
-          acc.lastClockOut = r.timestamp;
-        } else {
-          // clock-out with no matching clock-in — log-only event, ignore
-          // for totals but remember the timestamp so the UI can show it.
-          acc.lastClockOut = r.timestamp;
-        }
+      switch (r.action) {
+        case AuditAction.userClockedIn:
+          // Starting a fresh shift implicitly closes any dangling break
+          // so the state machine cannot deadlock.
+          acc.breakSince = null;
+          acc.openSince = r.timestamp;
+        case AuditAction.userClockedOut:
+          // If a break was still open, close it first so the duration
+          // accounting stays consistent.
+          if (acc.breakSince != null) {
+            acc.addBreak(
+              from: acc.breakSince!,
+              to: r.timestamp,
+              dayStart: dayStart,
+            );
+            acc.breakSince = null;
+          }
+          final openedAt = acc.openSince;
+          if (openedAt != null) {
+            acc.addInterval(
+              from: openedAt,
+              to: r.timestamp,
+              dayStart: dayStart,
+            );
+            acc.openSince = null;
+            acc.lastClockOut = r.timestamp;
+          } else {
+            // clock-out with no matching clock-in — log-only event
+            acc.lastClockOut = r.timestamp;
+          }
+        case AuditAction.userBreakStarted:
+          // Double-tap guard: only open a new break if none is running.
+          acc.breakSince ??= r.timestamp;
+        case AuditAction.userBreakEnded:
+          final openedBreak = acc.breakSince;
+          if (openedBreak != null) {
+            acc.addBreak(
+              from: openedBreak,
+              to: r.timestamp,
+              dayStart: dayStart,
+            );
+            acc.breakSince = null;
+          }
+        default:
+          // unreachable — filter above restricts the set.
+          break;
       }
     }
 
@@ -99,6 +128,9 @@ class ClockRepository {
               clockedInAt: a.openSince,
               clockedOutAt: a.lastClockOut,
               workedToday: a.workedToday,
+              breakedToday: a.breakedToday,
+              isOnBreak: a.breakSince != null,
+              breakStartedAt: a.breakSince,
             ))
         .toList(growable: false);
   }
@@ -112,7 +144,14 @@ class _Acc {
   String userName;
   DateTime? openSince;
   DateTime? lastClockOut;
+  DateTime? breakSince;
   Duration workedToday = Duration.zero;
+  Duration breakedToday = Duration.zero;
+
+  /// Break time accumulated inside the currently-open worked interval.
+  /// Subtracted from `workedToday` at clock-out so billable time reflects
+  /// paid hours only — see [addInterval].
+  Duration _pendingBreak = Duration.zero;
 
   void addInterval({
     required DateTime from,
@@ -125,7 +164,30 @@ class _Acc {
     final clampedFrom = from.isBefore(dayStart) ? dayStart : from;
     final clampedTo = to.isAfter(dayEnd) ? dayEnd : to;
     if (clampedTo.isAfter(clampedFrom)) {
-      workedToday += clampedTo.difference(clampedFrom);
+      var span = clampedTo.difference(clampedFrom);
+      if (_pendingBreak > Duration.zero) {
+        span = span > _pendingBreak ? span - _pendingBreak : Duration.zero;
+      }
+      workedToday += span;
+    }
+    _pendingBreak = Duration.zero;
+  }
+
+  void addBreak({
+    required DateTime from,
+    required DateTime to,
+    required DateTime dayStart,
+  }) {
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    final clampedFrom = from.isBefore(dayStart) ? dayStart : from;
+    final clampedTo = to.isAfter(dayEnd) ? dayEnd : to;
+    if (clampedTo.isAfter(clampedFrom)) {
+      final span = clampedTo.difference(clampedFrom);
+      breakedToday += span;
+      // Defer subtraction: the corresponding worked interval is still
+      // open, so we can't reduce `workedToday` yet. The pending bucket
+      // drains the next time [addInterval] closes.
+      _pendingBreak += span;
     }
   }
 }

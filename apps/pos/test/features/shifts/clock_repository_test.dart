@@ -213,6 +213,96 @@ void main() {
       expect(berfin.workedToday, Duration.zero);
     });
 
+    test('a closed break subtracts from worked time and adds to breakedToday',
+        () {
+      // 09:00 clockIn, 10:00 break start, 10:30 break end, 12:00 clockOut.
+      // Worked should be (12:00-09:00) - (10:30-10:00) = 2h 30m.
+      final tenThirty = DateTime(2026, 4, 22, 10, 30);
+      final rows = [
+        _row(
+          id: 'e4', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userClockedOut, at: noon,
+        ),
+        _row(
+          id: 'e3', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userBreakEnded, at: tenThirty,
+        ),
+        _row(
+          id: 'e2', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userBreakStarted, at: tenAm,
+        ),
+        _row(
+          id: 'e1', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userClockedIn, at: nineAm,
+        ),
+      ];
+      final out = ClockRepository.reduceStatuses(rows: rows, now: today);
+      expect(out.first.workedToday, const Duration(hours: 2, minutes: 30));
+      expect(out.first.breakedToday, const Duration(minutes: 30));
+      expect(out.first.isOnBreak, isFalse);
+    });
+
+    test('an open break leaves isOnBreak=true with breakStartedAt populated',
+        () {
+      final rows = [
+        _row(
+          id: 'e2', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userBreakStarted, at: tenAm,
+        ),
+        _row(
+          id: 'e1', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userClockedIn, at: nineAm,
+        ),
+      ];
+      final out = ClockRepository.reduceStatuses(rows: rows, now: today);
+      expect(out.first.isClockedIn, isTrue);
+      expect(out.first.isOnBreak, isTrue);
+      expect(out.first.breakStartedAt, tenAm);
+    });
+
+    test('clockOut while on break auto-closes the break', () {
+      final rows = [
+        _row(
+          id: 'e3', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userClockedOut, at: noon,
+        ),
+        _row(
+          id: 'e2', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userBreakStarted, at: tenAm,
+        ),
+        _row(
+          id: 'e1', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userClockedIn, at: nineAm,
+        ),
+      ];
+      final out = ClockRepository.reduceStatuses(rows: rows, now: today);
+      expect(out.first.isOnBreak, isFalse);
+      // Break 10:00-12:00 = 2h closed implicitly at clockOut.
+      expect(out.first.breakedToday, const Duration(hours: 2));
+      // Worked (3h total) minus break (2h) = 1h.
+      expect(out.first.workedToday, const Duration(hours: 1));
+    });
+
+    test('overtime getter exposes hours worked beyond the daily threshold',
+        () {
+      // 9h interval => 1h overtime at the default 8h threshold.
+      final earlyMorning = DateTime(2026, 4, 22, 6, 0);
+      final threePm = DateTime(2026, 4, 22, 15, 0);
+      final rows = [
+        _row(
+          id: 'o2', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userClockedOut, at: threePm,
+        ),
+        _row(
+          id: 'o1', userId: 'u1', userName: 'Ali',
+          action: AuditAction.userClockedIn, at: earlyMorning,
+        ),
+      ];
+      final out = ClockRepository.reduceStatuses(rows: rows, now: today);
+      expect(out.first.workedToday, const Duration(hours: 9));
+      expect(out.first.overtimeToday, const Duration(hours: 1));
+    });
+
     test('uses the most recent user name captured on the audit row', () {
       final rows = [
         _row(
