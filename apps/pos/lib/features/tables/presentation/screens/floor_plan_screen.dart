@@ -1026,7 +1026,11 @@ class _DraggableTableTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isRound = table.shape == TableShape.circle;
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label:
+          '${table.name}, $statusLabel, ${table.capacity} kişilik',
+      child: GestureDetector(
       onTap: onTap,
       onPanUpdate: (details) => onDragUpdate(details.delta),
       onPanEnd: (_) => onDragEnd(),
@@ -1096,6 +1100,7 @@ class _DraggableTableTile extends StatelessWidget {
               ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -390,6 +390,11 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
         final keyId = isSpecial
             ? 'pin_${key.toLowerCase()}_btn'
             : 'pin_numpad_$key';
+        final semanticLabel = switch (key) {
+              'BACK' => 'Geri sil',
+              'CLEAR' => 'Temizle',
+              _ => 'Rakam $key',
+            };
         return Expanded(
           child: Padding(
             padding: EdgeInsets.only(
@@ -398,42 +403,46 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
             ),
             child: Material(
               color: Colors.transparent,
-              child: InkWell(
-                key: Key(keyId),
-                onTap: () {
-                  if (key == 'CLEAR') {
-                    _onClear();
-                  } else if (key == 'BACK') {
-                    _onBackspace();
-                  } else {
-                    _onDigit(key);
-                  }
-                },
-                borderRadius: BorderRadius.circular(12),
-                splashColor: AppColors.primary.withValues(alpha: 0.15),
-                child: Ink(
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: isSpecial
-                        ? Icon(
-                            key == 'BACK'
-                                ? Icons.backspace_outlined
-                                : Icons.close,
-                            size: 22,
-                            color: AppColors.textSecondary,
-                          )
-                        : Text(
-                            key,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
+              child: Semantics(
+                button: true,
+                label: semanticLabel,
+                child: InkWell(
+                  key: Key(keyId),
+                  onTap: () {
+                    if (key == 'CLEAR') {
+                      _onClear();
+                    } else if (key == 'BACK') {
+                      _onBackspace();
+                    } else {
+                      _onDigit(key);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  splashColor: AppColors.primary.withValues(alpha: 0.15),
+                  child: Ink(
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: isSpecial
+                          ? Icon(
+                              key == 'BACK'
+                                  ? Icons.backspace_outlined
+                                  : Icons.close,
+                              size: 22,
+                              color: AppColors.textSecondary,
+                            )
+                          : Text(
+                              key,
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
               ),
@@ -446,7 +455,11 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
 
   Widget _buildEnterButton() {
     final isComplete = _pin.length == _pinLength && !_isLoggingIn;
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      enabled: isComplete,
+      label: _isLoggingIn ? 'Giriş yapılıyor' : 'Giriş',
+      child: GestureDetector(
       key: const Key('pin_enter_btn'),
       onTap: isComplete ? _onEnter : null,
       child: AnimatedOpacity(
@@ -498,6 +511,7 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
             ],
           ),
         ),
+      ),
       ),
     );
   }

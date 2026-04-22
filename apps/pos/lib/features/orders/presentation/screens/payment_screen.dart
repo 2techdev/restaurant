@@ -359,7 +359,10 @@ class _MethodButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    return Semantics(
+      button: true,
+      label: '$label ödeme yöntemi',
+      child: Material(
       color: fill,
       child: InkWell(
         onTap: onTap,
@@ -401,6 +404,7 @@ class _MethodButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
