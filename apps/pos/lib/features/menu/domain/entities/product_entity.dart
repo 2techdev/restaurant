@@ -69,6 +69,17 @@ class ProductEntity {
   /// References GangTemplate.id. Null = fall back to category default.
   final String? defaultGangId;
 
+  /// Whether this product is a combo / set menu bundling child products.
+  /// When true, the repository loads the component list from ComboItems
+  /// at cart time.
+  final bool isCombo;
+
+  /// Optional flat discount applied to the bundle, in cents. When null
+  /// the combo charges the parent product's own [price]; when set the
+  /// price is `sum(component unit prices * quantity) - comboDiscountCents`
+  /// floored at zero.
+  final int? comboDiscountCents;
+
   const ProductEntity({
     required this.id,
     required this.tenantId,
@@ -91,6 +102,8 @@ class ProductEntity {
     this.isWeightBased = false,
     this.weightUnit,
     this.defaultGangId,
+    this.isCombo = false,
+    this.comboDiscountCents,
   });
 
   /// Whether this product has configurable modifiers.
@@ -119,6 +132,8 @@ class ProductEntity {
     bool? isWeightBased,
     String? Function()? weightUnit,
     String? Function()? defaultGangId,
+    bool? isCombo,
+    int? Function()? comboDiscountCents,
   }) {
     return ProductEntity(
       id: id ?? this.id,
@@ -144,6 +159,10 @@ class ProductEntity {
       weightUnit: weightUnit != null ? weightUnit() : this.weightUnit,
       defaultGangId:
           defaultGangId != null ? defaultGangId() : this.defaultGangId,
+      isCombo: isCombo ?? this.isCombo,
+      comboDiscountCents: comboDiscountCents != null
+          ? comboDiscountCents()
+          : this.comboDiscountCents,
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:gastrocore_pos/features/audit_log/data/daos/audit_log_dao.dart';
 import 'package:gastrocore_pos/features/inventory/data/daos/inventory_dao.dart';
+import 'package:gastrocore_pos/features/menu/data/daos/combo_dao.dart';
 import 'package:gastrocore_pos/features/payments/data/daos/receipt_counter_dao.dart';
 import 'package:gastrocore_pos/features/sync/data/daos/sync_event_dao.dart';
 
@@ -104,13 +105,13 @@ part 'app_database.g.dart';
     ActionButtons,
     ZReports,
   ],
-  daos: [AuditLogDao, InventoryDao, ReceiptCounterDao, SyncEventDao],
+  daos: [AuditLogDao, ComboDao, InventoryDao, ReceiptCounterDao, SyncEventDao],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -269,6 +270,14 @@ class AppDatabase extends _$AppDatabase {
           'ON receipts (tenant_id, receipt_number) '
           'WHERE is_deleted = 0',
         );
+      }
+      if (from < 18) {
+        // v18: combo/set-menu flag + optional bundle discount on Products.
+        // The combo_items table already exists (added earlier) but was
+        // orphaned — no flag on Products identified which rows actually
+        // bundle sub-items. These two columns wire the scaffolding up.
+        await m.addColumn(products, products.isCombo);
+        await m.addColumn(products, products.comboDiscountCents);
       }
     },
     onCreate: (m) async {

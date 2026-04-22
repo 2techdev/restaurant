@@ -609,6 +609,8 @@ class MenuRepositoryImpl {
       printerGroup: row.printerGroup,
       modifierGroups: modifierGroups,
       defaultGangId: row.defaultGangId,
+      isCombo: row.isCombo,
+      comboDiscountCents: row.comboDiscountCents,
     );
   }
 
@@ -630,6 +632,8 @@ class MenuRepositoryImpl {
       prepTimeMinutes: Value(entity.prepTimeMinutes),
       printerGroup: Value(entity.printerGroup),
       defaultGangId: Value(entity.defaultGangId),
+      isCombo: Value(entity.isCombo),
+      comboDiscountCents: Value(entity.comboDiscountCents),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
       isDeleted: const Value(false),

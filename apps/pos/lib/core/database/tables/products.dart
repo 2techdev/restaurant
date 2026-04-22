@@ -28,6 +28,19 @@ class Products extends Table {
   /// Null means fall back to category default or no Gang.
   TextColumn get defaultGangId => text().nullable()();
 
+  /// Flags this product as a combo/set menu. When true, the POS must load
+  /// the component list from [ComboItems] (keyed by [comboProductId]) at
+  /// add-to-cart time and expand the cart line into its bundled items.
+  /// Default false so existing single-item products keep their behaviour.
+  BoolColumn get isCombo => boolean().withDefault(const Constant(false))();
+
+  /// Optional flat discount applied at the combo level, in cents. The
+  /// bundle is priced as `sum(components) - comboDiscountCents`, floored
+  /// at zero. Null / zero means no bundle discount (combo sells at the
+  /// combo product's own [price] instead). Kept as a nullable int so
+  /// schema migration does not need to backfill a sentinel.
+  IntColumn get comboDiscountCents => integer().nullable()();
+
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
   IntColumn get syncStatus => integer().withDefault(const Constant(0))();
