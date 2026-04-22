@@ -14,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
+import 'package:gastrocore_pos/features/fiscal_ch/presentation/swiss_mwst_export_button.dart';
 import 'package:gastrocore_pos/features/reports/domain/entities/report_entities.dart';
 import 'package:gastrocore_pos/features/reports/presentation/providers/reports_provider.dart';
 import 'package:gastrocore_pos/features/reports/services/reports_pdf_exporter.dart';
@@ -216,6 +217,8 @@ class _ZBody extends ConsumerWidget {
                 label: const Text('PDF (Önizleme)'),
               ),
               const SizedBox(width: 8),
+              SwissMwstExportButton(snapshot: snapshot),
+              const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: sealing || snapshot.ticketCount == 0
                     ? null
@@ -277,6 +280,8 @@ class _SnapshotTab extends ConsumerWidget {
                   icon: const Icon(Icons.picture_as_pdf_rounded),
                   label: const Text('PDF'),
                 ),
+                const SizedBox(width: 8),
+                SwissMwstExportButton(snapshot: snapshot),
               ],
             ),
             const SizedBox(height: 12),
