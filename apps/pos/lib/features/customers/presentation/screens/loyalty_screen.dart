@@ -8,6 +8,8 @@ import 'package:gastrocore_pos/features/customers/domain/entities/customer_entit
 import 'package:gastrocore_pos/features/customers/domain/entities/loyalty_transaction_entity.dart';
 import 'package:gastrocore_pos/features/customers/presentation/providers/customer_provider.dart';
 import 'package:gastrocore_pos/features/customers/presentation/widgets/loyalty_badge.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 
 
 class LoyaltyScreen extends ConsumerWidget {
@@ -19,6 +21,10 @@ class LoyaltyScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final customerAsync = ref.watch(customerByIdProvider(customerId));
     final txAsync = ref.watch(loyaltyTransactionsProvider(customerId));
+    // Loyalty rule knobs come from settings; fall back to factory defaults
+    // during the initial async load so the screen never shows blanks.
+    final loyaltyCfg = ref.watch(loyaltySettingsProvider).valueOrNull ??
+        const LoyaltySettings();
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
@@ -36,11 +42,11 @@ class LoyaltyScreen extends ConsumerWidget {
                     children: [
                       _buildPointsSummary(context, ref, customer),
                       const SizedBox(height: 20),
-                      _buildTierProgress(customer),
+                      _buildTierProgress(customer, loyaltyCfg),
                       const SizedBox(height: 20),
-                      _buildActions(context, ref, customer),
+                      _buildActions(context, ref, customer, loyaltyCfg),
                       const SizedBox(height: 20),
-                      _buildRules(),
+                      _buildRules(loyaltyCfg),
                       const SizedBox(height: 20),
                       _buildHistory(txAsync),
                       const SizedBox(height: 40),
@@ -175,22 +181,33 @@ class LoyaltyScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTierProgress(CustomerEntity customer) {
+  Widget _buildTierProgress(CustomerEntity customer, LoyaltySettings cfg) {
     final spentChf = customer.totalSpent ~/ 100;
+    final silverChf = cfg.silverThresholdCents ~/ 100;
+    final goldChf = cfg.goldThresholdCents ~/ 100;
+    // Resolve tier from the configurable thresholds rather than the
+    // hard-coded CustomerEntity.tier getter so an operator-tuned program
+    // is reflected instantly on this screen.
+    final tier = resolveLoyaltyTier(customer.totalSpent, cfg);
     double progress;
     String nextTier;
     int remaining;
 
-    switch (customer.tier) {
-      case CustomerTier.bronze:
-        progress = (spentChf / 200).clamp(0.0, 1.0);
+    switch (tier) {
+      case LoyaltyTier.bronze:
+        progress = silverChf == 0
+            ? 0.0
+            : (spentChf / silverChf).clamp(0.0, 1.0);
         nextTier = 'Silber';
-        remaining = (200 - spentChf).clamp(0, 200);
-      case CustomerTier.silver:
-        progress = ((spentChf - 200) / 300).clamp(0.0, 1.0);
+        remaining = (silverChf - spentChf).clamp(0, silverChf);
+      case LoyaltyTier.silver:
+        final band = goldChf - silverChf;
+        progress = band <= 0
+            ? 1.0
+            : ((spentChf - silverChf) / band).clamp(0.0, 1.0);
         nextTier = 'Gold';
-        remaining = (500 - spentChf).clamp(0, 300);
-      case CustomerTier.gold:
+        remaining = (goldChf - spentChf).clamp(0, band);
+      case LoyaltyTier.gold:
         progress = 1.0;
         nextTier = 'Gold';
         remaining = 0;
@@ -263,7 +280,15 @@ class LoyaltyScreen extends ConsumerWidget {
   }
 
   Widget _buildActions(
-      BuildContext context, WidgetRef ref, CustomerEntity customer) {
+      BuildContext context, WidgetRef ref, CustomerEntity customer,
+      LoyaltySettings cfg) {
+    // Minimum redemption = one full "CHF 1.00" worth of points under the
+    // current rules. Keeps the action disabled until the customer has
+    // actually accumulated something useful regardless of the ratio.
+    final minRedeem = cfg.centsPerPoint > 0 ? (100 ~/ cfg.centsPerPoint) : 100;
+    final ratioLabel = cfg.centsPerPoint == 1
+        ? '100 Pts = CHF 1.00'
+        : '1 Pt = ${cfg.centsPerPoint} Rp.';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -281,10 +306,10 @@ class LoyaltyScreen extends ConsumerWidget {
             Expanded(
               child: _ActionButton(
                 label: 'Punkte einlösen',
-                sublabel: '100 Pts = CHF 1.00',
+                sublabel: ratioLabel,
                 icon: Icons.redeem_rounded,
                 color: AppColors.orange,
-                enabled: customer.loyaltyPoints >= 100,
+                enabled: cfg.isActive && customer.loyaltyPoints >= minRedeem,
                 onTap: () => _redeemDialog(context, ref, customer),
               ),
             ),
@@ -304,7 +329,14 @@ class LoyaltyScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRules() {
+  Widget _buildRules(LoyaltySettings cfg) {
+    // Format the redemption line so a non-default ratio reads naturally.
+    // Default 1 ct / point still renders the familiar "100 Pts = CHF 1.00".
+    final redemptionLabel = cfg.centsPerPoint == 1
+        ? '100 Punkte = CHF 1.00 Rabatt'
+        : '1 Punkt = ${cfg.centsPerPoint} Rp. Rabatt';
+    final silverChf = cfg.silverThresholdCents ~/ 100;
+    final goldChf = cfg.goldThresholdCents ~/ 100;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -315,11 +347,11 @@ class LoyaltyScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Icon(Icons.info_outline_rounded,
+            children: [
+              const Icon(Icons.info_outline_rounded,
                   size: 14, color: AppColors.primary),
-              SizedBox(width: 8),
-              Text(
+              const SizedBox(width: 8),
+              const Text(
                 'Programm-Regeln',
                 style: TextStyle(
                   fontSize: 14,
@@ -327,31 +359,50 @@ class LoyaltyScreen extends ConsumerWidget {
                   color: AppColors.textPrimary,
                 ),
               ),
+              const Spacer(),
+              if (!cfg.isActive)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.red.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'DEAKTIVIERT',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.red,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 12),
           _RuleRow(
             icon: Icons.add_circle_rounded,
             color: AppColors.green,
-            text: '1 CHF ausgeben = 1 Punkt sammeln',
+            text: '1 CHF ausgeben = ${cfg.pointsPerChfSpent} Punkt(e) sammeln',
           ),
           const SizedBox(height: 8),
           _RuleRow(
             icon: Icons.remove_circle_rounded,
             color: AppColors.orange,
-            text: '100 Punkte = CHF 1.00 Rabatt',
+            text: redemptionLabel,
           ),
           const SizedBox(height: 8),
           _RuleRow(
             icon: Icons.star_rounded,
             color: const Color(0xFFC0C0C0),
-            text: 'Silber: ab CHF 200 Umsatz',
+            text: 'Silber: ab CHF $silverChf Umsatz',
           ),
           const SizedBox(height: 8),
           _RuleRow(
             icon: Icons.star_rounded,
             color: AppColors.yellow,
-            text: 'Gold: ab CHF 500 Umsatz',
+            text: 'Gold: ab CHF $goldChf Umsatz',
           ),
         ],
       ),

@@ -6,6 +6,7 @@ library;
 
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -69,6 +70,13 @@ abstract interface class SettingsRepository {
 
   Future<HappyHourSettings> loadHappyHourSettings();
   Future<void> saveHappyHourSettings(HappyHourSettings settings);
+
+  // ---------------------------------------------------------------------------
+  // Loyalty — configurable earn rate, redemption ratio, tier thresholds
+  // ---------------------------------------------------------------------------
+
+  Future<LoyaltySettings> loadLoyaltySettings();
+  Future<void> saveLoyaltySettings(LoyaltySettings settings);
 
   // ---------------------------------------------------------------------------
   // Backup & Restore

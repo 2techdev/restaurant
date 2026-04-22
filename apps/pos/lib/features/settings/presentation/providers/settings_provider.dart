@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gastrocore_pos/features/settings/data/repositories/settings_repository_impl.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -351,6 +352,51 @@ final themeCustomizationProvider = StateNotifierProvider<
 });
 
 // ---------------------------------------------------------------------------
+// Loyalty Settings (earn / redemption / tier thresholds)
+// ---------------------------------------------------------------------------
+
+class LoyaltySettingsNotifier
+    extends StateNotifier<AsyncValue<LoyaltySettings>> {
+  LoyaltySettingsNotifier(this._repository)
+      : super(const AsyncValue.loading()) {
+    _load();
+  }
+
+  final SettingsRepository _repository;
+
+  Future<void> _load() async {
+    state = await AsyncValue.guard(_repository.loadLoyaltySettings);
+  }
+
+  Future<void> save(LoyaltySettings settings) async {
+    await _repository.saveLoyaltySettings(settings);
+    state = AsyncValue.data(settings);
+  }
+
+  Future<void> update(
+    LoyaltySettings Function(LoyaltySettings) updater,
+  ) async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    await save(updater(current));
+  }
+
+  /// Restores the factory defaults matching the legacy hard-coded rules
+  /// (1 pt/CHF, 1 ct/pt, Silber CHF 200, Gold CHF 500). Used by the "Reset"
+  /// button in the editor and by the pilot smoke tests.
+  Future<void> resetToDefaults() async {
+    await save(const LoyaltySettings());
+  }
+}
+
+final loyaltySettingsProvider = StateNotifierProvider<LoyaltySettingsNotifier,
+    AsyncValue<LoyaltySettings>>((ref) {
+  final repo = ref.watch(settingsRepositoryProvider).valueOrNull;
+  if (repo == null) return LoyaltySettingsNotifier(_PlaceholderRepository());
+  return LoyaltySettingsNotifier(repo);
+});
+
+// ---------------------------------------------------------------------------
 // Backup provider (one-shot async operations)
 // ---------------------------------------------------------------------------
 
@@ -405,6 +451,11 @@ class _PlaceholderRepository implements SettingsRepository {
       const HappyHourSettings();
   @override
   Future<void> saveHappyHourSettings(HappyHourSettings s) async {}
+  @override
+  Future<LoyaltySettings> loadLoyaltySettings() async =>
+      const LoyaltySettings();
+  @override
+  Future<void> saveLoyaltySettings(LoyaltySettings s) async {}
   @override
   Future<String> getDatabasePath() async => '';
   @override

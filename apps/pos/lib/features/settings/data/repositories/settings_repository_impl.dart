@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -31,6 +32,7 @@ abstract final class _Keys {
   static const app = 'settings.v1.app';
   static const themeColors = 'settings.v1.themeColors';
   static const happyHour = 'settings.v1.happyHour';
+  static const loyalty = 'settings.v1.loyalty';
 }
 
 class SettingsRepositoryImpl implements SettingsRepository {
@@ -199,6 +201,26 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Loyalty
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<LoyaltySettings> loadLoyaltySettings() async {
+    final raw = _prefs.getString(_Keys.loyalty);
+    if (raw == null) return const LoyaltySettings();
+    try {
+      return LoyaltySettings.fromJsonString(raw);
+    } catch (_) {
+      return const LoyaltySettings();
+    }
+  }
+
+  @override
+  Future<void> saveLoyaltySettings(LoyaltySettings settings) async {
+    await _prefs.setString(_Keys.loyalty, settings.toJsonString());
+  }
+
+  // ---------------------------------------------------------------------------
   // Backup & Restore
   // ---------------------------------------------------------------------------
 
@@ -267,6 +289,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       _prefs.remove(_Keys.tax),
       _prefs.remove(_Keys.app),
       _prefs.remove(_Keys.themeColors),
+      _prefs.remove(_Keys.happyHour),
+      _prefs.remove(_Keys.loyalty),
     ]);
   }
 }

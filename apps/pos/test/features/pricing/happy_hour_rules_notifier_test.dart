@@ -17,6 +17,7 @@ import 'package:gastrocore_pos/features/pricing/domain/happy_hour_rule.dart';
 import 'package:gastrocore_pos/features/pricing/providers/happy_hour_provider.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -85,6 +86,11 @@ class _FakeSettingsRepository implements SettingsRepository {
       const ThemeCustomization();
   @override
   Future<void> saveThemeCustomization(ThemeCustomization s) async {}
+  @override
+  Future<LoyaltySettings> loadLoyaltySettings() async =>
+      const LoyaltySettings();
+  @override
+  Future<void> saveLoyaltySettings(LoyaltySettings s) async {}
 
   @override
   Future<String> getDatabasePath() async => '';

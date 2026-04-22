@@ -27,6 +27,7 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -72,6 +73,7 @@ enum _Section {
   themeColors('Tema Renkleri', Icons.color_lens_rounded),
   backup('Backup & Restore', Icons.backup_rounded),
   auditLog('Audit Log', Icons.history_rounded),
+  loyalty('Treueprogramm', Icons.card_giftcard_rounded),
   demoData('Demo Data', Icons.science_outlined),
   upgrade('License & Upgrade', Icons.workspace_premium_rounded),
   about('About', Icons.info_outline_rounded);
@@ -145,6 +147,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _Section.themeColors => const _ThemeColorsSection(),
       _Section.backup => const _BackupSection(),
       _Section.auditLog => _AuditLogLinkSection(onNavigate: _navigateBack),
+      _Section.loyalty => const _LoyaltySection(),
       _Section.demoData => const _DemoDataSection(),
       _Section.upgrade => const _UpgradeSection(),
       _Section.about => const _AboutSection(),
@@ -4935,4 +4938,343 @@ class _ColorPickerRowState extends State<_ColorPickerRow> {
       ],
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Loyalty section — configurable earn rate / redemption / tier thresholds
+// ---------------------------------------------------------------------------
+
+class _LoyaltySection extends ConsumerStatefulWidget {
+  const _LoyaltySection();
+
+  @override
+  ConsumerState<_LoyaltySection> createState() => _LoyaltySectionState();
+}
+
+class _LoyaltySectionState extends ConsumerState<_LoyaltySection> {
+  /// Snapshot of the currently-persisted settings. We keep a local mutable
+  /// copy so the form stays editable while the user is typing; the provider
+  /// is only touched on "Kaydet".
+  LoyaltySettings? _draft;
+  late final TextEditingController _earnCtrl;
+  late final TextEditingController _redeemCtrl;
+  late final TextEditingController _silverCtrl;
+  late final TextEditingController _goldCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _earnCtrl = TextEditingController();
+    _redeemCtrl = TextEditingController();
+    _silverCtrl = TextEditingController();
+    _goldCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _earnCtrl.dispose();
+    _redeemCtrl.dispose();
+    _silverCtrl.dispose();
+    _goldCtrl.dispose();
+    super.dispose();
+  }
+
+  void _seed(LoyaltySettings s) {
+    _draft = s;
+    _earnCtrl.text = s.pointsPerChfSpent.toString();
+    _redeemCtrl.text = s.centsPerPoint.toString();
+    _silverCtrl.text = (s.silverThresholdCents ~/ 100).toString();
+    _goldCtrl.text = (s.goldThresholdCents ~/ 100).toString();
+  }
+
+  LoyaltySettings _readForm(LoyaltySettings base) {
+    final earn = int.tryParse(_earnCtrl.text) ?? base.pointsPerChfSpent;
+    final redeem = int.tryParse(_redeemCtrl.text) ?? base.centsPerPoint;
+    final silverChf = int.tryParse(_silverCtrl.text);
+    final goldChf = int.tryParse(_goldCtrl.text);
+    return base.copyWith(
+      pointsPerChfSpent: earn,
+      centsPerPoint: redeem,
+      silverThresholdCents:
+          silverChf != null ? silverChf * 100 : base.silverThresholdCents,
+      goldThresholdCents:
+          goldChf != null ? goldChf * 100 : base.goldThresholdCents,
+    );
+  }
+
+  Future<void> _save() async {
+    final current = _draft ?? const LoyaltySettings();
+    final next = _readForm(current);
+    if (!next.isValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Geçersiz değerler. Tüm sayılar pozitif ve Gold > Silber olmalı.',
+          ),
+          duration: Duration(milliseconds: 2200),
+        ),
+      );
+      return;
+    }
+    await ref.read(loyaltySettingsProvider.notifier).save(next);
+    if (!mounted) return;
+    setState(() => _draft = next);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Treueprogramm kaydedildi'),
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
+  }
+
+  Future<void> _reset() async {
+    await ref.read(loyaltySettingsProvider.notifier).resetToDefaults();
+    if (!mounted) return;
+    setState(() => _seed(const LoyaltySettings()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(loyaltySettingsProvider);
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Text('$e', style: const TextStyle(color: AppColors.red)),
+      ),
+      data: (settings) {
+        // (Re)seed the controllers when the provider emits a new value
+        // that differs from our current draft — e.g. first load or reset.
+        if (_draft != settings) {
+          _seed(settings);
+        }
+        final live = _readForm(settings);
+        final sampleSpent = 10000; // CHF 100
+        final samplePoints = (sampleSpent ~/ 100) * live.pointsPerChfSpent;
+        final sampleDiscount = samplePoints * live.centsPerPoint;
+        return _SectionScaffold(
+          title: 'Treueprogramm',
+          action: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton.icon(
+                icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                label: const Text('Standart'),
+                onPressed: _reset,
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.save_rounded, size: 16),
+                label: const Text('Kaydet'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: _save,
+              ),
+            ],
+          ),
+          children: [
+            _Card(
+              title: 'DURUM',
+              children: [
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Programı etkinleştir',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  subtitle: Text(
+                    settings.isActive
+                        ? 'Müşteriler puan biriktirebilir ve eritebilir'
+                        : 'Puan kazanımı/eritimi geçici olarak devre dışı',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  value: settings.isActive,
+                  onChanged: (v) => ref
+                      .read(loyaltySettingsProvider.notifier)
+                      .update((s) => s.copyWith(isActive: v)),
+                ),
+              ],
+            ),
+            _Card(
+              title: 'KAZANIM (EARN RATE)',
+              children: [
+                const Text(
+                  'Her 1 CHF harcandığında kaç puan verilecek.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Text('1 CHF =',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 80,
+                      child: TextField(
+                        controller: _earnCtrl,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: _fieldDecoration(),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Punkt(e)',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                  ],
+                ),
+              ],
+            ),
+            _Card(
+              title: 'ERITIM (REDEMPTION)',
+              children: [
+                const Text(
+                  'Her 1 puan kaç santim (cent) indirim açığa çıkarır.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Text('1 Punkt =',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 80,
+                      child: TextField(
+                        controller: _redeemCtrl,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: _fieldDecoration(),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Rp. (santim)',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Örnek: $samplePoints Punkt = '
+                  'CHF ${(sampleDiscount / 100).toStringAsFixed(2)} indirim',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textDim,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+            _Card(
+              title: 'TIER EŞİKLERİ (CHF)',
+              children: [
+                const Text(
+                  'Müşteri yaşam boyu ciroya göre Bronz / Silber / Gold '
+                  'kademelerine yükselir. Eşikler CHF cinsindendir.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const SizedBox(width: 80,
+                        child: Text('Silber',
+                            style: TextStyle(
+                                color: Color(0xFFC0C0C0),
+                                fontWeight: FontWeight.w700))),
+                    SizedBox(
+                      width: 100,
+                      child: TextField(
+                        controller: _silverCtrl,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: _fieldDecoration(suffix: 'CHF'),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    SizedBox(width: 80,
+                        child: Text('Gold',
+                            style: TextStyle(
+                                color: AppColors.yellow,
+                                fontWeight: FontWeight.w700))),
+                    SizedBox(
+                      width: 100,
+                      child: TextField(
+                        controller: _goldCtrl,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: _fieldDecoration(suffix: 'CHF'),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            _Card(
+              title: 'ÖNIZLEME',
+              children: [
+                Text(
+                  '• 1 CHF = ${live.pointsPerChfSpent} Punkt(e)',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '• ${live.centsPerPoint == 1 ? "100 Punkte = CHF 1.00" : "1 Punkt = ${live.centsPerPoint} Rp."} indirim',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '• Silber: ab CHF ${(live.silverThresholdCents / 100).toStringAsFixed(0)} Umsatz',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary),
+                ),
+                Text(
+                  '• Gold: ab CHF ${(live.goldThresholdCents / 100).toStringAsFixed(0)} Umsatz',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  InputDecoration _fieldDecoration({String? suffix}) => InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: AppColors.bgInput,
+        suffixText: suffix,
+        suffixStyle: const TextStyle(color: AppColors.textSecondary),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+      );
 }
