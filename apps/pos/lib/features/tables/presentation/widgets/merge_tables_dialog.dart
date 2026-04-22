@@ -11,11 +11,15 @@
 /// plus [TableRepositoryImpl.clearTable] — no network calls.
 library;
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
+import 'package:gastrocore_pos/features/audit_log/domain/entities/audit_action.dart';
+import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_log_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/tables/domain/entities/table_entity.dart';
@@ -135,6 +139,27 @@ class _MergeTablesDialogState extends ConsumerState<MergeTablesDialog> {
       await tableRepo.clearTable(widget.primaryTable.id);
       await tableRepo.updateTableStatus(
           widget.primaryTable.id, TableStatus.dirty);
+
+      // Audit the merge. Uses entityId = source ticket (the one voided) so
+      // the history view anchors the record to the ticket that disappeared;
+      // newValueJson carries the full pair so operators can reconstruct
+      // which target received which items.
+      final audit = ref.read(auditServiceProvider);
+      await audit.log(
+        action: AuditAction.tableMerged,
+        entityType: 'ticket',
+        entityId: sourceTicket.id,
+        reason: reason,
+        newValueJson: jsonEncode({
+          'sourceTableId': widget.primaryTable.id,
+          'sourceTableName': widget.primaryTable.name,
+          'sourceTicketId': sourceTicket.id,
+          'targetTableId': targetTable.id,
+          'targetTableName': targetTable.name,
+          'targetTicketId': targetTicketId,
+          'itemCount': sourceTicket.items.length,
+        }),
+      );
 
       // Refresh derived providers so open tickets list / table streams sync.
       ref.invalidate(allTablesProvider);

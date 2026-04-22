@@ -10,6 +10,11 @@ enum AuditAction {
   orderVoided('Order Voided'),
   itemVoided('Item Voided'),
 
+  // Tables — merge one occupied table's ticket into another. Needs its
+  // own action because a merge touches two tickets + two tables and the
+  // reason text carries the source/target pair.
+  tableMerged('Table Merged'),
+
   // Payments
   paymentReceived('Payment Received'),
   paymentRefunded('Payment Refunded'),
