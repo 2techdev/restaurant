@@ -1,8 +1,23 @@
 # GastroCore Platform — Living Roadmap
 
-> **Last Updated:** 2026-03-23
-> **Current Version:** v0.1.0+1 (MVP)
-> **Next Target:** v1.0.0-beta (Swiss Pilot Release)
+> **Last Updated:** 2026-04-22
+> **Current Version:** v1.3.0-beta (pilot Blok 2 / 3)
+> **Next Target:** v1.4.0-beta (Offline DLQ + fiscal polish)
+
+---
+
+## Phase 1.5: Pilot Hardening — Blok 2 / 3 (v1.3.0-beta)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Happy hour rules (time window + scope + stackable) | ✅ Done | Settings → Happy Hour |
+| Loyalty tuning (earn rate, redemption, tier thresholds) | ✅ Done | Settings → Loyalty |
+| Shift break / pause + overtime tracking | ✅ Done | Mesai panel |
+| Turkish (tr) locale — 157 keys | ✅ Done | DE / FR / IT / EN / TR |
+| App self-update (manifest + SHA-256 + audit + share sheet) | ✅ Done | Settings → Güncelleme |
+| Semantics coverage (PIN pad / tables / payment) | ✅ Done | A11y regression test |
+| Golden baselines @ 1920×1200 | ✅ Done | 5 screens pinned |
+| Offline sync dead-letter queue (DLQ) | 🔄 In Progress | Next drop |
 
 **Status Legend:**
 ✅ Done — feature complete and tested

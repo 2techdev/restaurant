@@ -24,13 +24,15 @@ GastroCore is a production-grade restaurant management system built with Flutter
 
 | Capability | Detail |
 |---|---|
-| **Languages** | DE / FR / IT / EN (Swiss quadrilingual) |
+| **Languages** | DE / FR / IT / EN / TR (Swiss quadrilingual + Turkish staff UI) |
 | **Currency** | CHF (5-Rappen rounding) |
 | **Tax** | Swiss MWST — 8.1% dine-in, 2.6% takeaway, 3.8% accommodation |
 | **Database** | SQLite (device) ↔ PostgreSQL 16 (cloud) via Drift ORM |
 | **State** | Riverpod 2 + offline-first outbox sync |
 | **Backend** | Go 1.22, stdlib `net/http`, gorilla/websocket |
 | **Deployment** | Docker Compose / VPS / GitHub Pages (web) |
+| **Self-update** | Manifest-based APK update checker (SHA-256 pinned) |
+| **A11y** | Semantics labels on till surfaces, locked by regression test |
 
 ---
 

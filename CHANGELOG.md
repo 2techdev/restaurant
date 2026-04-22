@@ -7,6 +7,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased — Pilot Blok 2 / 3]
+
+### Added
+- **Happy hour rules** — configurable time windows (weekday + start/end), category/product scope, flat/percentage discount, stackable flag. Full CRUD via Settings → Happy Hour with audit trail (`AuditAction.happyHourRuleCreated/Updated/Deleted`).
+- **Loyalty tuning** — earn rate, redemption ratio, and tier thresholds (Silver/Gold/Platinum) editable in Settings → Loyalty. `LoyaltySettingsRepository` persists to SharedPreferences; `loyaltySettingsProvider` rebuilds dependent points calculations.
+- **Shift break / pause + overtime tracking** — staff can start/stop a break from the Mesai (shift) panel; overtime computed from `standardHours` vs actual clocked time. `ShiftBreakEntity` with audit action `shiftBreakStarted/Ended`.
+- **Turkish (tr) locale** — 157 translation keys added across `app_tr.arb`. TR joins DE/FR/IT/EN in `supportedLocales`.
+- **App self-update** — manifest-based checker with audit trail. `UpdateManifest` entity (versionName/buildNumber/apkUrl/sha256/changelog/minSupportedBuild/releasedAt), `UpdateService.fetchManifest()` with HTTP client injection for tests, mandatory-update detection (`isMandatoryFor`), `Share.share()` for APK download (no `url_launcher` dependency). Settings → Güncelleme panel with channel (stable/beta), manifest URL, and "Kontrol et" button.
+- **Semantics coverage on till surfaces** — PIN pad digit keys (`Rakam $n`), back (`Geri sil`), clear (`Temizle`), enter button with live `Giriş / Giriş yapılıyor` label; floor-plan table tiles announce `$name, $status, $capacity kişilik`; payment method tiles announce `$label ödeme yöntemi`. A11y regression test `test/a11y/pin_pad_semantics_test.dart` locks the labels.
+- **Golden baselines @ 1920×1200** — harness pinning the viewport to the pilot tablet resolution and 5 screen baselines (PIN login, empty order panel, payment method cards, table tile states, update-available card) so padding, colour token, and typography regressions surface as pixel diffs. Regenerate with `flutter test --update-goldens test/goldens/`.
+
+### Changed
+- `SettingsRepository` gains `loadUpdateChannelSettings` / `saveUpdateChannelSettings` — stored under key `settings.v1.updateChannel`; included in `clearAll()`.
+- `app_version.dart` pins `appVersionName = '1.3.0'` and `appBuildNumber = 130` as the single source of truth for the update comparison.
+
+---
+
 ## [Unreleased]
 
 ### Added

@@ -1,9 +1,24 @@
 # GastroCore Platform — Project Status Report
 
-> **Generated:** 2026-03-23
-> **Version:** v0.1.0+1 → v1.0.0-beta
-> **Codebase Size:** ~51,800 LOC (Flutter: 25,656 | Go: 6,768 | SQL: ~1,200 | Docs: ~15,000)
-> **Repository:** `C:\Projects\Restaurant\admiring-einstein\`
+> **Generated:** 2026-04-22
+> **Version:** v1.3.0-beta (pilot Blok 2 / 3)
+> **Codebase Size:** ~54,800 LOC (Flutter: ~28,200 | Go: 6,768 | SQL: ~1,200 | Docs: ~15,800)
+> **Repository:** `E:\Project\Restaurant\` (worktree `jolly-final`)
+
+---
+
+## 0. Pilot Blok 2 / 3 Snapshot
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Happy hour rules (time window + scope + stackable) | ✅ Done | Settings → Happy Hour |
+| Loyalty tuning (earn rate, redemption, tiers) | ✅ Done | Settings → Loyalty |
+| Shift break / pause + overtime tracking | ✅ Done | Mesai panel |
+| Turkish (tr) locale — 157 keys | ✅ Done | Joins DE/FR/IT/EN |
+| App self-update (manifest + audit + share sheet) | ✅ Done | Settings → Güncelleme |
+| Semantics coverage (PIN pad / tables / payment) | ✅ Done | Regression test locked |
+| Golden baselines @ 1920×1200 (5 screens) | ✅ Done | `test/goldens/` |
+| Offline sync dead-letter queue (DLQ) | 🔄 In Progress | Next drop |
 
 ---
 
