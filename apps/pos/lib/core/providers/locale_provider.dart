@@ -23,4 +23,5 @@ Locale _toLocale(AppLanguage language) => switch (language) {
       AppLanguage.fr => const Locale('fr'),
       AppLanguage.it => const Locale('it'),
       AppLanguage.en => const Locale('en'),
+      AppLanguage.tr => const Locale('tr'),
     };

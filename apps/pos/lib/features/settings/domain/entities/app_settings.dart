@@ -12,13 +12,15 @@ enum AppLanguage {
   de,
   fr,
   it,
-  en;
+  en,
+  tr;
 
   String get label => switch (this) {
         de => 'Deutsch',
         fr => 'Français',
         it => 'Italiano',
         en => 'English',
+        tr => 'Türkçe',
       };
 
   String get flag => switch (this) {
@@ -26,6 +28,7 @@ enum AppLanguage {
         fr => '🇫🇷',
         it => '🇮🇹',
         en => '🇬🇧',
+        tr => '🇹🇷',
       };
 
   static AppLanguage fromString(String s) =>
