@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/core/data/app_initializer.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
@@ -50,7 +51,8 @@ void main() async {
   }
 
   final syncUrl =
-      prefs.getString('sync_server_url') ?? 'http://localhost:8080';
+      prefs.getString('sync_server_url') ?? AppEndpoints.apiBaseUrl;
+  final wsUrl = prefs.getString('ws_server_url') ?? AppEndpoints.wsBaseUrl;
 
   runApp(
     ProviderScope(
@@ -59,6 +61,7 @@ void main() async {
         tenantIdProvider.overrideWithValue(tenantId),
         deviceIdProvider.overrideWith((ref) => deviceId),
         syncServerUrlProvider.overrideWith((ref) => syncUrl),
+        wsServerUrlProvider.overrideWith((ref) => wsUrl),
       ],
       child: const GastroCoreKdsApp(),
     ),

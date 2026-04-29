@@ -88,11 +88,11 @@ class _WaiterLoginScreenState extends ConsumerState<WaiterLoginScreen> {
     setState(() => _isLoggingIn = true);
 
     final pinHash = sha256.convert(utf8.encode(_pin)).toString();
-    final success =
+    final result =
         await ref.read(currentUserProvider.notifier).loginWithPin(pinHash);
 
     if (!mounted) return;
-    if (success) {
+    if (result == LoginResult.success) {
       context.go(WaiterRoutes.tables);
     } else {
       setState(() {
@@ -100,6 +100,14 @@ class _WaiterLoginScreenState extends ConsumerState<WaiterLoginScreen> {
         _isLoggingIn = false;
         _pin = '';
       });
+      if (result == LoginResult.pinCollision) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PIN çakışması — yöneticiyle görüşün.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
       await Future.delayed(const Duration(milliseconds: 800));
       if (mounted) setState(() => _showError = false);
     }

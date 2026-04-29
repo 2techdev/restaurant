@@ -49,6 +49,19 @@ class OrderRepositoryImpl {
               );
         }
       }
+
+      // 3. If the ticket belongs to a dine-in table, link the table back
+      //    to the order so the floor-plan shows it as occupied and the
+      //    next tap reloads the same ticket instead of starting a new one.
+      if (ticket.tableId != null && ticket.tableId!.isNotEmpty) {
+        await (_db.update(_db.restaurantTables)
+              ..where((t) => t.id.equals(ticket.tableId!)))
+            .write(RestaurantTablesCompanion(
+          currentOrderId: Value(ticket.id),
+          status: const Value('occupied'),
+          updatedAt: Value(DateTime.now()),
+        ));
+      }
     });
 
     // Return the fully hydrated entity.
@@ -511,6 +524,7 @@ class OrderRepositoryImpl {
       tableId: row.tableId,
       waiterId: row.waiterId,
       customerName: row.customerName,
+      customerId: row.customerId,
       guestCount: row.guestCount,
       status: _parseTicketStatus(row.status),
       channel: _parseOrderChannel(row.channel),
@@ -537,6 +551,7 @@ class OrderRepositoryImpl {
       tableId: Value(entity.tableId),
       waiterId: Value(entity.waiterId),
       customerName: Value(entity.customerName),
+      customerId: Value(entity.customerId),
       guestCount: Value(entity.guestCount),
       status: Value(_ticketStatusToString(entity.status)),
       channel: Value(_orderChannelToString(entity.channel)),

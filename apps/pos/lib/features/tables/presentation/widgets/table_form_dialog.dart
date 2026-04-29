@@ -43,6 +43,7 @@ class _TableFormDialogState extends ConsumerState<TableFormDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _capacityCtrl;
   late TableShape _shape;
+  late TableZone _zone;
   bool _saving = false;
 
   bool get _isEditing => widget.existing != null;
@@ -55,6 +56,12 @@ class _TableFormDialogState extends ConsumerState<TableFormDialog> {
     _capacityCtrl =
         TextEditingController(text: e?.capacity.toString() ?? '4');
     _shape = e?.shape ?? TableShape.rectangle;
+    // Zone (pilot, provider-backed). Default İç Salon for new tables.
+    final existingId = e?.id;
+    final assignments = ref.read(tableZoneAssignmentsProvider);
+    _zone = existingId != null
+        ? tableZoneForId(assignments, existingId)
+        : TableZone.icSalon;
   }
 
   @override
@@ -72,6 +79,7 @@ class _TableFormDialogState extends ConsumerState<TableFormDialog> {
     final capacity = int.parse(_capacityCtrl.text.trim());
     final name = _nameCtrl.text.trim();
 
+    String? resultingId;
     if (_isEditing) {
       await notifier.updateTable(
         tableId: widget.existing!.id,
@@ -79,15 +87,25 @@ class _TableFormDialogState extends ConsumerState<TableFormDialog> {
         capacity: capacity,
         shape: _shape,
       );
+      resultingId = widget.existing!.id;
     } else {
       final floorId =
           widget.floorId ?? ref.read(selectedFloorProvider) ?? '';
-      await notifier.createTable(
+      final created = await notifier.createTable(
         floorId: floorId,
         name: name,
         capacity: capacity,
         shape: _shape,
       );
+      resultingId = created?.id;
+    }
+
+    // Persist zone assignment in the pilot provider map.
+    if (resultingId != null) {
+      final current =
+          Map<String, TableZone>.from(ref.read(tableZoneAssignmentsProvider));
+      current[resultingId] = _zone;
+      ref.read(tableZoneAssignmentsProvider.notifier).state = current;
     }
 
     if (mounted) Navigator.of(context).pop();
@@ -211,6 +229,52 @@ class _TableFormDialogState extends ConsumerState<TableFormDialog> {
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+
+                // Zone (pilot, not persisted to DB yet)
+                _FieldLabel('Bölge'),
+                const SizedBox(height: 8),
+                Row(
+                  children: <TableZone>[
+                    TableZone.icSalon,
+                    TableZone.teras,
+                    TableZone.bar,
+                  ].map((zone) {
+                    final isSelected = _zone == zone;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _zone = zone),
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.accentDim
+                                : AppColors.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(8),
+                            border: isSelected
+                                ? Border.all(
+                                    color: AppColors.accent, width: 1.5)
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            tableZoneLabel(zone),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isSelected
+                                  ? AppColors.accent
+                                  : AppColors.textSecondary,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
                           ),
                         ),
                       ),

@@ -16,6 +16,7 @@ import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.d
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
+import 'package:gastrocore_pos/features/auth/domain/entities/permission.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
@@ -627,6 +628,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final total = ticket?.total ?? 0;
     final hasItems = items.isNotEmpty;
     final isDineIn = ticket?.orderType != OrderType.takeaway;
+    // Role gate: INDIRIM/Rabatt requires Şef+ (manager or admin).
+    final canDiscount = ref.watch(canProvider(Permission.discount));
 
     return Container(
       width: 320,
@@ -976,53 +979,59 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    // Discount
+                    // Discount (gated: requires Şef+)
                     Expanded(
-                      child: GestureDetector(
-                        onTap: hasItems
-                            ? () async {
-                                final ticket =
-                                    ref.read(currentTicketProvider);
-                                if (ticket == null) return;
-                                final result =
-                                    await DiscountDialog.show(
-                                  context: context,
-                                  ref: ref,
-                                  orderTotal: ticket.total,
-                                );
-                                if (result != null && mounted) {
-                                  final currentUser =
-                                      ref.read(currentUserProvider);
-                                  if (currentUser == null) return;
-                                  await ref
-                                      .read(currentTicketProvider
-                                          .notifier)
-                                      .applyDiscount(
-                                        discountType:
-                                            result.discountType,
-                                        discountValue:
-                                            result.discountValue,
-                                        reason: result.reason,
-                                        requestedBy: currentUser,
-                                        approvedBy: result.approvedBy,
-                                      );
+                      child: Tooltip(
+                        message: canDiscount ? '' : kPermissionRequiredTooltip,
+                        child: GestureDetector(
+                          onTap: (hasItems && canDiscount)
+                              ? () async {
+                                  final ticket =
+                                      ref.read(currentTicketProvider);
+                                  if (ticket == null) return;
+                                  final result =
+                                      await DiscountDialog.show(
+                                    context: context,
+                                    ref: ref,
+                                    orderTotal: ticket.total,
+                                  );
+                                  if (result != null && mounted) {
+                                    final currentUser =
+                                        ref.read(currentUserProvider);
+                                    if (currentUser == null) return;
+                                    await ref
+                                        .read(currentTicketProvider
+                                            .notifier)
+                                        .applyDiscount(
+                                          discountType:
+                                              result.discountType,
+                                          discountValue:
+                                              result.discountValue,
+                                          reason: result.reason,
+                                          requestedBy: currentUser,
+                                          approvedBy: result.approvedBy,
+                                        );
+                                  }
                                 }
-                              }
-                            : null,
-                        child: Container(
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'INDIRIM',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
-                                letterSpacing: 0.8,
+                              : null,
+                          child: Opacity(
+                            opacity: canDiscount ? 1.0 : 0.45,
+                            child: Container(
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceContainerHigh,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'INDIRIM',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
                               ),
                             ),
                           ),

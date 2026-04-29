@@ -18,6 +18,7 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/services/audit_service.dart';
 import 'package:gastrocore_pos/features/audit_log/domain/entities/audit_action.dart';
 import 'package:gastrocore_pos/features/audit_log/domain/entities/audit_log_entry_entity.dart';
+import 'package:gastrocore_pos/features/audit_log/domain/retention_policy.dart';
 
 // ---------------------------------------------------------------------------
 // AuditService singleton
@@ -225,5 +226,83 @@ class AuditLogExportNotifier extends StateNotifier<AuditExportState> {
 
 final auditLogExportProvider =
     StateNotifierProvider<AuditLogExportNotifier, AuditExportState>(
-  (ref) => AuditLogExportNotifier(ref),
+  AuditLogExportNotifier.new,
+);
+
+// ---------------------------------------------------------------------------
+// Retention / purge
+// ---------------------------------------------------------------------------
+
+/// State exposed by [auditLogPurgeProvider] so the settings UI can show
+/// how many rows would be removed and, after a run, how many were.
+class AuditPurgePreview {
+  const AuditPurgePreview({
+    required this.cutoff,
+    required this.rowsEligible,
+  });
+
+  final DateTime cutoff;
+  final int rowsEligible;
+}
+
+class AuditPurgeOutcome {
+  const AuditPurgeOutcome({
+    required this.cutoff,
+    required this.rowsRemoved,
+    required this.ranAt,
+  });
+
+  final DateTime cutoff;
+  final int rowsRemoved;
+  final DateTime ranAt;
+}
+
+class AuditLogPurgeNotifier extends StateNotifier<AuditPurgeOutcome?> {
+  AuditLogPurgeNotifier(this._ref) : super(null);
+
+  final Ref _ref;
+
+  /// Count rows older than the retention cutoff without deleting them.
+  /// Scoped to the active tenant. Safe to call before showing a
+  /// confirmation dialog.
+  Future<AuditPurgePreview> preview({
+    int years = kAuditLogRetentionYears,
+    DateTime? now,
+  }) async {
+    final db = _ref.read(databaseProvider);
+    final tenantId = _ref.read(tenantIdProvider);
+    final cutoff = auditLogRetentionCutoff(now ?? DateTime.now(), years: years);
+    final count = await db.auditLogDao
+        .countOlderThan(cutoff, tenantId: tenantId);
+    return AuditPurgePreview(cutoff: cutoff, rowsEligible: count);
+  }
+
+  /// Delete rows older than the retention cutoff. Returns the number of
+  /// rows removed and records it as the current state so a settings
+  /// screen can surface "last purge: N rows removed at …".
+  Future<AuditPurgeOutcome> purge({
+    int years = kAuditLogRetentionYears,
+    DateTime? now,
+  }) async {
+    final db = _ref.read(databaseProvider);
+    final tenantId = _ref.read(tenantIdProvider);
+    final cutoff = auditLogRetentionCutoff(now ?? DateTime.now(), years: years);
+    final removed = await db.auditLogDao
+        .purgeOlderThan(cutoff, tenantId: tenantId);
+    final outcome = AuditPurgeOutcome(
+      cutoff: cutoff,
+      rowsRemoved: removed,
+      ranAt: DateTime.now(),
+    );
+    state = outcome;
+    return outcome;
+  }
+}
+
+/// Provider for manual or scheduled audit-log retention purges. The
+/// state holds the most recent outcome (or null when no purge has run
+/// this app lifetime).
+final auditLogPurgeProvider =
+    StateNotifierProvider<AuditLogPurgeNotifier, AuditPurgeOutcome?>(
+  AuditLogPurgeNotifier.new,
 );

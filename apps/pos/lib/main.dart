@@ -18,7 +18,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:gastrocore_pos/app.dart';
+import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/core/data/app_initializer.dart';
+import 'package:gastrocore_pos/core/data/seed_data.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/features/brand_auth/presentation/providers/brand_auth_provider.dart';
@@ -56,9 +58,42 @@ Future<void> _bootstrap() async {
   final db = AppDatabase.create();
   await AppInitializer.initialize(db);
 
-  // Read the tenant ID from the (now-seeded) database.
+  // Post-seed hard override. If any of the four "visible" tables is still
+  // empty after the normal seed path ran — for instance because a silent
+  // exception inside `_seed()` got swallowed somewhere upstream — force
+  // a full re-seed so the pilot tablet never boots into an empty POS.
+  //
+  // `SeedData.seedForce()` calls `clearAll()` before inserting, so there
+  // is no double-insert risk on the stable [kPilotTenantId] primary key.
+  final tBoot = (await db.select(db.tenants).get()).length;
+  final cBoot = (await db.select(db.categories).get()).length;
+  final pBoot = (await db.select(db.products).get()).length;
+  final tblBoot = (await db.select(db.restaurantTables).get()).length;
+  debugPrint(
+    '[BOOT] post-init counts tenants=$tBoot cats=$cBoot prods=$pBoot '
+    'tables=$tblBoot',
+  );
+  if (tBoot == 0 || cBoot == 0 || pBoot == 0 || tblBoot == 0) {
+    debugPrint('[BOOT] empty detected — forcing SeedData.seedForce()');
+    await SeedData(db).seedForce();
+  }
+
+  // Resolve the active tenant ID.
+  //
+  // Pilot safeguard: hard-pin to [kPilotTenantId] instead of reading
+  // `tenants.first.id`. The seed already writes this exact ID, and every
+  // per-feature provider queries through `tenantIdProvider`, so forcing
+  // the constant here makes drift architecturally impossible — no other
+  // runtime path can slip a different UUID into the query scope. Accepted
+  // as temporary for the single-tenant pilot; revisit if/when multi-
+  // tenant boot is reintroduced.
+  //
+  // Log the row count so we can still see when the DB is empty.
   final tenants = await db.select(db.tenants).get();
-  final tenantId = tenants.first.id;
+  const tenantId = kPilotTenantId;
+  debugPrint(
+    '[BOOT] hard-pinned tenantId=$tenantId (tenants row count=${tenants.length})',
+  );
 
   // Pre-warm the license cache so the first frame knows the correct tier.
   final licenseRepo = LicenseRepositoryImpl(db);
@@ -72,9 +107,11 @@ Future<void> _bootstrap() async {
     await prefs.setString('device_id', deviceId);
   }
 
-  // Load the saved sync server URL (falls back to localhost default).
+  // Load the saved sync server URLs (fall back to the Hetzner pilot defaults
+  // surfaced by AppEndpoints — override via Settings or `--dart-define`).
   final syncUrl =
-      prefs.getString('sync_server_url') ?? 'http://localhost:8080';
+      prefs.getString('sync_server_url') ?? AppEndpoints.apiBaseUrl;
+  final wsUrl = prefs.getString('ws_server_url') ?? AppEndpoints.wsBaseUrl;
 
   // Build the ProviderScope so we can restore brand auth before the first frame.
   final container = ProviderContainer(
@@ -83,6 +120,7 @@ Future<void> _bootstrap() async {
       tenantIdProvider.overrideWithValue(tenantId),
       deviceIdProvider.overrideWith((ref) => deviceId),
       syncServerUrlProvider.overrideWith((ref) => syncUrl),
+      wsServerUrlProvider.overrideWith((ref) => wsUrl),
     ],
   );
 

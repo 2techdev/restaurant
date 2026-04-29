@@ -27,14 +27,33 @@ import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
+import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
+import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
+import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
+import 'package:gastrocore_pos/features/action_buttons/domain/entities/action_button_entity.dart';
+import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
+import 'package:gastrocore_pos/features/action_buttons/presentation/providers/action_button_provider.dart';
+import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
+import 'package:gastrocore_pos/features/orders/presentation/theme/pos_v2_theme.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/favorites_bar.dart';
 import 'package:gastrocore_pos/core/services/backup_service.dart';
+import 'package:gastrocore_pos/features/auth/domain/entities/permission.dart';
+import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/backup_provider.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_settings.dart';
+import 'package:gastrocore_pos/features/updates/domain/app_version.dart';
+import 'package:gastrocore_pos/features/updates/domain/entities/update_manifest.dart';
+import 'package:gastrocore_pos/features/updates/presentation/providers/update_provider.dart';
+import 'package:gastrocore_pos/features/sync/domain/entities/sync_event_entity.dart';
+import 'package:gastrocore_pos/features/sync/presentation/providers/sync_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
 import 'package:gastrocore_pos/features/licensing/domain/entities/app_feature.dart';
 import 'package:gastrocore_pos/features/licensing/domain/entities/license_tier.dart';
@@ -53,12 +72,18 @@ enum _Section {
   payment('Payment', Icons.payment_rounded),
   receipt('Receipt', Icons.receipt_long_rounded),
   tax('Tax (MWST)', Icons.calculate_rounded),
+  favorites('Hızlı Erişim Butonları', Icons.star_rounded),
+  functionButtons('Fonksiyon Butonları', Icons.flash_on_rounded),
   reports('Reports', Icons.assessment_rounded),
   appearance('Appearance', Icons.palette_rounded),
+  themeColors('Tema Renkleri', Icons.color_lens_rounded),
   backup('Backup & Restore', Icons.backup_rounded),
   auditLog('Audit Log', Icons.history_rounded),
+  loyalty('Treueprogramm', Icons.card_giftcard_rounded),
   demoData('Demo Data', Icons.science_outlined),
   upgrade('License & Upgrade', Icons.workspace_premium_rounded),
+  updates('Güncelleme', Icons.system_update_alt_rounded),
+  syncDlq('Senkron DLQ', Icons.error_outline_rounded),
   about('About', Icons.info_outline_rounded);
 
   const _Section(this.label, this.icon);
@@ -83,21 +108,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Role gate: Settings requires Yönetici (admin).
+    final canOpen = ref.watch(canProvider(Permission.settings));
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
       body: Column(
         children: [
           _TopBar(onBack: _navigateBack),
           Expanded(
-            child: Row(
-              children: [
-                _Sidebar(
-                  selected: _selected,
-                  onSelect: (s) => setState(() => _selected = s),
-                ),
-                Expanded(child: _buildContent()),
-              ],
-            ),
+            child: canOpen
+                ? Row(
+                    children: [
+                      _Sidebar(
+                        selected: _selected,
+                        onSelect: (s) => setState(() => _selected = s),
+                      ),
+                      Expanded(child: _buildContent()),
+                    ],
+                  )
+                : const _AccessDeniedPane(),
           ),
         ],
       ),
@@ -119,12 +148,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _Section.payment => const _PaymentSection(),
       _Section.receipt => const _ReceiptSection(),
       _Section.tax => const _TaxSection(),
+      _Section.favorites => const _FavoritesSection(),
+      _Section.functionButtons => const _FunctionButtonsSection(),
       _Section.reports => _ReportsSection(onNavigate: _navigateBack),
       _Section.appearance => const _AppearanceSection(),
+      _Section.themeColors => const _ThemeColorsSection(),
       _Section.backup => const _BackupSection(),
       _Section.auditLog => _AuditLogLinkSection(onNavigate: _navigateBack),
+      _Section.loyalty => const _LoyaltySection(),
       _Section.demoData => const _DemoDataSection(),
       _Section.upgrade => const _UpgradeSection(),
+      _Section.updates => const _UpdatesSection(),
+      _Section.syncDlq => const _SyncDlqSection(),
       _Section.about => const _AboutSection(),
     };
   }
@@ -1839,6 +1874,148 @@ class _AppearanceSection extends ConsumerWidget {
             ),
           ],
         ),
+        _Card(
+          title: 'KULLANIM ELİ',
+          children: [
+            const Text(
+              'POS yerleşimini sağ el veya sol el için aynala. Sol el modunda '
+              'şerit ve sipariş paneli sağ tarafa geçer, menü alanı sola kayar.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            RadioGroup<AppHandedness>(
+              groupValue: settings.handedness,
+              onChanged: (v) {
+                if (v != null) {
+                  ref.read(appSettingsProvider.notifier).setHandedness(v);
+                }
+              },
+              child: Column(
+                children: AppHandedness.values
+                    .map(
+                      (hand) => RadioListTile<AppHandedness>(
+                        contentPadding: EdgeInsets.zero,
+                        title: Row(
+                          children: [
+                            Icon(
+                              hand == AppHandedness.right
+                                  ? Icons.swipe_right_alt_rounded
+                                  : Icons.swipe_left_alt_rounded,
+                              size: 18,
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              hand.label,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        value: hand,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
+        _Card(
+          title: 'YÜKSEK KONTRAST',
+          children: [
+            const Text(
+              'Açık veya koyu temanın üzerine saf siyah / beyaz bir palet '
+              'bindirir. Parlak ortamlarda ve düşük görüşlü operatörler için '
+              'metin, kenar ve ayırıcılar daha okunaklı olur.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Yüksek kontrast modu',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                settings.highContrast ? 'Açık' : 'Kapalı',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              value: settings.highContrast,
+              onChanged: (v) => ref
+                  .read(appSettingsProvider.notifier)
+                  .setHighContrast(v),
+            ),
+          ],
+        ),
+        _Card(
+          title: 'YAZI BOYUTU',
+          children: [
+            const Text(
+              'Tüm ekranlardaki metin boyutunu ölçekler. iOS / Android '
+              'erişilebilirlik ayarlarıyla aynı mantık; yazı büyüdükçe '
+              'sıra yükseklikleri de otomatik büyür.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            RadioGroup<AppTextScale>(
+              groupValue: settings.textScale,
+              onChanged: (v) {
+                if (v != null) {
+                  ref.read(appSettingsProvider.notifier).setTextScale(v);
+                }
+              },
+              child: Column(
+                children: AppTextScale.values
+                    .map(
+                      (scale) => RadioListTile<AppTextScale>(
+                        contentPadding: EdgeInsets.zero,
+                        title: Row(
+                          children: [
+                            Text(
+                              scale.label,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '×${scale.scale.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        value: scale,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -2807,46 +2984,82 @@ class _SegmentedRow<T> extends StatelessWidget {
 // Reports Section
 // ---------------------------------------------------------------------------
 
-class _ReportsSection extends StatelessWidget {
+class _ReportsSection extends ConsumerWidget {
   const _ReportsSection({required this.onNavigate});
   final VoidCallback onNavigate;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Role gate: Z-Bericht / X-Rapor requires Yönetici (admin).
+    final canZReport = ref.watch(canProvider(Permission.zReport));
     return _SectionScaffold(
-      title: 'Reports',
+      title: 'Raporlar',
       children: [
         _Card(
+          title: 'Z-Raporu (Tagesabschluss)',
           children: [
             const Text(
-              'Z-Rapport (Tagesabschluss): Zeigt Umsatz, Zahlungen, '
-              'MwSt-Abrechnung und Top-Artikel für den aktuellen Shift. '
-              'Kann jederzeit gedruckt werden.',
+              'Z-Raporu (gün sonu): cari vardiyanın cirosunu, ödemelerini, '
+              'KDV/MwSt dökümünü ve en çok satan ürünleri gösterir. '
+              'Aynı ekrandan X-Raporu (ara rapor, kasa sıfırlanmaz) da '
+              'yazdırılabilir.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                context.push(AppRoutes.zReport);
-              },
-              icon: const Icon(Icons.assessment_rounded, size: 18),
-              label: const Text('Z-Rapport öffnen'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: AppColors.surfaceDim,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
+            Row(children: [
+              Tooltip(
+                message: canZReport ? '' : kPermissionRequiredTooltip,
+                child: ElevatedButton.icon(
+                  key: const Key('settings_open_z_report'),
+                  onPressed: canZReport
+                      ? () {
+                          context.push(AppRoutes.zReport);
+                        }
+                      : null,
+                  icon: const Icon(Icons.assessment_rounded, size: 18),
+                  label: const Text('Z-Raporu aç'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.surfaceDim,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Tooltip(
+                message: canZReport ? '' : kPermissionRequiredTooltip,
+                child: OutlinedButton.icon(
+                  key: const Key('settings_open_x_report'),
+                  onPressed: canZReport
+                      ? () {
+                          // X-Raporu aynı Z-Raporu ekranından yazdırılır
+                          // (Zwischenbericht — kasa sıfırlama yok).
+                          context.push(AppRoutes.zReport);
+                        }
+                      : null,
+                  icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                  label: const Text('X-Raporu (ara rapor)'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.orange,
+                    side: const BorderSide(color: AppColors.orange),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ]),
           ],
         ),
         _Card(
-          title: 'Schicht-Geschichte',
+          title: 'Vardiya Geçmişi',
           children: [
             const Text(
-              'Alle vergangenen Schichten mit Umsatz und Kassenbestand.',
+              'Tüm geçmiş vardiyalar, ciroları ve kasa bakiyesiyle birlikte.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
@@ -2855,7 +3068,7 @@ class _ReportsSection extends StatelessWidget {
                 context.push(AppRoutes.shiftHistory);
               },
               icon: const Icon(Icons.history_rounded, size: 18),
-              label: const Text('Schicht-Geschichte'),
+              label: const Text('Vardiya geçmişi'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.surfaceContainerHigh,
                 foregroundColor: AppColors.textPrimary,
@@ -2868,19 +3081,20 @@ class _ReportsSection extends StatelessWidget {
           ],
         ),
         _Card(
-          title: 'Tagesabschluss',
+          title: 'Gün Sonu / Kassensturz',
           children: [
             const Text(
-              'Shift schließen, Kasse zählen und Z-Rapport drucken.',
+              'Vardiyayı kapat, kasayı say ve Z-Raporu yazdır.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
+              key: const Key('settings_open_day_close'),
               onPressed: () {
                 context.go(AppRoutes.dayClose);
               },
               icon: const Icon(Icons.lock_clock_rounded, size: 18),
-              label: const Text('Day Close starten'),
+              label: const Text('Gün sonunu başlat'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.orangeDim,
                 foregroundColor: AppColors.orange,
@@ -3112,6 +3326,2503 @@ extension on ConsumerState {
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Access-denied placeholder
+// ---------------------------------------------------------------------------
+
+/// Shown in place of the settings sidebar/content when the current user's
+/// role lacks [Permission.settings]. Greyed out rather than hidden so staff
+/// see the feature exists and can ask a manager for access.
+class _AccessDeniedPane extends StatelessWidget {
+  const _AccessDeniedPane();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Opacity(
+        opacity: 0.55,
+        child: Tooltip(
+          message: kPermissionRequiredTooltip,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(
+                Icons.lock_outline_rounded,
+                size: 48,
+                color: AppColors.textSecondary,
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Yetki gerekli',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Ayarları yalnızca Yönetici açabilir.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+class _FavoritesSection extends ConsumerWidget {
+  const _FavoritesSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final favorites = ref.watch(favoritesProvider);
+
+    return _SectionScaffold(
+      title: 'Hızlı Erişim Butonları',
+      action: ElevatedButton.icon(
+        onPressed: () => _openEditor(context, ref, null),
+        icon: const Icon(Icons.add_rounded, size: 18),
+        label: const Text('Yeni Favori Ekle'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      children: [
+        _Card(
+          title: 'HAKKINDA',
+          children: const [
+            Text(
+              'Bu butonlar POS satış ekranında ürün kılavuzunun üstünde '
+              'yatay şerit olarak görünür. Her buton bir ürünü sepete '
+              'ekleyebilir ya da bir kategoriye geçiş yapabilir. Aşağıdaki '
+              'sıralama satış ekranına birebir yansır.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        _Card(
+          title: 'FAVORİLER (${favorites.length})',
+          children: [
+            if (favorites.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'Henüz favori yok. Yukarıdaki "Yeni Favori Ekle" ile başla.',
+                    style:
+                        TextStyle(color: AppColors.textDim, fontSize: 13),
+                  ),
+                ),
+              )
+            else
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: favorites.length,
+                itemBuilder: (ctx, i) {
+                  final fav = favorites[i];
+                  return _FavoriteRow(
+                    key: ValueKey(fav.id),
+                    index: i,
+                    favorite: fav,
+                    onEdit: () => _openEditor(context, ref, fav),
+                    onDelete: () => _confirmDelete(context, ref, fav),
+                  );
+                },
+                onReorder: (oldIndex, newIndex) {
+                  final ordered = favorites
+                      .map((b) => b.id)
+                      .toList();
+                  final idx =
+                      newIndex > oldIndex ? newIndex - 1 : newIndex;
+                  final moved = ordered.removeAt(oldIndex);
+                  ordered.insert(idx, moved);
+                  ref.read(favoritesProvider.notifier).reorder(ordered);
+                },
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openEditor(
+    BuildContext context,
+    WidgetRef ref,
+    FavoriteButton? existing,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _FavoriteEditorDialog(existing: existing),
+    );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    FavoriteButton fav,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(
+          'Favoriyi sil?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          '"${fav.label}" butonu favorilerden kaldırılacak.',
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('İptal',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child:
+                const Text('Sil', style: TextStyle(color: AppColors.red)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(favoritesProvider.notifier).remove(fav.id);
+    }
+  }
+}
+class _FavoriteRow extends StatelessWidget {
+  const _FavoriteRow({
+    super.key,
+    required this.index,
+    required this.favorite,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final int index;
+  final FavoriteButton favorite;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = favorite.color ??
+        (favorite.action == FavoriteAction.addProduct
+            ? AppColors.green
+            : AppColors.orange);
+    final icon = favorite.action == FavoriteAction.addProduct
+        ? Icons.fastfood_rounded
+        : Icons.category_rounded;
+    final typeLabel = favorite.action == FavoriteAction.addProduct
+        ? 'Ürün'
+        : 'Kategori';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          ReorderableDragStartListener(
+            index: index,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.drag_indicator_rounded,
+                  size: 20, color: AppColors.textDim),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: tint,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, size: 18, color: Colors.white),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  favorite.label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$typeLabel · ${favorite.target}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_rounded,
+                size: 18, color: AppColors.primary),
+            onPressed: onEdit,
+            tooltip: 'Düzenle',
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded,
+                size: 18, color: AppColors.red),
+            onPressed: onDelete,
+            tooltip: 'Sil',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FavoriteEditorDialog extends ConsumerStatefulWidget {
+  const _FavoriteEditorDialog({this.existing});
+
+  final FavoriteButton? existing;
+
+  @override
+  ConsumerState<_FavoriteEditorDialog> createState() =>
+      _FavoriteEditorDialogState();
+}
+
+class _FavoriteEditorDialogState
+    extends ConsumerState<_FavoriteEditorDialog> {
+  late FavoriteAction _action;
+  late TextEditingController _label;
+  late TextEditingController _search;
+  String? _targetName;
+  Color? _color;
+
+  static const List<Color> _palette = [
+    Color(0xFF43A047), // catGreen
+    Color(0xFFF57C00), // catOrange
+    Color(0xFFE53935), // catRed
+    Color(0xFFFBC02D), // catYellow
+    Color(0xFF00838F), // catTeal
+    Color(0xFF7B1FA2), // catPurple
+    Color(0xFF3841E9), // primary
+    Color(0xFF2E7D32), // catDarkGreen
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final ex = widget.existing;
+    _action = ex?.action ?? FavoriteAction.addProduct;
+    _label = TextEditingController(text: ex?.label ?? '');
+    _search = TextEditingController();
+    _targetName = ex?.target;
+    _color = ex?.color;
+  }
+
+  @override
+  void dispose() {
+    _label.dispose();
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final productsAsync = ref.watch(allActiveProductsProvider);
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final products = productsAsync.valueOrNull ?? const <ProductEntity>[];
+    final categories =
+        categoriesAsync.valueOrNull ?? const <CategoryEntity>[];
+
+    final query = _search.text.trim().toLowerCase();
+    final filteredProducts = query.isEmpty
+        ? products
+        : products.where((p) => p.name.toLowerCase().contains(query)).toList();
+    final filteredCategories = query.isEmpty
+        ? categories
+        : categories
+            .where((c) => c.name.toLowerCase().contains(query))
+            .toList();
+
+    final isEdit = widget.existing != null;
+
+    return Dialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        width: 520,
+        constraints: const BoxConstraints(maxHeight: 640),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isEdit ? 'Favoriyi Düzenle' : 'Yeni Favori',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Type picker
+            const Text('Tip',
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: _TypePill(
+                    label: 'Ürün Shortcut',
+                    icon: Icons.fastfood_rounded,
+                    selected: _action == FavoriteAction.addProduct,
+                    onTap: () => setState(() {
+                      _action = FavoriteAction.addProduct;
+                      _targetName = null;
+                    }),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _TypePill(
+                    label: 'Kategori Shortcut',
+                    icon: Icons.category_rounded,
+                    selected: _action == FavoriteAction.openCategory,
+                    onTap: () => setState(() {
+                      _action = FavoriteAction.openCategory;
+                      _targetName = null;
+                    }),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Target search
+            const Text('Hedef',
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _search,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(
+                  fontSize: 14, color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Ara…',
+                hintStyle: const TextStyle(
+                    color: AppColors.textDim, fontSize: 14),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    size: 18, color: AppColors.textDim),
+                filled: true,
+                fillColor: AppColors.bgInput,
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Target list
+            Container(
+              height: 180,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: _action == FavoriteAction.addProduct
+                  ? (filteredProducts.isEmpty
+                      ? const Center(
+                          child: Text('Ürün bulunamadı',
+                              style: TextStyle(color: AppColors.textDim)))
+                      : ListView.separated(
+                          itemCount: filteredProducts.length,
+                          separatorBuilder: (_, __) => const Divider(
+                              height: 1, color: AppColors.border),
+                          itemBuilder: (_, i) {
+                            final p = filteredProducts[i];
+                            final sel = _targetName == p.name;
+                            return ListTile(
+                              dense: true,
+                              selected: sel,
+                              selectedTileColor: AppColors.accentDim,
+                              title: Text(p.name,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textPrimary)),
+                              onTap: () => setState(() {
+                                _targetName = p.name;
+                                if (_label.text.trim().isEmpty) {
+                                  _label.text = p.name;
+                                }
+                              }),
+                            );
+                          },
+                        ))
+                  : (filteredCategories.isEmpty
+                      ? const Center(
+                          child: Text('Kategori bulunamadı',
+                              style: TextStyle(color: AppColors.textDim)))
+                      : ListView.separated(
+                          itemCount: filteredCategories.length,
+                          separatorBuilder: (_, __) => const Divider(
+                              height: 1, color: AppColors.border),
+                          itemBuilder: (_, i) {
+                            final c = filteredCategories[i];
+                            final sel = _targetName == c.name;
+                            return ListTile(
+                              dense: true,
+                              selected: sel,
+                              selectedTileColor: AppColors.accentDim,
+                              title: Text(c.name,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.textPrimary)),
+                              onTap: () => setState(() {
+                                _targetName = c.name;
+                                if (_label.text.trim().isEmpty) {
+                                  _label.text = c.name;
+                                }
+                              }),
+                            );
+                          },
+                        )),
+            ),
+            const SizedBox(height: 16),
+
+            // Label
+            const Text('Buton Yazısı',
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _label,
+              style: const TextStyle(
+                  fontSize: 14, color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'örn. Cola Zero',
+                hintStyle: const TextStyle(
+                    color: AppColors.textDim, fontSize: 14),
+                filled: true,
+                fillColor: AppColors.bgInput,
+                contentPadding: const EdgeInsets.symmetric(
+                    vertical: 10, horizontal: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Color
+            const Text('Renk (opsiyonel)',
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _ColorSwatch(
+                  color: null,
+                  selected: _color == null,
+                  onTap: () => setState(() => _color = null),
+                ),
+                for (final c in _palette)
+                  _ColorSwatch(
+                    color: c,
+                    selected: _color?.toARGB32() == c.toARGB32(),
+                    onTap: () => setState(() => _color = c),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Actions
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('İptal',
+                      style: TextStyle(color: AppColors.textSecondary)),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _canSave() ? _save : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Kaydet',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _canSave() {
+    return (_targetName ?? '').isNotEmpty && _label.text.trim().isNotEmpty;
+  }
+
+  Future<void> _save() async {
+    final notifier = ref.read(favoritesProvider.notifier);
+    final existing = widget.existing;
+    final label = _label.text.trim();
+    final target = _targetName!;
+
+    if (existing == null) {
+      await notifier.add(
+        action: _action,
+        target: target,
+        label: label,
+        color: _color,
+      );
+    } else {
+      await notifier.update(
+        existing.id,
+        action: _action,
+        target: target,
+        label: label,
+        color: _color,
+        clearColor: _color == null,
+      );
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+}
+
+class _TypePill extends StatelessWidget {
+  const _TypePill({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accentDim : AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                size: 16,
+                color:
+                    selected ? AppColors.primary : AppColors.textSecondary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color:
+                    selected ? AppColors.primary : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorSwatch extends StatelessWidget {
+  const _ColorSwatch({
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Color? color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color ?? AppColors.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+            width: selected ? 3 : 1,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: color == null
+            ? const Text(
+                'Oto',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary),
+              )
+            : (selected
+                ? const Icon(Icons.check_rounded,
+                    color: Colors.white, size: 18)
+                : null),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Function Buttons section — SambaPOS-style configurable action buttons
+// ---------------------------------------------------------------------------
+
+class _FunctionButtonsSection extends ConsumerWidget {
+  const _FunctionButtonsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final buttonsAsync = ref.watch(actionButtonsProvider);
+    final buttons =
+        buttonsAsync.valueOrNull ?? const <ActionButtonEntity>[];
+
+    return _SectionScaffold(
+      title: 'Fonksiyon Butonları',
+      action: ElevatedButton.icon(
+        onPressed: () => _openEditor(context, ref, null),
+        icon: const Icon(Icons.add_rounded, size: 18),
+        label: const Text('Yeni Fonksiyon Butonu'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      children: [
+        _Card(
+          title: 'HAKKINDA',
+          children: const [
+            Text(
+              'Fonksiyon butonları POS satış ekranında Schnell şeridinin '
+              'altına gelir. Her buton bir işlem yapar: yüzde indirim, fix '
+              'indirim, hediye, not ekle, gang değiştir, hesap yazdır. '
+              'Buton adını, rengini ve işlem parametresini aşağıdan '
+              'düzenleyebilirsin.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        _Card(
+          title: 'BUTONLAR (${buttons.length})',
+          children: [
+            if (buttons.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'Henüz fonksiyon butonu yok. Yukarıdaki "Yeni Fonksiyon '
+                    'Butonu" ile başla.',
+                    style: TextStyle(color: AppColors.textDim, fontSize: 13),
+                  ),
+                ),
+              )
+            else
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: buttons.length,
+                itemBuilder: (ctx, i) {
+                  final btn = buttons[i];
+                  return _ActionButtonRow(
+                    key: ValueKey(btn.id),
+                    index: i,
+                    button: btn,
+                    onEdit: () => _openEditor(context, ref, btn),
+                    onDelete: () => _confirmDelete(context, ref, btn),
+                    onToggleActive: (v) => ref
+                        .read(actionButtonActionsProvider.notifier)
+                        .setActive(btn.id, v),
+                  );
+                },
+                onReorder: (oldIndex, newIndex) {
+                  final ordered = buttons.map((b) => b.id).toList();
+                  final idx = newIndex > oldIndex ? newIndex - 1 : newIndex;
+                  final moved = ordered.removeAt(oldIndex);
+                  ordered.insert(idx, moved);
+                  ref
+                      .read(actionButtonActionsProvider.notifier)
+                      .reorder(ordered);
+                },
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openEditor(
+    BuildContext context,
+    WidgetRef ref,
+    ActionButtonEntity? existing,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _ActionButtonEditorDialog(existing: existing),
+    );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    ActionButtonEntity btn,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(
+          'Fonksiyon butonunu sil?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          '"${btn.label}" butonu silinecek.',
+          style:
+              const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('İptal',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sil',
+                style: TextStyle(color: AppColors.red)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(actionButtonActionsProvider.notifier).delete(btn.id);
+    }
+  }
+}
+
+class _ActionButtonRow extends StatelessWidget {
+  const _ActionButtonRow({
+    super.key,
+    required this.index,
+    required this.button,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onToggleActive,
+  });
+
+  final int index;
+  final ActionButtonEntity button;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final ValueChanged<bool> onToggleActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = button.color ?? AppColors.primary;
+    final payloadHint = _payloadHint(button);
+    final positionLabel = button.position.label;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          ReorderableDragStartListener(
+            index: index,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.drag_indicator_rounded,
+                  size: 20, color: AppColors.textDim),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: tint,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              _iconFor(button),
+              size: 18,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  button.label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: button.isActive
+                        ? AppColors.textPrimary
+                        : AppColors.textDim,
+                    decoration: button.isActive
+                        ? TextDecoration.none
+                        : TextDecoration.lineThrough,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${button.actionType.label} · $positionLabel'
+                  '${payloadHint.isEmpty ? '' : ' · $payloadHint'}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: button.isActive,
+            onChanged: onToggleActive,
+            activeTrackColor: AppColors.primary,
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_rounded,
+                size: 18, color: AppColors.primary),
+            onPressed: onEdit,
+            tooltip: 'Düzenle',
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded,
+                size: 18, color: AppColors.red),
+            onPressed: onDelete,
+            tooltip: 'Sil',
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _iconFor(ActionButtonEntity b) {
+    return switch (b.actionType) {
+      ActionButtonType.percentDiscount => Icons.percent_rounded,
+      ActionButtonType.fixedDiscount => Icons.money_off_rounded,
+      ActionButtonType.markGift => Icons.card_giftcard_rounded,
+      ActionButtonType.addNote => Icons.sticky_note_2_rounded,
+      ActionButtonType.setCourse => Icons.restaurant_menu_rounded,
+      ActionButtonType.printBill => Icons.receipt_long_rounded,
+      ActionButtonType.voidItem => Icons.delete_sweep_rounded,
+      ActionButtonType.customScript => Icons.code_rounded,
+    };
+  }
+
+  String _payloadHint(ActionButtonEntity b) {
+    switch (b.actionType) {
+      case ActionButtonType.percentDiscount:
+        final pct = b.actionPayload['percent'];
+        return pct == null ? '' : '%$pct';
+      case ActionButtonType.fixedDiscount:
+        final amt = b.actionPayload['amount'];
+        if (amt is int) return 'CHF ${(amt / 100).toStringAsFixed(2)}';
+        return '';
+      case ActionButtonType.setCourse:
+        final gid = b.actionPayload['gangId'];
+        return gid is String ? gid : '';
+      default:
+        return '';
+    }
+  }
+}
+
+class _ActionButtonEditorDialog extends ConsumerStatefulWidget {
+  const _ActionButtonEditorDialog({this.existing});
+
+  final ActionButtonEntity? existing;
+
+  @override
+  ConsumerState<_ActionButtonEditorDialog> createState() =>
+      _ActionButtonEditorDialogState();
+}
+
+class _ActionButtonEditorDialogState
+    extends ConsumerState<_ActionButtonEditorDialog> {
+  late TextEditingController _label;
+  late ActionButtonPosition _position;
+  late ActionButtonType _actionType;
+  Color? _color;
+  String? _iconName;
+
+  // Payload fields — only the ones the selected action uses are active.
+  int _percent = 10;
+  int _amountCents = 500;
+  String? _gangId;
+
+  /// Roles allowed to see this button. Empty = visible to every role
+  /// (the historical default before role gating was wired up).
+  late Set<UserRole> _allowedRoles;
+
+  static const List<Color> _palette = [
+    Color(0xFFE53935),
+    Color(0xFFF57C00),
+    Color(0xFFFBC02D),
+    Color(0xFF66BB6A),
+    Color(0xFF2E7D32),
+    Color(0xFF26A69A),
+    Color(0xFF29B6F6),
+    Color(0xFF3841E9),
+    Color(0xFFBF5AF2),
+    Color(0xFFE91E63),
+  ];
+
+  static const List<_IconOption> _icons = [
+    _IconOption('percent', Icons.percent_rounded),
+    _IconOption('card_giftcard', Icons.card_giftcard_rounded),
+    _IconOption('sticky_note_2', Icons.sticky_note_2_rounded),
+    _IconOption('receipt_long', Icons.receipt_long_rounded),
+    _IconOption('restaurant_menu', Icons.restaurant_menu_rounded),
+    _IconOption('money_off', Icons.money_off_rounded),
+    _IconOption('local_offer', Icons.local_offer_rounded),
+    _IconOption('delete_sweep', Icons.delete_sweep_rounded),
+    _IconOption('star', Icons.star_rounded),
+    _IconOption('bolt', Icons.bolt_rounded),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final ex = widget.existing;
+    _label = TextEditingController(text: ex?.label ?? '');
+    _position = ex?.position ?? ActionButtonPosition.ticketScreen;
+    _actionType = ex?.actionType ?? ActionButtonType.percentDiscount;
+    _color = ex?.color;
+    _iconName = ex?.iconName;
+    final payload = ex?.actionPayload ?? const <String, dynamic>{};
+    final pct = payload['percent'];
+    if (pct is int) _percent = pct;
+    final amt = payload['amount'];
+    if (amt is int) _amountCents = amt;
+    final gid = payload['gangId'];
+    if (gid is String) _gangId = gid;
+
+    // Seed role filter from the stored list. Unknown / legacy names are
+    // dropped silently so a stale seed from a future build can't crash
+    // the editor when that role enum value doesn't exist here yet.
+    final stored = ex?.roleFilter ?? const <String>[];
+    _allowedRoles = {
+      for (final name in stored)
+        for (final r in UserRole.values)
+          if (r.name == name) r,
+    };
+  }
+
+  @override
+  void dispose() {
+    _label.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.existing != null;
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: Text(
+        isEdit ? 'Fonksiyon butonunu düzenle' : 'Yeni fonksiyon butonu',
+        style: const TextStyle(color: AppColors.textPrimary),
+      ),
+      content: SizedBox(
+        width: 480,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _FieldLabel('Etiket'),
+              TextField(
+                controller: _label,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: const InputDecoration(
+                  hintText: 'ör. %10 Rabatt',
+                  hintStyle: TextStyle(color: AppColors.textDim),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _FieldLabel('İşlem'),
+              DropdownButtonFormField<ActionButtonType>(
+                initialValue: _actionType,
+                isExpanded: true,
+                items: [
+                  for (final t in ActionButtonType.values)
+                    DropdownMenuItem(value: t, child: Text(t.label)),
+                ],
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _actionType = v);
+                },
+              ),
+              const SizedBox(height: 16),
+              _FieldLabel('Konum'),
+              DropdownButtonFormField<ActionButtonPosition>(
+                initialValue: _position,
+                isExpanded: true,
+                items: [
+                  for (final p in ActionButtonPosition.values)
+                    DropdownMenuItem(value: p, child: Text(p.label)),
+                ],
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _position = v);
+                },
+              ),
+              const SizedBox(height: 16),
+              ..._payloadFields(),
+              const SizedBox(height: 16),
+              _FieldLabel('Renk'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _ColorSwatch(
+                    color: null,
+                    selected: _color == null,
+                    onTap: () => setState(() => _color = null),
+                  ),
+                  for (final c in _palette)
+                    _ColorSwatch(
+                      color: c,
+                      selected: _color?.toARGB32() == c.toARGB32(),
+                      onTap: () => setState(() => _color = c),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _FieldLabel('İkon (opsiyonel)'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _IconSwatch(
+                    icon: null,
+                    selected: _iconName == null,
+                    onTap: () => setState(() => _iconName = null),
+                  ),
+                  for (final opt in _icons)
+                    _IconSwatch(
+                      icon: opt.icon,
+                      selected: _iconName == opt.name,
+                      onTap: () => setState(() => _iconName = opt.name),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _FieldLabel('Görünürlük (rol filtresi)'),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'Hiçbirini seçmezsen buton herkese görünür. Bir veya '
+                  'birkaç rol seçersen buton sadece o rollerde oturum '
+                  'açan kullanıcılara gösterilir. Admin rolü her butonu '
+                  'daima görür.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textDim,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final role in UserRole.values)
+                    FilterChip(
+                      label: Text(_labelForRole(role)),
+                      selected: _allowedRoles.contains(role),
+                      onSelected: (sel) {
+                        setState(() {
+                          if (sel) {
+                            _allowedRoles.add(role);
+                          } else {
+                            _allowedRoles.remove(role);
+                          }
+                        });
+                      },
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('İptal',
+              style: TextStyle(color: AppColors.textSecondary)),
+        ),
+        FilledButton(
+          onPressed: _save,
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+          child: const Text('Kaydet'),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _payloadFields() {
+    switch (_actionType) {
+      case ActionButtonType.percentDiscount:
+        return [
+          _FieldLabel('Yüzde (%)'),
+          Row(
+            children: [
+              Expanded(
+                child: Slider(
+                  value: _percent.toDouble().clamp(1, 100),
+                  min: 1,
+                  max: 100,
+                  divisions: 99,
+                  label: '%$_percent',
+                  onChanged: (v) => setState(() => _percent = v.round()),
+                ),
+              ),
+              SizedBox(
+                width: 48,
+                child: Text('%$_percent',
+                    style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ];
+      case ActionButtonType.fixedDiscount:
+        return [
+          _FieldLabel('Tutar (CHF)'),
+          TextFormField(
+            initialValue: (_amountCents / 100).toStringAsFixed(2),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(color: AppColors.textPrimary),
+            onChanged: (s) {
+              final v = double.tryParse(s.replaceAll(',', '.'));
+              if (v == null) return;
+              setState(() => _amountCents = (v * 100).round());
+            },
+          ),
+        ];
+      case ActionButtonType.setCourse:
+        final gangs =
+            ref.watch(gangTemplatesProvider).valueOrNull ?? const [];
+        return [
+          _FieldLabel('Gang'),
+          DropdownButtonFormField<String>(
+            initialValue: gangs.any((g) => g.id == _gangId) ? _gangId : null,
+            isExpanded: true,
+            items: [
+              for (final g in gangs)
+                DropdownMenuItem<String>(
+                  value: g.id,
+                  child: Text('${g.sortOrder}. ${g.name}'),
+                ),
+            ],
+            onChanged: (v) => setState(() => _gangId = v),
+          ),
+          if (gangs.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'Önce ayarlardan gang tanımla.',
+                style: TextStyle(color: AppColors.textDim, fontSize: 12),
+              ),
+            ),
+        ];
+      case ActionButtonType.markGift:
+      case ActionButtonType.addNote:
+      case ActionButtonType.printBill:
+      case ActionButtonType.voidItem:
+      case ActionButtonType.customScript:
+        return const [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              'Bu işlem ek parametre almaz.',
+              style: TextStyle(color: AppColors.textDim, fontSize: 12),
+            ),
+          ),
+        ];
+    }
+  }
+
+  Map<String, dynamic> _buildPayload() {
+    switch (_actionType) {
+      case ActionButtonType.percentDiscount:
+        return {'percent': _percent};
+      case ActionButtonType.fixedDiscount:
+        return {'amount': _amountCents, 'currency': 'CHF'};
+      case ActionButtonType.setCourse:
+        return _gangId == null ? <String, dynamic>{} : {'gangId': _gangId};
+      case ActionButtonType.markGift:
+      case ActionButtonType.addNote:
+      case ActionButtonType.printBill:
+      case ActionButtonType.voidItem:
+      case ActionButtonType.customScript:
+        return <String, dynamic>{};
+    }
+  }
+
+  Future<void> _save() async {
+    final label = _label.text.trim();
+    if (label.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Etiket boş olamaz')),
+      );
+      return;
+    }
+    final payload = _buildPayload();
+    final notifier = ref.read(actionButtonActionsProvider.notifier);
+    final navigator = Navigator.of(context);
+    final ex = widget.existing;
+
+    // An empty selection serialises as null (historical "visible to all"
+    // sentinel); a non-empty set is persisted as a sorted list of role
+    // names so two buttons with the same filter serialize identically.
+    final rolesList = _allowedRoles.isEmpty
+        ? null
+        : (_allowedRoles.map((r) => r.name).toList()..sort());
+
+    bool ok;
+    if (ex == null) {
+      ok = await notifier.create(
+        label: label,
+        position: _position,
+        actionType: _actionType,
+        actionPayload: payload,
+        colorValue: _color?.toARGB32(),
+        iconName: _iconName,
+        roleFilter: rolesList,
+      );
+    } else {
+      ok = await notifier.update(
+        ex.copyWith(
+          label: label,
+          position: _position,
+          actionType: _actionType,
+          actionPayload: payload,
+          colorValue: _color?.toARGB32(),
+          clearColor: _color == null,
+          iconName: _iconName,
+          clearIcon: _iconName == null,
+          roleFilter: rolesList,
+          clearRoleFilter: rolesList == null,
+        ),
+      );
+    }
+    if (!ok) return;
+    if (mounted) navigator.pop();
+  }
+
+  String _labelForRole(UserRole role) => switch (role) {
+        UserRole.admin => 'Admin',
+        UserRole.manager => 'Müdür',
+        UserRole.waiter => 'Garson',
+        UserRole.cashier => 'Kasiyer',
+        UserRole.kitchen => 'Mutfak',
+      };
+}
+
+class _IconOption {
+  const _IconOption(this.name, this.icon);
+  final String name;
+  final IconData icon;
+}
+
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, top: 4),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textSecondary,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+class _IconSwatch extends StatelessWidget {
+  const _IconSwatch({
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData? icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: icon == null
+            ? const Icon(Icons.not_interested_rounded,
+                size: 16, color: AppColors.textDim)
+            : Icon(icon, size: 18, color: AppColors.textPrimary),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Theme colours section — operator-picked light/dark accent + surface
+// ---------------------------------------------------------------------------
+
+const List<Color> _kThemePresetPrimaries = <Color>[
+  Color(0xFF3841E9), // Kinetic default (matches GcColors.primary)
+  Color(0xFF486BE1), // POS v2 selection blue
+  Color(0xFF2BAE66), // Pay green
+  Color(0xFFD3543E), // Haupt red
+  Color(0xFFD88B3C), // Pasta orange
+  Color(0xFFC4539A), // Dessert magenta
+  Color(0xFF467DCB), // Drink azure
+  Color(0xFF5E35B1), // Deep purple
+  Color(0xFF00838F), // Teal 800
+  Color(0xFF2B2E38), // Graphite ink
+];
+
+const List<Color> _kThemePresetLightSurfaces = <Color>[
+  Color(0xFFFFFFFF),
+  Color(0xFFF4F5F7),
+  Color(0xFFFDF6EC),
+  Color(0xFFECEFF4),
+  Color(0xFFFFF8F0),
+  Color(0xFFF0F7F4),
+];
+
+const List<Color> _kThemePresetDarkSurfaces = <Color>[
+  Color(0xFF0E1116),
+  Color(0xFF161A21),
+  Color(0xFF10141B),
+  Color(0xFF1A1320),
+  Color(0xFF121826),
+  Color(0xFF0D1410),
+];
+
+String _colorToHex(Color c) {
+  final rgb = c.toARGB32() & 0x00FFFFFF;
+  return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+}
+
+class _ThemeColorsSection extends ConsumerWidget {
+  const _ThemeColorsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(themeCustomizationProvider);
+    final custom = async.valueOrNull ?? const ThemeCustomization();
+    final notifier = ref.read(themeCustomizationProvider.notifier);
+
+    return _SectionScaffold(
+      title: 'Tema Renkleri',
+      action: custom.isDefault
+          ? null
+          : OutlinedButton.icon(
+              onPressed: () async {
+                await notifier.restoreDefaults();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Varsayılan renklere dönüldü'),
+                      duration: Duration(milliseconds: 1500),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.restart_alt_rounded, size: 18),
+              label: const Text('Varsayılana Dön'),
+            ),
+      children: [
+        const _Card(
+          title: 'HAKKINDA',
+          children: [
+            Text(
+              'Vurgu rengi butonlar, seçili durumlar ve form odaklarında '
+              'kullanılır. Yüzey rengi uygulamanın arka planını etkiler. '
+              'Değişiklikler anında uygulanır.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+        _Card(
+          title: 'VURGU RENGI — AÇIK MOD',
+          children: [
+            _ColorPickerRow(
+              selectedHex: custom.lightPrimaryHex,
+              presets: _kThemePresetPrimaries,
+              onPick: notifier.setLightPrimary,
+            ),
+          ],
+        ),
+        _Card(
+          title: 'VURGU RENGI — KARANLIK MOD',
+          children: [
+            _ColorPickerRow(
+              selectedHex: custom.darkPrimaryHex,
+              presets: _kThemePresetPrimaries,
+              onPick: notifier.setDarkPrimary,
+            ),
+          ],
+        ),
+        _Card(
+          title: 'YUZEY — AÇIK MOD',
+          children: [
+            _ColorPickerRow(
+              selectedHex: custom.lightSurfaceHex,
+              presets: _kThemePresetLightSurfaces,
+              onPick: notifier.setLightSurface,
+            ),
+          ],
+        ),
+        _Card(
+          title: 'YUZEY — KARANLIK MOD',
+          children: [
+            _ColorPickerRow(
+              selectedHex: custom.darkSurfaceHex,
+              presets: _kThemePresetDarkSurfaces,
+              onPick: notifier.setDarkSurface,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ColorPickerRow extends StatefulWidget {
+  const _ColorPickerRow({
+    required this.selectedHex,
+    required this.presets,
+    required this.onPick,
+  });
+
+  final String? selectedHex;
+  final List<Color> presets;
+  final ValueChanged<String?> onPick;
+
+  @override
+  State<_ColorPickerRow> createState() => _ColorPickerRowState();
+}
+
+class _ColorPickerRowState extends State<_ColorPickerRow> {
+  late final TextEditingController _hexController;
+
+  @override
+  void initState() {
+    super.initState();
+    _hexController = TextEditingController(text: widget.selectedHex ?? '');
+  }
+
+  @override
+  void didUpdateWidget(_ColorPickerRow old) {
+    super.didUpdateWidget(old);
+    if (old.selectedHex != widget.selectedHex) {
+      _hexController.text = widget.selectedHex ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = v2ParseHex(widget.selectedHex);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _ColorSwatch(
+              color: null,
+              selected: widget.selectedHex == null,
+              onTap: () => widget.onPick(null),
+            ),
+            for (final c in widget.presets)
+              _ColorSwatch(
+                color: c,
+                selected: selected != null &&
+                    (c.toARGB32() & 0x00FFFFFF) ==
+                        (selected.toARGB32() & 0x00FFFFFF),
+                onTap: () => widget.onPick(_colorToHex(c)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _hexController,
+                decoration: const InputDecoration(
+                  labelText: 'Özel HEX (#RRGGBB)',
+                  hintText: '#3841E9',
+                  prefixIcon: Icon(Icons.tag_rounded, size: 18),
+                ),
+                onSubmitted: (value) {
+                  final trimmed = value.trim();
+                  if (trimmed.isEmpty) {
+                    widget.onPick(null);
+                    return;
+                  }
+                  final parsed = v2ParseHex(trimmed);
+                  if (parsed == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Geçersiz HEX. Örnek: #3841E9'),
+                        duration: Duration(milliseconds: 1500),
+                      ),
+                    );
+                    return;
+                  }
+                  widget.onPick(_colorToHex(parsed));
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            OutlinedButton(
+              onPressed: () {
+                final parsed = v2ParseHex(_hexController.text.trim());
+                if (parsed == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Geçersiz HEX. Örnek: #3841E9'),
+                      duration: Duration(milliseconds: 1500),
+                    ),
+                  );
+                  return;
+                }
+                widget.onPick(_colorToHex(parsed));
+              },
+              child: const Text('Uygula'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Loyalty section — configurable earn rate / redemption / tier thresholds
+// ---------------------------------------------------------------------------
+
+class _LoyaltySection extends ConsumerStatefulWidget {
+  const _LoyaltySection();
+
+  @override
+  ConsumerState<_LoyaltySection> createState() => _LoyaltySectionState();
+}
+
+class _LoyaltySectionState extends ConsumerState<_LoyaltySection> {
+  /// Snapshot of the currently-persisted settings. We keep a local mutable
+  /// copy so the form stays editable while the user is typing; the provider
+  /// is only touched on "Kaydet".
+  LoyaltySettings? _draft;
+  late final TextEditingController _earnCtrl;
+  late final TextEditingController _redeemCtrl;
+  late final TextEditingController _silverCtrl;
+  late final TextEditingController _goldCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _earnCtrl = TextEditingController();
+    _redeemCtrl = TextEditingController();
+    _silverCtrl = TextEditingController();
+    _goldCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _earnCtrl.dispose();
+    _redeemCtrl.dispose();
+    _silverCtrl.dispose();
+    _goldCtrl.dispose();
+    super.dispose();
+  }
+
+  void _seed(LoyaltySettings s) {
+    _draft = s;
+    _earnCtrl.text = s.pointsPerChfSpent.toString();
+    _redeemCtrl.text = s.centsPerPoint.toString();
+    _silverCtrl.text = (s.silverThresholdCents ~/ 100).toString();
+    _goldCtrl.text = (s.goldThresholdCents ~/ 100).toString();
+  }
+
+  LoyaltySettings _readForm(LoyaltySettings base) {
+    final earn = int.tryParse(_earnCtrl.text) ?? base.pointsPerChfSpent;
+    final redeem = int.tryParse(_redeemCtrl.text) ?? base.centsPerPoint;
+    final silverChf = int.tryParse(_silverCtrl.text);
+    final goldChf = int.tryParse(_goldCtrl.text);
+    return base.copyWith(
+      pointsPerChfSpent: earn,
+      centsPerPoint: redeem,
+      silverThresholdCents:
+          silverChf != null ? silverChf * 100 : base.silverThresholdCents,
+      goldThresholdCents:
+          goldChf != null ? goldChf * 100 : base.goldThresholdCents,
+    );
+  }
+
+  Future<void> _save() async {
+    final current = _draft ?? const LoyaltySettings();
+    final next = _readForm(current);
+    if (!next.isValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Geçersiz değerler. Tüm sayılar pozitif ve Gold > Silber olmalı.',
+          ),
+          duration: Duration(milliseconds: 2200),
+        ),
+      );
+      return;
+    }
+    await ref.read(loyaltySettingsProvider.notifier).save(next);
+    if (!mounted) return;
+    setState(() => _draft = next);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Treueprogramm kaydedildi'),
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
+  }
+
+  Future<void> _reset() async {
+    await ref.read(loyaltySettingsProvider.notifier).resetToDefaults();
+    if (!mounted) return;
+    setState(() => _seed(const LoyaltySettings()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(loyaltySettingsProvider);
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Text('$e', style: const TextStyle(color: AppColors.red)),
+      ),
+      data: (settings) {
+        // (Re)seed the controllers when the provider emits a new value
+        // that differs from our current draft — e.g. first load or reset.
+        if (_draft != settings) {
+          _seed(settings);
+        }
+        final live = _readForm(settings);
+        final sampleSpent = 10000; // CHF 100
+        final samplePoints = (sampleSpent ~/ 100) * live.pointsPerChfSpent;
+        final sampleDiscount = samplePoints * live.centsPerPoint;
+        return _SectionScaffold(
+          title: 'Treueprogramm',
+          action: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton.icon(
+                icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                label: const Text('Standart'),
+                onPressed: _reset,
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.save_rounded, size: 16),
+                label: const Text('Kaydet'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: _save,
+              ),
+            ],
+          ),
+          children: [
+            _Card(
+              title: 'DURUM',
+              children: [
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Programı etkinleştir',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  subtitle: Text(
+                    settings.isActive
+                        ? 'Müşteriler puan biriktirebilir ve eritebilir'
+                        : 'Puan kazanımı/eritimi geçici olarak devre dışı',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  value: settings.isActive,
+                  onChanged: (v) => ref
+                      .read(loyaltySettingsProvider.notifier)
+                      .update((s) => s.copyWith(isActive: v)),
+                ),
+              ],
+            ),
+            _Card(
+              title: 'KAZANIM (EARN RATE)',
+              children: [
+                const Text(
+                  'Her 1 CHF harcandığında kaç puan verilecek.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Text('1 CHF =',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 80,
+                      child: TextField(
+                        controller: _earnCtrl,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: _fieldDecoration(),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Punkt(e)',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                  ],
+                ),
+              ],
+            ),
+            _Card(
+              title: 'ERITIM (REDEMPTION)',
+              children: [
+                const Text(
+                  'Her 1 puan kaç santim (cent) indirim açığa çıkarır.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Text('1 Punkt =',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 80,
+                      child: TextField(
+                        controller: _redeemCtrl,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: _fieldDecoration(),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Rp. (santim)',
+                        style: TextStyle(color: AppColors.textPrimary)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Örnek: $samplePoints Punkt = '
+                  'CHF ${(sampleDiscount / 100).toStringAsFixed(2)} indirim',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textDim,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+            _Card(
+              title: 'TIER EŞİKLERİ (CHF)',
+              children: [
+                const Text(
+                  'Müşteri yaşam boyu ciroya göre Bronz / Silber / Gold '
+                  'kademelerine yükselir. Eşikler CHF cinsindendir.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const SizedBox(width: 80,
+                        child: Text('Silber',
+                            style: TextStyle(
+                                color: Color(0xFFC0C0C0),
+                                fontWeight: FontWeight.w700))),
+                    SizedBox(
+                      width: 100,
+                      child: TextField(
+                        controller: _silverCtrl,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: _fieldDecoration(suffix: 'CHF'),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    SizedBox(width: 80,
+                        child: Text('Gold',
+                            style: TextStyle(
+                                color: AppColors.yellow,
+                                fontWeight: FontWeight.w700))),
+                    SizedBox(
+                      width: 100,
+                      child: TextField(
+                        controller: _goldCtrl,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: _fieldDecoration(suffix: 'CHF'),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            _Card(
+              title: 'ÖNIZLEME',
+              children: [
+                Text(
+                  '• 1 CHF = ${live.pointsPerChfSpent} Punkt(e)',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '• ${live.centsPerPoint == 1 ? "100 Punkte = CHF 1.00" : "1 Punkt = ${live.centsPerPoint} Rp."} indirim',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '• Silber: ab CHF ${(live.silverThresholdCents / 100).toStringAsFixed(0)} Umsatz',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary),
+                ),
+                Text(
+                  '• Gold: ab CHF ${(live.goldThresholdCents / 100).toStringAsFixed(0)} Umsatz',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppColors.textPrimary),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  InputDecoration _fieldDecoration({String? suffix}) => InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: AppColors.bgInput,
+        suffixText: suffix,
+        suffixStyle: const TextStyle(color: AppColors.textSecondary),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Updates section — manifest-based OTA check
+// ---------------------------------------------------------------------------
+
+class _UpdatesSection extends ConsumerStatefulWidget {
+  const _UpdatesSection();
+
+  @override
+  ConsumerState<_UpdatesSection> createState() => _UpdatesSectionState();
+}
+
+class _UpdatesSectionState extends ConsumerState<_UpdatesSection> {
+  late final TextEditingController _urlController;
+  bool _dirty = false;
+  bool _bootstrapped = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    super.dispose();
+  }
+
+  void _syncFromState(UpdateChannelSettings settings) {
+    if (_bootstrapped) return;
+    _urlController.text = settings.manifestUrl;
+    _bootstrapped = true;
+  }
+
+  Future<void> _save(UpdateChannelSettings current) async {
+    await ref.read(updateChannelSettingsProvider.notifier).save(
+          current.copyWith(manifestUrl: _urlController.text.trim()),
+        );
+    if (!mounted) return;
+    setState(() => _dirty = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Güncelleme kanalı kaydedildi.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _check() async {
+    final manifest =
+        await ref.read(updateCheckControllerProvider.notifier).checkNow();
+    if (!mounted) return;
+    final state = ref.read(updateCheckControllerProvider);
+    if (state.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.errorMessage!),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    if (manifest == null) return;
+    final msg = manifest.isNewerThan(appBuildNumber)
+        ? 'Yeni sürüm bulundu: ${manifest.versionName} (build ${manifest.buildNumber}).'
+        : 'Uygulama güncel. Son sürüm: ${manifest.versionName}.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _download() async {
+    final ok =
+        await ref.read(updateCheckControllerProvider.notifier).openDownload();
+    if (!mounted || ok) return;
+    final state = ref.read(updateCheckControllerProvider);
+    if (state.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.errorMessage!),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final asyncChannel = ref.watch(updateChannelSettingsProvider);
+    final checkState = ref.watch(updateCheckControllerProvider);
+
+    final settings =
+        asyncChannel.valueOrNull ?? const UpdateChannelSettings();
+    _syncFromState(settings);
+
+    return _SectionScaffold(
+      title: 'Güncelleme',
+      children: [
+        _Card(
+          title: 'GEÇERLİ SÜRÜM',
+          children: [
+            _AboutRow(
+              label: 'Uygulama',
+              value: 'GastroCore POS',
+            ),
+            _AboutRow(
+              label: 'Sürüm',
+              value: '$appVersionName (build $appBuildNumber)',
+            ),
+            _AboutRow(
+              label: 'Kanal',
+              value: settings.channel.label,
+            ),
+          ],
+        ),
+        _Card(
+          title: 'MANİFEST URL',
+          children: [
+            const Text(
+              'Güncelleme kontrolü için manifest JSON URL\'i. Boş bırakılırsa kontrol çalışmaz.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _urlController,
+              decoration: InputDecoration(
+                hintText: 'https://...',
+                isDense: true,
+                filled: true,
+                fillColor: AppColors.bgInput,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: (_) => setState(() => _dirty = true),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                DropdownButton<UpdateChannel>(
+                  value: settings.channel,
+                  onChanged: (value) {
+                    if (value == null) return;
+                    ref
+                        .read(updateChannelSettingsProvider.notifier)
+                        .update((s) => s.copyWith(channel: value));
+                  },
+                  items: UpdateChannel.values
+                      .map(
+                        (c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(c.label),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: _dirty ? () => _save(settings) : null,
+                  icon: const Icon(Icons.save_rounded, size: 18),
+                  label: const Text('Kaydet'),
+                ),
+              ],
+            ),
+          ],
+        ),
+        _Card(
+          title: 'GÜNCELLEME KONTROLÜ',
+          children: [
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: checkState.isChecking ? null : _check,
+                  icon: checkState.isChecking
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.refresh_rounded, size: 18),
+                  label: Text(
+                    checkState.isChecking
+                        ? 'Kontrol ediliyor...'
+                        : 'Güncellemeleri kontrol et',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (checkState.checkedAt != null)
+                  Text(
+                    'Son: ${DateFormat('dd.MM.yyyy HH:mm').format(checkState.checkedAt!.toLocal())}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+            if (checkState.manifest != null) ...[
+              const SizedBox(height: 16),
+              _UpdateAvailableCard(
+                manifest: checkState.manifest!,
+                onDownload: _download,
+              ),
+            ] else if (checkState.errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                checkState.errorMessage!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _UpdateAvailableCard extends StatelessWidget {
+  const _UpdateAvailableCard({
+    required this.manifest,
+    required this.onDownload,
+  });
+
+  final UpdateManifest manifest;
+  final VoidCallback onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    final newer = manifest.isNewerThan(appBuildNumber);
+    final mandatory = manifest.isMandatoryFor(appBuildNumber);
+    final accent = mandatory
+        ? AppColors.error
+        : (newer ? AppColors.primary : AppColors.textSecondary);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                mandatory
+                    ? Icons.warning_amber_rounded
+                    : newer
+                        ? Icons.system_update_alt_rounded
+                        : Icons.check_circle_rounded,
+                color: accent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                mandatory
+                    ? 'Zorunlu güncelleme'
+                    : newer
+                        ? 'Yeni sürüm mevcut'
+                        : 'Uygulama güncel',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Sürüm: ${manifest.versionName} (build ${manifest.buildNumber})',
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+          ),
+          if (manifest.changelog.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              manifest.changelog,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ],
+          if (manifest.sha256 != null && manifest.sha256!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'SHA256: ${manifest.sha256}',
+              style: const TextStyle(
+                fontSize: 11,
+                fontFamily: 'monospace',
+                color: AppColors.textSecondary,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 12),
+          if (newer)
+            FilledButton.icon(
+              onPressed: onDownload,
+              style: FilledButton.styleFrom(backgroundColor: accent),
+              icon: const Icon(Icons.download_rounded, size: 18),
+              label: const Text('İndir'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sync dead-letter queue (DLQ) section
+// ---------------------------------------------------------------------------
+
+class _SyncDlqSection extends ConsumerWidget {
+  const _SyncDlqSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final eventsAsync = ref.watch(deadLetterEventsProvider);
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Senkronizasyon — Ölü Mesaj Kuyruğu',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Yeniden deneme limiti dolmuş ve otomatik sıradan çıkarılmış '
+            'olay kayıtları. Her birini yeniden kuyruğa alabilir veya '
+            'kalıcı olarak silebilirsiniz.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: eventsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Text('DLQ okunamadı: $e'),
+              ),
+              data: (events) {
+                if (events.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'DLQ boş. Tüm olaylar normal kuyruktan geçiyor.',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  );
+                }
+                return ListView.separated(
+                  itemCount: events.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) => _DlqTile(event: events[i]),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DlqTile extends ConsumerWidget {
+  const _DlqTile({required this.event});
+
+  final SyncEventEntity event;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final createdAt = DateFormat('dd.MM.yyyy HH:mm').format(event.createdAt);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${event.tableName} · ${event.operation.name}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Kayıt: ${event.recordId}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Oluşturuldu: $createdAt · Deneme: ${event.retryCount}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (event.errorMessage != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Hata: ${event.errorMessage}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFEF4444),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            children: [
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await ref
+                      .read(syncRepositoryProvider)
+                      .requeueDeadLetterEvent(event.id);
+                  ref.invalidate(deadLetterEventsProvider);
+                  ref.invalidate(deadLetterCountProvider);
+                },
+                icon: const Icon(Icons.replay_rounded, size: 16),
+                label: const Text('Tekrar Dene'),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () async {
+                  await ref
+                      .read(syncRepositoryProvider)
+                      .purgeDeadLetterEvent(event.id);
+                  ref.invalidate(deadLetterEventsProvider);
+                  ref.invalidate(deadLetterCountProvider);
+                },
+                icon: const Icon(Icons.delete_outline, size: 16),
+                label: const Text('Sil'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

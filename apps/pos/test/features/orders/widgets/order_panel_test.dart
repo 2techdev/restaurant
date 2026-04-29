@@ -7,6 +7,11 @@
 ///     chip row and any Gang section headers entirely.
 ///   * Custom `gangLabels` override the default "Gang N" text.
 ///
+/// NOTE: The chip row renders labels uppercased (see `_GangChip.build`),
+/// so all finders here target the uppercase form. The underlying
+/// RestaurantSettings API still returns mixed-case strings; the uppercase
+/// is a presentation concern only.
+///
 /// Run with:
 ///   flutter test test/features/orders/widgets/order_panel_test.dart
 library;
@@ -17,11 +22,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/order_panel.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/repositories/settings_repository.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
@@ -65,6 +74,26 @@ class _InMemorySettingsRepository implements SettingsRepository {
   Future<AppSettings> loadAppSettings() async => const AppSettings();
   @override
   Future<void> saveAppSettings(AppSettings settings) async {}
+  @override
+  Future<ThemeCustomization> loadThemeCustomization() async =>
+      const ThemeCustomization();
+  @override
+  Future<void> saveThemeCustomization(ThemeCustomization settings) async {}
+  @override
+  Future<HappyHourSettings> loadHappyHourSettings() async =>
+      const HappyHourSettings();
+  @override
+  Future<void> saveHappyHourSettings(HappyHourSettings settings) async {}
+  @override
+  Future<LoyaltySettings> loadLoyaltySettings() async =>
+      const LoyaltySettings();
+  @override
+  Future<void> saveLoyaltySettings(LoyaltySettings settings) async {}
+  @override
+  Future<UpdateChannelSettings> loadUpdateChannelSettings() async =>
+      const UpdateChannelSettings();
+  @override
+  Future<void> saveUpdateChannelSettings(UpdateChannelSettings settings) async {}
 
   @override
   Future<String> getDatabasePath() async => '';
@@ -91,12 +120,17 @@ Widget _harness({RestaurantSettings? settings}) {
             (ref) => _SeededRestaurantSettingsNotifier(settings),
           ),
         ];
+  // OrderPanel targets the POS tablet layout; a narrow test viewport
+  // overflows its action bar even in the empty-ticket case. Pin to a
+  // landscape-tablet size so Gang chips + footer fit.
   return ProviderScope(
     overrides: overrides,
     child: const MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(body: OrderPanel()),
+      home: Scaffold(
+        body: SizedBox(width: 1280, height: 800, child: OrderPanel()),
+      ),
     ),
   );
 }
@@ -112,12 +146,14 @@ void main() {
 
     testWidgets('renders a Gang chip for every configured slot',
         (tester) async {
-      await tester.pumpWidget(_harness());
+      // Explicit default override avoids depending on SharedPreferences
+      // being mocked at the test harness level.
+      await tester.pumpWidget(_harness(settings: const RestaurantSettings()));
       await tester.pumpAndSettle();
 
       for (var g = 1; g <= 3; g++) {
         expect(
-          find.text('Gang $g'),
+          find.text('GANG $g'),
           findsWidgets,
           reason: 'Gang $g must be visible even when ticket is empty',
         );
@@ -135,10 +171,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // The default labels must NOT appear anywhere on screen.
-      expect(find.text('Gang 1'), findsNothing);
-      expect(find.text('Gang 2'), findsNothing);
-      expect(find.text('Gang 3'), findsNothing);
+      // The chip row renders labels uppercased; assert both forms so the
+      // test fails loudly if either sneaks back onto the empty ticket.
+      for (final label in ['Gang 1', 'Gang 2', 'Gang 3', 'GANG 1', 'GANG 2',
+          'GANG 3']) {
+        expect(find.text(label), findsNothing);
+      }
     });
   });
 
@@ -155,11 +193,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Vorspeise'), findsWidgets);
-      expect(find.text('Hauptgang'), findsWidgets);
-      expect(find.text('Dessert'), findsWidgets);
+      expect(find.text('VORSPEISE'), findsWidgets);
+      expect(find.text('HAUPTGANG'), findsWidgets);
+      expect(find.text('DESSERT'), findsWidgets);
       // Defaults must NOT leak through when overrides are set.
-      expect(find.text('Gang 1'), findsNothing);
+      expect(find.text('GANG 1'), findsNothing);
     });
 
     testWidgets('falls back to default "Gang N" when override is blank',
@@ -175,16 +213,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Vorspeise'), findsWidgets);
+      expect(find.text('VORSPEISE'), findsWidgets);
       // Index 2 (1-based: Gang 2) was blank → default localized label.
-      expect(find.text('Gang 2'), findsWidgets);
-      expect(find.text('Dessert'), findsWidgets);
+      expect(find.text('GANG 2'), findsWidgets);
+      expect(find.text('DESSERT'), findsWidgets);
     });
   });
 
   group('OrderPanel — maxGangs range', () {
-    testWidgets('renders only the configured number of slots',
-        (tester) async {
+    testWidgets('renders only the configured number of slots', (tester) async {
       await tester.pumpWidget(
         _harness(
           settings: const RestaurantSettings(
@@ -195,9 +232,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Gang 1'), findsWidgets);
-      expect(find.text('Gang 2'), findsWidgets);
-      expect(find.text('Gang 3'), findsNothing);
+      expect(find.text('GANG 1'), findsWidgets);
+      expect(find.text('GANG 2'), findsWidgets);
+      expect(find.text('GANG 3'), findsNothing);
     });
   });
 

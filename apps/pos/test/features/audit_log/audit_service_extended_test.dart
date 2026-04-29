@@ -58,8 +58,12 @@ void main() {
       }
     });
 
-    test('covers 21 distinct actions', () {
-      expect(AuditAction.values.length, equals(21));
+    test('covers 32 distinct actions', () {
+      // Baseline of 21 has grown with product availability, customer/ticket
+      // linking, loyalty redemption, receipt reprint compliance, per-waiter
+      // clock-in / clock-out time tracking, paid pause, digital receipts,
+      // table merges, and kitchen dispatch for parked table tickets.
+      expect(AuditAction.values.length, equals(32));
     });
   });
 

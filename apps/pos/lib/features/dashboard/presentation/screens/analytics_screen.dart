@@ -290,11 +290,11 @@ class _PresetChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.primary.withOpacity(0.15)
+              ? AppColors.primary.withValues(alpha: 0.15)
               : AppColors.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(8),
           border: selected
-              ? Border.all(color: AppColors.primary.withOpacity(0.4), width: 1)
+              ? Border.all(color: AppColors.primary.withValues(alpha: 0.4), width: 1)
               : null,
         ),
         child: Row(
@@ -583,7 +583,7 @@ class _KpiCard extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, size: 16, color: color),
@@ -748,8 +748,8 @@ class _TrendChartState extends State<_TrendChart> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppColors.primary.withOpacity(0.18),
-                    AppColors.primary.withOpacity(0.0),
+                    AppColors.primary.withValues(alpha: 0.18),
+                    AppColors.primary.withValues(alpha: 0.0),
                   ],
                 ),
               ),
@@ -968,7 +968,7 @@ class _HourlyHeatmap extends StatelessWidget {
                 ? h.orderCount / maxOrders
                 : 0.0;
             final color = Color.lerp(
-              AppColors.primary.withOpacity(0.25),
+              AppColors.primary.withValues(alpha: 0.25),
               AppColors.primary,
               intensity,
             )!;
@@ -1031,7 +1031,7 @@ class _TopProductsCard extends StatelessWidget {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: i < 3
-                            ? AppColors.primary.withOpacity(0.15)
+                            ? AppColors.primary.withValues(alpha: 0.15)
                             : AppColors.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -1083,7 +1083,7 @@ class _TopProductsCard extends StatelessWidget {
                     valueColor:
                         AlwaysStoppedAnimation<Color>(i < 3
                             ? AppColors.primary
-                            : AppColors.primary.withOpacity(0.5)),
+                            : AppColors.primary.withValues(alpha: 0.5)),
                     minHeight: 4,
                   ),
                 ),
@@ -1138,7 +1138,7 @@ class _StaffPerformanceCard extends StatelessWidget {
                             width: 28,
                             height: 28,
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.12),
+                              color: AppColors.primary.withValues(alpha: 0.12),
                               shape: BoxShape.circle,
                             ),
                             child: Center(

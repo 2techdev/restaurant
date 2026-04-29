@@ -1,7 +1,10 @@
-/// Shift Opening Screen for GastroCore POS - Stitch V2 Design.
+/// Shift Opening Screen — Kinetic Grid redesign.
 ///
-/// Centered card with icon, numpad, quick amounts, gradient button.
-/// Matches Stitch V2 shift_opening design exactly.
+/// Two-column layout: left operator/date context card, right numpad with
+/// quick-amount chips and primary gradient CTA. Light palette, zero-radius,
+/// Swiss franc (CHF), Turkish copy only. Preserves widget keys used by the
+/// integration test harness (`shift_open_screen`, `shift_start_btn`,
+/// `quick_amount_200/500/1000`).
 library;
 
 import 'dart:async';
@@ -9,7 +12,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/core/router/app_router.dart';
+import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
 import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_log_provider.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
@@ -27,14 +31,9 @@ class ShiftOpenScreen extends ConsumerStatefulWidget {
 }
 
 class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
-  String _amountStr = '1000';
+  String _amountStr = '500';
   bool _isOpening = false;
-  int _selectedQuickAmount = 1000; // track which quick button is selected
-
-  @override
-  void initState() {
-    super.initState();
-  }
+  int _selectedQuickAmount = 500;
 
   void _onDigit(String digit) {
     setState(() {
@@ -76,14 +75,13 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
 
   String _formatDisplayAmount() {
     final val = int.tryParse(_amountStr) ?? 0;
-    if (val == 0) return '0,00';
-    final formatted = val.toStringAsFixed(0);
+    final whole = val.toString();
     final parts = <String>[];
-    for (var i = formatted.length; i > 0; i -= 3) {
+    for (var i = whole.length; i > 0; i -= 3) {
       final start = i - 3 < 0 ? 0 : i - 3;
-      parts.insert(0, formatted.substring(start, i));
+      parts.insert(0, whole.substring(start, i));
     }
-    return '${parts.join(".")},00';
+    return "${parts.join("'")}.00";
   }
 
   Future<void> _onStartShift() async {
@@ -92,7 +90,7 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
 
     final user = ref.read(currentUserProvider);
     if (user == null) {
-      if (mounted) context.go('/login');
+      if (mounted) context.go(AppRoutes.login);
       return;
     }
 
@@ -104,292 +102,342 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
             openingCash: openingCash,
           );
 
-      // Audit: day opened
       final audit = ref.read(auditServiceProvider);
       audit.setUser(userId: user.id, userName: user.name);
       await audit.logDayOpened(shift.id, cashierName: user.name);
 
-      if (mounted) context.go('/home');
+      if (mounted) context.go(AppRoutes.orderCenter);
     } catch (e) {
       if (mounted) {
         setState(() => _isOpening = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to open shift: $e'),
-            backgroundColor: AppColors.red,
+            content: Text('Vardiya açılamadı: $e'),
+            backgroundColor: GcColors.error,
           ),
         );
       }
     }
   }
 
-  String _roleLabel(UserRole role) {
-    return switch (role) {
-      UserRole.admin => 'ADMIN',
-      UserRole.manager => 'MANAGER',
-      UserRole.waiter => 'WAITER',
-      UserRole.cashier => 'CASHIER',
-      UserRole.kitchen => 'KITCHEN',
-    };
+  String _roleLabel(UserRole role) => switch (role) {
+        UserRole.admin => 'YÖNETİCİ',
+        UserRole.manager => 'MÜDÜR',
+        UserRole.waiter => 'GARSON',
+        UserRole.cashier => 'KASİYER',
+        UserRole.kitchen => 'MUTFAK',
+      };
+
+  String _formatDate(DateTime dt) {
+    const months = [
+      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+    ];
+    const days = [
+      'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe',
+      'Cuma', 'Cumartesi', 'Pazar',
+    ];
+    return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
+  String _formatTime(DateTime dt) {
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '$h:$m';
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final userRole = user != null ? _roleLabel(user.role) : 'ADMIN';
+    final now = DateTime.now();
 
     return Scaffold(
       key: const Key('shift_open_screen'),
-      backgroundColor: AppColors.surfaceDim,
-      // Action buttons pinned at bottom so they are always in the viewport
-      // (important for automated tests running at 800x600).
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Start shift button
-            GestureDetector(
-              key: const Key('shift_start_btn'),
-              onTap: _isOpening ? null : _onStartShift,
-              child: Container(
-                width: double.infinity,
-                height: 64,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primaryLight, AppColors.primary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+      backgroundColor: GcColors.surface,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 880;
+            final left = _ContextPanel(
+              user: user,
+              roleLabel: user != null ? _roleLabel(user.role) : 'YÖNETİCİ',
+              dateLine: _formatDate(now),
+              timeLine: _formatTime(now),
+            );
+            final right = _AmountPanel(
+              amountFormatted: _formatDisplayAmount(),
+              isOpening: _isOpening,
+              selectedQuickAmount: _selectedQuickAmount,
+              onDigit: _onDigit,
+              onDoubleZero: _onDoubleZero,
+              onBackspace: _onBackspace,
+              onQuickAmount: _onQuickAmount,
+              onStart: _onStartShift,
+              onBackToLogin: () => context.go(AppRoutes.login),
+            );
+
+            if (isWide) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 4, child: left),
+                  Container(width: 1, color: GcColors.ghostBorder),
+                  Expanded(flex: 5, child: right),
+                ],
+              );
+            }
+
+            return SingleChildScrollView(
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 260,
+                    child: left,
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primaryLight.withValues(alpha: 0.1),
-                      blurRadius: 16,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: _isOpening
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Color(0xFF002D6D),
-                          ),
-                        )
-                      : const Text(
-                          'VARDIYAYI BASLAT',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF002D6D),
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                ),
+                  Container(height: 1, color: GcColors.ghostBorder),
+                  right,
+                ],
               ),
-            ),
-            const SizedBox(height: 16),
-            // Back to login
-            GestureDetector(
-              onTap: () => context.go('/login'),
-              child: SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.arrow_back, size: 16, color: Color(0xFFC3C6D7)),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Back to Login',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFC3C6D7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
-      body: Stack(
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Left: operator + date context
+// ---------------------------------------------------------------------------
+
+class _ContextPanel extends StatelessWidget {
+  const _ContextPanel({
+    required this.user,
+    required this.roleLabel,
+    required this.dateLine,
+    required this.timeLine,
+  });
+
+  final UserEntity? user;
+  final String roleLabel;
+  final String dateLine;
+  final String timeLine;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = user?.name ?? 'Operatör';
+    return Container(
+      color: GcColors.surfaceContainerLow,
+      padding: const EdgeInsets.fromLTRB(40, 40, 40, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Background blur accents
-          Positioned(
-            top: -96,
-            left: -96,
-            child: Container(
-              width: 384,
-              height: 384,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primaryLight.withValues(alpha: 0.05),
-              ),
+          const Text('VARDIYA BAŞLAT',
+              style: TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.6,
+                color: GcColors.primary,
+              )),
+          const SizedBox(height: 12),
+          Text('Günaydın,',
+              style: GcText.body.copyWith(
+                color: GcColors.onSurfaceVariant,
+                fontSize: 16,
+              )),
+          const SizedBox(height: 4),
+          Text(
+            name,
+            style: GcText.displayBlack.copyWith(fontSize: 32),
+          ),
+          const SizedBox(height: 24),
+          _InfoRow(
+            icon: Icons.badge_outlined,
+            label: 'ROL',
+            value: roleLabel,
+          ),
+          const SizedBox(height: 12),
+          _InfoRow(
+            icon: Icons.calendar_today_outlined,
+            label: 'TARİH',
+            value: dateLine,
+          ),
+          const SizedBox(height: 12),
+          _InfoRow(
+            icon: Icons.schedule_outlined,
+            label: 'SAAT',
+            value: timeLine,
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: GcColors.surfaceContainer,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline,
+                    size: 18, color: GcColors.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Kasadaki açılış bakiyesini girin. Bu tutar, gün sonu raporunda beklenen nakit ile karşılaştırılır.',
+                    style: GcText.bodySmall.copyWith(height: 1.4),
+                  ),
+                ),
+              ],
             ),
           ),
-          Positioned(
-            bottom: -96,
-            right: -96,
-            child: Container(
-              width: 384,
-              height: 384,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primaryLight.withValues(alpha: 0.10),
-              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: GcColors.onSurfaceVariant),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: GcText.labelTiny),
+              const SizedBox(height: 2),
+              Text(value, style: GcText.body),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Right: amount entry + CTA
+// ---------------------------------------------------------------------------
+
+class _AmountPanel extends StatelessWidget {
+  const _AmountPanel({
+    required this.amountFormatted,
+    required this.isOpening,
+    required this.selectedQuickAmount,
+    required this.onDigit,
+    required this.onDoubleZero,
+    required this.onBackspace,
+    required this.onQuickAmount,
+    required this.onStart,
+    required this.onBackToLogin,
+  });
+
+  final String amountFormatted;
+  final bool isOpening;
+  final int selectedQuickAmount;
+  final ValueChanged<String> onDigit;
+  final VoidCallback onDoubleZero;
+  final VoidCallback onBackspace;
+  final ValueChanged<int> onQuickAmount;
+  final VoidCallback onStart;
+  final VoidCallback onBackToLogin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(40, 40, 40, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('AÇILIŞ KASASI', style: GcText.labelTiny),
+          const SizedBox(height: 12),
+          // Amount display
+          Container(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            color: GcColors.surfaceContainerLowest,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text('CHF',
+                    style: GcText.labelTiny.copyWith(
+                      color: GcColors.primary,
+                      fontSize: 14,
+                      letterSpacing: 1.4,
+                    )),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    amountFormatted,
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    style: GcText.displayBlack.copyWith(
+                      fontSize: 44,
+                      letterSpacing: -1.0,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          // Main centered card
+          const SizedBox(height: 16),
+          // Quick chips
+          Row(
+            children: [
+              _QuickChip(
+                amount: 200,
+                isSelected: selectedQuickAmount == 200,
+                onTap: () => onQuickAmount(200),
+              ),
+              const SizedBox(width: 8),
+              _QuickChip(
+                amount: 500,
+                isSelected: selectedQuickAmount == 500,
+                onTap: () => onQuickAmount(500),
+              ),
+              const SizedBox(width: 8),
+              _QuickChip(
+                amount: 1000,
+                isSelected: selectedQuickAmount == 1000,
+                onTap: () => onQuickAmount(1000),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Numpad
+          _Numpad(
+            onDigit: onDigit,
+            onDoubleZero: onDoubleZero,
+            onBackspace: onBackspace,
+          ),
+          const SizedBox(height: 20),
+          // CTA
+          _PrimaryCta(
+            label: 'VARDİYAYI BAŞLAT',
+            isLoading: isOpening,
+            onTap: isOpening ? null : onStart,
+          ),
+          const SizedBox(height: 12),
           Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 480),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Top section: icon + title
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(32, 40, 32, 24),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceContainerHigh,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.payments,
-                              size: 30,
-                              color: AppColors.primaryLight,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'VARDIYA AC / OPEN SHIFT',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFFE2E2EB),
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppColors.primaryLight,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                userRole,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFFB4B8C9),
-                                  letterSpacing: 2.0,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Amount display
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(32),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceDim,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              'ACILIS KASASI',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFFC3C6D7).withValues(alpha: 0.6),
-                                letterSpacing: 2.0,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    _formatDisplayAmount(),
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 48,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFFE2E2EB),
-                                      letterSpacing: -2.0,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  '\u20BA',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primaryLight,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Quick amounts
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(32, 16, 32, 8),
-                      child: Row(
-                        children: [
-                          _buildQuickBtn(200),
-                          const SizedBox(width: 16),
-                          _buildQuickBtn(500),
-                          const SizedBox(width: 16),
-                          _buildQuickBtn(1000),
-                        ],
-                      ),
-                    ),
-
-                    // Numpad
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
-                      child: _buildNumpad(),
-                    ),
-                  ],
-                ),
+            child: TextButton.icon(
+              onPressed: onBackToLogin,
+              icon: const Icon(Icons.arrow_back, size: 16),
+              label: const Text('GİRİŞE DÖN'),
+              style: TextButton.styleFrom(
+                foregroundColor: GcColors.onSurfaceVariant,
               ),
             ),
           ),
@@ -397,109 +445,196 @@ class _ShiftOpenScreenState extends ConsumerState<ShiftOpenScreen> {
       ),
     );
   }
+}
 
-  Widget _buildQuickBtn(int amount) {
-    final isSelected = _selectedQuickAmount == amount;
+// ---------------------------------------------------------------------------
+// Quick-amount chip
+// ---------------------------------------------------------------------------
+
+class _QuickChip extends StatelessWidget {
+  const _QuickChip({
+    required this.amount,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final int amount;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
         key: Key('quick_amount_$amount'),
-        onTap: () => _onQuickAmount(amount),
+        onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          height: 56,
+          duration: const Duration(milliseconds: 120),
+          height: 52,
           decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFF33343B)
-                : AppColors.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(8),
-            border: isSelected
-                ? Border.all(color: AppColors.primaryLight.withValues(alpha: 0.2), width: 2)
-                : null,
+                ? GcColors.primary
+                : GcColors.surfaceContainerLowest,
+            border: Border.all(
+              color: isSelected ? GcColors.primary : GcColors.outlineVariant,
+              width: 1,
+            ),
           ),
-          child: Center(
-            child: Text(
-              '$amount',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: isSelected
-                    ? AppColors.primaryLight
-                    : const Color(0xFFE2E2EB),
-              ),
+          alignment: Alignment.center,
+          child: Text(
+            'CHF $amount',
+            style: GcText.button.copyWith(
+              fontSize: 14,
+              color: isSelected ? GcColors.onPrimary : GcColors.onSurface,
             ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildNumpad() {
+// ---------------------------------------------------------------------------
+// Numpad
+// ---------------------------------------------------------------------------
+
+class _Numpad extends StatelessWidget {
+  const _Numpad({
+    required this.onDigit,
+    required this.onDoubleZero,
+    required this.onBackspace,
+  });
+
+  final ValueChanged<String> onDigit;
+  final VoidCallback onDoubleZero;
+  final VoidCallback onBackspace;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <List<String>>[
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9'],
+      ['00', '0', 'BACK'],
+    ];
     return Column(
       children: [
-        _buildNumRow(['1', '2', '3']),
-        const SizedBox(height: 12),
-        _buildNumRow(['4', '5', '6']),
-        const SizedBox(height: 12),
-        _buildNumRow(['7', '8', '9']),
-        const SizedBox(height: 12),
-        _buildNumRow(['00', '0', 'BACK']),
+        for (final row in rows) ...[
+          Row(
+            children: [
+              for (final key in row) ...[
+                Expanded(child: _NumKey(label: key, onTap: () {
+                  if (key == 'BACK') {
+                    onBackspace();
+                  } else if (key == '00') {
+                    onDoubleZero();
+                  } else {
+                    onDigit(key);
+                  }
+                })),
+                if (key != row.last) const SizedBox(width: 8),
+              ],
+            ],
+          ),
+          if (row != rows.last) const SizedBox(height: 8),
+        ],
       ],
     );
   }
+}
 
-  Widget _buildNumRow(List<String> keys) {
-    return Row(
-      children: keys.map((key) {
-        final idx = keys.indexOf(key);
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: idx == 0 ? 0 : 6,
-              right: idx == keys.length - 1 ? 0 : 6,
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  if (key == 'BACK') {
-                    _onBackspace();
-                  } else if (key == '00') {
-                    _onDoubleZero();
-                  } else {
-                    _onDigit(key);
-                  }
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Ink(
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1D1F26),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: key == 'BACK'
-                        ? const Icon(
-                            Icons.backspace_outlined,
-                            size: 22,
-                            color: AppColors.primaryLight,
-                          )
-                        : Text(
-                            key,
-                            style: TextStyle(
-                              fontSize: key == '00' ? 20 : 24,
-                              fontWeight: FontWeight.w700,
-                              color: key == '00'
-                                  ? const Color(0xFFB4B8C9)
-                                  : const Color(0xFFE2E2EB),
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-            ),
+class _NumKey extends StatelessWidget {
+  const _NumKey({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBack = label == 'BACK';
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Ink(
+          height: 56,
+          decoration: BoxDecoration(
+            color: GcColors.surfaceContainerLowest,
+            border: Border.all(color: GcColors.outlineVariant, width: 1),
           ),
-        );
-      }).toList(),
+          child: Center(
+            child: isBack
+                ? const Icon(Icons.backspace_outlined,
+                    size: 20, color: GcColors.onSurfaceVariant)
+                : Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: label == '00' ? 18 : 22,
+                      fontWeight: FontWeight.w700,
+                      color: GcColors.onSurface,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Primary CTA — gradient + top highlight strip
+// ---------------------------------------------------------------------------
+
+class _PrimaryCta extends StatelessWidget {
+  const _PrimaryCta({
+    required this.label,
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isLoading;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: const Key('shift_start_btn'),
+      onTap: onTap,
+      child: Container(
+        height: 60,
+        decoration: const BoxDecoration(
+          gradient: kPrimaryGradient,
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0, left: 0, right: 0, height: 1,
+              child: Container(color: kInsetHighlight),
+            ),
+            Center(
+              child: isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: GcColors.onPrimary,
+                      ),
+                    )
+                  : Text(
+                      label,
+                      style: GcText.button.copyWith(
+                        color: GcColors.onPrimary,
+                        fontSize: 15,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

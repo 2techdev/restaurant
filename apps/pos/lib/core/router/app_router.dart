@@ -40,9 +40,11 @@ import 'package:gastrocore_pos/features/reservations/presentation/screens/reserv
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_detail_screen.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_form_screen.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_list_screen.dart';
+import 'package:gastrocore_pos/features/tables/presentation/screens/floor_plan_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_list_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_detail_screen.dart';
 import 'package:gastrocore_pos/features/dashboard/presentation/screens/analytics_screen.dart';
+import 'package:gastrocore_pos/features/reports/presentation/screens/reports_center_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Route path constants
@@ -89,6 +91,7 @@ abstract final class AppRoutes {
   static const String customers = '/customers';
   static const String customerDetail = '/customers/:customerId';
   static const String analytics = '/analytics';
+  static const String reportsCenter = '/reports-center';
 
   /// Build a void route for a specific ticket.
   static String voidFor(String ticketId) => '/void/$ticketId';
@@ -218,7 +221,7 @@ GoRouter createAppRouter({
         ),
         GoRoute(
           path: AppRoutes.tables,
-          redirect: (_, __) => AppRoutes.orderCenter,
+          builder: (context, state) => const FloorPlanScreen(),
         ),
         GoRoute(
           path: AppRoutes.kitchen,
@@ -354,6 +357,10 @@ GoRouter createAppRouter({
           path: AppRoutes.analytics,
           builder: (context, state) => const AnalyticsScreen(),
         ),
+        GoRoute(
+          path: AppRoutes.reportsCenter,
+          builder: (context, state) => const ReportsCenterScreen(),
+        ),
       ],
     );
 
@@ -403,7 +410,7 @@ class _ForgotPasswordScreen extends StatelessWidget {
               ),
               SizedBox(height: 12),
               Text(
-                'Bitte besuchen Sie pos.2tech.ch/reset-password '
+                'Bitte besuchen Sie backoffice.gastrocore.ch/reset-password '
                 'in Ihrem Browser, um Ihr Passwort zurückzusetzen.',
                 textAlign: TextAlign.center,
                 style: TextStyle(

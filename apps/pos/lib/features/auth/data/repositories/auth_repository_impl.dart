@@ -10,6 +10,17 @@ import 'package:drift/drift.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 
+/// Thrown by [AuthRepositoryImpl.getUserByPin] when the same PIN hash resolves
+/// to multiple active users within a tenant. PIN-only login cannot
+/// disambiguate in that case — admin must re-assign PINs.
+class PinCollisionException implements Exception {
+  const PinCollisionException(this.matchCount);
+  final int matchCount;
+
+  @override
+  String toString() => 'PinCollisionException: $matchCount users share this PIN';
+}
+
 class AuthRepositoryImpl {
   final AppDatabase _db;
 
@@ -27,8 +38,10 @@ class AuthRepositoryImpl {
     return rows.map(_toEntity).toList();
   }
 
-  /// Look up a user by tenant and PIN hash. Returns `null` when no match
-  /// is found or the user is inactive / deleted.
+  /// Look up a user by tenant and PIN hash. Returns `null` when no active,
+  /// non-deleted user matches the hash. Throws [PinCollisionException] if
+  /// more than one user shares the same PIN within the tenant — PIN-only
+  /// login requires uniqueness and admin must resolve the conflict.
   Future<UserEntity?> getUserByPin(String tenantId, String pinHash) async {
     final query = _db.select(_db.users)
       ..where(
@@ -38,8 +51,12 @@ class AuthRepositoryImpl {
             u.isActive.equals(true) &
             u.isDeleted.equals(false),
       );
-    final row = await query.getSingleOrNull();
-    return row == null ? null : _toEntity(row);
+    final rows = await query.get();
+    if (rows.isEmpty) return null;
+    if (rows.length > 1) {
+      throw PinCollisionException(rows.length);
+    }
+    return _toEntity(rows.first);
   }
 
   // -------------------------------------------------------------------------

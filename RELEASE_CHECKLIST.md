@@ -44,10 +44,15 @@ tagging a release commit and distributing builds to customers.
 
 - [ ] `flutter analyze` — zero errors, zero warnings
 - [ ] `flutter test` — all tests pass
+- [ ] `flutter test test/goldens/` — golden baselines match (regenerate
+      with `--update-goldens` only on a reviewed layout change)
+- [ ] `flutter test test/a11y/` — Semantics labels locked (PIN pad, etc.)
 - [ ] `flutter build apk --release --dart-define=SENTRY_DSN=…`
 - [ ] `flutter build windows --release` (if targeting Windows POS hardware)
 - [ ] APK / EXE tested on at least one physical device
 - [ ] App size within budget (APK < 50 MB, Windows < 100 MB)
+- [ ] APK SHA-256 captured and posted to the update manifest
+      (`apkUrl` + `sha256` must match the distributed artifact)
 
 ## 6. Go Server Build
 
@@ -60,9 +65,11 @@ tagging a release commit and distributing builds to customers.
 
 ## 7. Localisation
 
-- [ ] All user-visible strings present in DE / FR / IT / EN `.arb` files
+- [ ] All user-visible strings present in DE / FR / IT / EN / TR `.arb` files
 - [ ] `flutter gen-l10n` run after any `.arb` changes
 - [ ] Decimal separator correct for Switzerland (apostrophe: 1'234.56 CHF)
+- [ ] Turkish staff UI spot-checked on a physical tablet (PIN login,
+      Mesai panel, Settings → Güncelleme)
 
 ## 8. Payments & Fiscal
 
@@ -118,4 +125,4 @@ zip -r gastrocore_pos_v1.2.0_android.zip build/app/outputs/flutter-apk/
 
 ---
 
-*Last updated: 2026-03-21*
+*Last updated: 2026-04-22*

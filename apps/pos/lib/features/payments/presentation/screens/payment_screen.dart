@@ -1,13 +1,20 @@
-/// Payment Screen for GastroCore POS - Stitch V2 Design.
+/// Payment screen — Kinetic Grid redesign for the fine-dining pilot.
 ///
-/// Left order summary, center numpad, right total display.
-/// 4 payment method tabs (Nakit/Kredi/Banka/Bol Ode).
-/// Matches Stitch V2 payment design exactly.
+/// Two-column layout:
+///   LEFT  (flex 5)  Order summary — items + MWST breakdown + totals.
+///   RIGHT (flex 7)  Method chips, tip chips, voucher/split, numpad, ÖDE.
+///
+/// Kinetic tokens: GcColors warm-light palette, zero-radius surfaces,
+/// WorkSans/Inter type. Primary ÖDE button uses kPrimaryGradient.
+///
+/// On a successful payment the repository closes the ticket; the table
+/// card turns green via its status-coloured provider.
 library;
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -17,21 +24,25 @@ import 'package:gastrocore_pos/core/payment/models/hardware_payment_request.dart
 import 'package:gastrocore_pos/core/payment/models/hardware_payment_result.dart';
 import 'package:gastrocore_pos/core/payment/models/hardware_payment_status.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
-import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/core/theme/app_tokens.dart';
+import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
+import 'package:gastrocore_pos/features/audit_log/domain/entities/audit_action.dart';
+import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_log_provider.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/customers/domain/entities/customer_entity.dart';
+import 'package:gastrocore_pos/features/customers/presentation/providers/customer_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/payments/domain/entities/payment_entity.dart';
+import 'package:gastrocore_pos/features/payments/domain/entities/voucher_entity.dart';
+import 'package:gastrocore_pos/features/payments/domain/mixed_tender_calculator.dart';
 import 'package:gastrocore_pos/features/payments/presentation/providers/refund_provider.dart';
 import 'package:gastrocore_pos/features/payments/providers/hardware_payment_providers.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 
-// ---------------------------------------------------------------------------
-// Payment Screen
-// ---------------------------------------------------------------------------
-
-enum _PaymentMethod { cash, creditCard, debitCard, split }
+/// Local tender selection.
+enum _Method { bar, karte, twint, gutschein }
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final String ticketId;
@@ -43,9 +54,29 @@ class PaymentScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
-  _PaymentMethod _selectedMethod = _PaymentMethod.cash;
-  String _amountStr = '';
+  _Method _method = _Method.bar;
+  String _amountStr = ''; // Entered tendered amount (whole CHF for cash).
+  int _tipAmount = 0; // In cents.
+  int? _selectedTipPercent;
+  VoucherEntity? _voucher;
+
+  /// Running mixed-tender state. Stays empty in the common single-method
+  /// flow; the list only grows when the cashier taps EKLE to stage a
+  /// partial tender (e.g. CHF 20 cash toward a CHF 57 bill, rest card).
+  MixedTenderCalculator _calc = const MixedTenderCalculator(grandTotalCents: 0);
+
+  /// Staged loyalty redemption. Points are only debited from the customer
+  /// (and the audit log emitted) on a successful payment; cancelling the
+  /// screen before PAY leaves the balance untouched. 1 point == 1 cent.
+  int _loyaltyPointsToRedeem = 0;
+
+  /// Customer linked to the current ticket, loaded once after the ticket
+  /// arrives. Null when the ticket has no linked customer.
+  CustomerEntity? _linkedCustomer;
+  String? _customerLoadedFor; // ticket.customerId we already fetched for
+
   bool _paymentComplete = false;
+  bool _submitting = false;
 
   // Terminal-flow state (only active for card / debit).
   bool _isProcessing = false;
@@ -56,39 +87,130 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   /// Cached ticket — updated whenever the async provider emits a new value.
   TicketEntity? _ticket;
 
-  // Derived from real ticket data.
+  // --- Derived totals ------------------------------------------------------
+
   int get _subtotal => _ticket?.subtotal ?? 0;
   int get _taxAmount => _ticket?.taxAmount ?? 0;
-  int get _grandTotal => _ticket?.total ?? 0;
-  List<OrderItemEntity> get _items => _ticket?.items ?? [];
+  int get _baseTotal => _ticket?.total ?? 0;
+  int get _voucherDiscount => _voucher?.discountAmount ?? 0;
 
-  int get _enteredAmount {
+  /// Loyalty discount in cents. Points redeem 1:1 as cents
+  /// (100 points = CHF 1.00).
+  int get _loyaltyDiscount => _loyaltyPointsToRedeem;
+
+  int get _grandTotal {
+    final total =
+        _baseTotal + _tipAmount - _voucherDiscount - _loyaltyDiscount;
+    return total < 0 ? 0 : total;
+  }
+
+  /// Outstanding balance when at least one tender has been staged.
+  /// Falls back to the grand total for the empty-list flow so the
+  /// existing single-method UX keeps working unchanged.
+  int get _outstanding {
+    if (!_calc.hasTenders) return _grandTotal;
+    return _liveCalc.outstandingCents;
+  }
+
+  /// Calculator kept in lockstep with the live grand total so tip /
+  /// voucher / loyalty changes after the first tender don't leave the
+  /// outstanding balance stale.
+  MixedTenderCalculator get _liveCalc =>
+      _calc.withGrandTotal(_grandTotal);
+
+  PaymentMethod _domainMethodFor(_Method m) {
+    return switch (m) {
+      _Method.bar => PaymentMethod.cash,
+      _Method.karte => PaymentMethod.creditCard,
+      _Method.twint => PaymentMethod.other,
+      _Method.gutschein => PaymentMethod.other,
+    };
+  }
+
+  String? _referenceFor(_Method m) {
+    return switch (m) {
+      _Method.twint => 'TWINT',
+      _Method.gutschein =>
+        _voucher != null ? 'VOUCHER:${_voucher!.code}' : 'GUTSCHEIN',
+      _ when _voucher != null => 'VOUCHER:${_voucher!.code}',
+      _ => null,
+    };
+  }
+
+  /// Map a persisted tender entry back to a UI method enum for the strip
+  /// label. Twint/Gutschein share PaymentMethod.other so we disambiguate
+  /// via the reference.
+  _Method _uiMethodFor(TenderEntry t) {
+    if (t.method == PaymentMethod.cash) return _Method.bar;
+    if (t.method == PaymentMethod.creditCard ||
+        t.method == PaymentMethod.debitCard) {
+      return _Method.karte;
+    }
+    if (t.reference == 'TWINT') return _Method.twint;
+    return _Method.gutschein;
+  }
+
+  /// Maximum points that can be redeemed on this ticket: capped by the
+  /// customer's balance and by the ticket total (we never allow the bill
+  /// to go negative via puan).
+  int get _maxRedeemablePoints {
+    final customer = _linkedCustomer;
+    if (customer == null) return 0;
+    final billRoom = _baseTotal + _tipAmount - _voucherDiscount;
+    if (billRoom <= 0) return 0;
+    return customer.loyaltyPoints < billRoom
+        ? customer.loyaltyPoints
+        : billRoom;
+  }
+
+  List<OrderItemEntity> get _items => _ticket?.items ?? const [];
+
+  int get _enteredCents {
     if (_amountStr.isEmpty) return 0;
-    return int.tryParse(_amountStr) ?? 0;
+    final value = int.tryParse(_amountStr) ?? 0;
+    return value * 100;
   }
 
   int get _changeAmount {
-    final entered = _enteredAmount * 100;
-    if (entered <= _grandTotal) return 0;
-    return entered - _grandTotal;
+    if (_method != _Method.bar) return 0;
+    final target = _outstanding;
+    if (_enteredCents <= target) return 0;
+    return _enteredCents - target;
   }
 
-  String _formatCents(int cents) {
+  bool get _canPay {
+    if (_submitting || _grandTotal <= 0) return false;
+    if (_calc.hasTenders && _liveCalc.isFullyPaid) return true;
+    final target = _outstanding;
+    if (_method == _Method.bar) return _enteredCents >= target;
+    return true; // Non-cash methods assume exact-outstanding tender.
+  }
+
+  /// Whether the "+ EKLE" (stage partial) button should be enabled.
+  ///
+  /// Active whenever the cashier has entered a non-zero amount that's
+  /// still below the outstanding balance. Covers mixed-method flows:
+  /// CHF 20 cash + card, or CHF 30 card + TWINT, etc.
+  bool get _canStage {
+    if (_submitting || _grandTotal <= 0) return false;
+    if (_calc.hasTenders && _liveCalc.isFullyPaid) return false;
+    final target = _outstanding;
+    if (target <= 0) return false;
+    return _enteredCents > 0 && _enteredCents < target;
+  }
+
+  String _fmt(int cents) {
     final abs = cents.abs();
     final whole = abs ~/ 100;
     final frac = (abs % 100).toString().padLeft(2, '0');
-    final wholeStr = whole.toString();
-    final parts = <String>[];
-    for (var i = wholeStr.length; i > 0; i -= 3) {
-      final start = i - 3 < 0 ? 0 : i - 3;
-      parts.insert(0, wholeStr.substring(start, i));
-    }
-    return '${parts.join(',')}.$frac';
+    return 'CHF ${whole.toString()}.$frac';
   }
 
+  // --- Inputs --------------------------------------------------------------
+
   void _onDigit(String digit) {
-    if (_amountStr.length >= 8) return;
-    setState(() => _amountStr += digit);
+    if (_amountStr.length >= 6) return;
+    setState(() => _amountStr = (_amountStr + digit));
   }
 
   void _onBackspace() {
@@ -96,8 +218,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     setState(() => _amountStr = _amountStr.substring(0, _amountStr.length - 1));
   }
 
-  void _onQuickAmount(int amount) {
-    setState(() => _amountStr = amount.toString());
+  void _onClear() => setState(() => _amountStr = '');
+
+  void _applyTipPercent(int percent) {
+    final cents = (_baseTotal * percent / 100).round();
+    setState(() {
+      _selectedTipPercent = percent;
+      _tipAmount = cents;
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -309,20 +437,20 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Keep _ticket in sync with the database.
     ref.listen(ticketByIdProvider(widget.ticketId), (_, next) {
       next.whenData((t) {
-        if (t != null && mounted) setState(() => _ticket = t);
+        if (t != null && mounted) {
+          setState(() => _ticket = t);
+          _maybeLoadLinkedCustomer(t.customerId);
+        }
       });
     });
 
-    if (_paymentComplete) {
-      return _buildCompletionView();
-    }
+    if (_paymentComplete) return _buildCompletion();
 
-    // Show loading spinner until ticket arrives.
     if (_ticket == null) {
       return const Scaffold(
+        backgroundColor: GcColors.surface,
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -451,240 +579,126 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  // -------------------------------------------------------------------------
-  // Completion view
-  // -------------------------------------------------------------------------
-
-  Widget _buildCompletionView() {
-    return Scaffold(
-      backgroundColor: AppColors.surfaceDim,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      body: Padding(
+        padding: const EdgeInsets.all(AppTokens.space16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.greenDim,
-              ),
-              child: const Icon(Icons.check_rounded, size: 40, color: AppColors.green),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Odeme Tamamlandi!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Rückgeld: CHF ${_formatCents(_changeAmount)}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.green),
-            ),
+            Expanded(flex: 5, child: _buildSummary()),
+            const SizedBox(width: AppTokens.space16),
+            Expanded(flex: 7, child: _buildPaymentSide()),
           ],
         ),
       ),
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Sidebar
-  // -------------------------------------------------------------------------
+  // --- LEFT — Summary ------------------------------------------------------
 
-  Widget _buildSidebar() {
-    return Container(
-      width: 96,
-      color: AppColors.surfaceDim,
-      child: Column(
-        children: [
-          const SizedBox(height: 16),
-          const Text('GC', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-          const SizedBox(height: 16),
-          _buildSidebarItem(Icons.shopping_cart, 'Order', true),
-          _buildSidebarItem(Icons.receipt_long, 'Records', false),
-          _buildSidebarItem(Icons.grid_view, 'Table', false),
-          _buildSidebarItem(Icons.restaurant_menu, 'Menu', false),
-          _buildSidebarItem(Icons.kitchen, 'KDS', false),
-          const Spacer(),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFF33343B),
-            ),
-            child: const Icon(Icons.person, size: 18, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(IconData icon, String label, bool isActive) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF2A2F3D) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 22, color: isActive ? AppColors.textPrimary : AppColors.textSecondary),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------------------
-  // Top bar
-  // -------------------------------------------------------------------------
-
-  Widget _buildTopBar() {
-    return Container(
-      height: 80,
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      color: AppColors.surfaceDim,
-      child: Row(
-        children: [
-          Flexible(
-            child: ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
-              ).createShader(bounds),
-              child: const Text(
-                'GastroCore POS',
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          const Flexible(
-            child: Text(
-              'Menu',
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-            ),
-          ),
-          const Spacer(),
-          const Icon(Icons.cloud_done, color: AppColors.textSecondary),
-          const SizedBox(width: 16),
-          const Icon(Icons.account_circle, color: AppColors.textSecondary),
-        ],
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------------------
-  // Order Summary (left panel) — populated from real ticket
-  // -------------------------------------------------------------------------
-
-  Widget _buildOrderSummary() {
-    final ticket = _ticket!;
-    final tableLabel = ticket.tableId != null
-        ? 'Masa #${ticket.tableId}'
-        : 'Siparis #${ticket.orderNumber}';
-
+  Widget _buildSummary() {
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF191B22),
-        borderRadius: BorderRadius.circular(12),
+      decoration: const BoxDecoration(
+        color: GcColors.surfaceContainerLowest,
+        border: Border.fromBorderSide(
+          BorderSide(color: GcColors.outlineVariant),
+        ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.space16,
+              vertical: AppTokens.space12,
+            ),
+            color: GcColors.surfaceContainerLow,
             child: Row(
               children: [
-                const Flexible(
-                  child: Text(
-                    'Order Summary',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFFE2E2EB)),
-                  ),
+                const Icon(
+                  Icons.receipt_long_rounded,
+                  size: 18,
+                  color: GcColors.onSurfaceVariant,
                 ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF282A30),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      tableLabel,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFFC3C6D7)),
-                    ),
+                const SizedBox(width: AppTokens.space8),
+                Text(
+                  'ADİSYON · ${_items.length} KALEM',
+                  style: const TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: GcColors.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
-          // Items from real ticket
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: AppTokens.space4),
               itemCount: _items.length,
-              itemBuilder: (context, index) {
-                final item = _items[index];
+              separatorBuilder: (_, __) => const Divider(
+                height: 1,
+                color: GcColors.outlineVariant,
+              ),
+              itemBuilder: (_, i) {
+                final item = _items[i];
+                final isIkram = item.subtotal == 0 ||
+                    (item.notes ?? '').startsWith('[İKRAM]');
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTokens.space16,
+                    vertical: AppTokens.space8,
+                  ),
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF33343B),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${item.quantity.ceil()}',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFE2E2EB)),
+                      SizedBox(
+                        width: 28,
+                        child: Text(
+                          '${item.quantity.toStringAsFixed(0)}×',
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: GcColors.onSurface,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               item.productName,
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFE2E2EB)),
+                              style: const TextStyle(
+                                fontFamily: 'WorkSans',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: GcColors.onSurface,
+                              ),
                             ),
-                            if (item.notes != null)
-                              Text(
-                                item.notes!,
-                                style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFFC3C6D7)),
+                            if (isIkram)
+                              const Text(
+                                'İKRAM',
+                                style: TextStyle(
+                                  fontFamily: 'WorkSans',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: GcColors.tertiary,
+                                  letterSpacing: 1.0,
+                                ),
                               ),
                           ],
                         ),
                       ),
                       Text(
-                        'CHF${_formatCents(item.subtotal)}',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFFE2E2EB)),
+                        _fmt(item.subtotal),
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: GcColors.onSurface,
+                        ),
                       ),
                     ],
                   ),
@@ -692,93 +706,66 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               },
             ),
           ),
-          // Totals from real ticket
           Container(
-            margin: const EdgeInsets.all(24),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1D1F26),
-              borderRadius: BorderRadius.circular(12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTokens.space16,
+              vertical: AppTokens.space12,
+            ),
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: GcColors.outlineVariant),
+              ),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildTotalRow('Subtotal', 'CHF${_formatCents(_subtotal)}', false),
-                const SizedBox(height: 12),
-                _buildTotalRow('KDV (dahil)', 'CHF${_formatCents(_taxAmount)}', false),
-                const SizedBox(height: 12),
-                Container(height: 1, color: const Color(0xFF424753).withValues(alpha: 0.2)),
-                const SizedBox(height: 12),
+                _totalLine('Ara Toplam', _fmt(_subtotal - _taxAmount)),
+                _totalLine('MWST (8.1%)', _fmt(_taxAmount)),
+                if (_tipAmount > 0)
+                  _totalLine(
+                    'Trinkgeld',
+                    '+${_fmt(_tipAmount)}',
+                    valueColor: GcColors.secondary,
+                  ),
+                if (_voucher != null)
+                  _totalLine(
+                    'Gutschein (${_voucher!.code})',
+                    '-${_fmt(_voucherDiscount)}',
+                    valueColor: GcColors.tertiary,
+                  ),
+                if (_loyaltyPointsToRedeem > 0)
+                  _totalLine(
+                    'Puan (${_loyaltyPointsToRedeem}P)',
+                    '-${_fmt(_loyaltyDiscount)}',
+                    valueColor: GcColors.tertiary,
+                  ),
+                const SizedBox(height: AppTokens.space8),
+                const Divider(color: GcColors.outlineVariant, height: 1),
+                const SizedBox(height: AppTokens.space8),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFE2E2EB))),
-                    Flexible(
+                    const Expanded(
                       child: Text(
-                        'CHF${_formatCents(_grandTotal)}',
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFFAFC6FF)),
+                        'TOPLAM',
+                        style: TextStyle(
+                          fontFamily: 'WorkSans',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.0,
+                          color: GcColors.onSurface,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _fmt(_grandTotal),
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: GcColors.primary,
                       ),
                     ),
                   ],
-                ),
-              ],
-            ),
-          ),
-          // Action buttons
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF282A30),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.print, size: 16, color: Color(0xFFE2E2EB)),
-                        SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            'Print',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFE2E2EB)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => context.go('/order-center'),
-                    child: Container(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF93000A).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.close, size: 16, color: Color(0xFFFFB4AB)),
-                          SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              'Cancel',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFFFB4AB)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -788,362 +775,1000 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
-  Widget _buildTotalRow(String label, String value, bool isBold) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _totalLine(String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                color: GcColors.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: valueColor ?? GcColors.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- RIGHT — Payment -----------------------------------------------------
+
+  Widget _buildPaymentSide() {
+    final showLoyalty = _linkedCustomer != null;
+    final showTenders = _calc.hasTenders;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Flexible(
+        _methodRow(),
+        if (showLoyalty) ...[
+          const SizedBox(height: AppTokens.space12),
+          _loyaltyRow(),
+        ],
+        const SizedBox(height: AppTokens.space12),
+        _tipRow(),
+        const SizedBox(height: AppTokens.space12),
+        _extraRow(),
+        if (showTenders) ...[
+          const SizedBox(height: AppTokens.space12),
+          _buildTenderStrip(),
+        ],
+        const SizedBox(height: AppTokens.space12),
+        Expanded(child: _buildMethodBody()),
+        const SizedBox(height: AppTokens.space12),
+        _buildPayCta(),
+      ],
+    );
+  }
+
+  Widget _loyaltyRow() {
+    final customer = _linkedCustomer!;
+    final hasRedemption = _loyaltyPointsToRedeem > 0;
+    final maxPoints = _maxRedeemablePoints;
+    final canRedeem = maxPoints > 0;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.space8),
+      decoration: BoxDecoration(
+        color: hasRedemption
+            ? GcColors.tertiary.withValues(alpha: 0.08)
+            : GcColors.surfaceContainerLowest,
+        border: Border.all(
+          color: hasRedemption
+              ? GcColors.tertiary
+              : GcColors.outlineVariant,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppTokens.space8),
+            child: Icon(
+              Icons.stars_rounded,
+              size: 18,
+              color: GcColors.tertiary,
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PUAN · ${customer.name.toUpperCase()}',
+                  style: const TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: GcColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasRedemption
+                      ? '${_loyaltyPointsToRedeem}P uygulandı · ${_fmt(_loyaltyDiscount)} indirim'
+                      : 'Mevcut ${customer.loyaltyPoints}P · en fazla ${maxPoints}P kullanılabilir',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: GcColors.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasRedemption) ...[
+            TextButton(
+              onPressed: _clearLoyalty,
+              child: const Text('KALDIR'),
+            ),
+            const SizedBox(width: AppTokens.space4),
+          ],
+          FilledButton(
+            onPressed: canRedeem ? _openLoyaltyDialog : null,
+            style: FilledButton.styleFrom(
+              backgroundColor: GcColors.tertiary,
+              foregroundColor: GcColors.onPrimary,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+              ),
+            ),
+            child: Text(hasRedemption ? 'DEĞİŞTİR' : 'KULLAN'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _methodRow() {
+    return SizedBox(
+      height: AppTokens.touchLarge,
+      child: Row(
+        children: [
+          _methodChip(_Method.bar, Icons.payments_rounded, 'BAR'),
+          const SizedBox(width: AppTokens.space8),
+          _methodChip(_Method.karte, Icons.credit_card_rounded, 'KARTE'),
+          const SizedBox(width: AppTokens.space8),
+          _methodChip(_Method.twint, Icons.phone_iphone_rounded, 'TWINT'),
+          const SizedBox(width: AppTokens.space8),
+          _methodChip(
+            _Method.gutschein,
+            Icons.confirmation_number_rounded,
+            'GUTSCHEIN',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _methodChip(_Method m, IconData icon, String label) {
+    final selected = _method == m;
+    return Expanded(
+      child: Material(
+        color: selected
+            ? GcColors.primary
+            : GcColors.surfaceContainerLowest,
+        child: InkWell(
+          onTap: () => setState(() => _method = m),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: selected ? kPrimaryGradient : null,
+              border: Border.all(
+                color: selected ? GcColors.primary : GcColors.outlineVariant,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? GcColors.onPrimary : GcColors.onSurface,
+                ),
+                const SizedBox(width: AppTokens.space8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.0,
+                    color: selected ? GcColors.onPrimary : GcColors.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tipRow() {
+    return Container(
+      padding: const EdgeInsets.all(AppTokens.space8),
+      decoration: BoxDecoration(
+        color: GcColors.surfaceContainerLowest,
+        border: Border.all(color: GcColors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppTokens.space8),
+            child: Text(
+              'TRINKGELD',
+              style: TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: GcColors.onSurfaceVariant,
+              ),
+            ),
+          ),
+          _tipChip('0%', _tipAmount == 0, _clearTip),
+          const SizedBox(width: AppTokens.space4),
+          _tipChip('5%', _selectedTipPercent == 5, () => _applyTipPercent(5)),
+          const SizedBox(width: AppTokens.space4),
+          _tipChip(
+            '10%',
+            _selectedTipPercent == 10,
+            () => _applyTipPercent(10),
+          ),
+          const SizedBox(width: AppTokens.space4),
+          _tipChip(
+            '15%',
+            _selectedTipPercent == 15,
+            () => _applyTipPercent(15),
+          ),
+          const SizedBox(width: AppTokens.space4),
+          _tipChip(
+            _tipAmount > 0 && _selectedTipPercent == null
+                ? '${_fmt(_tipAmount).replaceFirst("CHF ", "")} CHF'
+                : 'ÖZEL',
+            _selectedTipPercent == null && _tipAmount > 0,
+            _customTipDialog,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tipChip(String label, bool selected, VoidCallback onTap) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: selected ? GcColors.primary : GcColors.surfaceContainerLow,
+            border: Border.all(
+              color: selected ? GcColors.primary : GcColors.outlineVariant,
+            ),
+          ),
+          alignment: Alignment.center,
           child: Text(
             label,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, color: Color(0xFFC3C6D7)),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: const Color(0xFFE2E2EB),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // -------------------------------------------------------------------------
-  // Payment Interface (right panel)
-  // -------------------------------------------------------------------------
-
-  Widget _buildPaymentInterface() {
-    return Column(
-      children: [
-        // Payment methods + numpad area
-        Expanded(
-          child: Row(
-            children: [
-              // Left: methods + numpad (8/12)
-              Expanded(
-                flex: 2,
-                child: Column(
-                  children: [
-                    // Payment method buttons
-                    Row(
-                      children: [
-                        _buildMethodButton('Nakit', Icons.payments, _PaymentMethod.cash),
-                        const SizedBox(width: 16),
-                        _buildMethodButton('Kredi', Icons.credit_card, _PaymentMethod.creditCard),
-                        const SizedBox(width: 16),
-                        _buildMethodButton('Banka', Icons.account_balance, _PaymentMethod.debitCard),
-                        const SizedBox(width: 16),
-                        _buildMethodButton('Bol Ode', Icons.group, _PaymentMethod.split),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    // Numpad
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF191B22),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: _buildNumpad(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 24),
-              // Right: display + quick amounts + action (4/12)
-              Expanded(
-                child: Column(
-                  children: [
-                    // Amount display
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2A2F3D).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            const Text(
-                              'ODENEN TUTAR',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFFC3C6D7),
-                                letterSpacing: 2.0,
-                              ),
-                            ),
-                            Text(
-                              _amountStr.isEmpty ? 'CHF0.00' : 'CHF$_amountStr.00',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFFE2E2EB),
-                              ),
-                            ),
-                            // Change display
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF7990C6).withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text(
-                                    'PARA USTU',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFFAFC6FF),
-                                      letterSpacing: 2.0,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'CHF${_formatCents(_changeAmount)}',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFFAFC6FF),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Quick amounts
-                    Row(
-                      children: [
-                        _buildQuickBtn(10),
-                        const SizedBox(width: 12),
-                        _buildQuickBtn(20),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _buildQuickBtn(50),
-                        const SizedBox(width: 12),
-                        _buildQuickBtn(100),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Complete payment button
-                    GestureDetector(
-                      key: const Key('complete_payment_btn'),
-                      onTap: _enteredAmount * 100 >= _grandTotal ||
-                              _selectedMethod != _PaymentMethod.cash
-                          ? _onCompletePayment
-                          : null,
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 200),
-                        opacity: _enteredAmount * 100 >= _grandTotal ||
-                                _selectedMethod != _PaymentMethod.cash
-                            ? 1.0
-                            : 0.4,
-                        child: Container(
-                          width: double.infinity,
-                          height: 96,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFAFC6FF), Color(0xFF528DFF)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFAFC6FF).withValues(alpha: 0.2),
-                                blurRadius: 24,
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'ODEMEYI TAMAMLA',
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF002D6D),
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              const Text(
-                                'Siparisi Kapat & Yazdir',
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF002D6D),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMethodButton(String label, IconData icon, _PaymentMethod method) {
-    final isSelected = _selectedMethod == method;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedMethod = method),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          height: 64,
-          decoration: BoxDecoration(
-            color: isSelected
-                ? const Color(0xFF282A30)
-                : const Color(0xFF191B22),
-            borderRadius: BorderRadius.circular(12),
-            border: isSelected
-                ? Border.all(color: const Color(0xFF528DFF), width: 2)
-                : null,
-            boxShadow: isSelected
-                ? [BoxShadow(color: const Color(0xFF528DFF).withValues(alpha: 0.1), blurRadius: 12)]
-                : null,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 22, color: isSelected ? const Color(0xFF528DFF) : const Color(0xFFC3C6D7)),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: isSelected ? const Color(0xFF528DFF) : const Color(0xFFC3C6D7),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickBtn(int amount) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _onQuickAmount(amount),
-        child: Container(
-          height: 56,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1D1F26),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Text(
-              '$amount',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFFE2E2EB),
-              ),
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: selected ? GcColors.onPrimary : GcColors.onSurface,
             ),
           ),
         ),
       ),
     );
   }
+
+  Widget _extraRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _extraButton(
+            icon: Icons.card_giftcard_rounded,
+            label: _voucher == null
+                ? 'GUTSCHEIN'
+                : 'GUTSCHEIN · ${_voucher!.code}',
+            onTap: _voucher == null ? _pickVoucher : _clearVoucher,
+            active: _voucher != null,
+          ),
+        ),
+        const SizedBox(width: AppTokens.space8),
+        Expanded(
+          child: _extraButton(
+            icon: Icons.call_split_rounded,
+            label: 'BÖL',
+            onTap: () => context.push(AppRoutes.splitBillFor(widget.ticketId)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _extraButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool active = false,
+  }) {
+    return SizedBox(
+      height: 44,
+      child: Material(
+        color: active
+            ? GcColors.tertiary
+            : GcColors.surfaceContainerLowest,
+        child: InkWell(
+          onTap: onTap,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: active ? GcColors.tertiary : GcColors.outlineVariant,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 16,
+                  color: active ? GcColors.onPrimary : GcColors.onSurface,
+                ),
+                const SizedBox(width: AppTokens.space8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.0,
+                    color: active ? GcColors.onPrimary : GcColors.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMethodBody() {
+    // Always show the numpad — for non-cash methods the entered amount
+    // represents an optional *partial* tender (e.g. CHF 30 on card).
+    // Leaving the numpad empty means "pay the full outstanding via this
+    // method", which keeps the single-tap UX for the common case.
+    if (_method == _Method.bar) return _buildNumpad();
+    return Column(
+      children: [
+        _buildTerminalBanner(),
+        const SizedBox(height: AppTokens.space8),
+        Expanded(child: _buildNumpad()),
+      ],
+    );
+  }
+
+  /// Compact banner shown above the numpad for non-cash methods. Tells
+  /// the cashier which terminal to use while keeping the numpad visible
+  /// so partial tenders can be staged.
+  Widget _buildTerminalBanner() {
+    final label = switch (_method) {
+      _Method.karte => 'KARTENTERMINAL',
+      _Method.twint => 'TWINT',
+      _Method.gutschein => 'GUTSCHEIN',
+      _Method.bar => '',
+    };
+    final icon = switch (_method) {
+      _Method.karte => Icons.credit_card_rounded,
+      _Method.twint => Icons.phone_iphone_rounded,
+      _Method.gutschein => Icons.confirmation_number_rounded,
+      _Method.bar => Icons.payments_rounded,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTokens.space16,
+        vertical: AppTokens.space8,
+      ),
+      decoration: BoxDecoration(
+        color: GcColors.surfaceContainerLow,
+        border: Border.all(color: GcColors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: GcColors.onSurfaceVariant),
+          const SizedBox(width: AppTokens.space8),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: GcColors.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Text(
+            _amountStr.isEmpty
+                ? 'Tam ödeme: ${_fmt(_outstanding)}'
+                : 'Kısmi: ${_fmt(_enteredCents)}',
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: GcColors.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Cash numpad ---------------------------------------------------------
 
   Widget _buildNumpad() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: GcColors.surfaceContainerLowest,
+        border: Border.all(color: GcColors.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppTokens.space16),
+            color: GcColors.surfaceContainerLow,
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'ALINAN (CHF)',
+                    style: TextStyle(
+                      fontFamily: 'WorkSans',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                      color: GcColors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Text(
+                  _amountStr.isEmpty ? '0' : _amountStr,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: GcColors.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_changeAmount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTokens.space16,
+                vertical: AppTokens.space8,
+              ),
+              color: GcColors.secondaryDim,
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'RÜCKGELD',
+                      style: TextStyle(
+                        fontFamily: 'WorkSans',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: GcColors.onSecondary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _fmt(_changeAmount),
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: GcColors.onSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(child: _buildDigitsGrid()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDigitsGrid() {
+    final rows = [
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9'],
+      ['C', '0', '⌫'],
+    ];
     return Column(
       children: [
-        Expanded(child: _buildNumRow(['1', '2', '3'])),
-        const SizedBox(height: 16),
-        Expanded(child: _buildNumRow(['4', '5', '6'])),
-        const SizedBox(height: 16),
-        Expanded(child: _buildNumRow(['7', '8', '9'])),
-        const SizedBox(height: 16),
-        Expanded(child: _buildNumRow(['.', '0', 'BACK'])),
+        for (final row in rows)
+          Expanded(
+            child: Row(
+              children: [
+                for (final key in row)
+                  Expanded(child: _digitKey(key)),
+              ],
+            ),
+          ),
       ],
     );
   }
 
-  Widget _buildNumRow(List<String> keys) {
-    return Row(
-      children: keys.map((key) {
-        final idx = keys.indexOf(key);
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: idx == 0 ? 0 : 8,
-              right: idx == keys.length - 1 ? 0 : 8,
+  Widget _digitKey(String key) {
+    VoidCallback? onTap;
+    Widget child;
+    if (key == 'C') {
+      onTap = _onClear;
+      child = const Icon(Icons.refresh_rounded,
+          color: GcColors.onSurface, size: 22);
+    } else if (key == '⌫') {
+      onTap = _onBackspace;
+      child = const Icon(Icons.backspace_rounded,
+          color: GcColors.onSurface, size: 22);
+    } else {
+      onTap = () => _onDigit(key);
+      child = Text(
+        key,
+        style: const TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: GcColors.onSurface,
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.all(2),
+      child: Material(
+        color: GcColors.surfaceContainerLow,
+        child: InkWell(
+          onTap: onTap,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border.all(color: GcColors.outlineVariant),
             ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  if (key == 'BACK') {
-                    _onBackspace();
-                  } else {
-                    _onDigit(key);
-                  }
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Ink(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF33343B),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: key == 'BACK'
-                        ? const Icon(Icons.backspace_outlined, size: 22, color: Color(0xFFC3C6D7))
-                        : Text(
-                            key,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFFE2E2EB),
-                            ),
-                          ),
+            child: Center(child: child),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Mixed tender strip ---------------------------------------------------
+
+  Widget _buildTenderStrip() {
+    if (!_calc.hasTenders) return const SizedBox.shrink();
+    final live = _liveCalc;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTokens.space12,
+        vertical: AppTokens.space8,
+      ),
+      decoration: BoxDecoration(
+        color: GcColors.tertiary.withValues(alpha: 0.08),
+        border: Border.all(color: GcColors.tertiary),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'KISMİ ÖDEMELER',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: GcColors.tertiary,
                   ),
                 ),
               ),
+              Text(
+                'Kalan: ${_fmt(live.outstandingCents)}',
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: GcColors.tertiary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTokens.space4),
+          Wrap(
+            spacing: AppTokens.space8,
+            runSpacing: AppTokens.space4,
+            children: [
+              for (int i = 0; i < _calc.tenders.length; i++)
+                _tenderChip(i, _calc.tenders[i]),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tenderChip(int index, TenderEntry t) {
+    final uiMethod = _uiMethodFor(t);
+    final label = switch (uiMethod) {
+      _Method.bar => 'BAR',
+      _Method.karte => 'KARTE',
+      _Method.twint => 'TWINT',
+      _Method.gutschein => 'GUTSCHEIN',
+    };
+    return InkWell(
+      onTap: () => _removeTender(index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTokens.space8,
+          vertical: 4,
+        ),
+        decoration: BoxDecoration(
+          color: GcColors.surfaceContainerLowest,
+          border: Border.all(color: GcColors.tertiary),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$label · ${_fmt(t.amountCents)}',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: GcColors.onSurface,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.close_rounded, size: 14, color: GcColors.tertiary),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _stageTender() {
+    if (!_canStage) return;
+    final result = _liveCalc.addTender(
+      method: _domainMethodFor(_method),
+      amountCents: _enteredCents,
+      reference: _referenceFor(_method),
+    );
+    if (!result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_stageErrorMessage(result.error!))),
+      );
+      return;
+    }
+    setState(() {
+      _calc = result.calculator!;
+      _amountStr = '';
+      // Keep method as-is so rapid same-method partials are easy; the
+      // cashier can tap another chip for the next tender if needed.
+    });
+  }
+
+  void _removeTender(int index) {
+    setState(() => _calc = _calc.removeTenderAt(index));
+  }
+
+  String _stageErrorMessage(AddTenderError e) {
+    return switch (e) {
+      AddTenderError.nonPositive => 'Geçerli bir tutar girin.',
+      AddTenderError.overPayNonCash =>
+        'Kart/TWINT/kuponla kalan tutardan fazlası alınamaz.',
+      AddTenderError.alreadyFullyPaid => 'Adisyon zaten ödendi.',
+    };
+  }
+
+  // --- Pay CTA -------------------------------------------------------------
+
+  Widget _buildPayCta() {
+    return SizedBox(
+      height: AppTokens.touchLarge + 8,
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: _stageButton(),
+          ),
+          const SizedBox(width: AppTokens.space8),
+          Expanded(
+            flex: 5,
+            child: _payButton(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stageButton() {
+    final enabled = _canStage;
+    return Material(
+      color: enabled ? GcColors.tertiary : GcColors.surfaceContainerHighest,
+      child: InkWell(
+        onTap: enabled ? _stageTender : null,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: enabled ? GcColors.tertiary : GcColors.outlineVariant,
             ),
           ),
-        );
-      }).toList(),
+          child: Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.add_rounded,
+                  size: 20,
+                  color: enabled
+                      ? GcColors.onPrimary
+                      : GcColors.outlineVariant,
+                ),
+                const SizedBox(width: AppTokens.space4),
+                Text(
+                  'EKLE',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.0,
+                    color: enabled
+                        ? GcColors.onPrimary
+                        : GcColors.outlineVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _payButton() {
+    final displayAmount = _calc.hasTenders ? _outstanding : _grandTotal;
+    return Material(
+      color: _canPay
+          ? GcColors.primary
+          : GcColors.surfaceContainerHighest,
+      child: InkWell(
+        onTap: _canPay ? _submit : null,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: _canPay ? kPrimaryGradient : null,
+            border: Border(
+              top: BorderSide(
+                color: _canPay ? kInsetHighlight : Colors.transparent,
+                width: 2,
+              ),
+            ),
+          ),
+          child: Center(
+            child: _submitting
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 22,
+                        color: _canPay
+                            ? GcColors.onPrimary
+                            : GcColors.outlineVariant,
+                      ),
+                      const SizedBox(width: AppTokens.space8),
+                      Text(
+                        'ÖDE · ${_fmt(displayAmount)}',
+                        style: TextStyle(
+                          fontFamily: 'WorkSans',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                          color: _canPay
+                              ? GcColors.onPrimary
+                              : GcColors.outlineVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Completion view -----------------------------------------------------
+
+  Widget _buildCompletion() {
+    return Scaffold(
+      backgroundColor: GcColors.surface,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: GcColors.secondaryDim,
+              ),
+              child: const Icon(
+                Icons.check_rounded,
+                size: 48,
+                color: GcColors.onSecondary,
+              ),
+            ),
+            const SizedBox(height: AppTokens.space24),
+            const Text('Ödeme Tamamlandı', style: GcText.displayBlack),
+            const SizedBox(height: AppTokens.space8),
+            Text(
+              'Rückgeld: ${_fmt(_changeAmount)}',
+              style: GcText.headline.copyWith(color: GcColors.secondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Numeric dialog for choosing how many loyalty points to redeem.
+///
+/// Enforces a hard cap at [maxRedeemable] (= min(balance, bill room)) so
+/// the operator can't accidentally debit more points than the bill or the
+/// customer carries. Popping with a non-null int commits the selection;
+/// popping with null cancels. 1 point redeems 1 cent.
+class _LoyaltyRedeemDialog extends StatefulWidget {
+  const _LoyaltyRedeemDialog({
+    required this.balance,
+    required this.maxRedeemable,
+    required this.initial,
+  });
+
+  final int balance;
+  final int maxRedeemable;
+  final int initial;
+
+  @override
+  State<_LoyaltyRedeemDialog> createState() => _LoyaltyRedeemDialogState();
+}
+
+class _LoyaltyRedeemDialogState extends State<_LoyaltyRedeemDialog> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.initial > 0 ? widget.initial.toString() : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _fmtCents(int cents) {
+    final whole = (cents.abs() ~/ 100).toString();
+    final frac = (cents.abs() % 100).toString().padLeft(2, '0');
+    return 'CHF $whole.$frac';
+  }
+
+  void _commit() {
+    final raw = _controller.text.trim();
+    if (raw.isEmpty) {
+      Navigator.of(context).pop(0);
+      return;
+    }
+    final v = int.tryParse(raw);
+    if (v == null || v < 0) {
+      setState(() => _error = 'Geçerli bir sayı girin.');
+      return;
+    }
+    if (v > widget.maxRedeemable) {
+      setState(() =>
+          _error = 'En fazla ${widget.maxRedeemable} puan kullanılabilir.');
+      return;
+    }
+    Navigator.of(context).pop(v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: GcColors.surfaceContainerLowest,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+        side: BorderSide(color: GcColors.outlineVariant),
+      ),
+      title: const Text('Puan Kullan', style: GcText.headline),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Mevcut bakiye: ${widget.balance} puan',
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 13,
+              color: GcColors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Bu bilette en fazla ${widget.maxRedeemable} puan '
+            '(${_fmtCents(widget.maxRedeemable)}) kullanılabilir.',
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 12,
+              color: GcColors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppTokens.space12),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+            ],
+            decoration: InputDecoration(
+              labelText: 'Kullanılacak puan',
+              errorText: _error,
+              border: const OutlineInputBorder(),
+              suffixText: 'P',
+            ),
+            onSubmitted: (_) => _commit(),
+          ),
+          const SizedBox(height: AppTokens.space8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () {
+                  _controller.text = widget.maxRedeemable.toString();
+                  setState(() => _error = null);
+                },
+                child: const Text('TÜMÜNÜ KULLAN'),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('İptal'),
+        ),
+        FilledButton(
+          onPressed: _commit,
+          style: FilledButton.styleFrom(
+            backgroundColor: GcColors.tertiary,
+            foregroundColor: GcColors.onPrimary,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+            ),
+          ),
+          child: const Text('Uygula'),
+        ),
+      ],
     );
   }
 }

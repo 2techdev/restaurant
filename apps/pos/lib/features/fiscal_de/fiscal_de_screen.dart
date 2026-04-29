@@ -135,7 +135,7 @@ class _FiscalDeScreenState extends ConsumerState<FiscalDeScreen> {
             _buildConfigForm(),
             const SizedBox(height: 12),
             FilledButton(
-              onPressed: () => _saveConfig(),
+              onPressed: _saveConfig,
               child: const Text('Save Configuration'),
             ),
 
@@ -181,7 +181,7 @@ class _FiscalDeScreenState extends ConsumerState<FiscalDeScreen> {
             if (exportJob != null) _ExportJobCard(state: exportJob),
             const SizedBox(height: 8),
             FilledButton.icon(
-              onPressed: () => _triggerExport(),
+              onPressed: _triggerExport,
               icon: const Icon(Icons.cloud_download),
               label: const Text('Trigger DSFinV-K Export'),
             ),
@@ -251,7 +251,7 @@ class _FiscalDeScreenState extends ConsumerState<FiscalDeScreen> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
-          value: _env,
+          initialValue: _env,
           decoration: const InputDecoration(
             labelText: 'Environment',
             border: OutlineInputBorder(),

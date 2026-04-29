@@ -20,6 +20,7 @@ import 'package:gastrocore_pos/features/orders/presentation/providers/order_prov
 import 'package:gastrocore_pos/features/tables/domain/entities/table_entity.dart';
 import 'package:gastrocore_pos/features/tables/presentation/providers/table_provider.dart';
 import 'package:gastrocore_pos/features/tables/presentation/widgets/merge_tables_dialog.dart';
+import 'package:gastrocore_pos/features/tables/presentation/widgets/split_to_multi_dialog.dart';
 import 'package:gastrocore_pos/features/tables/presentation/widgets/table_form_dialog.dart';
 import 'package:gastrocore_pos/features/tables/presentation/widgets/transfer_order_dialog.dart';
 
@@ -200,6 +201,15 @@ class TableDetailSheet extends ConsumerWidget {
             onTap: () async {
               Navigator.of(context).pop();
               await showMergeTablesDialog(context, primaryTable: table);
+            },
+          ),
+          _ActionTile(
+            icon: Icons.call_split_rounded,
+            label: 'Split Items to Another Table',
+            color: AppColors.accent,
+            onTap: () async {
+              Navigator.of(context).pop();
+              await showSplitToMultiDialog(context, sourceTable: table);
             },
           ),
           _ActionTile(

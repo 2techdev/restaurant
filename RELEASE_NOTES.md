@@ -2,6 +2,31 @@
 
 ---
 
+## v1.3.0-beta — Swiss Pilot, Blok 2 / 3
+
+> **Release Date:** 2026-04-22
+> **Build:** Flutter 3.35 / Dart ^3.9.2 | Android minSdk 26
+> **Package:** `com.gastrocore.gastrocore_pos`
+> **Target Market:** Switzerland (DE/FR/IT/EN) + Türkiye staff UI (TR)
+
+### Highlights
+
+- **Happy hour rules** — per-day time windows with category/product scope and stackable flag. Managers can set up brunch, aperitif, and late-night promotions directly from Settings → Happy Hour.
+- **Loyalty tuning** — earn rate, redemption ratio, and Silver/Gold/Platinum thresholds are now configurable. Points calculation rebuilds automatically.
+- **Shift break / pause** — staff can clock a break from the Mesai panel; overtime is derived from `standardHours` vs actual clocked duration and surfaced on the Z-report.
+- **Turkish UI** — 157 translation keys added; TR joins DE/FR/IT/EN in `supportedLocales`.
+- **App self-update** — manifest-based checker (signed SHA-256 APK) with audit trail and mandatory-update floor. Operators trigger the download from Settings → Güncelleme; the platform share sheet hands the APK URL to the browser.
+- **Screen-reader coverage** — PIN pad, floor-plan tiles, and payment method tiles expose localised Semantics labels. A11y regression test locks the labels.
+- **Golden baselines @ 1920×1200** — 5 screens (PIN login, empty order panel, payment tiles, table tiles, update card) are pinned so padding/colour/typography regressions surface as pixel diffs.
+
+### Known Limitations
+
+- Offline sync dead-letter queue (DLQ) for poison events ships in the next release.
+- MWST-Nr format validation (CHE-XXX.XXX.XXX) still pending (Phase 2).
+- QR-Bill generation for on-demand invoices still pending (Phase 3).
+
+---
+
 ## v1.0.0-beta — Swiss Pilot Release
 
 > **Release Date:** 2026-03-23

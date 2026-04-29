@@ -12,11 +12,15 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/repositories/settings_repository.dart';
 
 /// SharedPreferences keys — prefixed to avoid collisions with other features.
@@ -27,6 +31,10 @@ abstract final class _Keys {
   static const receipt = 'settings.v1.receipt';
   static const tax = 'settings.v1.tax';
   static const app = 'settings.v1.app';
+  static const themeColors = 'settings.v1.themeColors';
+  static const happyHour = 'settings.v1.happyHour';
+  static const loyalty = 'settings.v1.loyalty';
+  static const updateChannel = 'settings.v1.updateChannel';
 }
 
 class SettingsRepositoryImpl implements SettingsRepository {
@@ -155,6 +163,86 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Theme customization
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<ThemeCustomization> loadThemeCustomization() async {
+    final raw = _prefs.getString(_Keys.themeColors);
+    if (raw == null) return const ThemeCustomization();
+    try {
+      return ThemeCustomization.fromJsonString(raw);
+    } catch (_) {
+      return const ThemeCustomization();
+    }
+  }
+
+  @override
+  Future<void> saveThemeCustomization(ThemeCustomization customization) async {
+    await _prefs.setString(_Keys.themeColors, customization.toJsonString());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Happy hour
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<HappyHourSettings> loadHappyHourSettings() async {
+    final raw = _prefs.getString(_Keys.happyHour);
+    if (raw == null) return const HappyHourSettings();
+    try {
+      return HappyHourSettings.fromJsonString(raw);
+    } catch (_) {
+      return const HappyHourSettings();
+    }
+  }
+
+  @override
+  Future<void> saveHappyHourSettings(HappyHourSettings settings) async {
+    await _prefs.setString(_Keys.happyHour, settings.toJsonString());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Loyalty
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<LoyaltySettings> loadLoyaltySettings() async {
+    final raw = _prefs.getString(_Keys.loyalty);
+    if (raw == null) return const LoyaltySettings();
+    try {
+      return LoyaltySettings.fromJsonString(raw);
+    } catch (_) {
+      return const LoyaltySettings();
+    }
+  }
+
+  @override
+  Future<void> saveLoyaltySettings(LoyaltySettings settings) async {
+    await _prefs.setString(_Keys.loyalty, settings.toJsonString());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Update channel
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<UpdateChannelSettings> loadUpdateChannelSettings() async {
+    final raw = _prefs.getString(_Keys.updateChannel);
+    if (raw == null) return const UpdateChannelSettings();
+    try {
+      return UpdateChannelSettings.fromJsonString(raw);
+    } catch (_) {
+      return const UpdateChannelSettings();
+    }
+  }
+
+  @override
+  Future<void> saveUpdateChannelSettings(UpdateChannelSettings settings) async {
+    await _prefs.setString(_Keys.updateChannel, settings.toJsonString());
+  }
+
+  // ---------------------------------------------------------------------------
   // Backup & Restore
   // ---------------------------------------------------------------------------
 
@@ -222,6 +310,10 @@ class SettingsRepositoryImpl implements SettingsRepository {
       _prefs.remove(_Keys.receipt),
       _prefs.remove(_Keys.tax),
       _prefs.remove(_Keys.app),
+      _prefs.remove(_Keys.themeColors),
+      _prefs.remove(_Keys.happyHour),
+      _prefs.remove(_Keys.loyalty),
+      _prefs.remove(_Keys.updateChannel),
     ]);
   }
 }

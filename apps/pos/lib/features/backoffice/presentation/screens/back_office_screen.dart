@@ -10,11 +10,12 @@ import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/backoffice/presentation/widgets/clock_management_tab.dart';
+import 'package:gastrocore_pos/features/backoffice/presentation/widgets/happy_hour_management_tab.dart';
 import 'package:gastrocore_pos/features/backoffice/presentation/widgets/menu_management_tab.dart';
 import 'package:gastrocore_pos/features/backoffice/presentation/widgets/table_management_tab.dart';
 import 'package:gastrocore_pos/features/backoffice/presentation/widgets/staff_management_tab.dart';
 import 'package:gastrocore_pos/features/backoffice/presentation/widgets/reports_tab.dart';
-import 'package:gastrocore_pos/features/backoffice/presentation/widgets/inventory_management_tab.dart';
 
 // ---------------------------------------------------------------------------
 // Sidebar tab definition
@@ -30,12 +31,15 @@ class _SidebarTab {
   final String label;
 }
 
+// Stok Yonetimi (inventory) is intentionally omitted — the pilot POS does
+// not use stock management and users should not see the Pro-upgrade gate.
 const _tabs = <_SidebarTab>[
   _SidebarTab(icon: Icons.restaurant_menu_rounded, label: 'Menu Yonetimi'),
   _SidebarTab(icon: Icons.table_bar_rounded, label: 'Masa Duzenle'),
   _SidebarTab(icon: Icons.people_rounded, label: 'Personel'),
+  _SidebarTab(icon: Icons.access_time_rounded, label: 'Mesai'),
+  _SidebarTab(icon: Icons.schedule_rounded, label: 'Happy Hour'),
   _SidebarTab(icon: Icons.bar_chart_rounded, label: 'Raporlar'),
-  _SidebarTab(icon: Icons.inventory_2_rounded, label: 'Stok Yonetimi'),
   _SidebarTab(icon: Icons.settings_rounded, label: 'Ayarlar'),
 ];
 
@@ -300,8 +304,9 @@ class _BackOfficeScreenState extends ConsumerState<BackOfficeScreen> {
         MenuManagementTab(),
         TableManagementTab(),
         StaffManagementTab(),
+        ClockManagementTab(),
+        HappyHourManagementTab(),
         ReportsTab(),
-        InventoryManagementTab(),
         _SettingsPlaceholder(),
       ],
     );

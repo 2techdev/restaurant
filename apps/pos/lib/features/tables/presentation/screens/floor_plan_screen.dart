@@ -138,8 +138,7 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
     final navItems = [
       ('Floor Plan', Icons.grid_view_rounded),
       ('Orders', Icons.receipt_long_rounded),
-      ('Kitchen', Icons.kitchen_rounded),
-      ('Inventory', Icons.inventory_2_rounded),
+      // Kitchen & Inventory entries removed — out of scope for the pilot POS.
       ('Reports', Icons.analytics_rounded),
     ];
 
@@ -159,8 +158,6 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
                   setState(() => _selectedNavIndex = 0);
                 } else if (i == 1) {
                   context.go('/order-center');
-                } else if (i == 2) {
-                  context.go('/kitchen');
                 }
               },
               child: Container(
@@ -462,7 +459,16 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
         child: Text('Error: $err',
             style: const TextStyle(color: AppColors.textDim)),
       ),
-      data: (tables) {
+      data: (allTables) {
+        // Apply pilot zone filter (Hepsi = no filter).
+        final selectedZone = ref.watch(selectedTableZoneProvider);
+        final assignments = ref.watch(tableZoneAssignmentsProvider);
+        final tables = selectedZone == TableZone.hepsi
+            ? allTables
+            : allTables
+                .where((t) =>
+                    tableZoneForId(assignments, t.id) == selectedZone)
+                .toList();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -529,6 +535,10 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
               ),
             ),
 
+            // Zone filter chips (Turkish labels). Hidden in edit mode
+            // because drag positions are scoped to a floor, not a zone.
+            if (!editMode) _buildZoneFilterBar(selectedZone),
+
             // Table area
             Expanded(
               child: Padding(
@@ -547,6 +557,58 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
           ],
         );
       },
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Zone filter bar (Hepsi / İç Salon / Teras / Bar)
+  // -------------------------------------------------------------------------
+
+  Widget _buildZoneFilterBar(TableZone selected) {
+    const zones = TableZone.values;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+      child: SizedBox(
+        height: 34,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: zones.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (_, i) {
+            final zone = zones[i];
+            final isActive = zone == selected;
+            return GestureDetector(
+              onTap: () => ref
+                  .read(selectedTableZoneProvider.notifier)
+                  .state = zone,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppColors.accentDim
+                      : AppColors.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(999),
+                  border: isActive
+                      ? Border.all(color: AppColors.accent, width: 1)
+                      : null,
+                ),
+                child: Text(
+                  tableZoneLabel(zone),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight:
+                        isActive ? FontWeight.w600 : FontWeight.w400,
+                    color: isActive
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -595,14 +657,17 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
 
   Widget _buildFloorGrid(List<RestaurantTableEntity> tables) {
     return LayoutBuilder(builder: (context, constraints) {
-      // Stitch: 3-4 columns for table map
-      final cols = (constraints.maxWidth / 200).floor().clamp(3, 4);
+      // Aim for ~180dp-wide square-ish tiles. On 1280-class landscape
+      // tablets this gives 6 cols; on a narrow phone it still returns 3.
+      final cols = (constraints.maxWidth / 180).floor().clamp(3, 6);
       return GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
-          childAspectRatio: 1.3,
+          // Near-square, slightly landscape — content fits without squish
+          // and tiles never render as tall vertical strips.
+          childAspectRatio: 1.1,
         ),
         itemCount: tables.length,
         itemBuilder: (_, i) => _buildTableTile(tables[i]),
@@ -961,7 +1026,11 @@ class _DraggableTableTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isRound = table.shape == TableShape.circle;
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label:
+          '${table.name}, $statusLabel, ${table.capacity} kişilik',
+      child: GestureDetector(
       onTap: onTap,
       onPanUpdate: (details) => onDragUpdate(details.delta),
       onPanEnd: (_) => onDragEnd(),
@@ -1031,6 +1100,7 @@ class _DraggableTableTile extends StatelessWidget {
               ),
           ],
         ),
+      ),
       ),
     );
   }

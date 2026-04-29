@@ -55,7 +55,13 @@ abstract final class AppTokens {
   /// Left OrderPanel min/max width on 1280-wide tablets.
   static const double orderPanelWidth = 320.0;
 
-  /// Right ActionRail width.
+  /// Left nav rail width (icon stack + action zone).
+  static const double leftNavRailWidth = 96.0;
+
+  /// Middle category column width (vertical 2-col aspect-square grid).
+  static const double gridCategoryColumnWidth = 220.0;
+
+  /// Right ActionRail width (legacy — replaced by leftNavRailWidth).
   static const double actionRailWidth = 88.0;
 
   /// Top bar height.

@@ -31,6 +31,13 @@ class ProductEntity {
   final String? barcode;
 
   final bool isActive;
+
+  /// Operator-facing "sold out / 86'd" flag. When false the product is
+  /// still on the menu (isActive) but temporarily cannot be ordered —
+  /// the POS grid greys it out and blocks taps until the cashier flips
+  /// it back on. Default true so existing rows stay sellable.
+  final bool isAvailable;
+
   final int displayOrder;
 
   /// Estimated preparation time in minutes (shown on kitchen display).
@@ -62,6 +69,17 @@ class ProductEntity {
   /// References GangTemplate.id. Null = fall back to category default.
   final String? defaultGangId;
 
+  /// Whether this product is a combo / set menu bundling child products.
+  /// When true, the repository loads the component list from ComboItems
+  /// at cart time.
+  final bool isCombo;
+
+  /// Optional flat discount applied to the bundle, in cents. When null
+  /// the combo charges the parent product's own [price]; when set the
+  /// price is `sum(component unit prices * quantity) - comboDiscountCents`
+  /// floored at zero.
+  final int? comboDiscountCents;
+
   const ProductEntity({
     required this.id,
     required this.tenantId,
@@ -74,6 +92,7 @@ class ProductEntity {
     this.imagePath,
     this.barcode,
     required this.isActive,
+    this.isAvailable = true,
     required this.displayOrder,
     this.prepTimeMinutes,
     required this.printerGroup,
@@ -83,6 +102,8 @@ class ProductEntity {
     this.isWeightBased = false,
     this.weightUnit,
     this.defaultGangId,
+    this.isCombo = false,
+    this.comboDiscountCents,
   });
 
   /// Whether this product has configurable modifiers.
@@ -101,6 +122,7 @@ class ProductEntity {
     String? Function()? imagePath,
     String? Function()? barcode,
     bool? isActive,
+    bool? isAvailable,
     int? displayOrder,
     int? Function()? prepTimeMinutes,
     String? printerGroup,
@@ -110,6 +132,8 @@ class ProductEntity {
     bool? isWeightBased,
     String? Function()? weightUnit,
     String? Function()? defaultGangId,
+    bool? isCombo,
+    int? Function()? comboDiscountCents,
   }) {
     return ProductEntity(
       id: id ?? this.id,
@@ -123,6 +147,7 @@ class ProductEntity {
       imagePath: imagePath != null ? imagePath() : this.imagePath,
       barcode: barcode != null ? barcode() : this.barcode,
       isActive: isActive ?? this.isActive,
+      isAvailable: isAvailable ?? this.isAvailable,
       displayOrder: displayOrder ?? this.displayOrder,
       prepTimeMinutes:
           prepTimeMinutes != null ? prepTimeMinutes() : this.prepTimeMinutes,
@@ -134,6 +159,10 @@ class ProductEntity {
       weightUnit: weightUnit != null ? weightUnit() : this.weightUnit,
       defaultGangId:
           defaultGangId != null ? defaultGangId() : this.defaultGangId,
+      isCombo: isCombo ?? this.isCombo,
+      comboDiscountCents: comboDiscountCents != null
+          ? comboDiscountCents()
+          : this.comboDiscountCents,
     );
   }
 
@@ -153,6 +182,7 @@ class ProductEntity {
           imagePath == other.imagePath &&
           barcode == other.barcode &&
           isActive == other.isActive &&
+          isAvailable == other.isAvailable &&
           displayOrder == other.displayOrder &&
           prepTimeMinutes == other.prepTimeMinutes &&
           printerGroup == other.printerGroup &&
@@ -174,6 +204,7 @@ class ProductEntity {
         imagePath,
         barcode,
         isActive,
+        isAvailable,
         displayOrder,
         prepTimeMinutes,
         printerGroup,

@@ -135,6 +135,18 @@ class _FakeRepo implements SyncRepository {
 
   @override
   Future<String> getLastCursor() async => cursor;
+
+  @override
+  Future<List<SyncEventEntity>> getDeadLetterEvents() async => [];
+
+  @override
+  Future<int> getDeadLetterCount() async => 0;
+
+  @override
+  Future<void> requeueDeadLetterEvent(int id) async {}
+
+  @override
+  Future<void> purgeDeadLetterEvent(int id) async {}
 }
 
 // ---------------------------------------------------------------------------

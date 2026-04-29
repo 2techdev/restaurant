@@ -353,12 +353,18 @@ void main() {
   // =========================================================================
 
   group('AppSettings', () {
-    test('default theme is dark', () {
-      expect(const AppSettings().themeMode, AppThemeMode.dark);
+    test('default theme is light', () {
+      expect(const AppSettings().themeMode, AppThemeMode.light);
     });
 
     test('default language is German', () {
       expect(const AppSettings().language, AppLanguage.de);
+    });
+
+    test('default high contrast is off, text scale is medium', () {
+      const s = AppSettings();
+      expect(s.highContrast, isFalse);
+      expect(s.textScale, AppTextScale.medium);
     });
 
     test('AppLanguage labels are non-empty', () {
@@ -374,21 +380,49 @@ void main() {
       }
     });
 
+    test('AppTextScale scale multipliers are monotonic and non-zero', () {
+      // Each preset must be larger than the previous so "Büyük > Orta >
+      // Küçük" stays truthful if we ever re-tune the numbers.
+      var previous = 0.0;
+      for (final scale in AppTextScale.values) {
+        expect(scale.scale, greaterThan(previous));
+        expect(scale.label, isNotEmpty);
+        previous = scale.scale;
+      }
+      // Sanity on the defaults we shipped.
+      expect(AppTextScale.medium.scale, 1.0);
+    });
+
     test('AppLanguage.fromString falls back to de', () {
       expect(AppLanguage.fromString('xx'), AppLanguage.de);
     });
 
-    test('AppThemeMode.fromString falls back to dark', () {
-      expect(AppThemeMode.fromString('rainbow'), AppThemeMode.dark);
+    test('AppThemeMode.fromString falls back to light', () {
+      expect(AppThemeMode.fromString('rainbow'), AppThemeMode.light);
     });
 
-    test('JSON round-trip', () {
+    test('AppTextScale.fromString falls back to medium', () {
+      expect(AppTextScale.fromString('xxl'), AppTextScale.medium);
+    });
+
+    test('JSON round-trip preserves all fields including a11y', () {
       const original = AppSettings(
         themeMode: AppThemeMode.light,
         language: AppLanguage.fr,
+        handedness: AppHandedness.left,
+        highContrast: true,
+        textScale: AppTextScale.large,
       );
       final restored = AppSettings.fromJsonString(original.toJsonString());
       expect(restored, original);
+    });
+
+    test('fromJson fills in defaults for missing a11y keys', () {
+      final legacy = AppSettings.fromJsonString(
+        '{"themeMode":"light","language":"de"}',
+      );
+      expect(legacy.highContrast, isFalse);
+      expect(legacy.textScale, AppTextScale.medium);
     });
 
     test('all four Swiss languages are represented', () {
@@ -400,10 +434,12 @@ void main() {
       ]));
     });
 
-    test('equality', () {
-      const a = AppSettings(themeMode: AppThemeMode.dark, language: AppLanguage.it);
-      const b = AppSettings(themeMode: AppThemeMode.dark, language: AppLanguage.it);
-      expect(a, equals(b));
+    test('equality distinguishes highContrast and textScale', () {
+      const a = AppSettings(highContrast: true);
+      const b = AppSettings();
+      expect(a == b, isFalse);
+      const c = AppSettings(textScale: AppTextScale.large);
+      expect(c == b, isFalse);
     });
   });
 }

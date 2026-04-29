@@ -10,11 +10,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gastrocore_pos/features/settings/data/repositories/settings_repository_impl.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/happy_hour_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/theme_customization.dart';
+import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/repositories/settings_repository.dart';
 
 // ---------------------------------------------------------------------------
@@ -268,6 +272,21 @@ class AppSettingsNotifier extends StateNotifier<AsyncValue<AppSettings>> {
     final current = state.valueOrNull ?? const AppSettings();
     await save(current.copyWith(language: language));
   }
+
+  Future<void> setHandedness(AppHandedness handedness) async {
+    final current = state.valueOrNull ?? const AppSettings();
+    await save(current.copyWith(handedness: handedness));
+  }
+
+  Future<void> setHighContrast(bool enabled) async {
+    final current = state.valueOrNull ?? const AppSettings();
+    await save(current.copyWith(highContrast: enabled));
+  }
+
+  Future<void> setTextScale(AppTextScale scale) async {
+    final current = state.valueOrNull ?? const AppSettings();
+    await save(current.copyWith(textScale: scale));
+  }
 }
 
 final appSettingsProvider =
@@ -275,6 +294,119 @@ final appSettingsProvider =
   final repo = ref.watch(settingsRepositoryProvider).valueOrNull;
   if (repo == null) return AppSettingsNotifier(_PlaceholderRepository());
   return AppSettingsNotifier(repo);
+});
+
+// ---------------------------------------------------------------------------
+// Theme customization (operator-picked accent + surface colours)
+// ---------------------------------------------------------------------------
+
+class ThemeCustomizationNotifier
+    extends StateNotifier<AsyncValue<ThemeCustomization>> {
+  ThemeCustomizationNotifier(this._repository)
+      : super(const AsyncValue.loading()) {
+    _load();
+  }
+
+  final SettingsRepository _repository;
+
+  Future<void> _load() async {
+    state = await AsyncValue.guard(_repository.loadThemeCustomization);
+  }
+
+  Future<void> save(ThemeCustomization customization) async {
+    await _repository.saveThemeCustomization(customization);
+    state = AsyncValue.data(customization);
+  }
+
+  Future<void> setLightPrimary(String? hex) async {
+    final current = state.valueOrNull ?? const ThemeCustomization();
+    await save(current.copyWith(
+      lightPrimaryHex: hex,
+      clearLightPrimary: hex == null,
+    ));
+  }
+
+  Future<void> setDarkPrimary(String? hex) async {
+    final current = state.valueOrNull ?? const ThemeCustomization();
+    await save(current.copyWith(
+      darkPrimaryHex: hex,
+      clearDarkPrimary: hex == null,
+    ));
+  }
+
+  Future<void> setLightSurface(String? hex) async {
+    final current = state.valueOrNull ?? const ThemeCustomization();
+    await save(current.copyWith(
+      lightSurfaceHex: hex,
+      clearLightSurface: hex == null,
+    ));
+  }
+
+  Future<void> setDarkSurface(String? hex) async {
+    final current = state.valueOrNull ?? const ThemeCustomization();
+    await save(current.copyWith(
+      darkSurfaceHex: hex,
+      clearDarkSurface: hex == null,
+    ));
+  }
+
+  Future<void> restoreDefaults() async {
+    await save(const ThemeCustomization());
+  }
+}
+
+final themeCustomizationProvider = StateNotifierProvider<
+    ThemeCustomizationNotifier, AsyncValue<ThemeCustomization>>((ref) {
+  final repo = ref.watch(settingsRepositoryProvider).valueOrNull;
+  if (repo == null) {
+    return ThemeCustomizationNotifier(_PlaceholderRepository());
+  }
+  return ThemeCustomizationNotifier(repo);
+});
+
+// ---------------------------------------------------------------------------
+// Loyalty Settings (earn / redemption / tier thresholds)
+// ---------------------------------------------------------------------------
+
+class LoyaltySettingsNotifier
+    extends StateNotifier<AsyncValue<LoyaltySettings>> {
+  LoyaltySettingsNotifier(this._repository)
+      : super(const AsyncValue.loading()) {
+    _load();
+  }
+
+  final SettingsRepository _repository;
+
+  Future<void> _load() async {
+    state = await AsyncValue.guard(_repository.loadLoyaltySettings);
+  }
+
+  Future<void> save(LoyaltySettings settings) async {
+    await _repository.saveLoyaltySettings(settings);
+    state = AsyncValue.data(settings);
+  }
+
+  Future<void> update(
+    LoyaltySettings Function(LoyaltySettings) updater,
+  ) async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    await save(updater(current));
+  }
+
+  /// Restores the factory defaults matching the legacy hard-coded rules
+  /// (1 pt/CHF, 1 ct/pt, Silber CHF 200, Gold CHF 500). Used by the "Reset"
+  /// button in the editor and by the pilot smoke tests.
+  Future<void> resetToDefaults() async {
+    await save(const LoyaltySettings());
+  }
+}
+
+final loyaltySettingsProvider = StateNotifierProvider<LoyaltySettingsNotifier,
+    AsyncValue<LoyaltySettings>>((ref) {
+  final repo = ref.watch(settingsRepositoryProvider).valueOrNull;
+  if (repo == null) return LoyaltySettingsNotifier(_PlaceholderRepository());
+  return LoyaltySettingsNotifier(repo);
 });
 
 // ---------------------------------------------------------------------------
@@ -322,6 +454,26 @@ class _PlaceholderRepository implements SettingsRepository {
   Future<AppSettings> loadAppSettings() async => const AppSettings();
   @override
   Future<void> saveAppSettings(AppSettings s) async {}
+  @override
+  Future<ThemeCustomization> loadThemeCustomization() async =>
+      const ThemeCustomization();
+  @override
+  Future<void> saveThemeCustomization(ThemeCustomization c) async {}
+  @override
+  Future<HappyHourSettings> loadHappyHourSettings() async =>
+      const HappyHourSettings();
+  @override
+  Future<void> saveHappyHourSettings(HappyHourSettings s) async {}
+  @override
+  Future<LoyaltySettings> loadLoyaltySettings() async =>
+      const LoyaltySettings();
+  @override
+  Future<void> saveLoyaltySettings(LoyaltySettings s) async {}
+  @override
+  Future<UpdateChannelSettings> loadUpdateChannelSettings() async =>
+      const UpdateChannelSettings();
+  @override
+  Future<void> saveUpdateChannelSettings(UpdateChannelSettings s) async {}
   @override
   Future<String> getDatabasePath() async => '';
   @override

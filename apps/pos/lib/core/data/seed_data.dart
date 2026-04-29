@@ -19,6 +19,15 @@ import 'package:flutter/material.dart' show Icons;
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
 
+/// Stable demo tenant ID baked into the seed so every fresh pilot install
+/// — and every boot that re-reads it via `tenants.first.id` — agrees on the
+/// same value. The previous random UUID path caused the runtime
+/// `tenantIdProvider` to drift from whichever UUID seed last minted, leaving
+/// products/tables/favorites queries filtering on the wrong tenant and the
+/// sales grid visibly empty. Hard-coding this constant means the seed, the
+/// bootstrap reader, and the per-feature queries all land on the same row.
+const String kPilotTenantId = 'pilot-zurich-001';
+
 /// Populates the database with realistic Swiss restaurant demo data.
 ///
 /// Demo Restaurant: "Demo Restaurant Zürich"
@@ -36,7 +45,7 @@ class SeedData {
   // Well-known IDs used across seed methods
   // -------------------------------------------------------------------------
 
-  String _tenantId = '';
+  String _tenantId = kPilotTenantId;
 
   // Category IDs
   String _catVorspeisedId = '';
@@ -84,11 +93,55 @@ class SeedData {
   // Public API
   // -------------------------------------------------------------------------
 
-  /// Inserts demo data only when the database is empty (no tenants).
+  /// Inserts demo data when the database is incomplete.
+  ///
+  /// Gate counts rows on every table the POS shells need to render:
+  /// `tenants`, `categories`, `products`, and `restaurantTables`. If ANY
+  /// of them is empty the DB is treated as partially seeded — wipe and
+  /// rebuild cleanly. A prior version only checked `tenants` + `products`,
+  /// which left a window where the Tables screen could come up empty on
+  /// a fresh install that crashed mid-seed. Aggressive here is fine: the
+  /// only caller is the pilot demo-data fixture.
   Future<void> seedIfEmpty() async {
-    final existing = await db.select(db.tenants).get();
-    if (existing.isNotEmpty) return;
+    final tenantCount = (await db.select(db.tenants).get()).length;
+    final categoryCount = (await db.select(db.categories).get()).length;
+    final productCount = (await db.select(db.products).get()).length;
+    final tableCount =
+        (await db.select(db.restaurantTables).get()).length;
+
+    debugPrint(
+      '[SEED] pre-check tenants=$tenantCount cats=$categoryCount '
+      'prods=$productCount tables=$tableCount',
+    );
+
+    final complete = tenantCount > 0 &&
+        categoryCount > 0 &&
+        productCount > 0 &&
+        tableCount > 0;
+    if (complete) {
+      debugPrint('[SEED] DB complete — skipping seed');
+      return;
+    }
+
+    // Anything non-empty is a partial seed — wipe before rebuilding so the
+    // stable [kPilotTenantId] primary key doesn't clash.
+    if (tenantCount > 0 || categoryCount > 0 || productCount > 0 ||
+        tableCount > 0) {
+      debugPrint('[SEED] partial state detected — clearAll() then reseed');
+      await clearAll();
+    }
     await _seed();
+
+    // Post-seed verification — catches silent InsertErrors.
+    final postT = (await db.select(db.tenants).get()).length;
+    final postC = (await db.select(db.categories).get()).length;
+    final postP = (await db.select(db.products).get()).length;
+    final postTbl =
+        (await db.select(db.restaurantTables).get()).length;
+    debugPrint(
+      '[SEED] post-seed tenants=$postT cats=$postC prods=$postP '
+      'tables=$postTbl (tenantId=$_tenantId)',
+    );
   }
 
   /// Always inserts demo data (clears existing first). Used from settings UI.
@@ -168,7 +221,7 @@ class SeedData {
   // -------------------------------------------------------------------------
 
   Future<void> _seedTenant() async {
-    _tenantId = IdGenerator.generateId();
+    _tenantId = kPilotTenantId;
     final now = DateTime.now();
     await db.into(db.tenants).insert(
       TenantsCompanion(
@@ -718,6 +771,17 @@ class SeedData {
       imagePath: 'https://images.unsplash.com/photo-1592415486689-125cbbfcaefd?w=400&h=300&fit=crop&q=80',
     );
     _drinkIds.add(colaId);
+
+    final colaZeroId = await add(
+      catId: _catGetraenkeId,
+      name: 'Coca-Cola Zero',
+      price: 450,
+      description: '330ml Dose, zuckerfrei',
+      taxGroup: 'beverage',
+      printerGroup: 'bar',
+      imagePath: 'https://images.unsplash.com/photo-1624552184280-9e9631bbeee9?w=400&h=300&fit=crop&q=80',
+    );
+    _drinkIds.add(colaZeroId);
 
     _prodHausweinId = await add(
       catId: _catGetraenkeId,

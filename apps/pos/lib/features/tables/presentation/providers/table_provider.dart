@@ -64,6 +64,52 @@ final allTablesProvider = FutureProvider<List<RestaurantTableEntity>>((ref) {
 final tableEditModeProvider = StateProvider<bool>((ref) => false);
 
 // ---------------------------------------------------------------------------
+// Zone filter (pilot: local, not persisted to DB)
+// ---------------------------------------------------------------------------
+
+/// Canonical zone labels shown as filter chips above the floor plan grid.
+/// Kept in Turkish to match the pilot UI. `hepsi` ("all") means no filter.
+///
+/// Persisting zone-per-table would require a new column on
+/// [restaurant_tables]; for the pilot we keep a local assignment map and a
+/// selection state in Riverpod so the feature can be exercised without a
+/// schema migration. Unknown / unassigned tables fall back to `icSalon`.
+enum TableZone {
+  hepsi,
+  icSalon,
+  teras,
+  bar,
+}
+
+/// Display label (Turkish) for [TableZone].
+String tableZoneLabel(TableZone z) => switch (z) {
+      TableZone.hepsi => 'Hepsi',
+      TableZone.icSalon => 'İç Salon',
+      TableZone.teras => 'Teras',
+      TableZone.bar => 'Bar',
+    };
+
+/// Currently selected zone filter. `hepsi` = no filter.
+final selectedTableZoneProvider =
+    StateProvider<TableZone>((ref) => TableZone.hepsi);
+
+/// Local per-table zone assignments (pilot, in-memory).
+///
+/// Keys are table IDs; missing entries are treated as [TableZone.icSalon] by
+/// [tableZoneForId]. This map replaces what would otherwise be a new
+/// `zone` column on restaurant_tables — kept as a provider for the pilot so
+/// no Drift migration is required.
+final tableZoneAssignmentsProvider =
+    StateProvider<Map<String, TableZone>>((ref) => const {});
+
+/// Resolve the zone for a given table ID, falling back to İç Salon.
+TableZone tableZoneForId(
+  Map<String, TableZone> assignments,
+  String tableId,
+) =>
+    assignments[tableId] ?? TableZone.icSalon;
+
+// ---------------------------------------------------------------------------
 // Table management notifier
 // ---------------------------------------------------------------------------
 

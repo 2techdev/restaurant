@@ -69,6 +69,7 @@ class RestaurantSettings {
     this.gangsEnabled = true,
     this.maxGangs = 3,
     this.gangLabels = kDefaultGangLabels,
+    this.shiftStartRequired = true,
   });
 
   /// Restaurant display name shown on receipts and the POS header.
@@ -155,6 +156,7 @@ class RestaurantSettings {
     bool? gangsEnabled,
     int? maxGangs,
     List<String>? gangLabels,
+    bool? shiftStartRequired,
   }) {
     return RestaurantSettings(
       name: name ?? this.name,
@@ -167,6 +169,7 @@ class RestaurantSettings {
       gangsEnabled: gangsEnabled ?? this.gangsEnabled,
       maxGangs: _clampMaxGangs(maxGangs ?? this.maxGangs),
       gangLabels: gangLabels ?? this.gangLabels,
+      shiftStartRequired: shiftStartRequired ?? this.shiftStartRequired,
     );
   }
 
@@ -181,6 +184,7 @@ class RestaurantSettings {
         'gangsEnabled': gangsEnabled,
         'maxGangs': maxGangs,
         'gangLabels': gangLabels,
+        'shiftStartRequired': shiftStartRequired,
       };
 
   factory RestaurantSettings.fromJson(Map<String, dynamic> json) {
@@ -200,6 +204,7 @@ class RestaurantSettings {
       gangsEnabled: (json['gangsEnabled'] as bool?) ?? true,
       maxGangs: _clampMaxGangs((json['maxGangs'] as num?)?.toInt() ?? 3),
       gangLabels: labels,
+      shiftStartRequired: (json['shiftStartRequired'] as bool?) ?? true,
     );
   }
 
@@ -235,6 +240,7 @@ class RestaurantSettings {
         gangsEnabled,
         maxGangs,
         Object.hashAll(gangLabels),
+        shiftStartRequired,
       );
 }
 

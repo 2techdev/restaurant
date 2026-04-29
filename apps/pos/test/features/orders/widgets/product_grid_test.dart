@@ -25,7 +25,13 @@ import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/produc
 // Helpers
 // ---------------------------------------------------------------------------
 
-ProductEntity _product(String id, String name, int price) => ProductEntity(
+ProductEntity _product(
+  String id,
+  String name,
+  int price, {
+  bool isAvailable = true,
+}) =>
+    ProductEntity(
       id: id,
       tenantId: 'T1',
       categoryId: 'C1',
@@ -34,6 +40,7 @@ ProductEntity _product(String id, String name, int price) => ProductEntity(
       costPrice: 0,
       taxGroup: 'standard',
       isActive: true,
+      isAvailable: isAvailable,
       displayOrder: 0,
       printerGroup: 'kitchen',
     );
@@ -45,7 +52,7 @@ final _stubProducts = [
 ];
 
 Widget _harness({
-  required int columns,
+  required double width,
   required void Function(ProductEntity) onTap,
   List<ProductEntity>? products,
 }) {
@@ -56,7 +63,13 @@ Widget _harness({
     ],
     child: MaterialApp(
       home: Scaffold(
-        body: ProductGrid(columns: columns, onProductTap: onTap),
+        body: Center(
+          child: SizedBox(
+            width: width,
+            height: 600,
+            child: ProductGrid(onProductTap: onTap),
+          ),
+        ),
       ),
     ),
   );
@@ -103,40 +116,138 @@ void main() {
   });
 
   group('ProductGrid rendering', () {
-    testWidgets('renders with 1-column key', (tester) async {
-      await tester.pumpWidget(_harness(columns: 1, onTap: (_) {}));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const ValueKey('product_grid_cols_1')), findsOneWidget);
-      expect(find.byKey(const ValueKey('product_grid_cols_2')), findsNothing);
-    });
-
-    testWidgets('renders with 2-column key', (tester) async {
-      await tester.pumpWidget(_harness(columns: 2, onTap: (_) {}));
+    testWidgets('renders 2-column layout at narrow width', (tester) async {
+      await tester.pumpWidget(_harness(width: 400, onTap: (_) {}));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('product_grid_cols_2')), findsOneWidget);
-      expect(find.byKey(const ValueKey('product_grid_cols_1')), findsNothing);
     });
 
-    testWidgets('clamps invalid column count when rendering', (tester) async {
-      // Passing 5 should be clamped to max=2.
-      await tester.pumpWidget(_harness(columns: 5, onTap: (_) {}));
+    testWidgets('renders 3-column layout at mid width', (tester) async {
+      await tester.pumpWidget(_harness(width: 620, onTap: (_) {}));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('product_grid_cols_2')), findsOneWidget);
+
+      expect(find.byKey(const ValueKey('product_grid_cols_3')), findsOneWidget);
+    });
+
+    testWidgets('renders 4-column layout at tablet width', (tester) async {
+      await tester.pumpWidget(_harness(width: 780, onTap: (_) {}));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('product_grid_cols_4')), findsOneWidget);
     });
 
     testWidgets('invokes onProductTap with the tapped product',
         (tester) async {
       final tapped = <String>[];
       await tester.pumpWidget(_harness(
-        columns: 2,
+        width: 620,
         onTap: (p) => tapped.add(p.id),
       ));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const ValueKey('product_card_p1')));
       expect(tapped, ['p1']);
+    });
+
+    testWidgets(
+        'ProductCard exposes a single button-labelled semantics node per tile',
+        (tester) async {
+      // a11y guard: the tile must collapse to one semantic button with a
+      // readable label so TalkBack / VoiceOver announces the whole tile
+      // as one tap target, not three separate text leaves.
+      final handle = tester.ensureSemantics();
+
+      await tester.pumpWidget(_harness(width: 620, onTap: (_) {}));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(RegExp(r'Forelle Müllerin.*CHF 32\.00')),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(RegExp(r'Kalbsbraten.*CHF 48\.00')),
+        findsOneWidget,
+      );
+
+      handle.dispose();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Sold-out / 86'd visual and tap-guard end-to-end.
+  //
+  // These tests pin the user-facing behaviour of the isAvailable flag added
+  // in schema v15: sold-out tiles must be clearly labelled, must not add to
+  // the cart on tap, and must carry a discoverable semantics hint so
+  // TalkBack announces the state.
+  // -------------------------------------------------------------------------
+
+  group('ProductGrid sold-out behaviour', () {
+    testWidgets('renders SATIŞTA DEĞİL ribbon on an unavailable tile',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        width: 620,
+        onTap: (_) {},
+        products: [
+          _product('p1', 'Forelle Müllerin', 3200),
+          _product('p2', 'Kalbsbraten', 4800, isAvailable: false),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // Only the sold-out tile shows the ribbon.
+      expect(find.text('SATIŞTA DEĞİL'), findsOneWidget);
+    });
+
+    testWidgets('tap on a sold-out tile does not fire onProductTap',
+        (tester) async {
+      final tapped = <String>[];
+      await tester.pumpWidget(_harness(
+        width: 620,
+        onTap: (p) => tapped.add(p.id),
+        products: [
+          _product('p1', 'Forelle Müllerin', 3200),
+          _product('p2', 'Kalbsbraten', 4800, isAvailable: false),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // Tapping the sold-out tile routes through _showUnavailableSnackbar
+      // which calls ScaffoldMessenger.showSnackBar, but must NOT add the
+      // product to the cart.
+      await tester.tap(find.byKey(const ValueKey('product_card_p2')));
+      await tester.pump();
+      expect(tapped, isEmpty,
+          reason: 'Sold-out tap must not propagate to cart handler.');
+
+      // An available tile still works.
+      await tester.tap(find.byKey(const ValueKey('product_card_p1')));
+      await tester.pump();
+      expect(tapped, ['p1']);
+    });
+
+    testWidgets(
+        'sold-out semantics label carries the "satışta değil" hint',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.pumpWidget(_harness(
+        width: 620,
+        onTap: (_) {},
+        products: [
+          _product('p1', 'Kalbsbraten', 4800, isAvailable: false),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.bySemanticsLabel(
+            RegExp(r'Kalbsbraten.*CHF 48\.00.*satışta değil')),
+        findsOneWidget,
+      );
+
+      handle.dispose();
     });
   });
 }

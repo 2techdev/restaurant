@@ -90,8 +90,8 @@ class RefundNotifier extends StateNotifier<RefundOperationState> {
         orderItemIds: orderItemIds,
         reason: reason,
         refundMethodStr: refundMethod,
-        approvedByUserId: approvedBy.id,
-        requestedByUserId: requestedBy.id,
+        approver: approvedBy,
+        requester: requestedBy,
         notes: notes,
       );
 

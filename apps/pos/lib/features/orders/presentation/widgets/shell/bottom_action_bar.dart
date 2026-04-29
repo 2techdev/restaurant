@@ -1,7 +1,22 @@
-/// Bottom action bar for the fine-dining shell.
+/// Bottom action bar — POS v2 three-cluster footer.
 ///
-/// Mirrors SambaPOS' bottom strip: back (close ticket), new order, send to
-/// kitchen (fires the active Gang), running total, and a prominent Pay CTA.
+/// Layout (left → total → right):
+///
+///   Left cluster:
+///     * [SCHLIESSEN] (error/catRed) — close the sales shell.
+///     * [NEUER BON]                 — park current + start a new ticket.
+///     * [SENDEN]                    — fire all unsent items to the kitchen.
+///
+///   Center:
+///     * GESAMT readout — running total, Work Sans Black, tabular figures.
+///
+///   Right cluster:
+///     * [TEILEN]   — split bill dialog (existing route).
+///     * [KARTE]    — jump straight to card-payment path (payment screen).
+///     * [BEZAHLEN] (catGreen gradient) — primary CTA; payment screen.
+///
+/// When there's no active ticket or no items, the action-dependent buttons
+/// render in a dimmed disabled state — the bar never reflows.
 library;
 
 import 'package:flutter/material.dart';
@@ -9,9 +24,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:gastrocore_pos/core/router/app_router.dart';
-import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/core/theme/app_tokens.dart';
+import 'package:gastrocore_pos/core/theme/kinetic_theme.dart';
+import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/features/orders/presentation/screens/payment_screen.dart';
 
 class BottomActionBar extends ConsumerWidget {
   const BottomActionBar({super.key});
@@ -19,23 +37,19 @@ class BottomActionBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ticket = ref.watch(currentTicketProvider);
-    final hasItems = ticket != null && ticket.items.isNotEmpty;
+    final hasTicket = ticket != null;
+    final hasItems = hasTicket && ticket.items.isNotEmpty;
+    final hasUnsent =
+        hasItems && ticket.items.any((i) => !i.sentToKitchen);
     final total = ticket?.total ?? 0;
 
     return Container(
-      height: AppTokens.bottomBarHeight,
-      padding: AppInsets.h12v8,
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceContainer,
-        border: Border(
-          top: BorderSide(color: AppColors.border, width: 1),
-        ),
-      ),
+      height: AppTokens.bottomBarHeight + 8,
+      color: GcColors.surfaceContainerHigh,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
         children: [
-          _SecondaryButton(
-            icon: Icons.arrow_back_rounded,
-            label: 'Geri',
+          _CloseButton(
             onTap: () {
               if (Navigator.canPop(context)) {
                 Navigator.pop(context);
@@ -44,89 +58,147 @@ class BottomActionBar extends ConsumerWidget {
               }
             },
           ),
-          const SizedBox(width: AppTokens.space8),
+          const SizedBox(width: 8),
           _SecondaryButton(
-            icon: Icons.add_circle_outline_rounded,
-            label: 'Yeni',
-            onTap: () => _createNew(context, ref),
+            icon: Icons.note_add_rounded,
+            label: 'NEUER BON',
+            enabled: true,
+            onTap: () => _onNewTicket(context, ref, hasItems: hasItems),
           ),
-          const SizedBox(width: AppTokens.space8),
+          const SizedBox(width: 8),
           _SecondaryButton(
             icon: Icons.send_rounded,
-            label: 'Gönder',
-            onTap: hasItems ? () => _sendToKitchen(context, ref) : null,
+            label: 'SENDEN',
+            enabled: hasUnsent,
+            onTap: () => _onSend(context, ref),
           ),
-          const Spacer(),
-          _TotalDisplay(totalCents: total),
-          const SizedBox(width: AppTokens.space12),
-          _PayCta(
+          const SizedBox(width: 12),
+          Expanded(child: _TotalReadout(totalCents: total)),
+          const SizedBox(width: 12),
+          _SecondaryButton(
+            icon: Icons.call_split_rounded,
+            label: 'TEILEN',
             enabled: hasItems,
             onTap: () {
-              if (ticket != null) {
-                context.push(AppRoutes.paymentFor(ticket.id));
-              }
+              if (ticket == null) return;
+              context.push(AppRoutes.splitBillFor(ticket.id));
             },
+          ),
+          const SizedBox(width: 8),
+          _SecondaryButton(
+            icon: Icons.credit_card_rounded,
+            label: 'KARTE',
+            enabled: hasItems,
+            onTap: () => _openPayment(context, ticket),
+          ),
+          const SizedBox(width: 8),
+          _PayButton(
+            enabled: hasItems,
+            totalCents: total,
+            onTap: () => _openPayment(context, ticket),
           ),
         ],
       ),
     );
   }
 
-  void _createNew(BuildContext ctx, WidgetRef ref) {
-    // New order from scratch — waiter context resolved by provider.
-    ref.read(currentTicketProvider.notifier).createNewTicket(
+  Future<void> _onNewTicket(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool hasItems,
+  }) async {
+    // Parked table tickets are allowed to sit unpaid — starting a new bon
+    // from a table view never discards work (the bon is safely linked to
+    // the table), so skip the warning dialog in that mode.
+    final isTableTicket = ref.read(currentTicketProvider)?.tableId != null;
+    if (hasItems && !isTableTicket) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Neuen Bon starten?'),
+          content: const Text(
+            'Der aktuelle Bon hat noch Artikel. Beim Start eines '
+            'neuen Bons gehen nicht gesendete Änderungen verloren.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Neu starten'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
+    final user = ref.read(currentUserProvider);
+    await ref.read(currentTicketProvider.notifier).createNewTicket(
           deviceId: 'DEV-POS-01',
+          waiterId: user?.id,
         );
   }
 
-  void _sendToKitchen(BuildContext ctx, WidgetRef ref) {
-    ScaffoldMessenger.of(ctx).showSnackBar(
+  Future<void> _onSend(BuildContext context, WidgetRef ref) async {
+    await ref.read(currentTicketProvider.notifier).sendToKitchen();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Aktif kalemler mutfağa gönderiliyor…'),
+        content: Text('An die Küche gesendet'),
         duration: Duration(seconds: 2),
       ),
     );
-    // TODO(sprint 2): wire to CurrentTicketNotifier.sendToKitchen.
+  }
+
+  void _openPayment(BuildContext context, TicketEntity? ticket) {
+    if (ticket == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => OrderPaymentScreen(ticketId: ticket.id),
+        fullscreenDialog: true,
+      ),
+    );
   }
 }
 
-class _SecondaryButton extends StatelessWidget {
-  const _SecondaryButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+// ---------------------------------------------------------------------------
+// SCHLIESSEN — fixed-width error button.
+// ---------------------------------------------------------------------------
 
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
+class _CloseButton extends StatelessWidget {
+  const _CloseButton({required this.onTap});
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    final fg = enabled ? AppColors.textPrimary : AppColors.textDim;
     return Material(
-      color: AppColors.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+      color: GcColors.catRed,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.space12,
-            vertical: AppTokens.space8,
+        child: Container(
+          height: AppTokens.touchLarge,
+          width: 130,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: kInsetHighlight, width: 2),
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18, color: fg),
-              const SizedBox(width: 6),
+              Icon(Icons.close_rounded, size: 18, color: Colors.white),
+              SizedBox(width: 6),
               Text(
-                label,
+                'SCHLIESSEN',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontFamily: 'WorkSans',
+                  fontSize: 12,
                   fontWeight: FontWeight.w800,
-                  color: fg,
+                  color: Colors.white,
+                  letterSpacing: 0.6,
                 ),
               ),
             ],
@@ -137,66 +209,168 @@ class _SecondaryButton extends StatelessWidget {
   }
 }
 
-class _TotalDisplay extends StatelessWidget {
-  const _TotalDisplay({required this.totalCents});
+// ---------------------------------------------------------------------------
+// _SecondaryButton — neutral surface, icon + label, 88–112px wide.
+// ---------------------------------------------------------------------------
+
+class _SecondaryButton extends StatelessWidget {
+  const _SecondaryButton({
+    required this.icon,
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = enabled
+        ? GcColors.surfaceContainerLowest
+        : GcColors.surfaceContainerHighest;
+    final fg = enabled ? GcColors.onSurface : GcColors.outline;
+    return Material(
+      color: bg,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        child: Container(
+          height: AppTokens.touchLarge,
+          constraints: const BoxConstraints(minWidth: 96),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: enabled
+              ? const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: kInsetHighlight, width: 2),
+                  ),
+                )
+              : null,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: fg),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'WorkSans',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: fg,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Center GESAMT readout — tabular figures, Work Sans Black.
+// ---------------------------------------------------------------------------
+
+class _TotalReadout extends StatelessWidget {
+  const _TotalReadout({required this.totalCents});
   final int totalCents;
 
   @override
   Widget build(BuildContext context) {
     final whole = totalCents ~/ 100;
     final frac = (totalCents % 100).toString().padLeft(2, '0');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Text(
-          'TOPLAM',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textDim,
-            letterSpacing: 1.2,
+    return Container(
+      height: AppTokens.touchLarge,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(color: GcColors.surfaceContainerLowest),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text('GESAMT', style: GcText.labelTiny),
+          const SizedBox(width: 12),
+          Text(
+            'CHF $whole.$frac',
+            style: GcText.displayBlack.copyWith(
+              fontSize: 24,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
-        ),
-        Text(
-          'CHF $whole.$frac',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-class _PayCta extends StatelessWidget {
-  const _PayCta({required this.enabled, required this.onTap});
+// ---------------------------------------------------------------------------
+// BEZAHLEN — flex CTA with cash gradient; the primary settlement action.
+// ---------------------------------------------------------------------------
+
+class _PayButton extends StatelessWidget {
+  const _PayButton({
+    required this.enabled,
+    required this.totalCents,
+    required this.onTap,
+  });
+
   final bool enabled;
+  final int totalCents;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: AppTokens.touchLarge,
-      child: ElevatedButton.icon(
-        onPressed: enabled ? onTap : null,
-        icon: const Icon(Icons.payments_rounded, size: 20),
-        label: const Text(
-          'ÖDEME',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.0,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryContainer,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+    // a11y: the primary CTA gets a screen-reader label that includes the
+    // amount so operators hear "Bezahlen, CHF 42.50" rather than just
+    // "Bezahlen". The disabled state is exposed via enabled=false so
+    // assistive tech can skip it when there's no active ticket.
+    final chf = (totalCents / 100).toStringAsFixed(2);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: 'Bezahlen, CHF $chf',
+      excludeSemantics: true,
+      child: Material(
+        color: enabled ? GcColors.catGreen : GcColors.surfaceContainerHighest,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          child: Container(
+            height: AppTokens.touchLarge,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              gradient: enabled ? kCashGradient : null,
+              border: enabled
+                  ? const Border(
+                      top: BorderSide(color: kInsetHighlight, width: 2),
+                    )
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.payments_rounded,
+                  size: 20,
+                  color: enabled ? Colors.white : GcColors.outlineVariant,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'BEZAHLEN',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: enabled ? Colors.white : GcColors.outlineVariant,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -84,7 +84,7 @@ class _LockedFlagPlaceholder extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.08),
+                color: color.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.lock_rounded, size: 36, color: color),
@@ -113,9 +113,9 @@ class _LockedFlagPlaceholder extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
+                color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: color.withOpacity(0.5)),
+                border: Border.all(color: color.withValues(alpha: 0.5)),
               ),
               child: Text(
                 required.badge,
@@ -157,9 +157,9 @@ class FlagBadge extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(
         edition.badge,

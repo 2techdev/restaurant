@@ -18,12 +18,15 @@ import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_p
 import 'package:gastrocore_pos/features/orders/data/repositories/order_repository_impl.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
+import 'package:gastrocore_pos/features/orders/presentation/providers/storno_log_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/core/services/fare_engine.dart';
 import 'package:gastrocore_pos/core/services/fare_models.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
 import 'package:gastrocore_pos/features/overrides/domain/entities/override_action.dart';
 import 'package:gastrocore_pos/features/overrides/presentation/providers/override_provider.dart';
+import 'package:gastrocore_pos/features/pricing/application/happy_hour_evaluator.dart';
+import 'package:gastrocore_pos/features/pricing/providers/happy_hour_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Swiss VAT configuration (effective 2024-01-01)
@@ -165,7 +168,7 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     return null;
   }
 
-  void addItem(
+  Future<void> addItem(
     ProductEntity product, {
     double quantity = 1,
     List<OrderItemModifierEntity> selectedModifiers = const [],
@@ -177,7 +180,7 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     String? categoryGangId,
     /// Seat number (1-based) this item belongs to. Null = unassigned.
     int? seatNumber,
-  }) {
+  }) async {
     if (state == null) return;
 
     // Resolve Gang: explicit > product default > category default
@@ -203,7 +206,7 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
       orderType: state!.orderType,
     );
 
-    final item = OrderItemEntity(
+    final rawItem = OrderItemEntity(
       id: itemId,
       tenantId: state!.tenantId,
       ticketId: state!.id,
@@ -221,7 +224,34 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
       taxGroup: product.taxGroup,
     );
 
+    // Thin happy-hour hook: if a time-based rule matches, swap in a
+    // discounted unit price + re-extract tax from the new gross.
+    // The evaluator is a pure function; no-op when no rule fires.
+    final hhRules = _ref.read(happyHourRulesProvider);
+    final evaluated = applyHappyHour(rawItem, product, hhRules, DateTime.now());
+    final item = identical(evaluated, rawItem)
+        ? rawItem
+        : evaluated.copyWith(
+            taxAmount: _extractItemTax(
+              grossPrice: evaluated.subtotal,
+              taxGroup: product.taxGroup,
+              orderType: state!.orderType,
+            ),
+          );
+
     state = state!.addItem(item);
+
+    // When the ticket is already persisted (e.g. the cashier fired Gang 1
+    // and is now adding to Gang 2), the in-memory append is not enough --
+    // the next fireGang / sendToKitchen call would filter and then try to
+    // updateItemStatus on rows that never existed, and the post-fire DB
+    // refresh would wipe the in-memory item. Persist right away so every
+    // item added to an open ticket round-trips through Drift.
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.addItemToTicket(state!.id, item);
+      state = await repo.getTicketById(state!.id);
+    }
   }
 
   /// Assign [seatNumber] to an existing order item (null clears it).
@@ -250,6 +280,22 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     final updatedItems = state!.items.map((item) {
       if (item.id != itemId) return item;
       return item.copyWith(gangId: () => gangId);
+    }).toList();
+    state = state!.copyWith(items: updatedItems);
+  }
+
+  /// Replace the free-form notes on an existing order item.
+  ///
+  /// Pass `null` or an empty string to clear the note. Used by the action
+  /// button dispatcher so operators can attach a note to the last item
+  /// without leaving the POS shell.
+  void updateItemNotes(String itemId, String? notes) {
+    if (state == null) return;
+    final trimmed = notes?.trim();
+    final effective = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    final updatedItems = state!.items.map((item) {
+      if (item.id != itemId) return item;
+      return item.copyWith(notes: () => effective);
     }).toList();
     state = state!.copyWith(items: updatedItems);
   }
@@ -326,6 +372,7 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
 
     final repo = _ref.read(orderRepositoryProvider);
     final kitchenRepo = _ref.read(kitchenRepositoryProvider);
+    final gangRepo = _ref.read(gangRepositoryProvider);
     final currentUser = _ref.read(currentUserProvider);
 
     // Persist draft before firing so the KDS ticket references a real row.
@@ -357,7 +404,65 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
       waiterName: currentUser?.name,
     );
 
+    // Persist the gang lifecycle: ensure a state row exists for this
+    // (ticket, gang) pair, then mark it fired. The order_panel reads this
+    // stream to render the "GÖNDERİLDİ" / "SERVİS EDİLDİ" badges.
+    final template = await _resolveGangTemplate(gang, gangRepo);
+    if (template != null) {
+      await gangRepo.ensureGangState(
+        id: IdGenerator.generateId(),
+        tenantId: state!.tenantId,
+        ticketId: state!.id,
+        gangTemplateId: template.id,
+      );
+      await gangRepo.fireGang(state!.id, template.id);
+    }
+
     state = await repo.getTicketById(state!.id);
+  }
+
+  /// Mark a Gang as served (delivered to the table).
+  ///
+  /// Transitions the OrderGangState from 'fired' (or 'ready') to 'served' so
+  /// the order panel shows it as delivered. Ensures a state row exists in
+  /// case the Gang was fired before this build shipped the lifecycle rows.
+  ///
+  /// No-op when: ticket is null, the ticket has never been persisted, or the
+  /// Gang has no items at all on this ticket.
+  Future<void> markGangServed(int gang) async {
+    if (state == null) return;
+    if (state!.status == TicketStatus.draft) return;
+
+    final hasItemsForGang = state!.items.any((item) => item.course == gang);
+    if (!hasItemsForGang) return;
+
+    final gangRepo = _ref.read(gangRepositoryProvider);
+    final template = await _resolveGangTemplate(gang, gangRepo);
+    if (template == null) return;
+
+    await gangRepo.ensureGangState(
+      id: IdGenerator.generateId(),
+      tenantId: state!.tenantId,
+      ticketId: state!.id,
+      gangTemplateId: template.id,
+    );
+    await gangRepo.markGangServed(state!.id, template.id);
+  }
+
+  /// Look up the GangTemplate whose [GangTemplateEntity.sortOrder] equals
+  /// the 1-based [course] index used by order items. Falls back to the
+  /// first active template when none matches, which keeps older tenants
+  /// (seeded before the sortOrder convention) working.
+  Future<GangTemplateEntity?> _resolveGangTemplate(
+    int course,
+    GangRepository gangRepo,
+  ) async {
+    final templates = await gangRepo.getGangTemplates(state!.tenantId);
+    if (templates.isEmpty) return null;
+    for (final t in templates) {
+      if (t.sortOrder == course) return t;
+    }
+    return templates.first;
   }
 
   /// Mark all un-sent items as "sent" and persist to the database.
@@ -369,6 +474,7 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
 
     final repo = _ref.read(orderRepositoryProvider);
     final kitchenRepo = _ref.read(kitchenRepositoryProvider);
+    final gangRepo = _ref.read(gangRepositoryProvider);
     final currentUser = _ref.read(currentUserProvider);
 
     // Persist ticket first if it is still a local draft.
@@ -580,8 +686,87 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     }
   }
 
+  /// Attach or detach a loyalty customer to the current ticket.
+  ///
+  /// Pass the customer id to link, or `null` to unlink. Persists the change
+  /// immediately when the ticket is past the draft stage so the topbar chip
+  /// survives app restarts; draft tickets pick the value up at first save.
+  Future<void> setCustomer(String? customerId) async {
+    if (state == null) return;
+    state = state!.copyWith(customerId: () => customerId);
+
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.setTicketCustomer(state!.id, customerId);
+      state = await repo.getTicketById(state!.id);
+    }
+  }
+
   /// Clear the current ticket (e.g. after payment).
   void clear() {
+    state = null;
+  }
+
+  /// Mark an item as "İkram" (on-the-house / complimentary).
+  ///
+  /// Zeroes the unit price, subtotal and tax for that line, tags the notes
+  /// with `[İKRAM]` so the receipt and KDS print clearly flag it, and
+  /// recalculates the ticket totals.
+  void markOnTheHouse(String itemId) {
+    if (state == null) return;
+    final updatedItems = state!.items.map((item) {
+      if (item.id != itemId) return item;
+      final rawNote = (item.notes ?? '').replaceFirst(
+        RegExp(r'^\[İKRAM\]\s*'),
+        '',
+      ).trim();
+      final newNote = rawNote.isEmpty ? '[İKRAM]' : '[İKRAM] $rawNote';
+      return item.copyWith(
+        unitPrice: 0,
+        subtotal: 0,
+        taxAmount: 0,
+        notes: () => newNote,
+      );
+    }).toList();
+    state = state!.copyWith(items: updatedItems).calculateTotals();
+  }
+
+  /// Void the current ticket entirely.
+  ///
+  /// If the ticket has been persisted, its status is moved to `cancelled`
+  /// (pre-payment cancellation); in-memory draft state is always cleared so
+  /// the POS returns to an empty slate ready for the next order.
+  ///
+  /// [reason] and [userId] are persisted to [stornoLogProvider] so auditors
+  /// can review every cancellation with who/when/why/how-much. Both are
+  /// required — the calling UI must collect a non-empty reason before
+  /// invoking this method.
+  Future<void> voidTicket({
+    required String reason,
+    required String userId,
+  }) async {
+    if (state == null) return;
+    final ticket = state!;
+    if (ticket.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.updateTicketStatus(ticket.id, TicketStatus.cancelled);
+    }
+
+    // Log the cancellation before clearing state so the entry captures the
+    // ticket's final totals.
+    final user = _ref.read(currentUserProvider);
+    _ref.read(stornoLogProvider.notifier).append(
+          StornoLogEntry(
+            ticketId: ticket.id,
+            orderNumber: ticket.orderNumber,
+            reason: reason,
+            userId: userId,
+            userName: user?.name ?? 'Bilinmiyor',
+            amountCents: ticket.total,
+            timestamp: DateTime.now(),
+          ),
+        );
+
     state = null;
   }
 }

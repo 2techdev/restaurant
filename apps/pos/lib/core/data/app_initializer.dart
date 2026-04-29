@@ -7,6 +7,7 @@ library;
 
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/data/seed_data.dart';
+import 'package:gastrocore_pos/features/action_buttons/data/repositories/action_button_repository.dart';
 
 /// Bootstraps the application by running all required initialization steps.
 class AppInitializer {
@@ -18,5 +19,10 @@ class AppInitializer {
   static Future<void> initialize(AppDatabase db) async {
     final seeder = SeedData(db);
     await seeder.seedIfEmpty();
+
+    // Idempotent — re-runs on every boot so existing pilot installs that
+    // predate the action_buttons table still pick up the default set after
+    // the v13 migration lands.
+    await ActionButtonRepository(db).seedDefaults(kPilotTenantId);
   }
 }

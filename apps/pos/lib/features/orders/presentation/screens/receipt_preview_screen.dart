@@ -5,18 +5,25 @@
 /// Follows Stitch S06 design reference.
 library;
 
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/printing/models/print_models.dart';
 import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
+import 'package:gastrocore_pos/features/audit_log/domain/entities/audit_action.dart';
+import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_log_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/calculations/calculation_pipeline.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/features/orders/services/digital_receipt_service.dart';
 
 // ---------------------------------------------------------------------------
 // Receipt Preview Screen
@@ -35,6 +42,16 @@ class ReceiptPreviewScreen extends ConsumerStatefulWidget {
 class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
   /// Cached ticket — updated whenever the async provider emits a new value.
   TicketEntity? _ticket;
+
+  /// Number of times the print action has been triggered on this screen
+  /// instance. Used to flip the button label and to annotate audit entries
+  /// with the copy number.
+  int _printCount = 0;
+
+  /// True when the ticket was already in [TicketStatus.completed] at the time
+  /// this screen was opened — every print in that case is a reprint (the
+  /// original receipt was already produced by the payment flow).
+  bool? _wasCompletedOnEntry;
 
   String _formatCents(int cents) {
     final isNeg = cents < 0;
@@ -129,22 +146,119 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
     );
   }
 
+  /// True when the current print tap counts as a reprint rather than the
+  /// original receipt. Two cases:
+  ///   • Ticket was already completed before this screen opened — the
+  ///     original was printed by the payment flow, any print here is a copy.
+  ///   • User has already triggered print at least once in this screen
+  ///     instance.
+  bool _isReprint() {
+    if (_printCount > 0) return true;
+    return _wasCompletedOnEntry == true;
+  }
+
   Future<void> _onPrint() async {
     final ticket = _ticket;
     if (ticket == null) return;
+    final isReprint = _isReprint();
     final useCase = ref.read(printReceiptUseCaseProvider);
     await useCase(_buildReceiptData(ticket));
+    _printCount += 1;
+    if (mounted) setState(() {});
+    if (isReprint) {
+      final audit = ref.read(auditServiceProvider);
+      final copyNo = _printCount; // first reprint = copy #1, next = #2 ...
+      unawaited(
+        audit.log(
+          action: AuditAction.receiptReprinted,
+          entityType: 'ticket',
+          entityId: ticket.id,
+          newValueJson:
+              '{"orderNumber":"${ticket.orderNumber}","copyNo":$copyNo,"total":${ticket.total}}',
+          reason: 'Fis #${ticket.orderNumber} · Kopya #$copyNo',
+        ),
+      );
+    }
   }
 
   Future<void> _onShare() async {
     final ticket = _ticket;
     if (ticket == null) return;
     final data = _buildReceiptData(ticket);
-    final text = _buildShareText(data);
-    await Share.share(
-      text,
-      subject: '${data.restaurantName} - Fiş #${data.receiptNo}',
+    final email = await _promptEmail();
+    if (!mounted) return;
+    if (email == null) {
+      // User bailed out — fall back to legacy text share so the button
+      // still behaves predictably.
+      final text = _buildShareText(data);
+      await Share.share(
+        text,
+        subject: '${data.restaurantName} - Fiş #${data.receiptNo}',
+      );
+      return;
+    }
+    const service = DigitalReceiptService();
+    await service.share(data, recipientEmail: email.isEmpty ? null : email);
+    if (!mounted) return;
+    final audit = ref.read(auditServiceProvider);
+    unawaited(
+      audit.log(
+        action: AuditAction.receiptSentDigital,
+        entityType: 'ticket',
+        entityId: ticket.id,
+        newValueJson:
+            '{"channel":"digital","orderNumber":"${ticket.orderNumber}","recipient":"${email.isEmpty ? '' : email}","total":${ticket.total}}',
+        reason: 'Dijital fiş · #${ticket.orderNumber}',
+      ),
     );
+  }
+
+  /// Simple modal asking for an optional recipient email. Returning
+  /// `null` means the user cancelled — the caller falls back to a plain
+  /// text share. An empty string means "share the PDF with no
+  /// pre-filled recipient" (e.g. AirDrop, WhatsApp, Files app).
+  Future<String?> _promptEmail() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Dijital fiş gönder'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'QR kodlu PDF fiş oluşturulur. E-posta adresini girerseniz '
+              'alıcı otomatik doldurulur; boş bırakılırsa paylaş menüsü açılır.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: 'E-posta (opsiyonel)',
+                hintText: 'musteri@example.ch',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('Gönder'),
+          ),
+        ],
+      ),
+    );
+    return result;
   }
 
   String _buildShareText(SwissReceiptData data) {
@@ -208,7 +322,13 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
     // Keep _ticket in sync with the database.
     ref.listen(ticketByIdProvider(widget.ticketId), (_, next) {
       next.whenData((t) {
-        if (t != null && mounted) setState(() => _ticket = t);
+        if (t != null && mounted) {
+          // Capture completion status at first load — any print that follows
+          // a completed ticket counts as a reprint regardless of whether it
+          // was triggered inside this screen instance.
+          _wasCompletedOnEntry ??= t.status == TicketStatus.completed;
+          setState(() => _ticket = t);
+        }
       });
     });
 
@@ -233,7 +353,9 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
   // -------------------------------------------------------------------------
 
   Widget _buildTopBar() {
-    const tabs = ['Dashboard', 'Tables', 'Orders', 'Kitchen', 'Inventory', 'Reports'];
+    // Kitchen / Inventory tabs removed — those features are not part of the
+    // pilot POS scope and should not surface Pro-upgrade gates.
+    const tabs = ['Dashboard', 'Tables', 'Orders', 'Reports'];
     const activeTab = 'Orders';
 
     return Container(
@@ -268,7 +390,6 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
             GestureDetector(
               onTap: () {
                 if (tab == 'Tables') context.go('/tables');
-                if (tab == 'Kitchen') context.go('/kitchen');
                 if (tab == 'Orders') context.go('/order-center');
               },
               child: Container(
@@ -351,6 +472,12 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Reprint banner — shown when this view is a copy of the
+                // original receipt. The banner disappears automatically if
+                // the ticket is still in a pre-payment state (the very first
+                // print right after settlement is not a reprint).
+                if (_isReprint()) _buildReprintBanner(),
+
                 // Restaurant name — from live tenant record
                 Consumer(builder: (context, ref, _) {
                   final tenant =
@@ -662,22 +789,19 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // QR code placeholder
+                // QR code — scannable by the customer to fetch the
+                // digital receipt payload (receipt no, total, timestamp).
                 Center(
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0F0F0),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.qr_code_2_rounded,
-                        size: 48,
-                        color: Color(0xFFAAAAAA),
-                      ),
-                    ),
+                  child: QrImageView(
+                    data: jsonEncode(<String, dynamic>{
+                      'v': 1,
+                      'receiptNo': ticket.orderNumber,
+                      'total': ticket.total,
+                      'currency': 'CHF',
+                    }),
+                    size: 80,
+                    backgroundColor: Colors.white,
+                    version: QrVersions.auto,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -690,6 +814,42 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Banner rendered on the receipt preview when the current view is a
+  /// reprint. Shows "KOPIE" + the copy number so cashiers (and auditors)
+  /// can tell at a glance that this is not the original Beleg. The copy
+  /// number increments with every in-screen print: 0 before any tap,
+  /// 1 after the first reprint tap, etc.
+  Widget _buildReprintBanner() {
+    final copyNo = _printCount; // reprint about to be produced
+    final label = copyNo == 0
+        ? 'KOPIE - Beleg bereits ausgestellt'
+        : 'KOPIE #$copyNo - Beleg bereits ausgestellt';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF3CD), // warm amber paper tint
+          border: Border.all(
+            color: const Color(0xFF8A6D1F),
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF5A4500),
+            letterSpacing: 1.2,
           ),
         ),
       ),
@@ -731,38 +891,48 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
         children: [
           const Spacer(),
 
-          // Print button — wired to PrinterService via use case
-          GestureDetector(
-            onTap: _onPrint,
-            child: Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryContainer],
-                  begin: Alignment(-0.7, -0.7),
-                  end: Alignment(0.7, 0.7),
+          // Print button — wired to PrinterService via use case.
+          // Label flips to "Yeniden Yazdir" when the next tap will produce
+          // a copy (ticket already completed or previously printed here).
+          Builder(builder: (_) {
+            final isReprint = _isReprint();
+            return GestureDetector(
+              onTap: _onPrint,
+              child: Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryContainer],
+                    begin: Alignment(-0.7, -0.7),
+                    end: Alignment(0.7, 0.7),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isReprint
+                          ? Icons.content_copy_rounded
+                          : Icons.print_rounded,
+                      size: 18,
+                      color: const Color(0xFF0D1B3A),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isReprint ? 'Yeniden Yazdir' : 'Yazdir',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0D1B3A),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.print_rounded,
-                      size: 18, color: Color(0xFF0D1B3A)),
-                  SizedBox(width: 8),
-                  Text(
-                    'Yazdir',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0D1B3A),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+            );
+          }),
           const SizedBox(width: 10),
 
           // Email button (secondary)

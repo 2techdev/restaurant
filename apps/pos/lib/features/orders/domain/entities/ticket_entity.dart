@@ -102,8 +102,15 @@ class TicketEntity {
   /// Waiter who opened or owns this order.
   final String? waiterId;
 
-  /// Optional customer name for delivery / takeaway.
+  /// Optional customer name for delivery / takeaway. Kept separate from
+  /// [customerId] because walk-in orders may capture a name without a
+  /// full CRM record.
   final String? customerName;
+
+  /// Optional FK to `customers.id`. When non-null the ticket is linked
+  /// to a loyalty account and payments can redeem puan against the
+  /// balance. Null for walk-in / ad-hoc orders.
+  final String? customerId;
 
   /// Number of guests at the table.
   final int guestCount;
@@ -208,6 +215,7 @@ class TicketEntity {
     this.tableId,
     this.waiterId,
     this.customerName,
+    this.customerId,
     this.guestCount = 1,
     this.status = TicketStatus.draft,
     this.channel = OrderChannel.pos,
@@ -321,6 +329,7 @@ class TicketEntity {
     String? Function()? tableId,
     String? Function()? waiterId,
     String? Function()? customerName,
+    String? Function()? customerId,
     int? guestCount,
     TicketStatus? status,
     OrderChannel? channel,
@@ -361,6 +370,7 @@ class TicketEntity {
       waiterId: waiterId != null ? waiterId() : this.waiterId,
       customerName:
           customerName != null ? customerName() : this.customerName,
+      customerId: customerId != null ? customerId() : this.customerId,
       guestCount: guestCount ?? this.guestCount,
       status: status ?? this.status,
       channel: channel ?? this.channel,
@@ -407,6 +417,7 @@ class TicketEntity {
           tableId == other.tableId &&
           waiterId == other.waiterId &&
           customerName == other.customerName &&
+          customerId == other.customerId &&
           guestCount == other.guestCount &&
           status == other.status &&
           channel == other.channel &&

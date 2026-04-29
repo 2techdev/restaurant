@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/providers/connectivity_provider.dart';
 import 'package:gastrocore_pos/features/sync/data/clients/sync_api_client.dart';
@@ -15,10 +16,18 @@ import 'package:gastrocore_pos/features/sync/domain/repositories/sync_repository
 // Configuration
 // ---------------------------------------------------------------------------
 
-/// The cloud sync server base URL.
-/// Overridden in settings or via environment.
+/// The cloud REST API base URL (defaults to [AppEndpoints.apiBaseUrl]).
+/// Overridable at runtime via Settings → Sync.
 final syncServerUrlProvider = StateProvider<String>(
-  (ref) => 'http://localhost:8080',
+  (ref) => AppEndpoints.apiBaseUrl,
+);
+
+/// The cloud WebSocket base URL (defaults to [AppEndpoints.wsBaseUrl]).
+/// Exposed separately so REST and WS can live on different subdomains
+/// (e.g. `api.2hub.ch` + `ws.2hub.ch`). Overridable at runtime via
+/// Settings → Sync.
+final wsServerUrlProvider = StateProvider<String>(
+  (ref) => AppEndpoints.wsBaseUrl,
 );
 
 // ---------------------------------------------------------------------------
@@ -178,12 +187,26 @@ final pendingEventCountProvider = Provider<int>((ref) {
   return ref.watch(syncProvider).pendingCount;
 });
 
+/// Count of events parked in the DLQ. Refreshes on every read so the
+/// Settings → Sync screen shows a live badge.
+final deadLetterCountProvider = FutureProvider<int>((ref) async {
+  final repo = ref.watch(syncRepositoryProvider);
+  return repo.getDeadLetterCount();
+});
+
+/// Full list of DLQ entries for the operator-facing inspection screen.
+final deadLetterEventsProvider =
+    FutureProvider.autoDispose((ref) async {
+  final repo = ref.watch(syncRepositoryProvider);
+  return repo.getDeadLetterEvents();
+});
+
 /// WebSocket sync client for real-time notifications.
 ///
 /// Connects automatically and triggers a pull sync when the server pushes a
 /// "new_events" notification. Also sends a heartbeat ping every 30 seconds.
 final webSocketSyncClientProvider = Provider<WebSocketSyncClient>((ref) {
-  final url = ref.watch(syncServerUrlProvider);
+  final url = ref.watch(wsServerUrlProvider);
   final deviceId = ref.watch(deviceIdProvider);
   final tenantId = ref.watch(tenantIdProvider);
 

@@ -9,7 +9,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:gastrocore_pos/features/auth/domain/entities/permission.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/user_entity.dart';
+
+/// Outcome of a PIN-only login attempt. [success] resolves to a user;
+/// [invalidPin] means the PIN did not match any active user; [pinCollision]
+/// means multiple users share the same PIN — admin must reassign.
+enum LoginResult { success, invalidPin, pinCollision }
 
 // ---------------------------------------------------------------------------
 // Repository
@@ -38,16 +44,20 @@ class CurrentUserNotifier extends StateNotifier<UserEntity?> {
 
   CurrentUserNotifier(this._ref) : super(null);
 
-  /// Attempt to log in with a [pinHash]. Returns `true` on success.
-  Future<bool> loginWithPin(String pinHash) async {
+  /// Attempt to log in with a [pinHash]. Returns a [LoginResult] so the UI
+  /// can distinguish an invalid PIN from a PIN collision (two users sharing
+  /// the same PIN — admin must resolve).
+  Future<LoginResult> loginWithPin(String pinHash) async {
     final repo = _ref.read(authRepositoryProvider);
     final tenantId = _ref.read(tenantIdProvider);
-    final user = await repo.getUserByPin(tenantId, pinHash);
-    if (user != null) {
+    try {
+      final user = await repo.getUserByPin(tenantId, pinHash);
+      if (user == null) return LoginResult.invalidPin;
       state = user;
-      return true;
+      return LoginResult.success;
+    } on PinCollisionException {
+      return LoginResult.pinCollision;
     }
-    return false;
   }
 
   /// Set the current user directly (e.g. from a saved session).
@@ -60,6 +70,31 @@ class CurrentUserNotifier extends StateNotifier<UserEntity?> {
     state = null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Role + permission gates
+// ---------------------------------------------------------------------------
+
+/// Effective role of the currently authenticated user.
+///
+/// Defaults to [UserRole.cashier] (kasiyer) when no user is logged in — this
+/// matches the pilot expectation that ungated surfaces behave like a cashier
+/// terminal rather than an admin one.  Derived from [currentUserProvider].
+final currentUserRoleProvider = Provider<UserRole>((ref) {
+  final user = ref.watch(currentUserProvider);
+  return user?.role ?? UserRole.cashier;
+});
+
+/// Returns `true` when the current user's role is permitted to perform [p].
+///
+/// Usage in widgets:
+/// ```dart
+/// final allowed = ref.watch(canProvider(Permission.storno));
+/// ```
+final canProvider = Provider.family<bool, Permission>((ref, p) {
+  final role = ref.watch(currentUserRoleProvider);
+  return roleCan(role, p);
+});
 
 // ---------------------------------------------------------------------------
 // Users list (for login screen)

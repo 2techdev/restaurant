@@ -213,6 +213,11 @@ class PaymentRepositoryImpl {
 
       // --- Update ticket status when fully paid ---
       if (newBillStatus == 'fully_paid') {
+        // Read the ticket so we can resolve its tableId once.
+        final ticketRow = await (_db.select(_db.tickets)
+              ..where((t) => t.id.equals(ticketId)))
+            .getSingle();
+
         await (_db.update(_db.tickets)
               ..where((t) => t.id.equals(ticketId)))
             .write(
@@ -222,6 +227,22 @@ class PaymentRepositoryImpl {
             updatedAt: Value(now),
           ),
         );
+
+        // Free the table: clear currentOrderId, flip status back to
+        // available, drop any concurrent flags. Mirrors
+        // TableRepositoryImpl.clearTable() but inlined here so the whole
+        // payment + table-release sequence lives in one transaction.
+        final tableId = ticketRow.tableId;
+        if (tableId != null && tableId.isNotEmpty) {
+          await (_db.update(_db.restaurantTables)
+                ..where((t) => t.id.equals(tableId)))
+              .write(RestaurantTablesCompanion(
+            currentOrderId: const Value(null),
+            status: const Value('available'),
+            flags: const Value(''),
+            updatedAt: Value(now),
+          ));
+        }
       }
 
       // Fetch the persisted payment to return.

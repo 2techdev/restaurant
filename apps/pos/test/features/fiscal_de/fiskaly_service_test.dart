@@ -80,7 +80,7 @@ void main() {
         client: _authClient(statusCode: 401),
       );
       expect(
-        () => service.authenticate(),
+        service.authenticate,
         throwsA(isA<FiskalyException>()),
       );
     });

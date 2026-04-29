@@ -192,7 +192,7 @@ class _PlanCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,9 +203,9 @@ class _PlanCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
+                  color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: color.withOpacity(0.6)),
+                  border: Border.all(color: color.withValues(alpha: 0.6)),
                 ),
                 child: Text(
                   edition.badge,
@@ -371,7 +371,7 @@ class _EditionGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _editionColor(edition);
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surfaceContainer,
         borderRadius: BorderRadius.circular(10),
@@ -388,7 +388,7 @@ class _EditionGroup extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
+                    color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(

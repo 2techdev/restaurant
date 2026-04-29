@@ -122,7 +122,7 @@ void main() {
           tenantId: 'tenant',
           onPeerDiscovered: (_) {},
         );
-        await expectAsync0(() => service.dispose())();
+        await expectAsync0(service.dispose)();
       });
 
       test('stopAdvertising before startAdvertising is safe', () async {
@@ -132,7 +132,7 @@ void main() {
           tenantId: 'tenant',
           onPeerDiscovered: (_) {},
         );
-        await expectAsync0(() => service.stopAdvertising())();
+        await expectAsync0(service.stopAdvertising)();
       });
 
       test('stopDiscovery before startDiscovery is safe', () async {
@@ -142,7 +142,7 @@ void main() {
           tenantId: 'tenant',
           onPeerDiscovered: (_) {},
         );
-        await expectAsync0(() => service.stopDiscovery())();
+        await expectAsync0(service.stopDiscovery)();
       });
     });
   });

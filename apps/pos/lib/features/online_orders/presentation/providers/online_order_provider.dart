@@ -1,7 +1,7 @@
 /// Riverpod providers for real-time online order management.
 ///
-/// When a customer completes an order on pos.2tech.ch the POS hub pushes a
-/// "new_order" WebSocket message.  This provider:
+/// When a customer completes an order via the online-ordering storefront, the
+/// POS hub pushes a "new_order" WebSocket message. This provider:
 ///   1. Maintains a [PosWsClient] connected to `/ws/pos`.
 ///   2. On "new_order": inserts the ticket + items into the local Drift
 ///      database, plays a notification sound, and adds the order to the
@@ -69,7 +69,7 @@ final _onlineAlertPlayerProvider = Provider<AudioPlayer>((ref) {
 /// auto-disposed when the last listener is removed. Mount it
 /// inside the order-centre shell to keep the connection alive while on that screen.
 final posWsClientProvider = Provider.autoDispose<PosWsClient>((ref) {
-  final baseUrl = ref.watch(syncServerUrlProvider);
+  final baseUrl = ref.watch(wsServerUrlProvider);
   final tenantId = ref.watch(tenantIdProvider);
   final deviceId = ref.watch(deviceIdProvider);
 

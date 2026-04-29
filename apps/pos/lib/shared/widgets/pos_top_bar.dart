@@ -128,7 +128,7 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ColoredBox(
       color: AppColors.surfaceDim,
       child: Column(
         mainAxisSize: MainAxisSize.min,

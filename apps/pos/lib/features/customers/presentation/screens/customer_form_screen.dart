@@ -438,7 +438,7 @@ class _CustomerFormScreenState
       await ref
           .read(customerNotifierProvider.notifier)
           .deleteCustomer(widget.customer!.id);
-      if (mounted) {
+      if (mounted && context.mounted) {
         // Pop twice: form + detail screen
         Navigator.of(context)
           ..pop()
