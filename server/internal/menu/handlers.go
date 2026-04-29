@@ -3,10 +3,12 @@ package menu
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/gastrocore/server/internal/org"
 	"github.com/gastrocore/server/internal/shared/middleware"
 	"github.com/gastrocore/server/internal/shared/response"
 	"github.com/gastrocore/server/internal/shared/uuid"
@@ -390,6 +392,46 @@ func (m *Module) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// HQ lock enforcement — check if this product is governed by an org policy
+	// (FULLY_LOCKED / PRICE_LOCKED / FLEXIBLE). For lock checks we need to
+	// know whether price- or cost-affecting fields are changing, which means
+	// reading the current row first.
+	var (
+		curPrice, curCost int64
+		curTax            string
+		curActive         bool
+	)
+	if err := m.db.QueryRowContext(r.Context(), `
+		SELECT price, cost_price, tax_group, is_active
+		FROM products WHERE id=$1 AND tenant_id=$2 AND is_deleted=FALSE
+	`, id, tenantID).Scan(&curPrice, &curCost, &curTax, &curActive); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			response.Error(w, http.StatusNotFound, "NOT_FOUND", "Product not found")
+			return
+		}
+		slog.Error("menu: load product for lock check", "error", err)
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to load product")
+		return
+	}
+	mu := org.Mutation{
+		ProductID:   id,
+		TenantID:    tenantID,
+		ChangePrice: curPrice != req.Price || curCost != req.CostPrice || (req.TaxGroup != "" && curTax != req.TaxGroup),
+		Disable:     curActive && !req.IsActive,
+	}
+	mu.ChangeOther = !mu.ChangePrice
+	if lockErr := org.CheckMutation(r.Context(), m.db, mu); lockErr != nil {
+		var le org.LockedError
+		if errors.As(lockErr, &le) {
+			response.ErrorWithDetails(w, http.StatusForbidden, le.Code, le.Message,
+				map[string]string{"lock_type": le.LockType})
+			return
+		}
+		slog.Error("menu: lock check", "error", lockErr)
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Lock check failed")
+		return
+	}
+
 	res, err := m.db.ExecContext(r.Context(), `
 		UPDATE products
 		SET name=$1, description=$2, price=$3, cost_price=$4, tax_group=$5,
@@ -423,6 +465,22 @@ func (m *Module) handleDeleteProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
+
+	// HQ lock enforcement — block deletes on FULLY_LOCKED / PRICE_LOCKED with
+	// allow_local_disable=false products.
+	if lockErr := org.CheckMutation(r.Context(), m.db, org.Mutation{
+		ProductID: id, TenantID: tenantID, Delete: true,
+	}); lockErr != nil {
+		var le org.LockedError
+		if errors.As(lockErr, &le) {
+			response.ErrorWithDetails(w, http.StatusForbidden, le.Code, le.Message,
+				map[string]string{"lock_type": le.LockType})
+			return
+		}
+		slog.Error("menu: lock check (delete)", "error", lockErr)
+		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Lock check failed")
+		return
+	}
 
 	res, err := m.db.ExecContext(r.Context(), `
 		UPDATE products SET is_deleted=true, updated_at=NOW()

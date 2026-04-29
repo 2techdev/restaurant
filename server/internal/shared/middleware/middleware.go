@@ -34,6 +34,10 @@ const (
 	ContextKeyDeviceType contextKey = "device_type"
 	// ContextKeyRole is the context key for the role from JWT.
 	ContextKeyRole contextKey = "role"
+	// ContextKeyOrganizationID is the context key for the HQ organization id (014_hq_chain).
+	ContextKeyOrganizationID contextKey = "organization_id"
+	// ContextKeyOrgRole is the context key for the HQ chain role (HQ_ADMIN, HQ_MANAGER, ...).
+	ContextKeyOrgRole contextKey = "org_role"
 )
 
 // Middleware is a function that wraps an http.Handler.
@@ -299,6 +303,20 @@ func AuthRequired(validateToken func(token string) (claims map[string]string, er
 			if v, ok := claims["role"]; ok {
 				ctx = context.WithValue(ctx, ContextKeyRole, v)
 			}
+			if v, ok := claims["organization_id"]; ok {
+				ctx = context.WithValue(ctx, ContextKeyOrganizationID, v)
+			}
+			if v, ok := claims["org_role"]; ok {
+				ctx = context.WithValue(ctx, ContextKeyOrgRole, v)
+				// HQ admins/managers can scope tenant-aware queries to a
+				// specific restaurant in their org by sending X-Tenant-ID.
+				// Restaurant-scoped users keep the JWT-stamped tenant_id.
+				if v == "HQ_ADMIN" || v == "HQ_MANAGER" {
+					if tid := r.Header.Get("X-Tenant-ID"); tid != "" {
+						ctx = context.WithValue(ctx, ContextKeyTenantID, tid)
+					}
+				}
+			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -353,6 +371,24 @@ func GetUserID(ctx context.Context) string {
 // GetRole extracts the role from context.
 func GetRole(ctx context.Context) string {
 	if v, ok := ctx.Value(ContextKeyRole).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// GetOrganizationID extracts the HQ organization id from context.
+// Returns "" when the user is not bound to an HQ organization.
+func GetOrganizationID(ctx context.Context) string {
+	if v, ok := ctx.Value(ContextKeyOrganizationID).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// GetOrgRole extracts the HQ chain role from context.
+// Returns "" when the user has no HQ role.
+func GetOrgRole(ctx context.Context) string {
+	if v, ok := ctx.Value(ContextKeyOrgRole).(string); ok {
 		return v
 	}
 	return ""

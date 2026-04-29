@@ -34,3 +34,17 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Claude worktrees (nested checkouts, never commit)
+.claude/worktrees/
+server/.claude/
+
+# Pilot APKs (large binaries, distributed via release artifacts)
+pilot/*.apk
+
+# Node.js (Next.js backoffice, etc.)
+**/node_modules/
+**/.next/
+**/.turbo/
+**/coverage/
+**/*.tsbuildinfo

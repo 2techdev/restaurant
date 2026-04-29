@@ -20,6 +20,12 @@ type Claims struct {
 	DeviceType string `json:"device_type,omitempty"` // kds, kiosk, pos, waiter
 	Role       string `json:"role,omitempty"`        // brand_manager, store_manager, waiter, kiosk, kds, device, admin
 
+	// HQ chain fields — added in 014_hq_chain. The DB-side org_role on
+	// users/admin_users is mirrored here so /api/v1/org/* authorization
+	// can run without an extra DB round-trip.
+	OrganizationID string `json:"organization_id,omitempty"`
+	OrgRole        string `json:"org_role,omitempty"` // HQ_ADMIN | HQ_MANAGER | RESTAURANT_MANAGER | RESTAURANT_STAFF | POS_OPERATOR
+
 	// Standard JWT fields
 	Subject   string `json:"sub,omitempty"`
 	IssuedAt  int64  `json:"iat,omitempty"`
@@ -125,6 +131,12 @@ func (s *JWTService) ValidateToken(token string) (map[string]string, error) {
 	}
 	if claims.Role != "" {
 		result["role"] = claims.Role
+	}
+	if claims.OrganizationID != "" {
+		result["organization_id"] = claims.OrganizationID
+	}
+	if claims.OrgRole != "" {
+		result["org_role"] = claims.OrgRole
 	}
 
 	return result, nil

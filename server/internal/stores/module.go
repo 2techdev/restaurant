@@ -55,11 +55,15 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/admin/stores/{id}", m.handleDeleteStore)
 	mux.HandleFunc("GET /api/v1/admin/stores/{id}/stats", m.handleGetStoreStats)
 
-	// Admin Users (web dashboard users)
-	mux.HandleFunc("GET /api/v1/admin/users", m.handleListAdminUsers)
-	mux.HandleFunc("POST /api/v1/admin/users", m.handleCreateAdminUser)
-	mux.HandleFunc("PUT /api/v1/admin/users/{id}", m.handleUpdateAdminUser)
-	mux.HandleFunc("DELETE /api/v1/admin/users/{id}", m.handleDeleteAdminUser)
+	// Admin Users (web dashboard users) — superseded by internal/auth's
+	// admin_user_crud.go which adds HQ_ADMIN/HQ_MANAGER RBAC and the
+	// disable/enable/reset-password endpoints. The legacy handlers in this
+	// package are kept (handleListAdminUsers etc.) so callers wiring custom
+	// muxes can still reach them, but we no longer register them globally.
+	_ = m.handleListAdminUsers
+	_ = m.handleCreateAdminUser
+	_ = m.handleUpdateAdminUser
+	_ = m.handleDeleteAdminUser
 
 	// Employees (POS staff per store)
 	mux.HandleFunc("GET /api/v1/admin/stores/{id}/employees", m.handleListEmployees)

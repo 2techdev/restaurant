@@ -177,7 +177,31 @@ type adminUserInfo struct {
 	Email          string   `json:"email"`
 	Name           string   `json:"name"`
 	Role           string   `json:"role"`
+	OrgRole        string   `json:"org_role,omitempty"` // HQ chain role — derived from admin_users.role
 	StoreIDs       []string `json:"store_ids,omitempty"`
+}
+
+// mapAdminRoleToOrgRole maps the legacy admin_users.role values onto the HQ
+// chain role taxonomy used by /api/v1/org/* endpoints. The mapping is the
+// minimum-privilege one: only "admin" maps to HQ_ADMIN. Returning "" means
+// the user has no HQ access (single-restaurant operator).
+//
+// Mapping rationale:
+//   admin            → HQ_ADMIN              (full org control + destructive ops)
+//   brand_manager    → HQ_MANAGER            (org control without destructive ops)
+//   store_manager    → RESTAURANT_MANAGER    (single-tenant manager)
+//   viewer / waiter  → ""                    (no HQ surface)
+func mapAdminRoleToOrgRole(adminRole string) string {
+	switch adminRole {
+	case "admin":
+		return "HQ_ADMIN"
+	case "brand_manager":
+		return "HQ_MANAGER"
+	case "store_manager":
+		return "RESTAURANT_MANAGER"
+	default:
+		return ""
+	}
 }
 
 // handleAdminLogin authenticates a web dashboard admin by email and password.
@@ -236,10 +260,14 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		UPDATE admin_users SET last_login_at=NOW() WHERE id=$1
 	`, userID)
 
+	orgRole := mapAdminRoleToOrgRole(role)
+
 	token, err := m.jwt.GenerateToken(Claims{
-		TenantID: orgID,
-		UserID:   userID,
-		Role:     role,
+		TenantID:       orgID,
+		UserID:         userID,
+		Role:           role,
+		OrganizationID: orgID,
+		OrgRole:        orgRole,
 	})
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "TOKEN_ERROR", "Failed to generate token")
@@ -249,9 +277,11 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	refreshExpiry := 7 * 24 * time.Hour
 	jwtRefresh := NewJWTService(m.cfg.JWTSecret, refreshExpiry)
 	refreshToken, _ := jwtRefresh.GenerateToken(Claims{
-		TenantID: orgID,
-		UserID:   userID,
-		Role:     role + "_refresh",
+		TenantID:       orgID,
+		UserID:         userID,
+		Role:           role + "_refresh",
+		OrganizationID: orgID,
+		OrgRole:        orgRole,
 	})
 
 	ids := []string(storeIDs)
@@ -270,6 +300,7 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 			Email:          req.Email,
 			Name:           name,
 			Role:           role,
+			OrgRole:        orgRole,
 			StoreIDs:       ids,
 		},
 	})
@@ -305,10 +336,12 @@ func (m *Module) handleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newToken, err := m.jwt.GenerateToken(Claims{
-		TenantID: claims["tenant_id"],
-		DeviceID: claims["device_id"],
-		UserID:   claims["user_id"],
-		Role:     role,
+		TenantID:       claims["tenant_id"],
+		DeviceID:       claims["device_id"],
+		UserID:         claims["user_id"],
+		Role:           role,
+		OrganizationID: claims["organization_id"],
+		OrgRole:        claims["org_role"],
 	})
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "TOKEN_ERROR", "Failed to generate token")
@@ -319,10 +352,12 @@ func (m *Module) handleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	newRefreshExpiry := 30 * 24 * time.Hour
 	jwtRefresh := NewJWTService(m.cfg.JWTSecret, newRefreshExpiry)
 	newRefresh, _ := jwtRefresh.GenerateToken(Claims{
-		TenantID: claims["tenant_id"],
-		DeviceID: claims["device_id"],
-		UserID:   claims["user_id"],
-		Role:     role + suffix,
+		TenantID:       claims["tenant_id"],
+		DeviceID:       claims["device_id"],
+		UserID:         claims["user_id"],
+		Role:           role + suffix,
+		OrganizationID: claims["organization_id"],
+		OrgRole:        claims["org_role"],
 	})
 
 	response.JSON(w, http.StatusOK, tokenResponse{

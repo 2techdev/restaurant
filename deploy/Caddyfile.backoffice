@@ -1,0 +1,22 @@
+# Alternatif: Caddy ile (otomatik SSL, daha basit)
+# Yer: /etc/caddy/Caddyfile (ya da include)
+# Reload: sudo systemctl reload caddy
+
+backoffice.gastrocore.ch {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3001 {
+        header_up Host {host}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Strict-Transport-Security "max-age=15552000; includeSubDomains"
+    }
+    log {
+        output file /var/log/caddy/backoffice.access.log
+    }
+}

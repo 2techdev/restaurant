@@ -39,6 +39,12 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/pair-device", m.handlePairDevice)
 	mux.HandleFunc("POST /api/v1/auth/pairing-code", m.handleGeneratePairingCode)
 	mux.HandleFunc("POST /api/v1/auth/refresh", m.handleRefreshPersisted)
+
+	// Admin user management (HQ_ADMIN/HQ_MANAGER)
+	m.registerAdminUserRoutes(mux)
+
+	// Self-service profile + password change
+	m.registerMeRoutes(mux)
 }
 
 // ValidateToken exposes the JWT validation for use by middleware.

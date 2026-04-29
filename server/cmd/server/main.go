@@ -15,7 +15,6 @@ import (
 	"github.com/gastrocore/server/internal/auth"
 	"github.com/gastrocore/server/internal/crm"
 	"github.com/gastrocore/server/internal/dashboard"
-	"github.com/gastrocore/server/internal/demo"
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
 	"github.com/gastrocore/server/internal/fiscal"
@@ -26,6 +25,7 @@ import (
 	"github.com/gastrocore/server/internal/menu"
 	"github.com/gastrocore/server/internal/online"
 	"github.com/gastrocore/server/internal/orders"
+	"github.com/gastrocore/server/internal/org"
 	"github.com/gastrocore/server/internal/pos"
 	"github.com/gastrocore/server/internal/printers"
 	"github.com/gastrocore/server/internal/qrbill"
@@ -87,7 +87,7 @@ func main() {
 	// ---------------------------------------------------------------------------
 	authModule := auth.NewModule(db, cfg)
 	syncModule := gosync.NewModule(db, cfg)
-	menuModule := menu.NewModule(db)
+	menuModule := menu.NewModuleWithHub(db, syncModule.SyncHub())
 	ordersModule := orders.NewModule(db)
 	onlineModule := online.NewModuleWithStripe(db, kdsHub, onlineHub, posHub, online.StripeConfig{
 		SecretKey:      cfg.StripeSecretKey,
@@ -112,6 +112,7 @@ func main() {
 	stationsModule := stations.NewModule(db, cfg)
 	usersModule := users.NewModule(db, cfg)
 	printersModule := printers.NewModule(db)
+	orgModule := org.NewModule(db, syncModule.SyncHub())
 
 	// ---------------------------------------------------------------------------
 	// Build router
@@ -147,9 +148,7 @@ func main() {
 		})
 	})
 
-	// Online ordering demo page
-	mux.HandleFunc("GET /demo", demo.Handler())
-	mux.HandleFunc("GET /demo/", demo.Handler())
+	// /demo registered by onlineModule.RegisterRoutes below.
 
 	// OpenAPI docs
 	mux.HandleFunc("GET /docs/swagger.json", docs.Handler())
@@ -179,6 +178,7 @@ func main() {
 	stationsModule.RegisterRoutes(mux)
 	usersModule.RegisterRoutes(mux)
 	printersModule.RegisterRoutes(mux)
+	orgModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain

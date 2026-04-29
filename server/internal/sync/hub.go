@@ -38,7 +38,6 @@ func newHub() *Hub {
 func (h *Hub) register(c *client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	// Close previous connection for same device if exists.
 	if old, ok := h.clients[c.deviceID]; ok {
 		close(old.send)
 	}
@@ -69,7 +68,24 @@ func (h *Hub) NotifyTenant(tenantID, senderDeviceID string, count int) {
 			select {
 			case c.send <- msg:
 			default:
-				// Slow client — drop message; they'll pull on reconnect.
+			}
+		}
+	}
+}
+
+// BroadcastTenant pushes an arbitrary JSON-encoded message to every
+// device currently connected for the given tenant. Used by modules that
+// need to fan out events richer than the {type:new_events,count:N}
+// envelope (e.g. menu_published with a version number). Slow consumers
+// have their message dropped; they'll re-fetch on reconnect.
+func (h *Hub) BroadcastTenant(tenantID string, msg []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, c := range h.clients {
+		if c.tenantID == tenantID {
+			select {
+			case c.send <- msg:
+			default:
 			}
 		}
 	}
