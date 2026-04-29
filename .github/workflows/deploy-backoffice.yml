@@ -1,8 +1,12 @@
-name: Deploy Backoffice
+name: Deploy Backoffice (Flutter — DEPRECATED, manual only)
 
-# Builds the Flutter web backoffice (apps/dashboard) and publishes it to
-# Cloudflare Pages at admin.2tech.ch. Mirrors deploy-online.yml so the same
-# pattern is used for both web frontends.
+# DEPRECATED 2026-04-30: the production backoffice is now Next.js at
+# apps/backoffice/, deployed to backoffice.gastrocore.ch via Caddy on Hetzner.
+# This workflow still builds the legacy Flutter Web from
+# archive/dashboard-flutter-deprecated-2026-04-30/ for one-off Cloudflare Pages
+# pushes to admin.2tech.ch. It no longer triggers on push — use the Actions tab
+# manual run if you really need it. Once admin.2tech.ch DNS is retired the
+# whole workflow can be deleted.
 #
 # Required repo secrets:
 #   CF_API_TOKEN           — Cloudflare API token with Pages:Edit
@@ -10,11 +14,6 @@ name: Deploy Backoffice
 #   CF_PAGES_PROJECT       — Cloudflare Pages project name (e.g. gastrocore-backoffice)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/dashboard/**"
-      - "packages/**"
   workflow_dispatch:
 
 permissions:
@@ -42,15 +41,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-dashboard-${{ hashFiles('apps/dashboard/pubspec.lock') }}
+          key: ${{ runner.os }}-pub-dashboard-${{ hashFiles('archive/dashboard-flutter-deprecated-2026-04-30/pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-dashboard-
 
       - name: Install dependencies
-        working-directory: apps/dashboard
+        working-directory: archive/dashboard-flutter-deprecated-2026-04-30
         run: flutter pub get
 
       - name: Flutter build web (release)
-        working-directory: apps/dashboard
+        working-directory: archive/dashboard-flutter-deprecated-2026-04-30
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: production
@@ -65,7 +64,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backoffice-web
-          path: apps/dashboard/build/web/
+          path: archive/dashboard-flutter-deprecated-2026-04-30/build/web/
           retention-days: 14
 
   deploy:
