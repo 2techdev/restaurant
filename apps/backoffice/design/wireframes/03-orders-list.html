@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 — Siparişler | GastroCore Backoffice Wireframe</title>
+<link rel="stylesheet" href="_tokens.css">
+<style>
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .chip { padding: 6px 12px; border-radius: 9999px; border: 1px solid var(--neutral-300); font-size: 13px; cursor: pointer; background: white; }
+  .chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .order-card { background: white; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 10px; }
+  .order-card .row { display: flex; justify-content: space-between; align-items: center; }
+  .order-num { font-weight: 700; font-size: 15px; }
+  .order-meta { color: var(--neutral-500); font-size: 12px; margin-top: 2px; }
+  .order-total { font-weight: 700; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="wireframe-banner"><strong>WIREFRAME</strong> — E04 Sipariş listesi. <a href="index.html">↩ Tümü</a></div>
+
+<div class="frame-wrap compare">
+
+  <!-- MOBILE -->
+  <div class="frame">
+    <div class="frame-label">📱 Mobile · 414px — kart layoutu</div>
+    <div class="mobile-frame">
+      <div class="mobile-statusbar"><span>9:41</span><span>📶 100%</span></div>
+      <div class="mobile-header">
+        <span class="hamburger">☰</span>
+        <h1>Siparişler</h1>
+        <span>⤓</span>
+      </div>
+      <div class="mobile-content">
+        <input class="input mb-2" placeholder="🔍 Sipariş # veya masa ara">
+        <div class="filter-bar">
+          <span class="chip active">Tümü · 142</span>
+          <span class="chip">Ödendi</span>
+          <span class="chip">Açık · 8</span>
+          <span class="chip">Hazır.</span>
+        </div>
+        <div style="font-size: 12px; color: var(--neutral-500); margin-bottom: 8px;">Bugün · 14:00 → 16:00 arası</div>
+
+        <div class="order-card">
+          <div class="row">
+            <div>
+              <div class="order-num">#4729</div>
+              <div class="order-meta">14:32 · Masa M07 · Yiğit · Masada</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="order-total">CHF 87.50</div>
+              <div><span class="badge badge-success"><span class="dot dot-success"></span>Ödendi</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-card">
+          <div class="row">
+            <div>
+              <div class="order-num">#4728</div>
+              <div class="order-meta">14:18 · Masa M03 · Aysel · Masada</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="order-total">CHF 142.00</div>
+              <div><span class="badge badge-info"><span class="dot dot-warning"></span>Açık</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-card">
+          <div class="row">
+            <div>
+              <div class="order-num">#4727</div>
+              <div class="order-meta">13:55 · Paket · — · Takeaway</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="order-total">CHF 24.50</div>
+              <div><span class="badge badge-warning"><span class="dot dot-warning"></span>Hazırlanıyor</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-card">
+          <div class="row">
+            <div>
+              <div class="order-num">#4726</div>
+              <div class="order-meta">13:48 · Masa M11 · Yiğit · Masada</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="order-total">CHF 65.20</div>
+              <div><span class="badge badge-success"><span class="dot dot-success"></span>Ödendi</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-card" style="opacity: 0.7;">
+          <div class="row">
+            <div>
+              <div class="order-num">#4725</div>
+              <div class="order-meta">13:30 · Masa M02 · Aysel</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="order-total">CHF 48.00</div>
+              <div><span class="badge badge-error"><span class="dot dot-error"></span>İptal</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESKTOP -->
+  <div class="frame">
+    <div class="frame-label">🖥️ Desktop · 1280px — tablo layoutu</div>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-icon">🍴</div>
+          <div class="sidebar-logo-text">GastroCore</div>
+        </div>
+        <div class="nav-item"><span class="nav-icon">📊</span> Dashboard</div>
+        <div class="nav-item active"><span class="nav-icon">🧾</span> Siparişler <span class="nav-badge">8</span></div>
+        <div class="nav-item"><span class="nav-icon">📖</span> Menü</div>
+        <div class="nav-item"><span class="nav-icon">📈</span> Raporlar</div>
+        <div class="nav-item"><span class="nav-icon">⚙️</span> Ayarlar</div>
+        <div class="sidebar-footer">
+          <div class="sidebar-user">
+            <div class="avatar">A</div>
+            <div class="user-meta">Aysel Y.<div class="role">REST. MANAGER</div></div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="main-header">
+          <h1>Siparişler</h1>
+          <input class="input" placeholder="🔍 Sipariş # veya masa" style="max-width: 280px;">
+          <button class="btn btn-secondary">⤓ CSV</button>
+        </div>
+        <div class="main-content">
+          <div class="filter-bar">
+            <select class="select" style="width: auto;"><option>Bugün</option></select>
+            <span class="chip active">Tümü · 142</span>
+            <span class="chip">Ödendi · 121</span>
+            <span class="chip">Açık · 8</span>
+            <span class="chip">Hazırlanıyor · 5</span>
+            <span class="chip">İptal · 8</span>
+            <span style="margin-left: auto; font-size: 12px; color: var(--neutral-500);">Seçilen: 0</span>
+          </div>
+
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th><input type="checkbox"></th>
+                <th>Sipariş #</th>
+                <th>Tarih</th>
+                <th>Masa</th>
+                <th>Garson</th>
+                <th>Tip</th>
+                <th>Toplam</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>#4729</strong></td>
+                <td>14:32</td>
+                <td>M07</td>
+                <td>Yiğit</td>
+                <td>Masada</td>
+                <td><strong>CHF 87.50</strong></td>
+                <td><span class="badge badge-success"><span class="dot dot-success"></span>Ödendi</span></td>
+                <td>⋯</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>#4728</strong></td>
+                <td>14:18</td>
+                <td>M03</td>
+                <td>Aysel</td>
+                <td>Masada</td>
+                <td><strong>CHF 142.00</strong></td>
+                <td><span class="badge badge-info">Açık</span></td>
+                <td>⋯</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>#4727</strong></td>
+                <td>13:55</td>
+                <td>—</td>
+                <td>—</td>
+                <td>Paket</td>
+                <td><strong>CHF 24.50</strong></td>
+                <td><span class="badge badge-warning">Hazırlanıyor</span></td>
+                <td>⋯</td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><strong>#4726</strong></td>
+                <td>13:48</td>
+                <td>M11</td>
+                <td>Yiğit</td>
+                <td>Masada</td>
+                <td><strong>CHF 65.20</strong></td>
+                <td><span class="badge badge-success">Ödendi</span></td>
+                <td>⋯</td>
+              </tr>
+              <tr style="opacity: 0.6;">
+                <td><input type="checkbox"></td>
+                <td><strong>#4725</strong></td>
+                <td>13:30</td>
+                <td>M02</td>
+                <td>Aysel</td>
+                <td>Masada</td>
+                <td><strong>CHF 48.00</strong></td>
+                <td><span class="badge badge-error">İptal</span></td>
+                <td>⋯</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top: 16px; display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--neutral-500);">
+            <span>1-25 / 142</span>
+            <div class="flex gap-2" style="margin-left: auto;">
+              <button class="btn btn-secondary btn-sm">‹</button>
+              <button class="btn btn-primary btn-sm">1</button>
+              <button class="btn btn-secondary btn-sm">2</button>
+              <button class="btn btn-secondary btn-sm">3</button>
+              <button class="btn btn-secondary btn-sm">›</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+</div>
+
+<div style="max-width: 1200px; margin: 24px auto; padding: 16px 24px; font-size: 13px; color: var(--neutral-600);">
+  <h3>Tasarım notları</h3>
+  <ul>
+    <li>Mobile'da tablo → kart dönüşümü zorunlu (yatay scroll kabul edilemez).</li>
+    <li>Status chip'lerinin yanındaki sayılar dinamik filtre sonuçlarını gösterir.</li>
+    <li>Bulk select header — desktop'tayken bulk action bar (Selected: N) görünür.</li>
+    <li>Mobile'da swipe-left ile sipariş kartında "İade Et" reveal edilebilir (gelecek).</li>
+    <li>Empty state filter sonrası: "Bu filtre için sonuç yok" + "Filtreleri sıfırla" CTA.</li>
+  </ul>
+</div>
+
+</body>
+</html>

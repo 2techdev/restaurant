@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 — Ürün Düzenle | GastroCore Backoffice Wireframe</title>
+<link rel="stylesheet" href="_tokens.css">
+<style>
+  .lang-tabs { display: flex; gap: 4px; margin-bottom: 8px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: 2px; background: var(--neutral-50); }
+  .lang-tab { flex: 1; padding: 6px 8px; font-size: 11px; text-align: center; border-radius: var(--radius-sm); cursor: pointer; }
+  .lang-tab.active { background: white; box-shadow: var(--shadow-sm); font-weight: 600; }
+  .danger-zone { border: 1px solid var(--error); border-radius: var(--radius-md); padding: 16px; background: var(--error-bg); margin-top: 32px; }
+  .toggle { width: 40px; height: 22px; background: var(--success); border-radius: 9999px; position: relative; cursor: pointer; display: inline-block; vertical-align: middle; }
+  .toggle::after { content: ''; position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; background: white; border-radius: 50%; }
+  .toggle.off { background: var(--neutral-300); }
+  .toggle.off::after { left: 2px; right: auto; }
+  .switch-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--neutral-100); }
+  .form-section { margin-bottom: 32px; }
+  .form-section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--neutral-500); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--neutral-200); }
+  .modifier-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 9999px; background: var(--primary-light); color: var(--primary); font-size: 12px; margin: 2px; }
+</style>
+</head>
+<body>
+<div class="wireframe-banner"><strong>WIREFRAME</strong> — E08 Ürün düzenleme. <a href="index.html">↩ Tümü</a></div>
+
+<div class="frame-wrap compare">
+
+  <!-- MOBILE — full page -->
+  <div class="frame">
+    <div class="frame-label">📱 Mobile · 414px — full page form</div>
+    <div class="mobile-frame">
+      <div class="mobile-statusbar"><span>9:41</span><span>📶 100%</span></div>
+      <div class="mobile-header">
+        <span style="font-size: 22px;">‹</span>
+        <h1>Margherita</h1>
+        <span style="color: var(--warning);">●</span>
+      </div>
+      <div class="mobile-content">
+        <div class="form-section">
+          <div class="form-section-title">Genel Bilgi</div>
+
+          <div class="field">
+            <label class="label">Ad <span class="req">*</span></label>
+            <div class="lang-tabs">
+              <span class="lang-tab active">DE</span>
+              <span class="lang-tab">EN</span>
+              <span class="lang-tab">TR</span>
+              <span class="lang-tab">FR</span>
+              <span class="lang-tab">IT</span>
+            </div>
+            <input class="input" value="Margherita Pizza">
+            <div class="help">5 dilden 3'ü çevirildi · 2 eksik</div>
+          </div>
+
+          <div class="field">
+            <label class="label">Açıklama</label>
+            <textarea class="input" rows="3">Klassische Margherita mit Tomaten, Mozzarella und Basilikum</textarea>
+          </div>
+
+          <div class="field">
+            <label class="label">Kategori <span class="req">*</span></label>
+            <select class="select"><option>Pizza</option></select>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Fiyatlama</div>
+          <div class="field">
+            <label class="label">Fiyat <span class="req">*</span></label>
+            <div style="position: relative;">
+              <input class="input" value="15.00" style="padding-left: 44px;">
+              <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--neutral-500);">CHF</span>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Vergi grubu <span class="req">*</span></label>
+            <select class="select"><option>%2.5 (Yiyecek - CH)</option></select>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Modifier'lar</div>
+          <div class="mb-3">
+            <span class="modifier-chip">Boyut · 1 zorunlu</span>
+            <span class="modifier-chip">Ekstra · 0-3 opsiyonel</span>
+          </div>
+          <button class="btn btn-secondary btn-block">＋ Modifier Grup Ekle</button>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Stok & Görünürlük</div>
+          <div class="switch-row">
+            <span>Mevcut (POS'ta görün)</span>
+            <span class="toggle"></span>
+          </div>
+          <div class="switch-row">
+            <span>Görünür (gizli değil)</span>
+            <span class="toggle"></span>
+          </div>
+          <div class="switch-row" style="border-bottom: 0;">
+            <span>Allergen: Gluten</span>
+            <span class="toggle off"></span>
+          </div>
+        </div>
+
+        <div class="danger-zone">
+          <div class="font-semibold mb-2" style="color: #7F1D1D;">⚠️ Tehlikeli bölge</div>
+          <button class="btn btn-danger btn-block">🗑 Bu ürünü sil</button>
+        </div>
+      </div>
+      <div class="mobile-footer">
+        <div class="flex gap-2">
+          <button class="btn btn-secondary" style="flex: 1;">İptal</button>
+          <button class="btn btn-primary" style="flex: 2;">💾 Kaydet (taslak)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESKTOP — split layout -->
+  <div class="frame">
+    <div class="frame-label">🖥️ Desktop · 1280px — split layout (form + preview)</div>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-icon">🍴</div>
+          <div class="sidebar-logo-text">GastroCore</div>
+        </div>
+        <div class="nav-item"><span class="nav-icon">📊</span> Dashboard</div>
+        <div class="nav-item active"><span class="nav-icon">📖</span> Menü</div>
+      </aside>
+
+      <main class="main">
+        <div class="main-header">
+          <span style="font-size: 18px; cursor: pointer;">‹</span>
+          <h1>Margherita Pizza <span class="text-sm text-muted">· #prd_874</span></h1>
+          <span class="text-sm" style="color: var(--warning);">● Kaydedilmedi</span>
+          <button class="btn btn-secondary">İptal</button>
+          <button class="btn btn-primary">💾 Kaydet (taslak)</button>
+        </div>
+
+        <div class="main-content" style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+
+          <!-- Form -->
+          <div>
+            <div class="form-section">
+              <div class="form-section-title">Genel Bilgi</div>
+              <div class="grid grid-2">
+                <div class="field">
+                  <label class="label">Ad <span class="req">*</span></label>
+                  <div class="lang-tabs">
+                    <span class="lang-tab active">🇩🇪 DE</span>
+                    <span class="lang-tab">🇬🇧 EN</span>
+                    <span class="lang-tab">🇹🇷 TR</span>
+                    <span class="lang-tab">🇫🇷 FR</span>
+                    <span class="lang-tab">🇮🇹 IT</span>
+                  </div>
+                  <input class="input" value="Margherita Pizza">
+                </div>
+                <div class="field">
+                  <label class="label">Kategori <span class="req">*</span></label>
+                  <select class="select" style="margin-top: 36px;"><option>Pizza</option></select>
+                </div>
+                <div class="field" style="grid-column: span 2;">
+                  <label class="label">Açıklama</label>
+                  <textarea class="input" rows="3">Klassische Margherita mit Tomaten, Mozzarella und Basilikum</textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Fiyatlama & Vergi</div>
+              <div class="grid grid-2">
+                <div class="field">
+                  <label class="label">Fiyat <span class="req">*</span></label>
+                  <div style="position: relative;">
+                    <input class="input" value="15.00" style="padding-left: 44px;">
+                    <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--neutral-500);">CHF</span>
+                  </div>
+                  <div class="help">Eski fiyat: CHF 14.00 (yayınlanmamış değişiklik)</div>
+                </div>
+                <div class="field">
+                  <label class="label">Vergi grubu <span class="req">*</span></label>
+                  <select class="select"><option>%2.5 (Yiyecek - CH)</option></select>
+                </div>
+                <div class="field">
+                  <label class="label">Hazırlık süresi</label>
+                  <input class="input" value="12 dakika">
+                </div>
+                <div class="field">
+                  <label class="label">Sıralama</label>
+                  <input class="input" value="1">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Modifier'lar</div>
+              <div class="mb-3">
+                <span class="modifier-chip">Boyut · 1 zorunlu × 3 seçenek</span>
+                <span class="modifier-chip">Ekstra · 0-3 opsiyonel × 8 seçenek</span>
+              </div>
+              <button class="btn btn-secondary">＋ Modifier Grup Ekle</button>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Allergen Etiketleri</div>
+              <div>
+                <span class="modifier-chip" style="background: var(--warning-bg); color: #78350F;">Gluten</span>
+                <span class="modifier-chip" style="background: var(--warning-bg); color: #78350F;">Süt ürünü</span>
+                <span class="modifier-chip" style="background: var(--neutral-100); color: var(--neutral-600);">＋ Vegetaryen</span>
+                <span class="modifier-chip" style="background: var(--neutral-100); color: var(--neutral-600);">＋ Vegan</span>
+                <span class="modifier-chip" style="background: var(--neutral-100); color: var(--neutral-600);">＋ Helal</span>
+              </div>
+            </div>
+
+            <div class="danger-zone">
+              <div class="font-semibold mb-2" style="color: #7F1D1D;">⚠️ Tehlikeli bölge</div>
+              <button class="btn btn-danger">🗑 Bu ürünü sil</button>
+            </div>
+          </div>
+
+          <!-- Right: Preview + meta -->
+          <div>
+            <div class="card mb-4">
+              <div class="card-title">POS Önizleme</div>
+              <div style="background: #0f1117; color: white; padding: 16px; border-radius: var(--radius-md); margin-top: 8px; text-align: center;">
+                <div style="font-size: 32px;">🍕</div>
+                <div style="font-weight: 600; margin-top: 8px;">Margherita Pizza</div>
+                <div style="color: #4f8cff; font-weight: 700; margin-top: 4px;">CHF 15.00</div>
+              </div>
+            </div>
+
+            <div class="card mb-4">
+              <div class="card-title">Stok</div>
+              <div class="switch-row" style="border: 0;">
+                <span>Mevcut</span>
+                <span class="toggle"></span>
+              </div>
+              <div class="switch-row" style="border: 0;">
+                <span>POS'ta görünür</span>
+                <span class="toggle"></span>
+              </div>
+            </div>
+
+            <div class="card mb-4">
+              <div class="card-title">Meta</div>
+              <div class="text-sm" style="color: var(--neutral-600);">
+                <div>Oluşturulma: 12.03.2025</div>
+                <div>Son güncelleme: 28.04.2026</div>
+                <div>Düzenleyen: Yiğit D.</div>
+                <div>Yayın versiyonu: v14</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">Bu ürün hakkında</div>
+              <div class="text-sm" style="color: var(--neutral-600);">
+                Son 30 günde <strong>247 adet</strong> satıldı (top 1).
+                <br>Toplam ciro: <strong>CHF 3.458</strong>.
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+</div>
+
+<div style="max-width: 1200px; margin: 24px auto; padding: 16px 24px; font-size: 13px; color: var(--neutral-600);">
+  <h3>Tasarım notları</h3>
+  <ul>
+    <li><strong>Multi-language input:</strong> Lang tabs pattern'i — varsayılan DE açık, diğer diller boşsa "Çevirilmedi" rozet.</li>
+    <li>Kaydet "(taslak)" yazılı: kullanıcı POS'a yansıdığını sanmamalı.</li>
+    <li>Eski fiyat help text'inde gösteriliyor — değişiklik şeffaf.</li>
+    <li>Desktop'ta sağ panel: önizleme + meta + analitik (bağlamsal bilgi).</li>
+    <li>FULLY_LOCKED ürün açıldığında: tüm input'lar disabled + üstte banner "Bu ürün HQ master menüsünden geliyor".</li>
+  </ul>
+</div>
+
+</body>
+</html>

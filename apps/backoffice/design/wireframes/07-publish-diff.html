@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 — POS'a Yayınla Diff | GastroCore Backoffice Wireframe</title>
+<link rel="stylesheet" href="_tokens.css">
+<style>
+  .step-bar { display: flex; gap: 8px; padding: 16px 24px; background: var(--neutral-50); border-bottom: 1px solid var(--neutral-200); }
+  .step { flex: 1; text-align: center; padding: 8px; font-size: 12px; color: var(--neutral-500); border-bottom: 2px solid var(--neutral-200); }
+  .step.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+  .step.done { color: var(--success); border-bottom-color: var(--success); }
+  .summary-card { background: var(--neutral-50); padding: 16px; border-radius: var(--radius-md); margin-bottom: 16px; }
+  .summary-stat { display: inline-block; margin-right: 24px; }
+  .summary-stat .num { font-size: 28px; font-weight: 700; }
+  .summary-stat .lbl { font-size: 12px; color: var(--neutral-500); }
+  .device-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--neutral-100); }
+  .device-icon { width: 32px; height: 32px; background: var(--neutral-100); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; }
+  .progress-bar { height: 6px; background: var(--neutral-200); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--primary); transition: width 0.5s; }
+</style>
+</head>
+<body>
+<div class="wireframe-banner"><strong>WIREFRAME</strong> — E09 POS'a Yayınla diff & apply. <a href="index.html">↩ Tümü</a></div>
+
+<div class="frame-wrap compare">
+
+  <!-- MOBILE — full page wizard -->
+  <div class="frame">
+    <div class="frame-label">📱 Mobile · 414px — wizard full page</div>
+    <div class="mobile-frame">
+      <div class="mobile-statusbar"><span>9:41</span><span>📶 100%</span></div>
+      <div class="mobile-header">
+        <span style="font-size: 22px;">×</span>
+        <h1>POS'a Yayınla</h1>
+      </div>
+
+      <div class="step-bar">
+        <div class="step done">1. Diff</div>
+        <div class="step active">2. Onay</div>
+        <div class="step">3. Yayın</div>
+      </div>
+
+      <div class="mobile-content">
+        <div class="summary-card">
+          <div class="summary-stat">
+            <div class="num" style="color: var(--success);">2</div>
+            <div class="lbl">Yeni</div>
+          </div>
+          <div class="summary-stat">
+            <div class="num" style="color: var(--info);">3</div>
+            <div class="lbl">Değişti</div>
+          </div>
+          <div class="summary-stat">
+            <div class="num" style="color: var(--error);">1</div>
+            <div class="lbl">Silindi</div>
+          </div>
+        </div>
+
+        <div class="font-semibold mb-2">Değişiklik detayı</div>
+
+        <div class="diff-add mb-2" style="border-radius: var(--radius-md);">
+          <strong>+ Yeni</strong> Tartufo Pizza<br>
+          <span class="text-sm">Pizza · CHF 22</span>
+        </div>
+
+        <div class="diff-add mb-2" style="border-radius: var(--radius-md);">
+          <strong>+ Yeni</strong> Limoncello<br>
+          <span class="text-sm">İçecek · CHF 6</span>
+        </div>
+
+        <div class="diff-mod mb-2" style="border-radius: var(--radius-md);">
+          <strong>~ Değişti</strong> Margherita Pizza<br>
+          <span class="text-sm">Fiyat: CHF 14 → <strong>15</strong></span>
+        </div>
+
+        <div class="diff-mod mb-2" style="border-radius: var(--radius-md);">
+          <strong>~ Değişti</strong> Caprese<br>
+          <span class="text-sm">Stok: Mevcut → <strong>Tükendi</strong></span>
+        </div>
+
+        <div class="diff-mod mb-2" style="border-radius: var(--radius-md);">
+          <strong>~ Değişti</strong> Tagliatelle<br>
+          <span class="text-sm">Fiyat: CHF 18 → <strong>19</strong></span>
+        </div>
+
+        <div class="diff-del mb-2" style="border-radius: var(--radius-md);">
+          <strong>− Silindi</strong> Spaghetti Aglio
+        </div>
+
+        <div class="card" style="background: var(--warning-bg); border-color: var(--warning); margin-top: 16px;">
+          <div class="font-semibold" style="color: #78350F;">⚠️ Bu değişiklikler 3 POS cihazına gönderilecek</div>
+          <div class="text-sm" style="color: #78350F; margin-top: 4px;">İptal ettikten sonra 5 dakika içinde geri alabilirsiniz.</div>
+        </div>
+      </div>
+
+      <div class="mobile-footer">
+        <div class="flex gap-2">
+          <button class="btn btn-secondary" style="flex: 1;">‹ Geri</button>
+          <button class="btn btn-primary" style="flex: 2;">📤 Onayla & Yayınla</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESKTOP — modal -->
+  <div class="frame">
+    <div class="frame-label">🖥️ Desktop · 1280px — büyük modal · adım 3 yayın anı</div>
+    <div class="modal-overlay" style="background: rgba(0,0,0,0.4); min-height: 720px; display: flex; align-items: flex-start; justify-content: center;">
+      <div class="modal" style="margin-top: 32px; max-width: 720px; width: 100%;">
+        <div class="modal-header">
+          <h2>📤 POS'a Yayınla</h2>
+          <span class="x-close">×</span>
+        </div>
+
+        <div class="step-bar" style="border-bottom: 1px solid var(--neutral-200);">
+          <div class="step done">1. Diff Önizle ✓</div>
+          <div class="step done">2. Onay ✓</div>
+          <div class="step active">3. Yayın</div>
+        </div>
+
+        <div class="modal-body">
+          <div style="text-align: center; padding: 16px 0;">
+            <div style="font-size: 36px; margin-bottom: 8px;">📡</div>
+            <div class="font-semibold" style="font-size: 18px;">POS cihazlarına gönderiliyor…</div>
+            <div class="text-muted">2 / 3 cihaz aldı</div>
+          </div>
+
+          <div class="progress-bar mb-4" style="margin: 0 auto; max-width: 400px;">
+            <div class="progress-fill" style="width: 67%;"></div>
+          </div>
+
+          <div class="font-semibold mb-2">Cihaz durumu</div>
+
+          <div class="device-row">
+            <div class="device-icon">📱</div>
+            <div class="flex-1">
+              <div class="font-semibold">Kasa #1</div>
+              <div class="text-sm text-muted">10" Android · v1.2.4</div>
+            </div>
+            <span class="badge badge-success">✓ Alındı</span>
+          </div>
+          <div class="device-row">
+            <div class="device-icon">📱</div>
+            <div class="flex-1">
+              <div class="font-semibold">Bar Tablet</div>
+              <div class="text-sm text-muted">10" Android · v1.2.4</div>
+            </div>
+            <span class="badge badge-success">✓ Alındı</span>
+          </div>
+          <div class="device-row">
+            <div class="device-icon">📺</div>
+            <div class="flex-1">
+              <div class="font-semibold">Mutfak KDS</div>
+              <div class="text-sm text-muted">12" Android · v1.2.3</div>
+            </div>
+            <span class="badge badge-warning">⏳ Gönderiliyor…</span>
+          </div>
+
+          <div class="card" style="margin-top: 16px; background: var(--neutral-50);">
+            <div class="text-sm">
+              <strong>Versiyon:</strong> v15 (önceki: v14)<br>
+              <strong>Yayın zamanı:</strong> 29.04.2026 14:42<br>
+              <strong>Yayınlayan:</strong> Yiğit Demir<br>
+              <strong>Audit log:</strong> kayıt edildi
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" disabled style="opacity: 0.5;">Bekleyin…</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="max-width: 1200px; margin: 24px auto; padding: 16px 24px; font-size: 13px; color: var(--neutral-600);">
+  <h3>Tasarım notları</h3>
+  <ul>
+    <li>3 adım wizard: Diff → Onay → Yayın. Her adımda back butonu (Yayın adımında yok).</li>
+    <li>Diff renk kodu: yeşil (yeni), mavi (değişti), kırmızı (silindi).</li>
+    <li>Cihaz offline ise: <span class="badge badge-error">⚠ Offline</span> + "Online olunca otomatik gönderilecek".</li>
+    <li>Tamamlanınca: success modal + "Geri al (5dk içinde)" CTA + audit log link.</li>
+    <li>Mobile'da modal yerine full page route (<code>/menu/publish</code>) kullan.</li>
+  </ul>
+</div>
+
+</body>
+</html>

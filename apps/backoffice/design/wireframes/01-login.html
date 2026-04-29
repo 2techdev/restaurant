@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 — Login | GastroCore Backoffice Wireframe</title>
+<link rel="stylesheet" href="_tokens.css">
+<style>
+  .login-card { max-width: 400px; margin: 48px auto; padding: 32px 28px; background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow-md); }
+  .login-logo { text-align: center; margin-bottom: 24px; }
+  .login-logo .icon { width: 56px; height: 56px; background: var(--primary); border-radius: var(--radius-lg); display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 28px; margin-bottom: 12px; }
+  .login-logo h1 { font-size: 24px; margin: 0; font-weight: 700; }
+  .login-logo .subtitle { color: var(--neutral-500); font-size: 13px; margin-top: 4px; }
+  .lang-bar { display: flex; gap: 6px; justify-content: center; margin-bottom: 24px; }
+  .lang-flag { padding: 6px 10px; border-radius: var(--radius-md); border: 1px solid var(--neutral-200); cursor: pointer; font-size: 14px; }
+  .lang-flag.active { border-color: var(--primary); background: var(--primary-light); }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 16px; }
+  .forgot-link { display: block; text-align: center; margin-top: 16px; color: var(--primary); font-size: 13px; text-decoration: none; }
+  .login-bg { min-height: 100vh; padding-top: 64px; background: linear-gradient(135deg, #EEF2FF 0%, #F9FAFB 100%); }
+</style>
+</head>
+<body>
+<div class="wireframe-banner"><strong>WIREFRAME</strong> — E01 Login. Statik layout. Figma'da yeniden çizilecek. <a href="index.html">↩ Tümü</a></div>
+
+<div class="frame-wrap compare">
+
+  <!-- MOBILE -->
+  <div class="frame">
+    <div class="frame-label">📱 Mobile · 414px · light</div>
+    <div class="mobile-frame">
+      <div class="mobile-statusbar">
+        <span>9:41</span>
+        <span>📶 100%</span>
+      </div>
+      <div class="mobile-content" style="background: linear-gradient(135deg, #EEF2FF 0%, #F9FAFB 100%);">
+        <div class="lang-bar">
+          <span class="lang-flag">🇩🇪</span>
+          <span class="lang-flag">🇬🇧</span>
+          <span class="lang-flag active">🇹🇷</span>
+          <span class="lang-flag">🇫🇷</span>
+          <span class="lang-flag">🇮🇹</span>
+        </div>
+        <div class="login-card" style="margin-top: 24px;">
+          <div class="login-logo">
+            <div class="icon">🍴</div>
+            <h1>GastroCore</h1>
+            <div class="subtitle">Restoran müdürleri için erişim</div>
+          </div>
+          <div class="field">
+            <label class="label">E-posta adresi</label>
+            <input class="input" placeholder="ornek@restoran.ch">
+          </div>
+          <div class="field">
+            <label class="label">Şifre</label>
+            <input class="input" type="password" placeholder="••••••••">
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" checked id="rm-mob">
+            <label for="rm-mob">Oturumu açık tut</label>
+          </div>
+          <button class="btn btn-primary btn-block btn-lg">Giriş Yap</button>
+          <a class="forgot-link" href="#">Şifremi unuttum</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESKTOP -->
+  <div class="frame">
+    <div class="frame-label">🖥️ Desktop · 1280px · light</div>
+    <div class="login-bg" style="height: 720px;">
+      <div style="display: flex; justify-content: flex-end; padding: 16px 24px;">
+        <div class="lang-bar" style="margin: 0;">
+          <span class="lang-flag">🇩🇪</span>
+          <span class="lang-flag">🇬🇧</span>
+          <span class="lang-flag active">🇹🇷</span>
+          <span class="lang-flag">🇫🇷</span>
+          <span class="lang-flag">🇮🇹</span>
+        </div>
+      </div>
+      <div class="login-card">
+        <div class="login-logo">
+          <div class="icon">🍴</div>
+          <h1>GastroCore</h1>
+          <div class="subtitle">Restoran müdürleri için erişim</div>
+        </div>
+        <div class="field">
+          <label class="label">E-posta adresi</label>
+          <input class="input" placeholder="ornek@restoran.ch">
+        </div>
+        <div class="field">
+          <label class="label">Şifre</label>
+          <input class="input" type="password" placeholder="••••••••">
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" checked id="rm-desk">
+          <label for="rm-desk">Oturumu açık tut</label>
+        </div>
+        <button class="btn btn-primary btn-block btn-lg">Giriş Yap</button>
+        <a class="forgot-link" href="#">Şifremi unuttum</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="max-width: 1200px; margin: 24px auto; padding: 16px 24px; font-size: 13px; color: var(--neutral-600);">
+  <h3>Tasarım notları</h3>
+  <ul>
+    <li><strong>Dil bar'ı sticky üstte</strong> — kullanıcı login öncesi dilini seçer.</li>
+    <li>Mobile'da login card 24px padding, desktop'ta 32px.</li>
+    <li>Şifre input'unda göz toggle ikonu eklenecek (Figma'da).</li>
+    <li>Loading state: "Giriş Yap" butonunda spinner; form disabled.</li>
+    <li>Error state: form üstünde inline kırmızı banner (Geçersiz e-posta veya şifre).</li>
+    <li>Tema toggle: sağ üst köşeye küçük 🌓 ikonu (mevcut wireframe'de gösterilmedi).</li>
+  </ul>
+</div>
+
+</body>
+</html>

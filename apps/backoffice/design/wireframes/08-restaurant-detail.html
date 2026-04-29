@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>08 — Restoran Detay | GastroCore Backoffice Wireframe</title>
+<link rel="stylesheet" href="_tokens.css">
+<style>
+  .schedule-row { display: grid; grid-template-columns: 100px 1fr 1fr auto; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--neutral-100); font-size: 13px; }
+  .day-name { font-weight: 600; }
+  .toggle { width: 36px; height: 20px; background: var(--success); border-radius: 9999px; position: relative; cursor: pointer; }
+  .toggle::after { content: ''; position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; }
+  .toggle.off { background: var(--neutral-300); }
+  .toggle.off::after { left: 2px; right: auto; }
+  .holiday-row { display: flex; gap: 8px; align-items: center; padding: 8px 0; font-size: 13px; }
+  .header-meta { display: flex; gap: 12px; align-items: center; padding: 16px 24px; background: white; border-bottom: 1px solid var(--neutral-200); }
+  .header-meta-item { font-size: 12px; color: var(--neutral-500); }
+  .header-meta-item strong { color: var(--neutral-900); display: block; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wireframe-banner"><strong>WIREFRAME</strong> — E26 Restoran detay (7-tab). <a href="index.html">↩ Tümü</a></div>
+
+<div class="frame-wrap compare">
+
+  <!-- MOBILE -->
+  <div class="frame">
+    <div class="frame-label">📱 Mobile · 414px — accordion (tab yerine)</div>
+    <div class="mobile-frame">
+      <div class="mobile-statusbar"><span>9:41</span><span>📶 100%</span></div>
+      <div class="mobile-header">
+        <span style="font-size: 22px;">‹</span>
+        <h1>Lugano Bistro</h1>
+      </div>
+      <div class="mobile-content">
+        <div class="card mb-3" style="text-align: center;">
+          <div style="width: 64px; height: 64px; background: var(--primary); border-radius: var(--radius-lg); display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 28px; margin-bottom: 8px;">L</div>
+          <div class="font-bold text-lg">Lugano Bistro</div>
+          <div class="text-sm text-muted">Via Pretorio 12 · 6900 Lugano · CH</div>
+          <div class="text-sm" style="margin-top: 8px;">
+            <span class="badge badge-success"><span class="dot dot-success"></span>POS Online</span>
+            <span class="badge badge-info" style="margin-left: 4px;">v1.2.4</span>
+          </div>
+        </div>
+
+        <!-- Accordion -->
+        <div class="card mb-2" style="padding: 0;">
+          <div style="padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid var(--neutral-100);">
+            <span class="font-semibold">📋 Genel</span>
+            <span style="color: var(--neutral-400);">▼</span>
+          </div>
+          <div style="padding: 16px;">
+            <div class="field"><label class="label">Ad</label><input class="input" value="Lugano Bistro"></div>
+            <div class="field"><label class="label">Adres</label><input class="input" value="Via Pretorio 12"></div>
+            <div class="field"><label class="label">Telefon</label><input class="input" value="+41 91 234 56 78"></div>
+          </div>
+        </div>
+
+        <div class="card mb-2" style="padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <span class="font-semibold">🕐 Açılış Saatleri</span>
+            <span style="color: var(--neutral-400);">▶</span>
+          </div>
+        </div>
+
+        <div class="card mb-2" style="padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <span class="font-semibold">💰 Vergi Profilleri</span>
+            <span style="color: var(--neutral-400);">▶</span>
+          </div>
+        </div>
+
+        <div class="card mb-2" style="padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <span class="font-semibold">🧾 Fiş Şablonu</span>
+            <span style="color: var(--neutral-400);">▶</span>
+          </div>
+        </div>
+
+        <div class="card mb-2" style="padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <span class="font-semibold">💳 Ödeme Yöntemleri</span>
+            <span style="color: var(--neutral-400);">▶</span>
+          </div>
+        </div>
+
+        <div class="card mb-2" style="padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <span class="font-semibold">📡 POS Cihazları (3)</span>
+            <span style="color: var(--neutral-400);">▶</span>
+          </div>
+        </div>
+
+        <div class="card mb-2" style="padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+            <span class="font-semibold">⚙️ Ayarlar</span>
+            <span style="color: var(--neutral-400);">▶</span>
+          </div>
+        </div>
+      </div>
+      <div class="mobile-footer">
+        <button class="btn btn-primary btn-block btn-lg">💾 Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESKTOP -->
+  <div class="frame">
+    <div class="frame-label">🖥️ Desktop · 1280px — 7 tab · "Açılış Saatleri" aktif</div>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-icon">🍴</div>
+          <div class="sidebar-logo-text">GastroCore</div>
+        </div>
+        <div class="nav-item"><span class="nav-icon">📊</span> Dashboard</div>
+        <div class="nav-item active"><span class="nav-icon">🏪</span> Restoranlar</div>
+      </aside>
+
+      <main class="main">
+        <div class="main-header">
+          <span style="font-size: 18px; cursor: pointer;">‹</span>
+          <h1>Lugano Bistro</h1>
+          <button class="btn btn-secondary">Görüntüle</button>
+          <button class="btn btn-primary">💾 Kaydet</button>
+        </div>
+
+        <div class="header-meta">
+          <div class="header-meta-item">
+            <strong>3 POS</strong>
+            <span>cihazı</span>
+          </div>
+          <div style="width: 1px; height: 32px; background: var(--neutral-200);"></div>
+          <div class="header-meta-item">
+            <strong>CHF 4.821</strong>
+            <span>bugünkü ciro</span>
+          </div>
+          <div style="width: 1px; height: 32px; background: var(--neutral-200);"></div>
+          <div class="header-meta-item">
+            <strong>87</strong>
+            <span>bugünkü sipariş</span>
+          </div>
+          <div style="width: 1px; height: 32px; background: var(--neutral-200);"></div>
+          <div class="header-meta-item">
+            <strong><span class="badge badge-success"><span class="dot dot-success"></span>Online</span></strong>
+            <span>son sync 2dk önce</span>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab">📋 Genel</div>
+          <div class="tab active">🕐 Açılış Saatleri</div>
+          <div class="tab">💰 Vergi</div>
+          <div class="tab">🧾 Fiş Şablonu</div>
+          <div class="tab">💳 Ödeme</div>
+          <div class="tab">📡 POS Cihazları (3)</div>
+          <div class="tab">⚙️ Ayarlar</div>
+        </div>
+
+        <div class="main-content">
+          <div class="card">
+            <div class="font-semibold mb-3" style="font-size: 16px;">Haftalık Çizelge</div>
+
+            <div class="schedule-row">
+              <span class="day-name">Pazartesi</span>
+              <input class="input" value="10:00" type="time">
+              <input class="input" value="22:00" type="time">
+              <span class="toggle"></span>
+            </div>
+            <div class="schedule-row">
+              <span class="day-name">Salı</span>
+              <input class="input" value="10:00" type="time">
+              <input class="input" value="22:00" type="time">
+              <span class="toggle"></span>
+            </div>
+            <div class="schedule-row">
+              <span class="day-name">Çarşamba</span>
+              <input class="input" value="10:00" type="time">
+              <input class="input" value="22:00" type="time">
+              <span class="toggle"></span>
+            </div>
+            <div class="schedule-row">
+              <span class="day-name">Perşembe</span>
+              <input class="input" value="10:00" type="time">
+              <input class="input" value="23:00" type="time">
+              <span class="toggle"></span>
+            </div>
+            <div class="schedule-row">
+              <span class="day-name">Cuma</span>
+              <input class="input" value="10:00" type="time">
+              <input class="input" value="00:00" type="time">
+              <span class="toggle"></span>
+            </div>
+            <div class="schedule-row">
+              <span class="day-name">Cumartesi</span>
+              <input class="input" value="11:00" type="time">
+              <input class="input" value="00:00" type="time">
+              <span class="toggle"></span>
+            </div>
+            <div class="schedule-row" style="opacity: 0.5;">
+              <span class="day-name">Pazar</span>
+              <span class="text-muted" style="grid-column: span 2; text-align: center;">— Kapalı —</span>
+              <span class="toggle off"></span>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 24px;">
+            <div class="font-semibold mb-3" style="font-size: 16px;">Tatil Günleri</div>
+
+            <div class="holiday-row">
+              <span style="flex: 1;">📅 25.12.2026 — Noel</span>
+              <span class="badge badge-error">Kapalı</span>
+              <span style="color: var(--neutral-400); cursor: pointer;">⋯</span>
+            </div>
+            <div class="holiday-row">
+              <span style="flex: 1;">📅 01.01.2027 — Yılbaşı</span>
+              <span class="badge badge-error">Kapalı</span>
+              <span style="color: var(--neutral-400); cursor: pointer;">⋯</span>
+            </div>
+            <div class="holiday-row">
+              <span style="flex: 1;">📅 14.04.2027 — Paskalya</span>
+              <span class="badge badge-warning">Sınırlı saat: 12-18</span>
+              <span style="color: var(--neutral-400); cursor: pointer;">⋯</span>
+            </div>
+
+            <button class="btn btn-secondary" style="margin-top: 12px;">＋ Tatil Ekle</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+</div>
+
+<div style="max-width: 1200px; margin: 24px auto; padding: 16px 24px; font-size: 13px; color: var(--neutral-600);">
+  <h3>Tasarım notları</h3>
+  <ul>
+    <li>Mobile'da 7 tab → accordion'a dönüşür (yatay scroll yerine).</li>
+    <li>Header meta strip: 4 hızlı stat (cihaz, bugünkü ciro, sipariş, online status).</li>
+    <li>Açılış saati toggle off ise "Kapalı" gösterilir + saat input'ları kaybolur.</li>
+    <li>Tatil günleri: tarih + kapalı/sınırlı saat seçeneği.</li>
+    <li>Save bar sticky: tab değişince "değişiklik kaydedilmedi" uyarısı.</li>
+    <li>HQ_ADMIN tüm tab'ları görür, RM kendi rest. detayını görür ama bazı alanlar disabled olabilir.</li>
+  </ul>
+</div>
+
+</body>
+</html>

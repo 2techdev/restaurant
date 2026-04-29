@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 — Sipariş Detay | GastroCore Backoffice Wireframe</title>
+<link rel="stylesheet" href="_tokens.css">
+<style>
+  .item-row { display: flex; padding: 8px 0; border-bottom: 1px solid var(--neutral-100); align-items: flex-start; gap: 12px; }
+  .item-qty { background: var(--primary-light); color: var(--primary); padding: 4px 8px; border-radius: var(--radius-sm); font-weight: 600; font-size: 12px; min-width: 32px; text-align: center; }
+  .item-name { flex: 1; }
+  .item-mod { font-size: 12px; color: var(--neutral-500); margin-top: 2px; }
+  .item-price { font-weight: 600; min-width: 80px; text-align: right; }
+  .totals-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+  .totals-row.total { font-weight: 700; font-size: 18px; padding-top: 12px; border-top: 1px solid var(--neutral-200); margin-top: 8px; }
+  .timeline-item { padding: 8px 0; font-size: 13px; display: flex; gap: 8px; }
+  .timeline-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); margin-top: 6px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="wireframe-banner"><strong>WIREFRAME</strong> — E05 Sipariş detay (modal). <a href="index.html">↩ Tümü</a></div>
+
+<div class="frame-wrap compare">
+
+  <!-- MOBILE — full page -->
+  <div class="frame">
+    <div class="frame-label">📱 Mobile · 414px — full page (modal değil)</div>
+    <div class="mobile-frame">
+      <div class="mobile-statusbar"><span>9:41</span><span>📶 100%</span></div>
+      <div class="mobile-header">
+        <span style="font-size: 22px;">‹</span>
+        <h1>Sipariş #4729</h1>
+      </div>
+      <div class="mobile-content">
+        <div class="card mb-3">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong>📍 Masa M07</strong>
+            <span class="badge badge-success"><span class="dot dot-success"></span>Ödendi</span>
+          </div>
+          <div class="text-sm text-muted">👤 Yiğit · 14:32 · Masada</div>
+        </div>
+
+        <div class="card mb-3">
+          <div class="font-semibold mb-2">Ürünler</div>
+          <div class="item-row">
+            <span class="item-qty">2x</span>
+            <div class="item-name">
+              Margherita Pizza
+              <div class="item-mod">+ Ekstra mozarella</div>
+            </div>
+            <div class="item-price">CHF 32.00</div>
+          </div>
+          <div class="item-row">
+            <span class="item-qty">1x</span>
+            <div class="item-name">Tiramisu</div>
+            <div class="item-price">CHF 8.00</div>
+          </div>
+          <div class="item-row">
+            <span class="item-qty">3x</span>
+            <div class="item-name">Espresso</div>
+            <div class="item-price">CHF 10.50</div>
+          </div>
+          <div style="margin-top: 12px;">
+            <div class="totals-row"><span>Ara toplam</span><span>CHF 50.50</span></div>
+            <div class="totals-row"><span>KDV (%7.7)</span><span>CHF 3.89</span></div>
+            <div class="totals-row total"><span>Toplam</span><span>CHF 54.39</span></div>
+          </div>
+        </div>
+
+        <div class="card mb-3">
+          <div class="font-semibold mb-2">Ödeme</div>
+          <div style="font-size: 14px;">💳 Kredi Kartı · CHF 54.39</div>
+          <div class="text-sm text-muted">Ödendi: 14:42</div>
+        </div>
+
+        <div class="card mb-3">
+          <div class="font-semibold mb-2">Zaman çizelgesi</div>
+          <div class="timeline-item"><div class="timeline-dot"></div><div>Sipariş alındı · 14:32 · Yiğit</div></div>
+          <div class="timeline-item"><div class="timeline-dot"></div><div>Mutfağa gönderildi · 14:33</div></div>
+          <div class="timeline-item"><div class="timeline-dot"></div><div>Hazır · 14:39 · Mutfak</div></div>
+          <div class="timeline-item"><div class="timeline-dot"></div><div>Servis edildi · 14:40</div></div>
+          <div class="timeline-item"><div class="timeline-dot"></div><div>Ödendi · 14:42 · Kart</div></div>
+        </div>
+      </div>
+      <div class="mobile-footer">
+        <div class="flex gap-2">
+          <button class="btn btn-secondary" style="flex: 1;">🖨 Yazdır</button>
+          <button class="btn btn-danger" style="flex: 1;">↩ İade Et</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESKTOP — modal overlay -->
+  <div class="frame">
+    <div class="frame-label">🖥️ Desktop · 1280px — modal overlay</div>
+    <div class="modal-overlay" style="background: rgba(0,0,0,0.4); min-height: 720px; display: flex; align-items: flex-start; justify-content: center;">
+      <div class="modal" style="margin-top: 48px;">
+        <div class="modal-header">
+          <h2>Sipariş #4729</h2>
+          <span class="badge badge-success"><span class="dot dot-success"></span>Ödendi</span>
+          <span class="x-close">×</span>
+        </div>
+        <div class="modal-body">
+          <div class="grid grid-2 mb-4">
+            <div>
+              <div class="text-sm text-muted">Masa</div>
+              <div class="font-semibold">📍 M07</div>
+            </div>
+            <div>
+              <div class="text-sm text-muted">Garson</div>
+              <div class="font-semibold">👤 Yiğit Demir</div>
+            </div>
+            <div>
+              <div class="text-sm text-muted">Tarih / Saat</div>
+              <div class="font-semibold">29.04.2026 · 14:32</div>
+            </div>
+            <div>
+              <div class="text-sm text-muted">Tip</div>
+              <div class="font-semibold">Masada</div>
+            </div>
+          </div>
+
+          <div class="font-semibold mb-2">Ürünler</div>
+          <div class="item-row">
+            <span class="item-qty">2x</span>
+            <div class="item-name">
+              Margherita Pizza
+              <div class="item-mod">+ Ekstra mozarella (CHF 4.00)</div>
+            </div>
+            <div class="item-price">CHF 32.00</div>
+          </div>
+          <div class="item-row">
+            <span class="item-qty">1x</span>
+            <div class="item-name">Tiramisu</div>
+            <div class="item-price">CHF 8.00</div>
+          </div>
+          <div class="item-row">
+            <span class="item-qty">3x</span>
+            <div class="item-name">Espresso</div>
+            <div class="item-price">CHF 10.50</div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="totals-row"><span>Ara toplam</span><span>CHF 50.50</span></div>
+            <div class="totals-row"><span>KDV %7.7</span><span>CHF 3.89</span></div>
+            <div class="totals-row total"><span>Toplam</span><span>CHF 54.39</span></div>
+          </div>
+
+          <div style="margin-top: 16px; padding: 12px; background: var(--neutral-50); border-radius: var(--radius-md); display: flex; justify-content: space-between;">
+            <div>
+              <div class="text-sm text-muted">Ödeme yöntemi</div>
+              <div class="font-semibold">💳 Kredi Kartı</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="text-sm text-muted">Ödendi</div>
+              <div class="font-semibold">14:42</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost">✉ E-posta</button>
+          <button class="btn btn-secondary">🖨 Yazdır</button>
+          <button class="btn btn-danger">↩ İade Et</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="max-width: 1200px; margin: 24px auto; padding: 16px 24px; font-size: 13px; color: var(--neutral-600);">
+  <h3>Tasarım notları</h3>
+  <ul>
+    <li>Mobile'da modal yerine <strong>full page route</strong> (URL: <code>/orders/4729</code>) — geri tuşu çalışsın.</li>
+    <li>İade Et tıklanınca: item seçimi + sebep + manager PIN overlay (ikinci modal).</li>
+    <li>Timeline mobile'da var, desktop'ta opsiyonel (modal kompakt kalsın).</li>
+    <li>Multi-item iade: checkbox grid, kısmi iade desteği.</li>
+    <li>İade sonrası sipariş "Kısmi iade edildi" badge ile işaretlenir.</li>
+  </ul>
+</div>
+
+</body>
+</html>

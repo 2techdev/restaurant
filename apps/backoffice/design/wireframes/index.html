@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GastroCore Backoffice — Wireframe Index</title>
+<link rel="stylesheet" href="_tokens.css">
+<style>
+  body { padding-top: 48px; }
+  .container { max-width: 960px; margin: 32px auto; padding: 0 24px; }
+  h1 { font-size: 32px; margin-bottom: 8px; }
+  .subtitle { color: var(--neutral-500); margin-bottom: 32px; }
+  .wf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .wf-card { background: white; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: 20px; text-decoration: none; color: var(--neutral-900); transition: all 0.2s; }
+  .wf-card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); }
+  .wf-num { font-size: 11px; color: var(--primary); font-weight: 700; letter-spacing: 1px; }
+  .wf-title { font-size: 18px; font-weight: 700; margin: 4px 0; }
+  .wf-id { font-size: 12px; color: var(--neutral-500); margin-bottom: 8px; }
+  .wf-desc { font-size: 13px; color: var(--neutral-600); }
+  .meta { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px 20px; border-radius: var(--radius-md); margin-bottom: 32px; }
+  .meta h3 { margin: 0 0 8px; font-size: 14px; }
+  .meta p { margin: 0; font-size: 13px; color: var(--neutral-700); }
+</style>
+</head>
+<body>
+<div class="wireframe-banner"><strong>WIREFRAME</strong> — Bu sayfalar tasarımcı için referans. Figma'da yeniden çizilecek.</div>
+
+<div class="container">
+  <h1>GastroCore Backoffice — Wireframes</h1>
+  <p class="subtitle">8 statik HTML wireframe. Mobile (414px) + Desktop (1280px) yan yana.</p>
+
+  <div class="meta">
+    <h3>📘 Tasarım Brief'i</h3>
+    <p>Tüm bağlam, persona, akış, design system ve açık sorular için: <a href="../../DESIGN_BRIEF.md">DESIGN_BRIEF.md</a></p>
+  </div>
+
+  <div class="wf-grid">
+    <a href="01-login.html" class="wf-card">
+      <div class="wf-num">01 / 08</div>
+      <div class="wf-title">Login</div>
+      <div class="wf-id">E01 · /login</div>
+      <div class="wf-desc">Email + şifre + dil seçici. Mobile + desktop layout.</div>
+    </a>
+
+    <a href="02-dashboard.html" class="wf-card">
+      <div class="wf-num">02 / 08</div>
+      <div class="wf-title">Dashboard</div>
+      <div class="wf-id">E03 · /</div>
+      <div class="wf-desc">KPI kartları, ciro grafiği, top sellers. RM mobile + HQ desktop aggregate.</div>
+    </a>
+
+    <a href="03-orders-list.html" class="wf-card">
+      <div class="wf-num">03 / 08</div>
+      <div class="wf-title">Sipariş Listesi</div>
+      <div class="wf-id">E04 · /orders</div>
+      <div class="wf-desc">Filtre + tablo (desktop) / kart (mobile). Status chip'ler.</div>
+    </a>
+
+    <a href="04-order-detail.html" class="wf-card">
+      <div class="wf-num">04 / 08</div>
+      <div class="wf-title">Sipariş Detay</div>
+      <div class="wf-id">E05 · modal / full page</div>
+      <div class="wf-desc">Item list, totals, timeline, iade aksiyonu.</div>
+    </a>
+
+    <a href="05-menu-products.html" class="wf-card">
+      <div class="wf-num">05 / 08</div>
+      <div class="wf-title">Menü ▸ Ürünler</div>
+      <div class="wf-id">E07 · /menu/products</div>
+      <div class="wf-desc">Ürün liste, policy locks, taslak değişiklik banner.</div>
+    </a>
+
+    <a href="06-product-edit.html" class="wf-card">
+      <div class="wf-num">06 / 08</div>
+      <div class="wf-title">Ürün Düzenle</div>
+      <div class="wf-id">E08 · /menu/products/:id</div>
+      <div class="wf-desc">Multi-language tabs, modifier'lar, danger zone.</div>
+    </a>
+
+    <a href="07-publish-diff.html" class="wf-card">
+      <div class="wf-num">07 / 08</div>
+      <div class="wf-title">POS'a Yayınla</div>
+      <div class="wf-id">E09 · /menu/publish</div>
+      <div class="wf-desc">3-step wizard: diff → onay → yayın progress.</div>
+    </a>
+
+    <a href="08-restaurant-detail.html" class="wf-card">
+      <div class="wf-num">08 / 08</div>
+      <div class="wf-title">Restoran Detay</div>
+      <div class="wf-id">E26 · /restaurants/:id</div>
+      <div class="wf-desc">7-tab (mobile accordion), açılış saatleri tab.</div>
+    </a>
+  </div>
+
+  <div class="meta" style="margin-top: 32px; background: var(--neutral-100); border-color: var(--neutral-400);">
+    <h3>Wireframe scope</h3>
+    <p>Bu 8 wireframe, brief'in §12.2 "v0.1 pilot mutlaka" listesinden seçildi. Diğer ekranlar (Raporlar, Kullanıcılar, HQ Master Menü, Audit Log, Ayarlar) için brief'in §3'teki ASCII wireframe'leri ve ekran-ekran feature açıklamaları yeterli referans sunar.</p>
+  </div>
+</div>
+</body>
+</html>
