@@ -1,21 +1,16 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { canManageHq } from "@/lib/roles";
-import { PlaceholderPage } from "@/components/shared/placeholder-page";
+import { DevicesPageClient } from "./devices-client";
 
 export default async function Page({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
   const session = await getSession();
   if (!session) redirect(`/${locale}/login`);
-  if (!canManageHq(session.user.org_role)) redirect(`/${locale}/dashboard`);
+
+  // RM'ler kendi tenant'ları için cihaz görür; HQ rolleri ise active tenant
+  // (topbar tenant switcher) bazlı listeler. "all" modunda boş liste + uyarı.
   const tNav = await getTranslations({ locale, namespace: "nav" });
-  return (
-    <PlaceholderPage
-      title={tNav("rmDevices")}
-      hint={tNav("comingSoon")}
-      bodyMessage={tNav("comingSoonHint")}
-    />
-  );
+  return <DevicesPageClient locale={locale} title={tNav("rmDevices")} />;
 }

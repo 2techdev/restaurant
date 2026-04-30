@@ -4,48 +4,119 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    /* ─── Surface ─── */
+    --background: 240 10% 98%;          /* #F7F8FA */
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --popover-foreground: 222 47% 11%;
+
+    /* ─── Brand ─── */
+    --primary: 243 75% 59%;             /* #4F46E5 indigo */
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 243 100% 96%;
+
+    /* ─── Neutrals ─── */
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 243 75% 59%;
+
+    /* ─── Status (solid + soft variants for badges) ─── */
+    --success: 158 71% 33%;
+    --success-foreground: 0 0% 100%;
+    --success-soft: 142 71% 92%;
+    --warning: 32 95% 44%;
+    --warning-foreground: 0 0% 100%;
+    --warning-soft: 41 96% 90%;
+    --error: 0 70% 50%;
+    --error-foreground: 0 0% 100%;
+    --error-soft: 0 100% 95%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+    --info-soft: 213 100% 95%;
+
+    /* shadcn legacy alias (destructive == error) */
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* ─── Diff colors (publish flow) ─── */
+    --diff-add: 158 71% 33%;
+    --diff-add-bg: 145 80% 96%;
+    --diff-mod: 32 95% 44%;
+    --diff-mod-bg: 41 96% 95%;
+    --diff-del: 0 70% 50%;
+    --diff-del-bg: 0 100% 97%;
+
+    /* ─── Geometry ─── */
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --background: 222 47% 6%;
+    --foreground: 210 40% 96%;
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 243 75% 65%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 243 60% 18%;
+
+    --secondary: 222 33% 14%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 222 33% 14%;
+    --muted-foreground: 215 16% 65%;
+    --accent: 222 33% 16%;
+    --accent-foreground: 210 40% 96%;
+    --border: 222 33% 16%;
+    --input: 222 33% 16%;
+    --ring: 243 75% 65%;
+
+    --success: 158 65% 45%;
+    --success-soft: 158 50% 18%;
+    --warning: 38 92% 55%;
+    --warning-soft: 32 60% 18%;
+    --error: 0 75% 60%;
+    --error-soft: 0 50% 18%;
+    --info: 217 91% 65%;
+    --info-soft: 217 50% 18%;
+
+    --destructive: 0 75% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --diff-add: 158 65% 45%;
+    --diff-add-bg: 158 50% 14%;
+    --diff-mod: 38 92% 55%;
+    --diff-mod-bg: 32 60% 14%;
+    --diff-del: 0 75% 60%;
+    --diff-del-bg: 0 50% 14%;
+  }
+
+  /* ─── Sidebar — always-dark scope (data-sidebar="true") ───
+   * Cherry-picked from designer canvas: enterprise-grade dark sidebar that
+   * stays dark in both light + dark page modes. Only the sidebar wrapper sets
+   * data-sidebar="true"; descendants use these locally-scoped vars.
+   */
+  [data-sidebar="true"] {
+    --background: 222 47% 8%;           /* #0B1220 */
+    --foreground: 215 16% 65%;
+    --card: 222 47% 8%;
+    --card-foreground: 215 16% 65%;
+    --primary: 243 75% 65%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 222 33% 17%;
+    --accent-foreground: 0 0% 100%;
+    --muted: 222 33% 14%;
+    --muted-foreground: 215 16% 50%;
+    --border: 222 33% 16%;
   }
 }
 
@@ -53,6 +124,23 @@
   * { @apply border-border; }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    /* Inter stylistic alternates: cv11 (lower-case alternates),
+     * ss01 (open digits), ss03 (open four). Keeps numerics legible in dense
+     * data tables and KPI cards. rlig + calt preserve ligatures. */
+    font-feature-settings: "cv11", "ss01", "ss03", "rlig" 1, "calt" 1;
+    letter-spacing: -0.005em;
+  }
+
+  /* Heading polish — tighter tracking on display sizes */
+  h1, .h1 { letter-spacing: -0.012em; }
+  h2, h3, h4, h5, h6 { letter-spacing: -0.005em; }
+
+  /* Mono numerics in tables / KPI / kbd */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+
+  /* Keyboard chip used in command palette + sidebar shortcuts */
+  kbd, .kbd {
+    @apply font-mono text-[10px] px-1.5 py-0.5 rounded border bg-muted/50 text-muted-foreground;
+    font-feature-settings: "cv11", "ss01";
   }
 }

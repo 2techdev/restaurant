@@ -185,10 +185,20 @@ func (m *Module) authorizeTenantRead(r *http.Request, pathTenantID string) (stri
 		return "", false
 	}
 
-	// Path 2 — X-API-Key. Compare against the tenant's stored hash.
+	// Path 2 — X-API-Key. Two flavours:
+	//   (a) Device-scoped key (`gc_dev_…`) → look up `pos_devices`.
+	//   (b) Legacy per-tenant key → compare against `tenants.pos_api_key`.
+	// Device keys are checked first because they're the going-forward path
+	// and rotating the legacy tenant key out is on the cleanup roadmap.
 	key := strings.TrimSpace(r.Header.Get("X-API-Key"))
 	if key == "" {
 		return "", false
+	}
+	if devTenant := m.validateDeviceAPIKey(r, key); devTenant != "" {
+		if devTenant != pathTenantID {
+			return "", false
+		}
+		return pathTenantID, true
 	}
 	var stored sql.NullString
 	err := m.db.QueryRowContext(r.Context(),

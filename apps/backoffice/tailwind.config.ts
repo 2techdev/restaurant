@@ -14,15 +14,35 @@ const config: Config = {
       screens: { "2xl": "1400px" },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        mono: [
+          "var(--font-jetbrains-mono)",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "monospace",
+        ],
+      },
+      width: {
+        // 232px = sidebar width per designer canvas
+        "58": "14.5rem",
+      },
+      height: {
+        // 26px = sidebar nav row height (denser than shadcn default h-9)
+        "6.5": "1.625rem",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          soft: "hsl(var(--primary-soft))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -47,6 +67,35 @@ const config: Config = {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+
+        // Status — solid + soft for status badges and inline alerts.
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+          soft: "hsl(var(--success-soft))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+          soft: "hsl(var(--warning-soft))",
+        },
+        error: {
+          DEFAULT: "hsl(var(--error))",
+          foreground: "hsl(var(--error-foreground))",
+          soft: "hsl(var(--error-soft))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+          soft: "hsl(var(--info-soft))",
+        },
+
+        // Diff colors — used by menu publish flow + version history viewer.
+        diff: {
+          add: { DEFAULT: "hsl(var(--diff-add))", bg: "hsl(var(--diff-add-bg))" },
+          mod: { DEFAULT: "hsl(var(--diff-mod))", bg: "hsl(var(--diff-mod-bg))" },
+          del: { DEFAULT: "hsl(var(--diff-del))", bg: "hsl(var(--diff-del-bg))" },
         },
       },
       borderRadius: {
