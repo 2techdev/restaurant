@@ -106,8 +106,8 @@ export const NAV_CONFIG: NavEntry[] = [
     icon: "Tag",
     items: [
       { href: (l) => `/${l}/promotions`, labelKey: "promotionsCampaigns" },
-      { href: (l) => `/${l}/promotions/happy-hour`, labelKey: "promotionsHappyHour", placeholder: true },
-      { href: (l) => `/${l}/promotions/discounts`, labelKey: "promotionsDiscounts", placeholder: true },
+      { href: (l) => `/${l}/promotions/happy-hour`, labelKey: "promotionsHappyHour" },
+      { href: (l) => `/${l}/promotions/discounts`, labelKey: "promotionsDiscounts" },
     ],
   },
   {
@@ -154,7 +154,7 @@ export const NAV_CONFIG: NavEntry[] = [
     items: [
       { href: (l) => `/${l}/users`, labelKey: "usersList" },
       { href: (l) => `/${l}/users/roles`, labelKey: "usersRoles" },
-      { href: (l) => `/${l}/users/activity`, labelKey: "usersActivity", placeholder: true },
+      { href: (l) => `/${l}/users/activity`, labelKey: "usersActivity" },
     ],
   },
   {
@@ -168,7 +168,7 @@ export const NAV_CONFIG: NavEntry[] = [
       { href: (l) => `/${l}/restaurant-management/devices`, labelKey: "rmDevices", placeholder: true },
       { href: (l) => `/${l}/restaurant-management/opening-hours`, labelKey: "rmOpeningHours" },
       { href: (l) => `/${l}/restaurant-management/tax-profiles`, labelKey: "rmTaxProfiles" },
-      { href: (l) => `/${l}/restaurant-management/receipt-templates`, labelKey: "rmReceiptTemplates", placeholder: true },
+      { href: (l) => `/${l}/restaurant-management/receipt-templates`, labelKey: "rmReceiptTemplates" },
       { href: (l) => `/${l}/restaurant-management/payment-methods`, labelKey: "rmPaymentMethods" },
     ],
   },
