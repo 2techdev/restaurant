@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { LogOut } from "lucide-react";
+import { LogOut, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,11 +16,18 @@ import {
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LocaleSwitcher } from "@/components/shell/locale-switcher";
 import { TenantSwitcher } from "@/components/shell/tenant-switcher";
+import { usePalette } from "@/components/shell/command-palette";
 import type { AdminUser } from "@/lib/api-types";
 
 export function Topbar({ locale, user }: { locale: string; user: AdminUser }) {
   const tAuth = useTranslations("auth");
   const router = useRouter();
+  const palette = usePalette();
+  const [isMac, setIsMac] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMac(/Mac/i.test(navigator.platform));
+  }, []);
 
   const onLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -29,10 +36,25 @@ export function Topbar({ locale, user }: { locale: string; user: AdminUser }) {
   };
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card/30 backdrop-blur-sm px-6">
+    <header className="flex h-14 items-center justify-between border-b border-border bg-card/30 backdrop-blur-sm px-4">
       <div className="flex items-center gap-3">
         <TenantSwitcher />
       </div>
+
+      {/* Center: Command palette trigger (display only — opens palette on click). */}
+      <button
+        type="button"
+        onClick={palette.open}
+        className="hidden md:flex items-center gap-2 rounded-md border border-border bg-background/50 px-3 h-8 min-w-[260px] text-[12.5px] text-muted-foreground hover:bg-accent/40 transition-colors"
+        aria-label="Komut paletini aç"
+      >
+        <Search className="h-3.5 w-3.5" />
+        <span className="flex-1 text-left">Sayfa, eylem ara…</span>
+        <kbd className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-border bg-muted/50 text-muted-foreground tracking-wider">
+          {isMac ? "⌘" : "Ctrl"} K
+        </kbd>
+      </button>
+
       <div className="flex items-center gap-2">
         <LocaleSwitcher locale={locale} variant="dropdown" />
         <ThemeToggle />

@@ -40,4 +40,7 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 
 	// Cloud-master sync — version, snapshot, publish, api-key rotate.
 	m.registerSyncRoutes(mux)
+
+	// Device pairing — POS tablets exchange admin login → device-scoped key.
+	m.registerDevicePairingRoutes(mux)
 }

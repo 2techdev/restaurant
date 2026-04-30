@@ -1724,9 +1724,34 @@ HQA → /audit
 
 ## 6. Tasarım Sistemi
 
-### 6.1 Mevcut renk paleti (kod tabanından)
+### 6.1 Mevcut renk paleti (designer canvas refactor sonrası — v1.2, deploy 2026-04-30)
 
 `apps/backoffice/app/globals.css` (HSL custom properties) + `apps/backoffice/tailwind.config.ts` (Tailwind tokens):
+
+**Designer canvas'tan cherry-pick edilen palet:**
+
+| Token | Hex (light) | HSL | Kullanım |
+|-------|-------------|-----|----------|
+| `--background` | `#F7F8FA` | `240 10% 98%` | Sayfa arka planı (light) |
+| `--background` (sidebar scope) | `#0B1220` | `222 47% 8%` | **Her zaman dark sidebar** (`[data-sidebar="true"]` selector) |
+| `--primary` | `#4F46E5` indigo | `243 75% 59%` | Birincil aksiyon, focus ring |
+| `--primary-soft` | indigo soft | `243 100% 96%` | Active sub-item bg, indigo-tinted areas |
+| `--success` / `--success-soft` | yeşil 500 / 100 | `158 71% 33%` / `142 71% 92%` | StatusBadge, paid, diff-add |
+| `--warning` / `--warning-soft` | amber / 100 | `32 95% 44%` / `41 96% 90%` | StatusBadge, preparing, diff-mod |
+| `--error` / `--error-soft` | kırmızı / 100 | `0 70% 50%` / `0 100% 95%` | StatusBadge, cancelled, diff-del |
+| `--info` / `--info-soft` | mavi / 100 | `217 91% 60%` / `213 100% 95%` | Info badge, neutral chip |
+| `--diff-add` / `--diff-add-bg` | success + soft | `158 71% 33%` / `145 80% 96%` | Menu publish flow yeni satır |
+| `--diff-mod` / `--diff-mod-bg` | warning + soft | `32 95% 44%` / `41 96% 95%` | Menu publish flow değişen satır |
+| `--diff-del` / `--diff-del-bg` | error + soft | `0 70% 50%` / `0 100% 97%` | Menu publish flow silinen satır |
+
+**Önemli pattern'ler:**
+- **Sidebar dark scope:** `[data-sidebar="true"]` selector altında lokal `--background`, `--foreground`, `--accent`, `--muted` re-tanımlanır → sidebar wrapper light/dark page mode'undan bağımsız her zaman koyu lacivert görünümü korur.
+- **Soft/solid pair:** Her status renginin solid (foreground) + soft (background) eşi var → StatusBadge ve inline alert'lerde tutarlı kontrast.
+- **Diff renkleri ayrı token:** Status semantik'inden ayrılmış (publish flow'unda nüansa ihtiyaç var).
+
+---
+
+### 6.1 (eski v1.1 palet — referans)
 
 | Token | Hex (light) | Hex (dark) | Kullanım |
 |-------|-------------|------------|----------|
@@ -1760,9 +1785,25 @@ HQA → /audit
 | `warning-bg` | `#FEF3C7` | `#78350F` | Uyarı banner zemini |
 | `error-bg` | `#FEE2E2` | `#7F1D1D` | Hata banner zemini |
 
-### 6.3 Tipografi
+### 6.3 Tipografi (v1.2 designer cherry-pick)
 
-**Font ailesi:** Inter (Google Fonts) — fallback: -apple-system, system-ui, "Helvetica Neue", Arial, sans-serif
+**Font ailesi:**
+- **Sans:** Inter (variable, `next/font/google` ile yüklendi → CSS variable `--font-inter`); fallback: system-ui, sans-serif
+- **Mono:** **JetBrains Mono** (variable, `next/font/google` ile yüklendi → CSS variable `--font-jetbrains-mono`); fallback: ui-monospace, SFMono-Regular, Menlo, monospace
+- Mono kullanım yerleri: count badge'ler, kbd chip'leri, API key, JSON, version numarası, audit log timestamps, KPI tabular numerics
+
+**Inter stylistic alternates** (`globals.css` `body` selector):
+```css
+font-feature-settings: "cv11", "ss01", "ss03", "rlig" 1, "calt" 1;
+letter-spacing: -0.005em;
+```
+- `cv11` — alt karakter seçenekleri (yumuşatılmış)
+- `ss01` — açık rakam (0/6/9 daha okunabilir, veri tablo + KPI için kritik)
+- `ss03` — açık 4 rakam
+- `rlig` + `calt` — ligatures (varsayılan)
+- letter-spacing `-0.005em` body, `h1` için `-0.012em` (display tracking tighter)
+
+**Eski Inter-only paragrafı (referans):** Inter (Google Fonts) — fallback: -apple-system, system-ui, "Helvetica Neue", Arial, sans-serif
 
 **Type scale:**
 
@@ -2778,6 +2819,51 @@ Pilot öncesi tasarımcı ile ürün ekibi:
 - Backend API docs: `https://api.gastrocore.ch/docs` (Swagger UI)
 - Slack/Discord: `#design` kanalı
 - Haftalık 1 saat sync (her Salı 10:00 CET)
+
+---
+
+## 12.A Designer Canvas Cherry-Pick (2026-04-30 deploy)
+
+> **Bağlam:** Pilot tasarımcısı 2026-04-29'da 13 ekranlık enterprise mockup paketi (`tokens.jsx`, `layout.jsx`, `screen-*.jsx`) gönderdi. Production Next.js backoffice'e **sadece pattern + token uyarlandı**, mockup'lar 1:1 port edilmedi.
+
+| Pattern | Cherry-pick edilen | Atlanan |
+|---------|---------------------|---------|
+| **Color tokens** | indigo `#4F46E5` primary, soft variant'ler (success/warning/error/info), diff colors (`--diff-add/mod/del` + `-bg`) | Designer'ın özel "noir" + "champagne" tone'ları (henüz brand kararı yok) |
+| **Sidebar dark scope** | `[data-sidebar="true"]` lokal CSS scope — sidebar her zaman dark, sayfa light mode'da bile | Sidebar'ın tam canvas görünümü (collapsible + nav-config-driven yapı zaten vardı) |
+| **Sidebar density** | 232px width (`w-58` custom), 26px row (`h-6.5` custom), 13px label, 10px mono kbd chip, 10px section header tracking-wide | Drag-and-drop sidebar yeniden sıralama (scope dışı) |
+| **NavGroup count badge** | Mono, mute, sağda mini sayı (örn "Siparişler 87") — `nav-config.ts` `count?: number` alanı | Real-time WebSocket rolling count (v0.3'e ertelendi) |
+| **NavSubItem indicator dot** | 6×6 dot, success/warning/error/info renk; `indicator?` alanı | "trend mini-sparkline" (over-engineered) |
+| **Kbd shortcut chip** | "G D", "G O", "G M" mnemonic'leri (`kbd?: string` nav-config alanı) | Tüm kbd'leri global hotkey'e bağlama — sadece görsel chip; ⌘K paletten arama yeterli |
+| **Tenant switcher** | 26×26 gradient avatar (restaurant indigo, HQ amber), 2-line trigger (12px name + 10px mono sub-info "Tek Restoran · {short_id}") | CHE-XXX fiscal ID gerçek implementasyonu (backend'de henüz `Tenant.uid` yok — placeholder kısa UUID) |
+| **⌘K Command Palette** | Tüm sidebar route'lar + "Yeni Sipariş / Menü Yayınla / Vergi Raporu Çıkar" hızlı eylemler + tenant switch — `cmdk` kuruldu, shadcn Command primitive eklendi | Algolia tarzı recent items / fuzzy ranking (cmdk default fuzzy yeterli) |
+| **StatusBadge** | 8 variant (success/warning/error/info/neutral/diff-add/diff-mod/diff-del); 20px height pill, 11px font, soft bg + solid fg | "Animated badge" (pulse on update); v0.3'te framer-motion ile |
+| **Typography** | JetBrains Mono variable font (`next/font/google`); Inter ss01/ss03/cv11 feature settings; `letter-spacing: -0.005em` body + `-0.012em` h1 | Custom Display font (designer "Söhne" önerdi — lisans yok, atlandı) |
+| **Topbar search trigger** | ⌘K kbd badge + "Sayfa, eylem ara…" placeholder; tıklayınca palette açar; Ctrl/⌘ platform aware | Search results dropdown (palette zaten o işi yapıyor) |
+
+### 12.A.1 Yeni / değişen dosyalar
+
+| Dosya | Durum |
+|-------|-------|
+| `app/globals.css` | rewritten — token paleti tam + sidebar scope |
+| `tailwind.config.ts` | rewritten — fontFamily, status/diff colors, custom width/height |
+| `app/[locale]/layout.tsx` | edit — Inter + JetBrains Mono `next/font/google` |
+| `lib/nav-config.ts` | edit — `count`, `badge`, `indicator`, `kbd`, `action` alanları |
+| `components/shell/sidebar.tsx` | rewritten — `data-sidebar="true"`, 232px, 26px row, IndicatorDot/CountBadge/Kbd helper'ları |
+| `components/shell/tenant-switcher.tsx` | rewritten — gradient avatar + 2-line layout |
+| `components/shell/topbar.tsx` | rewritten — search trigger + ⌘K kbd + Mac/Ctrl detection |
+| `components/shell/command-palette.tsx` | **YENİ** — global ⌘K provider |
+| `components/ui/command.tsx` | **YENİ** — shadcn Command primitive (cmdk wrapper) |
+| `components/ui/status-badge.tsx` | **YENİ** — 8 variant pill |
+| `app/[locale]/(dashboard)/layout.tsx` | edit — `<CommandPaletteProvider>` mount |
+| `package.json` | `+cmdk` (`--legacy-peer-deps` React RC için) |
+
+**Atlananlar (mockup'tan production'a girmeyenler):**
+- Tüm `screen-*.jsx` 1:1 port (vision mockup, sadece token + pattern alındı)
+- Inline CSS — Tailwind utility class'a kalındı
+- Designer'ın inline SVG icon set'i — `lucide-react` korundu
+- DesignCanvas wrapper component'leri (designer aracı, production'a girmez)
+
+**Build sonucu:** Tüm sayfalar 5 dilde prerender oldu, shared bundle 100 KB, hata yok.
 
 ---
 
