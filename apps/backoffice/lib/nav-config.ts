@@ -11,12 +11,34 @@
  *   shared <PlaceholderPage>.
  */
 
+/**
+ * Optional sub-item indicator dot (designer canvas pattern).
+ * Renders as a 6×6 dot beside the label so users get peripheral signal that
+ * something is happening on that page (e.g. live orders / failed jobs).
+ */
+export type NavIndicator = "success" | "warning" | "error" | "info";
+
 export type NavLeaf = {
   kind: "leaf";
   href: (locale: string) => string;
   labelKey: string; // i18n key under namespace `nav`
   icon: string;
   hqOnly?: boolean;
+  /** Optional count badge (mono, muted) on the right side. */
+  badge?: number | string;
+  /** Optional dot indicator color. */
+  indicator?: NavIndicator;
+  /** Keyboard shortcut chip (e.g. "G D" → "Go to Dashboard"). */
+  kbd?: string;
+};
+
+export type NavSubItem = {
+  href: (locale: string) => string;
+  labelKey: string;
+  placeholder?: boolean;
+  badge?: number | string;
+  indicator?: NavIndicator;
+  kbd?: string;
 };
 
 export type NavGroup = {
@@ -25,11 +47,11 @@ export type NavGroup = {
   labelKey: string;
   icon: string;
   hqOnly?: boolean;
-  items: {
-    href: (locale: string) => string;
-    labelKey: string;
-    placeholder?: boolean;
-  }[];
+  /** Aggregate count rendered beside the group title (mono, muted). */
+  count?: number;
+  /** Optional inline action shown on the section header — e.g. "+ Yeni". */
+  action?: { labelKey: string; href: (locale: string) => string };
+  items: NavSubItem[];
 };
 
 export type NavEntry = NavLeaf | NavGroup;
@@ -40,17 +62,29 @@ export const NAV_CONFIG: NavEntry[] = [
     href: (l) => `/${l}/dashboard`,
     labelKey: "dashboard",
     icon: "LayoutDashboard",
+    kbd: "G D",
   },
   {
     kind: "group",
     id: "orders",
     labelKey: "orders",
     icon: "ShoppingBag",
+    count: 87,
     items: [
-      { href: (l) => `/${l}/orders`, labelKey: "ordersActive" },
-      { href: (l) => `/${l}/orders/history`, labelKey: "ordersHistory", placeholder: true },
-      { href: (l) => `/${l}/orders/refunds`, labelKey: "ordersRefunds", placeholder: true },
-      { href: (l) => `/${l}/orders/filters`, labelKey: "ordersFilters", placeholder: true },
+      {
+        href: (l) => `/${l}/orders`,
+        labelKey: "ordersActive",
+        badge: 3,
+        indicator: "success",
+        kbd: "G O",
+      },
+      { href: (l) => `/${l}/orders/history`, labelKey: "ordersHistory" },
+      {
+        href: (l) => `/${l}/orders/refunds`,
+        labelKey: "ordersRefunds",
+        indicator: "warning",
+      },
+      { href: (l) => `/${l}/orders/filters`, labelKey: "ordersFilters" },
     ],
   },
   {
@@ -59,10 +93,10 @@ export const NAV_CONFIG: NavEntry[] = [
     labelKey: "menu",
     icon: "UtensilsCrossed",
     items: [
-      { href: (l) => `/${l}/menu`, labelKey: "menuCategories" },
-      { href: (l) => `/${l}/menu/products`, labelKey: "menuProducts", placeholder: true },
-      { href: (l) => `/${l}/menu/modifiers`, labelKey: "menuModifiers", placeholder: true },
-      { href: (l) => `/${l}/menu/publish-history`, labelKey: "menuPublishHistory", placeholder: true },
+      { href: (l) => `/${l}/menu`, labelKey: "menuCategories", kbd: "G M" },
+      { href: (l) => `/${l}/menu/products`, labelKey: "menuProducts" },
+      { href: (l) => `/${l}/menu/modifiers`, labelKey: "menuModifiers" },
+      { href: (l) => `/${l}/menu/publish-history`, labelKey: "menuPublishHistory" },
     ],
   },
   {
@@ -83,10 +117,10 @@ export const NAV_CONFIG: NavEntry[] = [
     icon: "BarChart3",
     items: [
       { href: (l) => `/${l}/reports`, labelKey: "reportsRevenue" },
-      { href: (l) => `/${l}/reports/top-sellers`, labelKey: "reportsTopSellers", placeholder: true },
-      { href: (l) => `/${l}/reports/hourly`, labelKey: "reportsHourly", placeholder: true },
-      { href: (l) => `/${l}/reports/mwst`, labelKey: "reportsMwst", placeholder: true },
-      { href: (l) => `/${l}/reports/export`, labelKey: "reportsExport", placeholder: true },
+      { href: (l) => `/${l}/reports/top-sellers`, labelKey: "reportsTopSellers" },
+      { href: (l) => `/${l}/reports/hourly`, labelKey: "reportsHourly" },
+      { href: (l) => `/${l}/reports/mwst`, labelKey: "reportsMwst" },
+      { href: (l) => `/${l}/reports/export`, labelKey: "reportsExport" },
     ],
   },
   {
@@ -95,9 +129,9 @@ export const NAV_CONFIG: NavEntry[] = [
     labelKey: "customers",
     icon: "UsersRound",
     items: [
-      { href: (l) => `/${l}/customers`, labelKey: "customersList", placeholder: true },
-      { href: (l) => `/${l}/customers/loyalty`, labelKey: "customersLoyalty", placeholder: true },
-      { href: (l) => `/${l}/customers/feedback`, labelKey: "customersFeedback", placeholder: true },
+      { href: (l) => `/${l}/customers`, labelKey: "customersList" },
+      { href: (l) => `/${l}/customers/loyalty`, labelKey: "customersLoyalty" },
+      { href: (l) => `/${l}/customers/feedback`, labelKey: "customersFeedback" },
     ],
   },
   {
@@ -106,9 +140,9 @@ export const NAV_CONFIG: NavEntry[] = [
     labelKey: "inventory",
     icon: "Package",
     items: [
-      { href: (l) => `/${l}/inventory`, labelKey: "inventoryStock", placeholder: true },
-      { href: (l) => `/${l}/inventory/suppliers`, labelKey: "inventorySuppliers", placeholder: true },
-      { href: (l) => `/${l}/inventory/reorder`, labelKey: "inventoryReorder", placeholder: true },
+      { href: (l) => `/${l}/inventory`, labelKey: "inventoryStock" },
+      { href: (l) => `/${l}/inventory/suppliers`, labelKey: "inventorySuppliers" },
+      { href: (l) => `/${l}/inventory/reorder`, labelKey: "inventoryReorder" },
     ],
   },
   {
@@ -119,7 +153,7 @@ export const NAV_CONFIG: NavEntry[] = [
     hqOnly: true,
     items: [
       { href: (l) => `/${l}/users`, labelKey: "usersList" },
-      { href: (l) => `/${l}/users/roles`, labelKey: "usersRoles", placeholder: true },
+      { href: (l) => `/${l}/users/roles`, labelKey: "usersRoles" },
       { href: (l) => `/${l}/users/activity`, labelKey: "usersActivity", placeholder: true },
     ],
   },
@@ -132,10 +166,10 @@ export const NAV_CONFIG: NavEntry[] = [
     items: [
       { href: (l) => `/${l}/organization/restaurants`, labelKey: "rmList" },
       { href: (l) => `/${l}/restaurant-management/devices`, labelKey: "rmDevices", placeholder: true },
-      { href: (l) => `/${l}/restaurant-management/opening-hours`, labelKey: "rmOpeningHours", placeholder: true },
-      { href: (l) => `/${l}/restaurant-management/tax-profiles`, labelKey: "rmTaxProfiles", placeholder: true },
+      { href: (l) => `/${l}/restaurant-management/opening-hours`, labelKey: "rmOpeningHours" },
+      { href: (l) => `/${l}/restaurant-management/tax-profiles`, labelKey: "rmTaxProfiles" },
       { href: (l) => `/${l}/restaurant-management/receipt-templates`, labelKey: "rmReceiptTemplates", placeholder: true },
-      { href: (l) => `/${l}/restaurant-management/payment-methods`, labelKey: "rmPaymentMethods", placeholder: true },
+      { href: (l) => `/${l}/restaurant-management/payment-methods`, labelKey: "rmPaymentMethods" },
     ],
   },
   // ─────── HEADQUARTERS section ───────
@@ -181,7 +215,7 @@ export const NAV_CONFIG: NavEntry[] = [
     icon: "Landmark",
     hqOnly: true,
     items: [
-      { href: (l) => `/${l}/organization/info`, labelKey: "orgInfo", placeholder: true },
+      { href: (l) => `/${l}/organization/info`, labelKey: "orgInfo" },
       { href: (l) => `/${l}/organization/billing`, labelKey: "orgBilling", placeholder: true },
       { href: (l) => `/${l}/organization/plan`, labelKey: "orgPlan", placeholder: true },
     ],
@@ -196,7 +230,7 @@ export const NAV_CONFIG: NavEntry[] = [
       { href: (l) => `/${l}/settings?tab=password`, labelKey: "settingsPassword" },
       { href: (l) => `/${l}/settings?tab=notifications`, labelKey: "settingsNotifications" },
       { href: (l) => `/${l}/settings?tab=apikeys`, labelKey: "settingsApiKeys" },
-      { href: (l) => `/${l}/settings/integrations`, labelKey: "settingsIntegrations", placeholder: true },
+      { href: (l) => `/${l}/settings/integrations`, labelKey: "settingsIntegrations" },
       { href: (l) => `/${l}/settings?tab=audit`, labelKey: "settingsAudit" },
     ],
   },
