@@ -163,9 +163,12 @@ export function ProductForm({
           <Select value={taxGroup} onValueChange={setTaxGroup} disabled={isLocked}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="standard">Standard (7.7%)</SelectItem>
-              <SelectItem value="reduced">Reduced (2.5%)</SelectItem>
-              <SelectItem value="zero">Zero (0%)</SelectItem>
+              {/* Swiss VAT rates effective 2024-01-01. Old rates 7.7/2.5/3.7
+                  are obsolete — see lib/constants/tax-profiles.ts. */}
+              <SelectItem value="standard">Standart (8.1%)</SelectItem>
+              <SelectItem value="reduced">İndirimli (2.6%)</SelectItem>
+              <SelectItem value="accommodation">Konaklama (3.8%)</SelectItem>
+              <SelectItem value="zero">Muaf (0%)</SelectItem>
             </SelectContent>
           </Select>
         </div>

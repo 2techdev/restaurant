@@ -51,7 +51,24 @@ const ICONS: Record<string, LucideIcon> = {
   BarChart4,
 };
 
-const STORAGE_KEY = "bo_sidebar_expanded";
+// v2 storage schema: separate "manually overridden" set from the auto-open
+// behaviour driven by the active route. Without this split, a useEffect re-fire
+// on navigation kept resurrecting the auto-open state and the operator could
+// never collapse a group whose sub-item was active.
+const STORAGE_KEY = "bo_sidebar_expanded.v2";
+const LEGACY_STORAGE_KEY = "bo_sidebar_expanded";
+
+interface ExpansionState {
+  /** Group IDs the user has explicitly toggled. */
+  manuallyOverridden: string[];
+  /** For each overridden group: the user's intent (open/closed). */
+  manualState: Record<string, boolean>;
+}
+
+const EMPTY_STATE: ExpansionState = {
+  manuallyOverridden: [],
+  manualState: {},
+};
 
 const INDICATOR_CLASS: Record<NavIndicator, string> = {
   success: "bg-success",
@@ -80,57 +97,82 @@ export function Sidebar({ locale, role }: { locale: string; role: UserRole | str
 
   const visible = NAV_CONFIG.filter((e) => !e.hqOnly || isHq);
 
-  const initialExpanded = React.useMemo<Record<string, boolean>>(() => {
-    const out: Record<string, boolean> = {};
-    for (const e of visible) {
-      if (e.kind !== "group") continue;
-      out[e.id] = groupContainsActive(e, locale, pathname);
-    }
-    return out;
-  }, [visible, locale, pathname]);
-
-  const [expanded, setExpanded] = React.useState<Record<string, boolean>>(initialExpanded);
+  const [state, setState] = React.useState<ExpansionState>(EMPTY_STATE);
   const [hydrated, setHydrated] = React.useState(false);
 
+  // Hydrate from localStorage. Tolerate the legacy v1 schema
+  // (`Record<string, boolean>` under `bo_sidebar_expanded`) so an existing
+  // operator session doesn't lose its preferences on this rollout.
   React.useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const saved = JSON.parse(raw) as Record<string, boolean>;
-        setExpanded((prev) => ({ ...prev, ...saved }));
+        const parsed = JSON.parse(raw) as Partial<ExpansionState>;
+        setState({
+          manuallyOverridden: parsed.manuallyOverridden ?? [],
+          manualState: parsed.manualState ?? {},
+        });
+      } else {
+        const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+        if (legacy) {
+          const saved = JSON.parse(legacy) as Record<string, boolean>;
+          // Migrate: every entry in the legacy map is treated as a manual
+          // override (since the legacy code was the only writer).
+          setState({
+            manuallyOverridden: Object.keys(saved),
+            manualState: saved,
+          });
+        }
       }
     } catch {
-      // ignore
+      // ignore — start with EMPTY_STATE
     }
     setHydrated(true);
   }, []);
 
+  // Persist on every state change after hydration.
   React.useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(expanded));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
-      // ignore quota
+      // ignore quota / private mode
     }
-  }, [expanded, hydrated]);
+  }, [state, hydrated]);
 
-  React.useEffect(() => {
-    setExpanded((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const e of visible) {
-        if (e.kind !== "group") continue;
-        if (groupContainsActive(e, locale, pathname) && !next[e.id]) {
-          next[e.id] = true;
-          changed = true;
-        }
+  // Compute current open/closed for each group. Manual override wins;
+  // otherwise auto-open when the active route lives inside the group.
+  const isGroupExpanded = React.useCallback(
+    (group: NavGroup): boolean => {
+      if (state.manuallyOverridden.includes(group.id)) {
+        return !!state.manualState[group.id];
       }
-      return changed ? next : prev;
-    });
-  }, [visible, locale, pathname]);
+      return groupContainsActive(group, locale, pathname);
+    },
+    [state, locale, pathname]
+  );
 
-  const toggle = (id: string) =>
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  // Toggle: always records a manual override so the next auto-open pass
+  // can't resurrect the previous state.
+  const toggle = React.useCallback(
+    (groupId: string) => {
+      setState((prev) => {
+        const wasOverridden = prev.manuallyOverridden.includes(groupId);
+        const currentlyOpen = wasOverridden
+          ? !!prev.manualState[groupId]
+          : visible
+              .filter((e): e is NavGroup => e.kind === "group" && e.id === groupId)
+              .some((g) => groupContainsActive(g, locale, pathname));
+        return {
+          manuallyOverridden: wasOverridden
+            ? prev.manuallyOverridden
+            : [...prev.manuallyOverridden, groupId],
+          manualState: { ...prev.manualState, [groupId]: !currentlyOpen },
+        };
+      });
+    },
+    [locale, pathname, visible]
+  );
 
   return (
     <aside
@@ -160,7 +202,7 @@ export function Sidebar({ locale, role }: { locale: string; role: UserRole | str
               entry={entry}
               locale={locale}
               pathname={pathname}
-              expandedMap={expanded}
+              isGroupExpanded={isGroupExpanded}
               onToggle={toggle}
               t={t}
               insertHqHeader={isFirstHq}
@@ -209,7 +251,7 @@ function NavRow({
   entry,
   locale,
   pathname,
-  expandedMap,
+  isGroupExpanded,
   onToggle,
   t,
   insertHqHeader,
@@ -217,7 +259,7 @@ function NavRow({
   entry: NavEntry;
   locale: string;
   pathname: string;
-  expandedMap: Record<string, boolean>;
+  isGroupExpanded: (group: NavGroup) => boolean;
   onToggle: (id: string) => void;
   t: (key: string) => string;
   insertHqHeader?: boolean;
@@ -250,7 +292,7 @@ function NavRow({
   }
 
   const Icon = ICONS[entry.icon] ?? LayoutDashboard;
-  const isOpen = !!expandedMap[entry.id];
+  const isOpen = isGroupExpanded(entry);
   const groupActive = groupContainsActive(entry, locale, pathname);
 
   return (
