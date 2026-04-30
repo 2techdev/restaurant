@@ -24,4 +24,10 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/reports/products", m.handleProductReport)
 	mux.HandleFunc("GET /api/v1/reports/staff", m.handleStaffReport)
 	mux.HandleFunc("GET /api/v1/reports/shifts", m.handleShiftReport)
+
+	// Coverage extension (016): top-sellers, hourly, MWST, CSV export.
+	mux.HandleFunc("GET /api/v1/reports/top-sellers", m.handleTopSellers)
+	mux.HandleFunc("GET /api/v1/reports/hourly", m.handleHourlyReport)
+	mux.HandleFunc("GET /api/v1/reports/mwst", m.handleMWSTReport)
+	mux.HandleFunc("GET /api/v1/reports/export", m.handleExport)
 }

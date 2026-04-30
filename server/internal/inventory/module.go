@@ -27,4 +27,12 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	// Stock movements
 	mux.HandleFunc("GET /api/v1/inventory/movements", m.handleListMovements)
 	mux.HandleFunc("POST /api/v1/inventory/movements", m.handleCreateMovement)
+
+	// Convenience aliases mounted at the root /api/v1/inventory path so
+	// backoffice clients can hit a flatter URL surface.
+	mux.HandleFunc("GET /api/v1/inventory", m.handleListItems)
+	mux.HandleFunc("POST /api/v1/inventory", m.handleCreateItem)
+	mux.HandleFunc("PUT /api/v1/inventory/{id}", m.handleUpdateItem)
+	mux.HandleFunc("POST /api/v1/inventory/{id}/adjust", m.handleAdjust)
+	mux.HandleFunc("GET /api/v1/inventory/low-stock", m.handleLowStock)
 }

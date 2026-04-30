@@ -52,6 +52,18 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/crm/customers/{id}", m.handleDeleteCustomer)
 	mux.HandleFunc("POST /api/v1/crm/customers/{id}/loyalty", m.handleAddLoyalty)
 	mux.HandleFunc("GET /api/v1/crm/customers/{id}/loyalty", m.handleListLoyalty)
+
+	// Flatter aliases (added in 016) so backoffice clients can hit the
+	// canonical resource path without the /crm/ prefix.
+	mux.HandleFunc("GET /api/v1/customers", m.handleListCustomers)
+	mux.HandleFunc("POST /api/v1/customers", m.handleCreateCustomer)
+	mux.HandleFunc("GET /api/v1/customers/{id}", m.handleGetCustomer)
+	mux.HandleFunc("PUT /api/v1/customers/{id}", m.handleUpdateCustomer)
+	mux.HandleFunc("DELETE /api/v1/customers/{id}", m.handleDeleteCustomer)
+	mux.HandleFunc("POST /api/v1/customers/{id}/loyalty", m.handleAddLoyalty)
+	mux.HandleFunc("POST /api/v1/customers/{id}/loyalty/add", m.handleAddLoyalty)
+	mux.HandleFunc("GET /api/v1/customers/{id}/loyalty", m.handleListLoyalty)
+	mux.HandleFunc("GET /api/v1/customers/{id}/orders", m.handleCustomerOrders)
 }
 
 // publishSyncEvent writes a sync event to the sync_events table and notifies
