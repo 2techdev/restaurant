@@ -12,22 +12,26 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gastrocore/server/internal/audit"
 	"github.com/gastrocore/server/internal/auth"
 	"github.com/gastrocore/server/internal/crm"
 	"github.com/gastrocore/server/internal/dashboard"
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
+	"github.com/gastrocore/server/internal/feedback"
 	"github.com/gastrocore/server/internal/fiscal"
 	"github.com/gastrocore/server/internal/inventory"
 	"github.com/gastrocore/server/internal/kds"
 	"github.com/gastrocore/server/internal/license"
 	"github.com/gastrocore/server/internal/licenses"
 	"github.com/gastrocore/server/internal/menu"
+	"github.com/gastrocore/server/internal/notifications"
 	"github.com/gastrocore/server/internal/online"
 	"github.com/gastrocore/server/internal/orders"
 	"github.com/gastrocore/server/internal/org"
 	"github.com/gastrocore/server/internal/pos"
 	"github.com/gastrocore/server/internal/printers"
+	"github.com/gastrocore/server/internal/promotions"
 	"github.com/gastrocore/server/internal/qrbill"
 	"github.com/gastrocore/server/internal/reports"
 	"github.com/gastrocore/server/internal/reservations"
@@ -36,6 +40,7 @@ import (
 	"github.com/gastrocore/server/internal/shared/middleware"
 	"github.com/gastrocore/server/internal/stations"
 	"github.com/gastrocore/server/internal/stores"
+	"github.com/gastrocore/server/internal/suppliers"
 	"github.com/gastrocore/server/internal/users"
 	gosync "github.com/gastrocore/server/internal/sync"
 	"github.com/gastrocore/server/internal/tables"
@@ -114,6 +119,13 @@ func main() {
 	printersModule := printers.NewModule(db)
 	orgModule := org.NewModule(db, syncModule.SyncHub())
 
+	// Coverage extension (016)
+	feedbackModule := feedback.NewModule(db)
+	suppliersModule := suppliers.NewModule(db)
+	promotionsModule := promotions.NewModule(db)
+	auditModule := audit.NewModule(db)
+	notificationsModule := notifications.NewModule(db)
+
 	// ---------------------------------------------------------------------------
 	// Build router
 	// ---------------------------------------------------------------------------
@@ -180,6 +192,13 @@ func main() {
 	printersModule.RegisterRoutes(mux)
 	orgModule.RegisterRoutes(mux)
 
+	// Coverage extension (016)
+	feedbackModule.RegisterRoutes(mux)
+	suppliersModule.RegisterRoutes(mux)
+	promotionsModule.RegisterRoutes(mux)
+	auditModule.RegisterRoutes(mux)
+	notificationsModule.RegisterRoutes(mux)
+
 	// ---------------------------------------------------------------------------
 	// Middleware chain
 	// ---------------------------------------------------------------------------
@@ -207,11 +226,18 @@ func main() {
 
 	// authGate applies JWT authentication to all /api/v1/* routes except
 	// public ones (auth, online ordering, health, docs).
+	//
+	// Menu version + snapshot paths run their own auth inside the handler
+	// (authorizeTenantRead — accepts JWT *or* X-API-Key from a paired POS
+	// device). The middleware lets them through without an Authorization
+	// header so the X-API-Key path actually reaches the handler.
 	authGate := middleware.Middleware(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			path := r.URL.Path
 			if !strings.HasPrefix(path, "/api/v1/") ||
 				strings.HasPrefix(path, "/api/v1/online/") ||
+				strings.HasPrefix(path, "/api/v1/menu/version/") ||
+				strings.HasPrefix(path, "/api/v1/menu/snapshot/") ||
 				publicAPIPaths[path] {
 				next.ServeHTTP(w, r)
 				return
