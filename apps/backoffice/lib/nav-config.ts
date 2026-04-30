@@ -181,8 +181,8 @@ export const NAV_CONFIG: NavEntry[] = [
     hqOnly: true,
     items: [
       { href: (l) => `/${l}/organization/menu`, labelKey: "masterMenuCategories" },
-      { href: (l) => `/${l}/organization/menu/products`, labelKey: "masterMenuProducts", placeholder: true },
-      { href: (l) => `/${l}/organization/menu/publish-history`, labelKey: "masterMenuPublish", placeholder: true },
+      { href: (l) => `/${l}/organization/menu/products`, labelKey: "masterMenuProducts" },
+      { href: (l) => `/${l}/organization/menu/publish-history`, labelKey: "masterMenuPublish" },
     ],
   },
   {
@@ -193,7 +193,7 @@ export const NAV_CONFIG: NavEntry[] = [
     hqOnly: true,
     items: [
       { href: (l) => `/${l}/organization/menu-policies`, labelKey: "policiesList" },
-      { href: (l) => `/${l}/organization/menu-policies/new`, labelKey: "policiesNew", placeholder: true },
+      { href: (l) => `/${l}/organization/menu-policies/new`, labelKey: "policiesNew" },
     ],
   },
   {
@@ -204,8 +204,8 @@ export const NAV_CONFIG: NavEntry[] = [
     hqOnly: true,
     items: [
       { href: (l) => `/${l}/organization/reports`, labelKey: "aggregateRevenue" },
-      { href: (l) => `/${l}/organization/reports/comparison`, labelKey: "aggregateComparison", placeholder: true },
-      { href: (l) => `/${l}/organization/reports/by-location`, labelKey: "aggregateByLocation", placeholder: true },
+      { href: (l) => `/${l}/organization/reports/comparison`, labelKey: "aggregateComparison" },
+      { href: (l) => `/${l}/organization/reports/by-location`, labelKey: "aggregateByLocation" },
     ],
   },
   {
@@ -216,8 +216,8 @@ export const NAV_CONFIG: NavEntry[] = [
     hqOnly: true,
     items: [
       { href: (l) => `/${l}/organization/info`, labelKey: "orgInfo" },
-      { href: (l) => `/${l}/organization/billing`, labelKey: "orgBilling", placeholder: true },
-      { href: (l) => `/${l}/organization/plan`, labelKey: "orgPlan", placeholder: true },
+      { href: (l) => `/${l}/organization/billing`, labelKey: "orgBilling" },
+      { href: (l) => `/${l}/organization/plan`, labelKey: "orgPlan" },
     ],
   },
   {
