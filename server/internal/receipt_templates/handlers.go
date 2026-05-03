@@ -20,21 +20,32 @@ func resolveTenant(r *http.Request) string {
 	return r.URL.Query().Get("tenant_id")
 }
 
-// GET /api/v1/receipt-templates
+// GET /api/v1/receipt-templates  (?type=kitchen_ticket|customer_receipt|z_report)
 func (m *Module) handleList(w http.ResponseWriter, r *http.Request) {
 	tenantID := resolveTenant(r)
 	if tenantID == "" {
 		response.Error(w, http.StatusUnauthorized, "UNAUTHORIZED", "Tenant context required")
 		return
 	}
-	rows, err := m.db.QueryContext(r.Context(), `
-		SELECT id, tenant_id, name, language, width_mm, is_default,
+	typeFilter := strings.TrimSpace(r.URL.Query().Get("type"))
+	if typeFilter != "" && !validTemplateType(typeFilter) {
+		response.Error(w, http.StatusBadRequest, "VALIDATION_ERROR",
+			"type must be one of kitchen_ticket|customer_receipt|z_report")
+		return
+	}
+	args := []any{tenantID}
+	q := `
+		SELECT id, tenant_id, name, template_type, language, width_mm, is_default,
 		       COALESCE(header,''), body_format, COALESCE(footer,''),
 		       paper_cut, open_drawer, copies, created_at, updated_at
 		FROM receipt_templates
-		WHERE tenant_id = $1
-		ORDER BY is_default DESC, name ASC
-	`, tenantID)
+		WHERE tenant_id = $1`
+	if typeFilter != "" {
+		q += ` AND template_type = $2`
+		args = append(args, typeFilter)
+	}
+	q += ` ORDER BY template_type, is_default DESC, name ASC`
+	rows, err := m.db.QueryContext(r.Context(), q, args...)
 	if err != nil {
 		slog.Error("receipt_templates: list", "error", err)
 		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to list templates")
@@ -61,7 +72,7 @@ func (m *Module) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.PathValue("id")
 	row := m.db.QueryRowContext(r.Context(), `
-		SELECT id, tenant_id, name, language, width_mm, is_default,
+		SELECT id, tenant_id, name, template_type, language, width_mm, is_default,
 		       COALESCE(header,''), body_format, COALESCE(footer,''),
 		       paper_cut, open_drawer, copies, created_at, updated_at
 		FROM receipt_templates
@@ -105,12 +116,12 @@ func (m *Module) handleCreate(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback()
 
 	if req.IsDefault {
-		// Clear any existing default for this (tenant, language) — partial unique index
-		// would otherwise reject the insert.
+		// Clear any existing default for this (tenant, language, template_type) —
+		// partial unique index would otherwise reject the insert.
 		if _, err := tx.ExecContext(r.Context(), `
 			UPDATE receipt_templates SET is_default = false, updated_at = NOW()
-			WHERE tenant_id = $1 AND language = $2 AND is_default = true
-		`, tenantID, req.Language); err != nil {
+			WHERE tenant_id = $1 AND language = $2 AND template_type = $3 AND is_default = true
+		`, tenantID, req.Language, req.TemplateType); err != nil {
 			slog.Error("receipt_templates: clear default", "error", err)
 			response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to clear existing default")
 			return
@@ -133,11 +144,11 @@ func (m *Module) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = tx.ExecContext(r.Context(), `
-		INSERT INTO receipt_templates (id, tenant_id, name, language, width_mm, is_default,
+		INSERT INTO receipt_templates (id, tenant_id, name, template_type, language, width_mm, is_default,
 		                               header, body_format, footer, paper_cut, open_drawer, copies,
 		                               created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13)
-	`, id, tenantID, req.Name, req.Language, req.WidthMM, req.IsDefault,
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$14)
+	`, id, tenantID, req.Name, req.TemplateType, req.Language, req.WidthMM, req.IsDefault,
 		req.Header, req.BodyFormat, req.Footer, paperCut, openDrawer, copies, now)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -155,8 +166,8 @@ func (m *Module) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Created(w, Template{
-		ID: id, TenantID: tenantID, Name: req.Name, Language: req.Language,
-		WidthMM: req.WidthMM, IsDefault: req.IsDefault,
+		ID: id, TenantID: tenantID, Name: req.Name, TemplateType: req.TemplateType,
+		Language: req.Language, WidthMM: req.WidthMM, IsDefault: req.IsDefault,
 		Header: req.Header, BodyFormat: req.BodyFormat, Footer: req.Footer,
 		PaperCut: paperCut, OpenDrawer: openDrawer, Copies: copies,
 		CreatedAt: now, UpdatedAt: now,
@@ -191,8 +202,9 @@ func (m *Module) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.IsDefault {
 		if _, err := tx.ExecContext(r.Context(), `
 			UPDATE receipt_templates SET is_default = false, updated_at = NOW()
-			WHERE tenant_id = $1 AND language = $2 AND is_default = true AND id <> $3
-		`, tenantID, req.Language, id); err != nil {
+			WHERE tenant_id = $1 AND language = $2 AND template_type = $3
+			  AND is_default = true AND id <> $4
+		`, tenantID, req.Language, req.TemplateType, id); err != nil {
 			slog.Error("receipt_templates: clear default", "error", err)
 			response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to clear existing default")
 			return
@@ -214,12 +226,12 @@ func (m *Module) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	res, err := tx.ExecContext(r.Context(), `
 		UPDATE receipt_templates SET
-			name = $3, language = $4, width_mm = $5, is_default = $6,
-			header = $7, body_format = $8, footer = $9,
-			paper_cut = $10, open_drawer = $11, copies = $12,
+			name = $3, template_type = $4, language = $5, width_mm = $6, is_default = $7,
+			header = $8, body_format = $9, footer = $10,
+			paper_cut = $11, open_drawer = $12, copies = $13,
 			updated_at = NOW()
 		WHERE id = $1 AND tenant_id = $2
-	`, id, tenantID, req.Name, req.Language, req.WidthMM, req.IsDefault,
+	`, id, tenantID, req.Name, req.TemplateType, req.Language, req.WidthMM, req.IsDefault,
 		req.Header, req.BodyFormat, req.Footer, paperCut, openDrawer, copies)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -278,7 +290,7 @@ func (m *Module) handleTestPrint(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	row := m.db.QueryRowContext(r.Context(), `
-		SELECT id, tenant_id, name, language, width_mm, is_default,
+		SELECT id, tenant_id, name, template_type, language, width_mm, is_default,
 		       COALESCE(header,''), body_format, COALESCE(footer,''),
 		       paper_cut, open_drawer, copies, created_at, updated_at
 		FROM receipt_templates
@@ -336,7 +348,7 @@ type rowScanner interface {
 func scanRow(s rowScanner) (Template, error) {
 	var t Template
 	if err := s.Scan(
-		&t.ID, &t.TenantID, &t.Name, &t.Language, &t.WidthMM, &t.IsDefault,
+		&t.ID, &t.TenantID, &t.Name, &t.TemplateType, &t.Language, &t.WidthMM, &t.IsDefault,
 		&t.Header, &t.BodyFormat, &t.Footer,
 		&t.PaperCut, &t.OpenDrawer, &t.Copies,
 		&t.CreatedAt, &t.UpdatedAt,
@@ -346,10 +358,25 @@ func scanRow(s rowScanner) (Template, error) {
 	return t, nil
 }
 
+func validTemplateType(s string) bool {
+	switch s {
+	case "kitchen_ticket", "customer_receipt", "z_report":
+		return true
+	}
+	return false
+}
+
 func validateUpsert(req *upsertReq) error {
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
 		return errMsg("name required")
+	}
+	req.TemplateType = strings.TrimSpace(req.TemplateType)
+	if req.TemplateType == "" {
+		req.TemplateType = "customer_receipt"
+	}
+	if !validTemplateType(req.TemplateType) {
+		return errMsg("template_type must be one of kitchen_ticket|customer_receipt|z_report")
 	}
 	if req.Language == "" {
 		req.Language = "de"

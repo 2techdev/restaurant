@@ -94,12 +94,12 @@ func (m *Module) handleSync(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := m.db.QueryContext(r.Context(), `
-		SELECT id, tenant_id, name, language, width_mm, is_default,
+		SELECT id, tenant_id, name, template_type, language, width_mm, is_default,
 		       COALESCE(header,''), body_format, COALESCE(footer,''),
 		       paper_cut, open_drawer, copies, created_at, updated_at
 		FROM receipt_templates
 		WHERE tenant_id = $1
-		ORDER BY is_default DESC, name ASC
+		ORDER BY template_type, is_default DESC, name ASC
 	`, tenantID)
 	if err != nil {
 		slog.Error("receipt_templates: sync list", "error", err)

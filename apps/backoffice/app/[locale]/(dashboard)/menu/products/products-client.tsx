@@ -85,13 +85,15 @@ const ALLERGENS = [
 
 // ─── Schema ─────────────────────────────────────────────────────────────
 //
-// MenuProduct.name is a single string in the backend; the multi-language
-// UI is a *display* aid for now (each tab edits the same field). Once the
-// backend gains a JSON `names` map, swap the schema to z.record(z.string())
-// and the form picks it up without rewriting.
+// Backend now persists name_translations + description_translations as JSONB
+// (migration 022). The form stores all 5 languages in one map; the primary
+// language string is mirrored to `name` / `description` on submit so legacy
+// code that reads only the single field keeps working.
+const PRIMARY_LANG: LocaleCode = "tr";
+
 const ProductFormSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
+  name_translations: z.record(z.string(), z.string()).default({}),
+  description_translations: z.record(z.string(), z.string()).default({}),
   category_id: z.string().min(1),
   price_chf: z.coerce.number().min(0),
   price_takeaway_chf: z.coerce.number().min(0).optional(),
@@ -101,7 +103,10 @@ const ProductFormSchema = z.object({
   is_active: z.boolean(),
   display_order: z.coerce.number().int().min(0),
   allergens: z.array(z.string()).default([]),
-});
+}).refine(
+  (v) => (v.name_translations[PRIMARY_LANG] ?? "").trim().length > 0,
+  { message: "primary language name is required", path: ["name_translations"] },
+);
 type ProductFormInput = z.infer<typeof ProductFormSchema>;
 
 const TAX_GROUPS = [
@@ -424,9 +429,23 @@ export function ProductsClient({ initialProducts, initialCategories }: Props) {
         categories={cats}
         onClose={() => setSheet(null)}
         onSubmit={(input) => {
+          const primaryName = (input.name_translations[PRIMARY_LANG] ?? "").trim();
+          const primaryDesc = (input.description_translations[PRIMARY_LANG] ?? "").trim();
+          // Strip empties so the JSONB stays compact + only secondary langs go
+          // into the translations map. Primary lang lives in `name` only.
+          const stripPrimary = (
+            map: Record<string, string>,
+          ): Record<string, string> =>
+            Object.fromEntries(
+              Object.entries(map).filter(
+                ([k, v]) => k !== PRIMARY_LANG && v.trim().length > 0,
+              ),
+            );
           const payload: Record<string, unknown> = {
-            name: input.name,
-            description: input.description ?? "",
+            name: primaryName,
+            name_translations: stripPrimary(input.name_translations),
+            description: primaryDesc,
+            description_translations: stripPrimary(input.description_translations),
             category_id: input.category_id,
             price: Math.round(input.price_chf * 100),
             tax_group: input.tax_group,
@@ -502,8 +521,16 @@ function ProductSheet({
     resolver: zodResolver(ProductFormSchema),
     values: product
       ? {
-          name: product.name,
-          description: product.description ?? "",
+          name_translations: {
+            [PRIMARY_LANG]: product.name,
+            ...((product as { name_translations?: Record<string, string> })
+              .name_translations ?? {}),
+          },
+          description_translations: {
+            [PRIMARY_LANG]: product.description ?? "",
+            ...((product as { description_translations?: Record<string, string> })
+              .description_translations ?? {}),
+          },
           category_id: product.category_id,
           price_chf: (product.price ?? 0) / 100,
           price_takeaway_chf: product.price_takeaway != null ? product.price_takeaway / 100 : undefined,
@@ -515,8 +542,8 @@ function ProductSheet({
           allergens: [],
         }
       : {
-          name: "",
-          description: "",
+          name_translations: { [PRIMARY_LANG]: "" },
+          description_translations: { [PRIMARY_LANG]: "" },
           category_id: categories[0]?.id ?? "",
           price_chf: 0,
           tax_group: "standard",
@@ -550,34 +577,20 @@ function ProductSheet({
         </SheetHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
-          {/* Multi-language name (display tabs — schema is single field) */}
-          <div className="space-y-2">
-            <Label>{t("col.name")}</Label>
-            <Tabs
-              value={activeLocale}
-              onValueChange={(v) => setActiveLocale(v as LocaleCode)}
-            >
-              <TabsList className="grid grid-cols-5 w-full">
-                {LOCALES.map((l) => (
-                  <TabsTrigger key={l} value={l} className="uppercase text-[11px]">
-                    {l}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              {LOCALES.map((l) => (
-                <TabsContent key={l} value={l} className="mt-2">
-                  <Input
-                    placeholder={`${l.toUpperCase()} — ${t("namePlaceholder")}`}
-                    {...form.register("name")}
-                    disabled={isLockedAll}
-                  />
-                </TabsContent>
-              ))}
-            </Tabs>
-            <p className="text-[11px] text-muted-foreground">
-              {t("multiLangHint")}
-            </p>
-            {form.formState.errors.name && (
+          {/* Primary-language name + description — required */}
+          <div className="space-y-1">
+            <Label>
+              {t("col.name")}{" "}
+              <span className="text-[10px] uppercase text-muted-foreground">
+                ({PRIMARY_LANG} — ana dil)
+              </span>
+            </Label>
+            <Input
+              placeholder={t("namePlaceholder")}
+              {...form.register(`name_translations.${PRIMARY_LANG}` as const)}
+              disabled={isLockedAll}
+            />
+            {form.formState.errors.name_translations && (
               <p className="text-xs text-error">{tCommon("error")}</p>
             )}
           </div>
@@ -587,10 +600,42 @@ function ProductSheet({
             <textarea
               rows={2}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              {...form.register("description")}
+              placeholder={`${PRIMARY_LANG.toUpperCase()} — ${t("col.description")}`}
+              {...form.register(`description_translations.${PRIMARY_LANG}` as const)}
               disabled={isLockedAll}
             />
           </div>
+
+          {/* Other languages — collapsible. POS will pick the right
+              translation based on the operator's session locale and fall
+              back to the primary-language string above. */}
+          <details className="rounded-md border border-input bg-muted/20">
+            <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">
+              Diğer Diller (DE / EN / FR / IT)
+            </summary>
+            <div className="space-y-3 p-3 border-t">
+              {LOCALES.filter((l) => l !== PRIMARY_LANG).map((l) => (
+                <div key={l} className="space-y-1">
+                  <Label className="text-xs uppercase">{l}</Label>
+                  <Input
+                    placeholder={`${l.toUpperCase()} — ${t("namePlaceholder")}`}
+                    {...form.register(`name_translations.${l}` as const)}
+                    disabled={isLockedAll}
+                  />
+                  <textarea
+                    rows={2}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs"
+                    placeholder={`${l.toUpperCase()} — ${t("col.description")}`}
+                    {...form.register(`description_translations.${l}` as const)}
+                    disabled={isLockedAll}
+                  />
+                </div>
+              ))}
+              <p className="text-[11px] text-muted-foreground">
+                Boş bırakılan diller POS'ta ana dile geri düşer.
+              </p>
+            </div>
+          </details>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">

@@ -2,41 +2,49 @@ package menu
 
 import "time"
 
+// Translations is a {locale -> string} map persisted as JSONB. Empty / null
+// in the DB roundtrips to an empty map, never nil — handlers can iterate
+// without nil checks. Wire format is the same JSON object PostgreSQL stores.
+type Translations map[string]string
+
 // Category represents a menu category (e.g., Drinks, Main Course).
 type Category struct {
-	ID           string    `json:"id"`
-	TenantID     string    `json:"tenant_id"`
-	Name         string    `json:"name"`
-	DisplayOrder int       `json:"display_order"`
-	Color        *string   `json:"color,omitempty"`   // hex string e.g. "#FF5733"
-	Icon         *string   `json:"icon,omitempty"`     // icon name or emoji
-	ParentID     *string   `json:"parent_id,omitempty"` // self-reference for subcategories
-	IsActive     bool      `json:"is_active"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	IsDeleted    bool      `json:"is_deleted"`
+	ID               string       `json:"id"`
+	TenantID         string       `json:"tenant_id"`
+	Name             string       `json:"name"`
+	NameTranslations Translations `json:"name_translations,omitempty"`
+	DisplayOrder     int          `json:"display_order"`
+	Color            *string      `json:"color,omitempty"`     // hex string e.g. "#FF5733"
+	Icon             *string      `json:"icon,omitempty"`      // icon name or emoji
+	ParentID         *string      `json:"parent_id,omitempty"` // self-reference for subcategories
+	IsActive         bool         `json:"is_active"`
+	CreatedAt        time.Time    `json:"created_at"`
+	UpdatedAt        time.Time    `json:"updated_at"`
+	IsDeleted        bool         `json:"is_deleted"`
 }
 
 // Product represents a menu item.
 type Product struct {
-	ID              string    `json:"id"`
-	TenantID        string    `json:"tenant_id"`
-	CategoryID      string    `json:"category_id"`
-	Name            string    `json:"name"`
-	Description     *string   `json:"description,omitempty"`
-	Price           int64     `json:"price"`       // cents: 1500 = CHF 15.00
-	CostPrice       int64     `json:"cost_price"`  // cents
-	TaxGroup        string    `json:"tax_group"`
-	ImagePath       *string   `json:"image_path,omitempty"`
-	Barcode         *string   `json:"barcode,omitempty"`
-	IsActive        bool      `json:"is_active"`
-	DisplayOrder    int       `json:"display_order"`
-	PrepTimeMinutes *int      `json:"prep_time_minutes,omitempty"`
-	PrinterGroup    string    `json:"printer_group"`
-	DefaultGang     *int      `json:"default_gang,omitempty"` // 1, 2, or 3; null = no default course hint
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
-	IsDeleted       bool      `json:"is_deleted"`
+	ID                      string       `json:"id"`
+	TenantID                string       `json:"tenant_id"`
+	CategoryID              string       `json:"category_id"`
+	Name                    string       `json:"name"`
+	NameTranslations        Translations `json:"name_translations,omitempty"`
+	Description             *string      `json:"description,omitempty"`
+	DescriptionTranslations Translations `json:"description_translations,omitempty"`
+	Price                   int64        `json:"price"`      // cents: 1500 = CHF 15.00
+	CostPrice               int64        `json:"cost_price"` // cents
+	TaxGroup                string       `json:"tax_group"`
+	ImagePath               *string      `json:"image_path,omitempty"`
+	Barcode                 *string      `json:"barcode,omitempty"`
+	IsActive                bool         `json:"is_active"`
+	DisplayOrder            int          `json:"display_order"`
+	PrepTimeMinutes         *int         `json:"prep_time_minutes,omitempty"`
+	PrinterGroup            string       `json:"printer_group"`
+	DefaultGang             *int         `json:"default_gang,omitempty"` // 1, 2, or 3; null = no default course hint
+	CreatedAt               time.Time    `json:"created_at"`
+	UpdatedAt               time.Time    `json:"updated_at"`
+	IsDeleted               bool         `json:"is_deleted"`
 }
 
 // ModifierGroup represents a group of modifiers (e.g., "Size", "Toppings").
