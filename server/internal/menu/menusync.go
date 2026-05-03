@@ -80,21 +80,24 @@ type snapTax struct {
 }
 
 type snapCategory struct {
-	ID            string  `json:"id"`
-	Name          string  `json:"name"`
-	DisplayOrder  int     `json:"displayOrder"`
-	Color         *string `json:"color"`
-	Icon          *string `json:"icon"`
-	ParentID      *string `json:"parentId"`
-	IsActive      bool    `json:"isActive"`
-	DefaultGangID *string `json:"defaultGangId"`
+	ID               string       `json:"id"`
+	Name             string       `json:"name"`
+	NameTranslations Translations `json:"nameTranslations"`
+	DisplayOrder     int          `json:"displayOrder"`
+	Color            *string      `json:"color"`
+	Icon             *string      `json:"icon"`
+	ParentID         *string      `json:"parentId"`
+	IsActive         bool         `json:"isActive"`
+	DefaultGangID    *string      `json:"defaultGangId"`
 }
 
 type snapProduct struct {
-	ID                string  `json:"id"`
-	CategoryID        string  `json:"categoryId"`
-	Name              string  `json:"name"`
-	Description       string  `json:"description"`
+	ID                      string       `json:"id"`
+	CategoryID              string       `json:"categoryId"`
+	Name                    string       `json:"name"`
+	NameTranslations        Translations `json:"nameTranslations"`
+	Description             string       `json:"description"`
+	DescriptionTranslations Translations `json:"descriptionTranslations"`
 	PriceCents        int64   `json:"priceCents"`
 	CostPriceCents    int64   `json:"costPriceCents"`
 	TaxGroup          string  `json:"taxGroup"`
@@ -526,7 +529,8 @@ func buildSnapshot(ctx context.Context, tx *sql.Tx, tenantID string) (*snapshot,
 
 	// Categories.
 	catRows, err := tx.QueryContext(ctx, `
-		SELECT id::text, name, display_order, color, icon, parent_id::text, is_active
+		SELECT id::text, name, display_order, color, icon, parent_id::text, is_active,
+		       COALESCE(name_translations, '{}'::jsonb)
 		FROM categories
 		WHERE tenant_id = $1 AND is_deleted = false
 		ORDER BY display_order ASC, name ASC
@@ -539,9 +543,11 @@ func buildSnapshot(ctx context.Context, tx *sql.Tx, tenantID string) (*snapshot,
 		var c snapCategory
 		var color, icon sql.NullString
 		var parentID sql.NullString
-		if err := catRows.Scan(&c.ID, &c.Name, &c.DisplayOrder, &color, &icon, &parentID, &c.IsActive); err != nil {
+		var nameTr []byte
+		if err := catRows.Scan(&c.ID, &c.Name, &c.DisplayOrder, &color, &icon, &parentID, &c.IsActive, &nameTr); err != nil {
 			continue
 		}
+		c.NameTranslations = ScanTranslations(nameTr)
 		if color.Valid && color.String != "" {
 			s := color.String
 			c.Color = &s
@@ -561,7 +567,9 @@ func buildSnapshot(ctx context.Context, tx *sql.Tx, tenantID string) (*snapshot,
 	prodRows, err := tx.QueryContext(ctx, `
 		SELECT id::text, category_id::text, name, COALESCE(description,''),
 		       price, cost_price, tax_group, image_path, barcode,
-		       is_active, display_order, prep_time_minutes, printer_group
+		       is_active, display_order, prep_time_minutes, printer_group,
+		       COALESCE(name_translations, '{}'::jsonb),
+		       COALESCE(description_translations, '{}'::jsonb)
 		FROM products
 		WHERE tenant_id = $1 AND is_deleted = false
 		ORDER BY display_order ASC, name ASC
@@ -577,11 +585,15 @@ func buildSnapshot(ctx context.Context, tx *sql.Tx, tenantID string) (*snapshot,
 		var p snapProduct
 		var img, barcode sql.NullString
 		var prep sql.NullInt64
+		var nameTr, descTr []byte
 		if err := prodRows.Scan(&p.ID, &p.CategoryID, &p.Name, &p.Description,
 			&p.PriceCents, &p.CostPriceCents, &p.TaxGroup, &img, &barcode,
-			&p.IsActive, &p.DisplayOrder, &prep, &p.PrinterGroup); err != nil {
+			&p.IsActive, &p.DisplayOrder, &prep, &p.PrinterGroup,
+			&nameTr, &descTr); err != nil {
 			continue
 		}
+		p.NameTranslations = ScanTranslations(nameTr)
+		p.DescriptionTranslations = ScanTranslations(descTr)
 		if img.Valid && img.String != "" {
 			s := img.String
 			p.ImageURL = &s

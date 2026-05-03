@@ -29,7 +29,8 @@ func (m *Module) handleListCategories(w http.ResponseWriter, r *http.Request) {
 		SELECT id, tenant_id, name, display_order,
 		       COALESCE(color,''), COALESCE(icon,''),
 		       COALESCE(parent_id::text,''),
-		       is_active, created_at, updated_at
+		       is_active, created_at, updated_at,
+		       COALESCE(name_translations, '{}'::jsonb)
 		FROM categories
 		WHERE tenant_id = $1 AND is_deleted = false
 		ORDER BY display_order ASC, name ASC
@@ -45,13 +46,16 @@ func (m *Module) handleListCategories(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var c Category
 		var color, icon, parentID string
+		var nameTr []byte
 		if err := rows.Scan(
 			&c.ID, &c.TenantID, &c.Name, &c.DisplayOrder,
 			&color, &icon, &parentID,
 			&c.IsActive, &c.CreatedAt, &c.UpdatedAt,
+			&nameTr,
 		); err != nil {
 			continue
 		}
+		c.NameTranslations = ScanTranslations(nameTr)
 		if color != "" {
 			c.Color = &color
 		}
@@ -76,12 +80,13 @@ func (m *Module) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name         string  `json:"name"`
-		DisplayOrder int     `json:"display_order"`
-		Color        *string `json:"color"`
-		Icon         *string `json:"icon"`
-		ParentID     *string `json:"parent_id"`
-		IsActive     bool    `json:"is_active"`
+		Name             string       `json:"name"`
+		NameTranslations Translations `json:"name_translations"`
+		DisplayOrder     int          `json:"display_order"`
+		Color            *string      `json:"color"`
+		Icon             *string      `json:"icon"`
+		ParentID         *string      `json:"parent_id"`
+		IsActive         bool         `json:"is_active"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
@@ -96,9 +101,9 @@ func (m *Module) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 
 	_, err := m.db.ExecContext(r.Context(), `
-		INSERT INTO categories (id, tenant_id, name, display_order, color, icon, parent_id, is_active, created_at, updated_at, sync_status, is_deleted)
-		VALUES ($1, $2, $3, $4, $5, $6, $7::uuid, $8, $9, $9, 0, false)
-	`, id, tenantID, req.Name, req.DisplayOrder,
+		INSERT INTO categories (id, tenant_id, name, name_translations, display_order, color, icon, parent_id, is_active, created_at, updated_at, sync_status, is_deleted)
+		VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8::uuid, $9, $10, $10, 0, false)
+	`, id, tenantID, req.Name, MarshalTranslations(req.NameTranslations), req.DisplayOrder,
 		nullableString(req.Color), nullableString(req.Icon), nullableString(req.ParentID),
 		req.IsActive, now,
 	)
@@ -109,16 +114,17 @@ func (m *Module) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cat := Category{
-		ID:           id,
-		TenantID:     tenantID,
-		Name:         req.Name,
-		DisplayOrder: req.DisplayOrder,
-		Color:        req.Color,
-		Icon:         req.Icon,
-		ParentID:     req.ParentID,
-		IsActive:     req.IsActive,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:               id,
+		TenantID:         tenantID,
+		Name:             req.Name,
+		NameTranslations: req.NameTranslations,
+		DisplayOrder:     req.DisplayOrder,
+		Color:            req.Color,
+		Icon:             req.Icon,
+		ParentID:         req.ParentID,
+		IsActive:         req.IsActive,
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 	response.Created(w, cat)
 }
@@ -134,11 +140,12 @@ func (m *Module) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	var req struct {
-		Name         string  `json:"name"`
-		DisplayOrder int     `json:"display_order"`
-		Color        *string `json:"color"`
-		Icon         *string `json:"icon"`
-		IsActive     bool    `json:"is_active"`
+		Name             string       `json:"name"`
+		NameTranslations Translations `json:"name_translations"`
+		DisplayOrder     int          `json:"display_order"`
+		Color            *string      `json:"color"`
+		Icon             *string      `json:"icon"`
+		IsActive         bool         `json:"is_active"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
@@ -147,9 +154,10 @@ func (m *Module) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 
 	res, err := m.db.ExecContext(r.Context(), `
 		UPDATE categories
-		SET name=$1, display_order=$2, color=$3, icon=$4, is_active=$5, updated_at=NOW()
-		WHERE id=$6 AND tenant_id=$7 AND is_deleted=false
-	`, req.Name, req.DisplayOrder,
+		SET name=$1, name_translations=$2::jsonb, display_order=$3,
+		    color=$4, icon=$5, is_active=$6, updated_at=NOW()
+		WHERE id=$7 AND tenant_id=$8 AND is_deleted=false
+	`, req.Name, MarshalTranslations(req.NameTranslations), req.DisplayOrder,
 		nullableString(req.Color), nullableString(req.Icon),
 		req.IsActive, id, tenantID,
 	)
@@ -212,7 +220,9 @@ func (m *Module) handleListProducts(w http.ResponseWriter, r *http.Request) {
 			       price, cost_price, tax_group,
 			       COALESCE(image_path,''), COALESCE(barcode,''),
 			       is_active, display_order, prep_time_minutes,
-			       COALESCE(printer_group,'kitchen'), default_gang, created_at, updated_at
+			       COALESCE(printer_group,'kitchen'), default_gang, created_at, updated_at,
+			       COALESCE(name_translations, '{}'::jsonb),
+			       COALESCE(description_translations, '{}'::jsonb)
 			FROM products
 			WHERE tenant_id=$1 AND category_id=$2 AND is_deleted=false
 			ORDER BY display_order ASC, name ASC
@@ -223,7 +233,9 @@ func (m *Module) handleListProducts(w http.ResponseWriter, r *http.Request) {
 			       price, cost_price, tax_group,
 			       COALESCE(image_path,''), COALESCE(barcode,''),
 			       is_active, display_order, prep_time_minutes,
-			       COALESCE(printer_group,'kitchen'), default_gang, created_at, updated_at
+			       COALESCE(printer_group,'kitchen'), default_gang, created_at, updated_at,
+			       COALESCE(name_translations, '{}'::jsonb),
+			       COALESCE(description_translations, '{}'::jsonb)
 			FROM products
 			WHERE tenant_id=$1 AND is_deleted=false
 			ORDER BY display_order ASC, name ASC
@@ -242,15 +254,19 @@ func (m *Module) handleListProducts(w http.ResponseWriter, r *http.Request) {
 		var desc, imagePath, barcode string
 		var prepTime sql.NullInt64
 		var defaultGang sql.NullInt16
+		var nameTr, descTr []byte
 		if err := rows.Scan(
 			&p.ID, &p.TenantID, &p.CategoryID, &p.Name, &desc,
 			&p.Price, &p.CostPrice, &p.TaxGroup,
 			&imagePath, &barcode,
 			&p.IsActive, &p.DisplayOrder, &prepTime,
 			&p.PrinterGroup, &defaultGang, &p.CreatedAt, &p.UpdatedAt,
+			&nameTr, &descTr,
 		); err != nil {
 			continue
 		}
+		p.NameTranslations = ScanTranslations(nameTr)
+		p.DescriptionTranslations = ScanTranslations(descTr)
 		if desc != "" {
 			p.Description = &desc
 		}
@@ -283,19 +299,21 @@ func (m *Module) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		CategoryID      string  `json:"category_id"`
-		Name            string  `json:"name"`
-		Description     *string `json:"description"`
-		Price           int64   `json:"price"`
-		CostPrice       int64   `json:"cost_price"`
-		TaxGroup        string  `json:"tax_group"`
-		ImagePath       *string `json:"image_path"`
-		Barcode         *string `json:"barcode"`
-		IsActive        bool    `json:"is_active"`
-		DisplayOrder    int     `json:"display_order"`
-		PrepTimeMinutes *int    `json:"prep_time_minutes"`
-		PrinterGroup    string  `json:"printer_group"`
-		DefaultGang     *int    `json:"default_gang"`
+		CategoryID              string       `json:"category_id"`
+		Name                    string       `json:"name"`
+		NameTranslations        Translations `json:"name_translations"`
+		Description             *string      `json:"description"`
+		DescriptionTranslations Translations `json:"description_translations"`
+		Price                   int64        `json:"price"`
+		CostPrice               int64        `json:"cost_price"`
+		TaxGroup                string       `json:"tax_group"`
+		ImagePath               *string      `json:"image_path"`
+		Barcode                 *string      `json:"barcode"`
+		IsActive                bool         `json:"is_active"`
+		DisplayOrder            int          `json:"display_order"`
+		PrepTimeMinutes         *int         `json:"prep_time_minutes"`
+		PrinterGroup            string       `json:"printer_group"`
+		DefaultGang             *int         `json:"default_gang"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
@@ -321,12 +339,14 @@ func (m *Module) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 
 	_, err := m.db.ExecContext(r.Context(), `
 		INSERT INTO products (
-			id, tenant_id, category_id, name, description, price, cost_price,
+			id, tenant_id, category_id, name, name_translations,
+			description, description_translations, price, cost_price,
 			tax_group, image_path, barcode, is_active, display_order,
 			prep_time_minutes, printer_group, default_gang, created_at, updated_at, sync_status, is_deleted
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16,0,false)
-	`, id, tenantID, req.CategoryID, req.Name,
-		nullableString(req.Description), req.Price, req.CostPrice,
+		) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$18,0,false)
+	`, id, tenantID, req.CategoryID, req.Name, MarshalTranslations(req.NameTranslations),
+		nullableString(req.Description), MarshalTranslations(req.DescriptionTranslations),
+		req.Price, req.CostPrice,
 		req.TaxGroup, nullableString(req.ImagePath), nullableString(req.Barcode),
 		req.IsActive, req.DisplayOrder,
 		nullableInt(req.PrepTimeMinutes), req.PrinterGroup,
@@ -339,23 +359,25 @@ func (m *Module) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prod := Product{
-		ID:              id,
-		TenantID:        tenantID,
-		CategoryID:      req.CategoryID,
-		Name:            req.Name,
-		Description:     req.Description,
-		Price:           req.Price,
-		CostPrice:       req.CostPrice,
-		TaxGroup:        req.TaxGroup,
-		ImagePath:       req.ImagePath,
-		Barcode:         req.Barcode,
-		IsActive:        req.IsActive,
-		DisplayOrder:    req.DisplayOrder,
-		PrepTimeMinutes: req.PrepTimeMinutes,
-		PrinterGroup:    req.PrinterGroup,
-		DefaultGang:     req.DefaultGang,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		ID:                      id,
+		TenantID:                tenantID,
+		CategoryID:              req.CategoryID,
+		Name:                    req.Name,
+		NameTranslations:        req.NameTranslations,
+		Description:             req.Description,
+		DescriptionTranslations: req.DescriptionTranslations,
+		Price:                   req.Price,
+		CostPrice:               req.CostPrice,
+		TaxGroup:                req.TaxGroup,
+		ImagePath:               req.ImagePath,
+		Barcode:                 req.Barcode,
+		IsActive:                req.IsActive,
+		DisplayOrder:            req.DisplayOrder,
+		PrepTimeMinutes:         req.PrepTimeMinutes,
+		PrinterGroup:            req.PrinterGroup,
+		DefaultGang:             req.DefaultGang,
+		CreatedAt:               now,
+		UpdatedAt:               now,
 	}
 	response.Created(w, prod)
 }
@@ -371,17 +393,19 @@ func (m *Module) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	var req struct {
-		Name            string  `json:"name"`
-		Description     *string `json:"description"`
-		Price           int64   `json:"price"`
-		CostPrice       int64   `json:"cost_price"`
-		TaxGroup        string  `json:"tax_group"`
-		ImagePath       *string `json:"image_path"`
-		IsActive        bool    `json:"is_active"`
-		DisplayOrder    int     `json:"display_order"`
-		PrepTimeMinutes *int    `json:"prep_time_minutes"`
-		CategoryID      string  `json:"category_id"`
-		DefaultGang     *int    `json:"default_gang"`
+		Name                    string       `json:"name"`
+		NameTranslations        Translations `json:"name_translations"`
+		Description             *string      `json:"description"`
+		DescriptionTranslations Translations `json:"description_translations"`
+		Price                   int64        `json:"price"`
+		CostPrice               int64        `json:"cost_price"`
+		TaxGroup                string       `json:"tax_group"`
+		ImagePath               *string      `json:"image_path"`
+		IsActive                bool         `json:"is_active"`
+		DisplayOrder            int          `json:"display_order"`
+		PrepTimeMinutes         *int         `json:"prep_time_minutes"`
+		CategoryID              string       `json:"category_id"`
+		DefaultGang             *int         `json:"default_gang"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.Error(w, http.StatusBadRequest, "INVALID_BODY", "Invalid request body")
@@ -434,11 +458,15 @@ func (m *Module) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 	res, err := m.db.ExecContext(r.Context(), `
 		UPDATE products
-		SET name=$1, description=$2, price=$3, cost_price=$4, tax_group=$5,
-		    image_path=$6, is_active=$7, display_order=$8,
-		    prep_time_minutes=$9, category_id=$10, default_gang=$11, updated_at=NOW()
-		WHERE id=$12 AND tenant_id=$13 AND is_deleted=false
-	`, req.Name, nullableString(req.Description), req.Price, req.CostPrice, req.TaxGroup,
+		SET name=$1, name_translations=$2::jsonb,
+		    description=$3, description_translations=$4::jsonb,
+		    price=$5, cost_price=$6, tax_group=$7,
+		    image_path=$8, is_active=$9, display_order=$10,
+		    prep_time_minutes=$11, category_id=$12, default_gang=$13, updated_at=NOW()
+		WHERE id=$14 AND tenant_id=$15 AND is_deleted=false
+	`, req.Name, MarshalTranslations(req.NameTranslations),
+		nullableString(req.Description), MarshalTranslations(req.DescriptionTranslations),
+		req.Price, req.CostPrice, req.TaxGroup,
 		nullableString(req.ImagePath), req.IsActive, req.DisplayOrder,
 		nullableInt(req.PrepTimeMinutes), req.CategoryID,
 		nullableInt(req.DefaultGang),

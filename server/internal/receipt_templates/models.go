@@ -4,33 +4,35 @@ import "time"
 
 // Template represents a printable receipt layout for a tenant.
 type Template struct {
-	ID         string    `json:"id"`
-	TenantID   string    `json:"tenant_id"`
-	Name       string    `json:"name"`
-	Language   string    `json:"language"`    // de | fr | it | en | tr
-	WidthMM    int       `json:"width_mm"`    // 58 or 80
-	IsDefault  bool      `json:"is_default"`
-	Header     string    `json:"header"`
-	BodyFormat string    `json:"body_format"`
-	Footer     string    `json:"footer"`
-	PaperCut   bool      `json:"paper_cut"`
-	OpenDrawer bool      `json:"open_drawer"`
-	Copies     int       `json:"copies"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID           string    `json:"id"`
+	TenantID     string    `json:"tenant_id"`
+	Name         string    `json:"name"`
+	TemplateType string    `json:"template_type"` // kitchen_ticket | customer_receipt | z_report
+	Language     string    `json:"language"`      // de | fr | it | en | tr
+	WidthMM      int       `json:"width_mm"`      // 58 or 80
+	IsDefault    bool      `json:"is_default"`
+	Header       string    `json:"header"`
+	BodyFormat   string    `json:"body_format"`
+	Footer       string    `json:"footer"`
+	PaperCut     bool      `json:"paper_cut"`
+	OpenDrawer   bool      `json:"open_drawer"`
+	Copies       int       `json:"copies"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type upsertReq struct {
-	Name       string `json:"name"`
-	Language   string `json:"language"`
-	WidthMM    int    `json:"width_mm"`
-	IsDefault  bool   `json:"is_default"`
-	Header     string `json:"header"`
-	BodyFormat string `json:"body_format"`
-	Footer     string `json:"footer"`
-	PaperCut   *bool  `json:"paper_cut"`
-	OpenDrawer *bool  `json:"open_drawer"`
-	Copies     *int   `json:"copies"`
+	Name         string `json:"name"`
+	TemplateType string `json:"template_type"`
+	Language     string `json:"language"`
+	WidthMM      int    `json:"width_mm"`
+	IsDefault    bool   `json:"is_default"`
+	Header       string `json:"header"`
+	BodyFormat   string `json:"body_format"`
+	Footer       string `json:"footer"`
+	PaperCut     *bool  `json:"paper_cut"`
+	OpenDrawer   *bool  `json:"open_drawer"`
+	Copies       *int   `json:"copies"`
 }
 
 // TestPrintReq carries the inputs for /test-print — a server-side render
