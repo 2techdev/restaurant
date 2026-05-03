@@ -33,6 +33,7 @@ import (
 	"github.com/gastrocore/server/internal/printers"
 	"github.com/gastrocore/server/internal/promotions"
 	"github.com/gastrocore/server/internal/qrbill"
+	"github.com/gastrocore/server/internal/receipt_templates"
 	"github.com/gastrocore/server/internal/reports"
 	"github.com/gastrocore/server/internal/reservations"
 	"github.com/gastrocore/server/internal/shared/config"
@@ -126,6 +127,9 @@ func main() {
 	auditModule := audit.NewModule(db)
 	notificationsModule := notifications.NewModule(db)
 
+	// Swiss-compliant receipt templates (020)
+	receiptTemplatesModule := receipt_templates.NewModule(db)
+
 	// ---------------------------------------------------------------------------
 	// Build router
 	// ---------------------------------------------------------------------------
@@ -199,6 +203,9 @@ func main() {
 	auditModule.RegisterRoutes(mux)
 	notificationsModule.RegisterRoutes(mux)
 
+	// Receipt templates (020) — Swiss MWST-compliant printable layouts
+	receiptTemplatesModule.RegisterRoutes(mux)
+
 	// ---------------------------------------------------------------------------
 	// Middleware chain
 	// ---------------------------------------------------------------------------
@@ -238,6 +245,7 @@ func main() {
 				strings.HasPrefix(path, "/api/v1/online/") ||
 				strings.HasPrefix(path, "/api/v1/menu/version/") ||
 				strings.HasPrefix(path, "/api/v1/menu/snapshot/") ||
+				strings.HasPrefix(path, "/api/v1/receipt-templates/sync/") ||
 				publicAPIPaths[path] {
 				next.ServeHTTP(w, r)
 				return
