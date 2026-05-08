@@ -54,6 +54,8 @@ import 'tables/loyalty_transactions.dart';
 import 'tables/fiscal_signatures.dart';
 import 'tables/lan_sync_peers.dart';
 import 'tables/manager_pins.dart';
+import 'tables/receipt_templates.dart';
+import 'tables/user_tenant_assignments.dart';
 import 'tables/z_reports.dart';
 
 part 'app_database.g.dart';
@@ -103,6 +105,8 @@ part 'app_database.g.dart';
     GangTemplates,
     OrderGangStates,
     ActionButtons,
+    ReceiptTemplates,
+    UserTenantAssignments,
     ZReports,
   ],
   daos: [AuditLogDao, ComboDao, InventoryDao, ReceiptCounterDao, SyncEventDao],
@@ -111,7 +115,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 23;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -279,11 +283,84 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(products, products.isCombo);
         await m.addColumn(products, products.comboDiscountCents);
       }
+      if (from < 19) {
+        // v19 (M4): ad-hoc table flag on RestaurantTables. Cashiers can
+        // ring up "Tisch 150" from the sales-shell numpad; the row is
+        // soft-deleted on close so the floor plan doesn't accumulate
+        // historical strays. Existing persistent tables default to
+        // false, matching the column default and pre-M4 behaviour.
+        await m.addColumn(restaurantTables, restaurantTables.isTemporary);
+      }
+      if (from < 20) {
+        // v20: cloud-master menu sync metadata. The MenuSyncService stamps
+        // `cloudVersion` on every product/category row it applies, so the
+        // audit trail can correlate POS state back to a published Cloud
+        // version (see lib/features/menu_sync/). Null for legacy rows or
+        // rows authored locally while menuEditMode != 'cloud'.
+        await m.addColumn(products, products.cloudVersion);
+        await m.addColumn(categories, categories.cloudVersion);
+      }
+      if (from < 21) {
+        // v21: Swiss MWST-compliant receipt templates, replicated from
+        // the backoffice via menu sync snapshots. Each template carries a
+        // language + width and is consumed by the print engine at order
+        // completion. UID-Nummer is rendered from the tenants row.
+        await m.createTable(receiptTemplates);
+      }
+      if (from < 22) {
+        // v22: template_type discriminator (kitchen_ticket /
+        // customer_receipt / z_report). The print engine picks the right
+        // builder based on this value at print time. Existing rows default
+        // to customer_receipt, matching pre-22 behaviour.
+        //
+        // Hotfix 2026-05-07: pilot devices upgrading from schema 21 already
+        // had `template_type` in the table because Drift's `m.createTable`
+        // uses the LATEST Dart definition, not the schema-pinned one. So
+        // the column was created in v21 and re-adding it in v22 raises
+        // SqliteException "duplicate column name". Guard with a PRAGMA
+        // existence check so the migration is idempotent regardless of
+        // whether the prior install was 21-pristine or 21-with-22-leak.
+        final hasColumn = await _columnExists('receipt_templates', 'template_type');
+        if (!hasColumn) {
+          await m.addColumn(receiptTemplates, receiptTemplates.templateType);
+        }
+      }
+      if (from < 23) {
+        // v23: user_tenant_assignments — N:M user↔tenant relation enabling
+        // the runtime tenant switcher (operators working at multiple
+        // restaurants). The schema migration runs everywhere, but the
+        // switcher UI is gated by the `multiTenantSwitcherEnabled` flag in
+        // AppSettings (default false), so pilot devices stay single-tenant
+        // until the operator (or remote config) opts in. Existing tickets
+        // / users are not touched — additive only.
+        await m.createTable(userTenantAssignments);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_user_tenant_user '
+          'ON user_tenant_assignments (user_id) '
+          'WHERE is_deleted = 0',
+        );
+        await customStatement(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_user_tenant_pair '
+          'ON user_tenant_assignments (user_id, tenant_id) '
+          'WHERE is_deleted = 0',
+        );
+      }
     },
     onCreate: (m) async {
       await m.createAll();
     },
   );
+
+  /// Returns true if [table] already has a column named [column] in the
+  /// live SQLite schema. Used to make ALTER TABLE migrations idempotent
+  /// across installs that may have been affected by Drift's createTable
+  /// pulling forward future column definitions.
+  Future<bool> _columnExists(String table, String column) async {
+    final rows = await customSelect(
+      "PRAGMA table_info('$table')",
+    ).get();
+    return rows.any((r) => r.read<String>('name') == column);
+  }
 
   /// Create a database backed by a file in the app documents directory.
   static AppDatabase create() {

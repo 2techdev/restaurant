@@ -53,12 +53,45 @@ class PullResult {
 
 /// HTTP client for sync push/pull operations.
 class SyncApiClient {
-  SyncApiClient({required this.baseUrl, this.timeout = const Duration(seconds: 30)});
+  SyncApiClient({
+    required this.baseUrl,
+    this.timeout = const Duration(seconds: 30),
+    this.authTokenProvider,
+    this.tenantIdProvider,
+  });
 
   final String baseUrl;
   final Duration timeout;
 
+  /// Async resolver for the Bearer token. Resolved per request so the
+  /// client picks up token rotations without rebuilding the provider.
+  /// Returns null/'' for local-demo / unauthenticated mode — those calls
+  /// go through without an Authorization header.
+  final Future<String?> Function()? authTokenProvider;
+
+  /// Resolves the active tenant for the current operator session. Wired to
+  /// `activeTenantProvider` (see core/tenant/active_tenant_provider.dart).
+  /// When a tenant is resolved, every request carries `X-Tenant-ID`, which
+  /// the cloud uses as the authoritative tenant scope (the body/query
+  /// `tenant_id` remains for backwards compatibility with v1 endpoints).
+  /// Returns null when no operator is signed in — callers stay tenant-less.
+  final String Function()? tenantIdProvider;
+
   final _client = http.Client();
+
+  Future<Map<String, String>> _headers({bool json = false}) async {
+    final headers = <String, String>{};
+    if (json) headers['Content-Type'] = 'application/json';
+    final token = await authTokenProvider?.call();
+    if (token != null && token.isNotEmpty && token != 'local') {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    final tid = tenantIdProvider?.call();
+    if (tid != null && tid.isNotEmpty) {
+      headers['X-Tenant-ID'] = tid;
+    }
+    return headers;
+  }
 
   /// Push a batch of events to the server.
   /// Returns (accepted, rejected) counts.
@@ -74,7 +107,7 @@ class SyncApiClient {
     final response = await _client
         .post(
           Uri.parse('$baseUrl/api/v1/sync/push'),
-          headers: {'Content-Type': 'application/json'},
+          headers: await _headers(json: true),
           body: body,
         )
         .timeout(timeout);
@@ -108,7 +141,8 @@ class SyncApiClient {
       },
     );
 
-    final response = await _client.get(uri).timeout(timeout);
+    final response =
+        await _client.get(uri, headers: await _headers()).timeout(timeout);
 
     if (response.statusCode != 200) {
       throw SyncApiException(
@@ -153,7 +187,8 @@ class SyncApiClient {
         if (cursor.isNotEmpty) 'cursor': cursor,
       },
     );
-    final response = await _client.get(uri).timeout(timeout);
+    final response =
+        await _client.get(uri, headers: await _headers()).timeout(timeout);
     if (response.statusCode != 200) {
       throw SyncApiException('Status check failed: ${response.statusCode}');
     }

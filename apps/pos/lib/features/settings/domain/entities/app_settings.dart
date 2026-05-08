@@ -116,6 +116,9 @@ class AppSettings {
     this.handedness = AppHandedness.right,
     this.highContrast = false,
     this.textScale = AppTextScale.medium,
+    this.posShowProductImages = false,
+    this.disabledRailIds = const <String>{},
+    this.multiTenantSwitcherEnabled = false,
   });
 
   /// Active color theme.
@@ -135,12 +138,39 @@ class AppSettings {
   /// User-chosen text size preset. Feeds into MediaQuery.textScaler.
   final AppTextScale textScale;
 
+  /// When true the items-grid product cards render their picture (the
+  /// per-product `imagePath`); when false, just the name + price. Toggled
+  /// from the in-shell Tweaks overlay; persists across app restarts via
+  /// the AppSettings repository — round-5 operator request.
+  final bool posShowProductImages;
+
+  /// IDs of POS rail entries the operator has manually hidden from the
+  /// fast-sale shell. Stored as a NEGATIVE list (disabled IDs) rather
+  /// than a positive whitelist so new rail entries added in future
+  /// builds appear by default — no migration needed when the rail set
+  /// grows. IDs map to the literal `id:` strings on `_RailBtn`
+  /// constructors (`bons`, `cancel`, `print`, `lock`).
+  /// Round-8 operator request: "kafama gore aktif pasif yapabileyim".
+  final Set<String> disabledRailIds;
+
+  /// Enables the runtime tenant switcher (F-multi-tenant, 2026-05-09). When
+  /// false (default), pilot devices stay locked to a single tenant — the
+  /// Settings tile + post-login picker stay hidden, the cloud sync continues
+  /// to use the device's primary tenantId, and the schema migration sits
+  /// idle. When flipped to true the operator can switch between tenants
+  /// they have been granted access to via [user_tenant_assignments]. Default
+  /// false guarantees pilot APK behaviour is unchanged.
+  final bool multiTenantSwitcherEnabled;
+
   AppSettings copyWith({
     AppThemeMode? themeMode,
     AppLanguage? language,
     AppHandedness? handedness,
     bool? highContrast,
     AppTextScale? textScale,
+    bool? posShowProductImages,
+    Set<String>? disabledRailIds,
+    bool? multiTenantSwitcherEnabled,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
@@ -148,6 +178,11 @@ class AppSettings {
         handedness: handedness ?? this.handedness,
         highContrast: highContrast ?? this.highContrast,
         textScale: textScale ?? this.textScale,
+        posShowProductImages:
+            posShowProductImages ?? this.posShowProductImages,
+        disabledRailIds: disabledRailIds ?? this.disabledRailIds,
+        multiTenantSwitcherEnabled:
+            multiTenantSwitcherEnabled ?? this.multiTenantSwitcherEnabled,
       );
 
   Map<String, dynamic> toJson() => {
@@ -156,6 +191,9 @@ class AppSettings {
         'handedness': handedness.name,
         'highContrast': highContrast,
         'textScale': textScale.name,
+        'posShowProductImages': posShowProductImages,
+        'disabledRailIds': disabledRailIds.toList(),
+        'multiTenantSwitcherEnabled': multiTenantSwitcherEnabled,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -170,6 +208,13 @@ class AppSettings {
         textScale: AppTextScale.fromString(
           (json['textScale'] as String?) ?? 'medium',
         ),
+        posShowProductImages:
+            (json['posShowProductImages'] as bool?) ?? false,
+        disabledRailIds: ((json['disabledRailIds'] as List<dynamic>?) ?? const [])
+            .whereType<String>()
+            .toSet(),
+        multiTenantSwitcherEnabled:
+            (json['multiTenantSwitcherEnabled'] as bool?) ?? false,
       );
 
   String toJsonString() => jsonEncode(toJson());
@@ -178,16 +223,31 @@ class AppSettings {
       AppSettings.fromJson(jsonDecode(s) as Map<String, dynamic>);
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AppSettings &&
-          themeMode == other.themeMode &&
-          language == other.language &&
-          handedness == other.handedness &&
-          highContrast == other.highContrast &&
-          textScale == other.textScale;
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! AppSettings) return false;
+    if (themeMode != other.themeMode) return false;
+    if (language != other.language) return false;
+    if (handedness != other.handedness) return false;
+    if (highContrast != other.highContrast) return false;
+    if (textScale != other.textScale) return false;
+    if (posShowProductImages != other.posShowProductImages) return false;
+    if (multiTenantSwitcherEnabled != other.multiTenantSwitcherEnabled) {
+      return false;
+    }
+    if (disabledRailIds.length != other.disabledRailIds.length) return false;
+    return disabledRailIds.containsAll(other.disabledRailIds);
+  }
 
   @override
-  int get hashCode =>
-      Object.hash(themeMode, language, handedness, highContrast, textScale);
+  int get hashCode => Object.hash(
+        themeMode,
+        language,
+        handedness,
+        highContrast,
+        textScale,
+        posShowProductImages,
+        multiTenantSwitcherEnabled,
+        Object.hashAllUnordered(disabledRailIds),
+      );
 }
