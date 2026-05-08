@@ -687,5 +687,30 @@
     "addonHqDesc": "Mehr-Restaurant-Kette mit Stammmenü-Cascade.",
     "addonBrandingName": "Custom Branding",
     "addonBrandingDesc": "Eigenes Logo + Farben auf Belegen und Online-Bestellung."
+  },
+  "admin": {
+    "tenants": {
+      "title": "Tenants verwalten",
+      "subtitle": "Sie können sich vorübergehend in jedes Restaurant-Admin-Konto einloggen.",
+      "col": {
+        "tenant": "Restaurant",
+        "owner": "Inhaber / Admin",
+        "adminCount": "Admin-Anzahl",
+        "lastActive": "Letzte Aktivität",
+        "action": "Aktion"
+      },
+      "login": "Als Benutzer anmelden",
+      "loggingIn": "Weiterleiten…",
+      "noOwner": "Kein Admin",
+      "noOwnerError": "Restaurant {tenant} hat keinen Admin-Benutzer.",
+      "empty": "Noch keine Tenants.",
+      "footer": "Jede Sitzung läuft nach 15 Minuten automatisch ab und wird im Audit-Log gespeichert.",
+      "genericError": "Anmeldung fehlgeschlagen. Bitte erneut versuchen."
+    }
+  },
+  "impersonation": {
+    "activeAs": "Sie sind als <target>{targetEmail}</target> angemeldet (Super-Admin: <super>{superAdminEmail}</super>).",
+    "exitButton": "Beenden",
+    "exiting": "Beende…"
   }
 }

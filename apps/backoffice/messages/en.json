@@ -687,5 +687,30 @@
     "addonHqDesc": "Multi-restaurant chain with master menu cascade.",
     "addonBrandingName": "Custom Branding",
     "addonBrandingDesc": "Your logo + colors on the receipts and online ordering."
+  },
+  "admin": {
+    "tenants": {
+      "title": "Manage Tenants",
+      "subtitle": "Temporarily log in as any tenant's admin to investigate and assist.",
+      "col": {
+        "tenant": "Restaurant",
+        "owner": "Owner / Admin",
+        "adminCount": "Admins",
+        "lastActive": "Last active",
+        "action": "Action"
+      },
+      "login": "Login as User",
+      "loggingIn": "Redirecting…",
+      "noOwner": "No admin",
+      "noOwnerError": "Tenant {tenant} has no admin user.",
+      "empty": "No tenants yet.",
+      "footer": "Each impersonation expires after 15 minutes and is recorded in the audit log.",
+      "genericError": "Could not log in. Please try again."
+    }
+  },
+  "impersonation": {
+    "activeAs": "You are logged in as <target>{targetEmail}</target> (Super Admin: <super>{superAdminEmail}</super>).",
+    "exitButton": "Exit",
+    "exiting": "Exiting…"
   }
 }

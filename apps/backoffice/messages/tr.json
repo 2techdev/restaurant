@@ -1047,5 +1047,30 @@
     "addonHqDesc": "Master menü cascade ile çok-restoranlı zincir.",
     "addonBrandingName": "Custom Branding",
     "addonBrandingDesc": "Kendi logo + renklerin fişlerde ve online sipariş üzerinde."
+  },
+  "admin": {
+    "tenants": {
+      "title": "Tenants — Süper Admin",
+      "subtitle": "Tüm restoranların admin hesaplarına geçici giriş yapabilirsiniz.",
+      "col": {
+        "tenant": "Restoran",
+        "owner": "Sahip / Admin",
+        "adminCount": "Admin Sayısı",
+        "lastActive": "Son Aktivite",
+        "action": "İşlem"
+      },
+      "login": "Giriş yap",
+      "loggingIn": "Yönlendiriliyor…",
+      "noOwner": "Admin yok",
+      "noOwnerError": "{tenant} restoranının admin kullanıcısı yok.",
+      "empty": "Henüz tenant yok.",
+      "footer": "Her giriş 15 dakika sonra otomatik sona erer ve audit log'a kaydedilir.",
+      "genericError": "Giriş yapılamadı. Tekrar deneyin."
+    }
+  },
+  "impersonation": {
+    "activeAs": "<target>{targetEmail}</target> olarak giriyorsun. Süper Admin: <super>{superAdminEmail}</super>.",
+    "exitButton": "Çıkış",
+    "exiting": "Çıkılıyor…"
   }
 }

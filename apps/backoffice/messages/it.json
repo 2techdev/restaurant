@@ -687,5 +687,30 @@
     "addonHqDesc": "Multi-restaurant chain with master menu cascade.",
     "addonBrandingName": "Custom Branding",
     "addonBrandingDesc": "Your logo + colors on the receipts and online ordering."
+  },
+  "admin": {
+    "tenants": {
+      "title": "Gestisci Tenants",
+      "subtitle": "Accedi temporaneamente come admin di qualsiasi tenant per assistere.",
+      "col": {
+        "tenant": "Ristorante",
+        "owner": "Proprietario / Admin",
+        "adminCount": "Admin",
+        "lastActive": "Ultima attività",
+        "action": "Azione"
+      },
+      "login": "Accedi come utente",
+      "loggingIn": "Reindirizzamento…",
+      "noOwner": "Nessun admin",
+      "noOwnerError": "Il ristorante {tenant} non ha un utente admin.",
+      "empty": "Nessun tenant.",
+      "footer": "Ogni sessione scade dopo 15 minuti ed è registrata nel registro di audit.",
+      "genericError": "Accesso non riuscito. Riprova."
+    }
+  },
+  "impersonation": {
+    "activeAs": "Sei connesso come <target>{targetEmail}</target> (Super Admin: <super>{superAdminEmail}</super>).",
+    "exitButton": "Esci",
+    "exiting": "Uscita…"
   }
 }
