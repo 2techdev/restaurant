@@ -38,6 +38,9 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v1/menu/modifiers", m.handleListModifiers)
 
+	// Magic-link onboarding — pull a menu snapshot from Reservation by token.
+	mux.HandleFunc("POST /api/v1/menu/import-from-token", m.handleImportFromToken)
+
 	// Cloud-master sync — version, snapshot, publish, api-key rotate.
 	m.registerSyncRoutes(mux)
 
