@@ -4,6 +4,13 @@
 /// Covers: seedIfEmpty idempotency, seedForce replace, clearAll, staff,
 /// categories, products, modifier groups, modifier options, modifier-product
 /// links, and tax profiles.
+///
+/// Updated 2026-05-09: schema v22 — seed reality refresh.
+/// - 7 staff (added Hans Koch / kitchen)
+/// - Avatars switched to Unsplash CDN URLs
+/// - 25 products total (added one beverage)
+/// - 7 modifier groups (added Getränke Extras + Schärfe)
+/// - "Zusätzliche Zutaten" → "Extras", "Getränkegrösse" → "Grösse"
 library;
 
 import 'package:drift/native.dart';
@@ -18,7 +25,6 @@ import 'package:gastrocore_pos/core/database/app_database.dart';
 
 AppDatabase _makeDb() => AppDatabase(NativeDatabase.memory());
 
-/// Seeds once and returns the database for assertions.
 Future<AppDatabase> _seededDb() async {
   final db = _makeDb();
   await SeedData(db).seedIfEmpty();
@@ -30,9 +36,6 @@ Future<AppDatabase> _seededDb() async {
 // ---------------------------------------------------------------------------
 
 void main() {
-  // -------------------------------------------------------------------------
-  // seedIfEmpty — basic smoke test
-  // -------------------------------------------------------------------------
   group('seedIfEmpty', () {
     test('creates exactly one tenant', () async {
       final db = await _seededDb();
@@ -47,25 +50,22 @@ void main() {
       final db = _makeDb();
       final seed = SeedData(db);
       await seed.seedIfEmpty();
-      await seed.seedIfEmpty(); // should be no-op
+      await seed.seedIfEmpty();
       final tenants = await db.select(db.tenants).get();
       expect(tenants.length, 1);
       await db.close();
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Staff
-  // -------------------------------------------------------------------------
   group('staff', () {
     late AppDatabase db;
 
     setUp(() async => db = await _seededDb());
     tearDown(() => db.close());
 
-    test('inserts 6 users', () async {
+    test('inserts 7 users', () async {
       final users = await db.select(db.users).get();
-      expect(users.length, 6);
+      expect(users.length, 7);
     });
 
     test('user names are correct', () async {
@@ -79,6 +79,7 @@ void main() {
           'Luca Bernasconi',
           'Anna Fischer',
           'Thomas Keller',
+          'Hans Koch',
         ]),
       );
     });
@@ -88,15 +89,15 @@ void main() {
       expect(roles, isSubsetOf({'admin', 'manager', 'waiter', 'cashier', 'kitchen'}));
     });
 
-    test('every user has an avatarPath', () async {
+    test('every user has an avatarPath (Unsplash URL)', () async {
       final users = await db.select(db.users).get();
       for (final u in users) {
+        expect(u.avatarPath, isNotNull, reason: '${u.name} should have an avatarPath');
         expect(
           u.avatarPath,
-          isNotNull,
-          reason: '${u.name} should have an avatarPath',
+          contains('unsplash.com'),
+          reason: '${u.name} should have a CDN avatar URL',
         );
-        expect(u.avatarPath, contains('assets/images/staff/'));
       }
     });
 
@@ -116,9 +117,6 @@ void main() {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Categories
-  // -------------------------------------------------------------------------
   group('categories', () {
     late AppDatabase db;
 
@@ -155,19 +153,16 @@ void main() {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Products
-  // -------------------------------------------------------------------------
   group('products', () {
     late AppDatabase db;
 
     setUp(() async => db = await _seededDb());
     tearDown(() => db.close());
 
-    test('creates 24 products total', () async {
+    test('creates 25 products total', () async {
       final products = await db.select(db.products).get();
-      // 4 starters + 6 mains + 4 pizza&pasta + 4 desserts + 6 beverages = 24
-      expect(products.length, 24);
+      // 4 starters + 6 mains + 4 pizza&pasta + 4 desserts + 7 beverages = 25
+      expect(products.length, 25);
     });
 
     test('all products have a positive price', () async {
@@ -220,18 +215,15 @@ void main() {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Modifier Groups
-  // -------------------------------------------------------------------------
   group('modifier groups', () {
     late AppDatabase db;
 
     setUp(() async => db = await _seededDb());
     tearDown(() => db.close());
 
-    test('creates 5 modifier groups', () async {
+    test('creates 7 modifier groups', () async {
       final groups = await db.select(db.modifierGroups).get();
-      expect(groups.length, 5);
+      expect(groups.length, 7);
     });
 
     test('group names are correct', () async {
@@ -241,11 +233,13 @@ void main() {
       expect(
         names,
         containsAll([
-          'Zusätzliche Zutaten',
+          'Extras',
           'Sauce',
           'Garpunkt',
-          'Getränkegrösse',
+          'Grösse',
           'Beilage',
+          'Getränke Extras',
+          'Schärfe',
         ]),
       );
     });
@@ -259,17 +253,17 @@ void main() {
       expect(g.maxSelections, 1);
     });
 
-    test('Zusätzliche Zutaten is optional, multiple, max=5', () async {
+    test('Extras is optional, multiple, max=5', () async {
       final g = (await db.select(db.modifierGroups).get())
-          .firstWhere((x) => x.name == 'Zusätzliche Zutaten');
+          .firstWhere((x) => x.name == 'Extras');
       expect(g.isRequired, isFalse);
       expect(g.selectionType, 'multiple');
       expect(g.maxSelections, 5);
     });
 
-    test('Getränkegrösse is required, single, min=1 max=1', () async {
+    test('Grösse is required, single, min=1 max=1', () async {
       final g = (await db.select(db.modifierGroups).get())
-          .firstWhere((x) => x.name == 'Getränkegrösse');
+          .firstWhere((x) => x.name == 'Grösse');
       expect(g.isRequired, isTrue);
       expect(g.selectionType, 'single');
       expect(g.maxSelections, 1);
@@ -291,39 +285,36 @@ void main() {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Modifier Options
-  // -------------------------------------------------------------------------
   group('modifier options', () {
     late AppDatabase db;
 
     setUp(() async => db = await _seededDb());
     tearDown(() => db.close());
 
-    test('Zusätzliche Zutaten has 5 options', () async {
+    test('Extras has 4 options', () async {
       final group = (await db.select(db.modifierGroups).get())
-          .firstWhere((g) => g.name == 'Zusätzliche Zutaten');
+          .firstWhere((g) => g.name == 'Extras');
       final opts = (await db.select(db.modifiers).get())
           .where((m) => m.groupId == group.id)
           .toList();
-      expect(opts.length, 5);
+      expect(opts.length, 4);
     });
 
-    test('Zusätzliche Zutaten contains Avocado at 300 cents', () async {
+    test('Extras contains Avocado at 350 cents', () async {
       final group = (await db.select(db.modifierGroups).get())
-          .firstWhere((g) => g.name == 'Zusätzliche Zutaten');
+          .firstWhere((g) => g.name == 'Extras');
       final avocado = (await db.select(db.modifiers).get())
           .firstWhere((m) => m.groupId == group.id && m.name == 'Avocado');
-      expect(avocado.priceDelta, 300);
+      expect(avocado.priceDelta, 350);
     });
 
-    test('Sauce has 5 options with Ketchup as default', () async {
+    test('Sauce has 4 options with Ketchup as default', () async {
       final group = (await db.select(db.modifierGroups).get())
           .firstWhere((g) => g.name == 'Sauce');
       final opts = (await db.select(db.modifiers).get())
           .where((m) => m.groupId == group.id)
           .toList();
-      expect(opts.length, 5);
+      expect(opts.length, 4);
       final defaultOpt = opts.firstWhere((m) => m.isDefault);
       expect(defaultOpt.name, 'Ketchup');
     });
@@ -339,12 +330,12 @@ void main() {
       expect(defaultOpt.name, 'Medium');
     });
 
-    test('Getränkegrösse Mittel costs +100 cents', () async {
+    test('Grösse Normal costs +200 cents', () async {
       final group = (await db.select(db.modifierGroups).get())
-          .firstWhere((g) => g.name == 'Getränkegrösse');
-      final mittel = (await db.select(db.modifiers).get())
-          .firstWhere((m) => m.groupId == group.id && m.name == 'Mittel');
-      expect(mittel.priceDelta, 100);
+          .firstWhere((g) => g.name == 'Grösse');
+      final normal = (await db.select(db.modifiers).get())
+          .firstWhere((m) => m.groupId == group.id && m.name == 'Normal');
+      expect(normal.priceDelta, 200);
     });
 
     test('Beilage has 4 options', () async {
@@ -365,9 +356,6 @@ void main() {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Product–Modifier Links
-  // -------------------------------------------------------------------------
   group('product-modifier links', () {
     late AppDatabase db;
 
@@ -398,21 +386,21 @@ void main() {
       );
     });
 
-    test('Burger Classic is linked to Zusätzliche Zutaten', () async {
+    test('Burger Classic is linked to Extras', () async {
       final burger = (await db.select(db.products).get())
           .firstWhere((p) => p.name == 'Burger Classic');
-      final zutaten = (await db.select(db.modifierGroups).get())
-          .firstWhere((g) => g.name == 'Zusätzliche Zutaten');
+      final extras = (await db.select(db.modifierGroups).get())
+          .firstWhere((g) => g.name == 'Extras');
       final links = await db.select(db.productModifierGroups).get();
       expect(
-        links.any((l) => l.productId == burger.id && l.modifierGroupId == zutaten.id),
+        links.any((l) => l.productId == burger.id && l.modifierGroupId == extras.id),
         isTrue,
       );
     });
 
-    test('all beverages are linked to Getränkegrösse', () async {
+    test('all beverages are linked to Grösse', () async {
       final groesse = (await db.select(db.modifierGroups).get())
-          .firstWhere((g) => g.name == 'Getränkegrösse');
+          .firstWhere((g) => g.name == 'Grösse');
       final beverages = (await db.select(db.products).get())
           .where((p) => p.taxGroup == 'beverage' || p.taxGroup == 'alcohol')
           .toList();
@@ -422,14 +410,14 @@ void main() {
           links.any((l) =>
               l.productId == bev.id && l.modifierGroupId == groesse.id),
           isTrue,
-          reason: '${bev.name} should be linked to Getränkegrösse',
+          reason: '${bev.name} should be linked to Grösse',
         );
       }
     });
 
-    test('all pizzas are linked to Zusätzliche Zutaten', () async {
-      final zutaten = (await db.select(db.modifierGroups).get())
-          .firstWhere((g) => g.name == 'Zusätzliche Zutaten');
+    test('all pizzas are linked to Extras', () async {
+      final extras = (await db.select(db.modifierGroups).get())
+          .firstWhere((g) => g.name == 'Extras');
       final pizzas = (await db.select(db.products).get())
           .where((p) => ['Margherita', 'Quattro Formaggi', 'Prosciutto e Rucola']
               .contains(p.name))
@@ -439,17 +427,14 @@ void main() {
       for (final pizza in pizzas) {
         expect(
           links.any((l) =>
-              l.productId == pizza.id && l.modifierGroupId == zutaten.id),
+              l.productId == pizza.id && l.modifierGroupId == extras.id),
           isTrue,
-          reason: '${pizza.name} should be linked to Zusätzliche Zutaten',
+          reason: '${pizza.name} should be linked to Extras',
         );
       }
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Tax Profiles
-  // -------------------------------------------------------------------------
   group('tax profiles', () {
     late AppDatabase db;
 
@@ -484,9 +469,6 @@ void main() {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Floors & Tables
-  // -------------------------------------------------------------------------
   group('floors and tables', () {
     late AppDatabase db;
 
@@ -509,34 +491,28 @@ void main() {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // seedForce — replace
-  // -------------------------------------------------------------------------
   group('seedForce', () {
     test('replaces existing data and leaves exactly 1 tenant', () async {
       final db = _makeDb();
       final seed = SeedData(db);
       await seed.seedIfEmpty();
-      await seed.seedForce(); // replace
+      await seed.seedForce();
       final tenants = await db.select(db.tenants).get();
       expect(tenants.length, 1);
       await db.close();
     });
 
-    test('after seedForce products count is still 24', () async {
+    test('after seedForce products count is still 25', () async {
       final db = _makeDb();
       final seed = SeedData(db);
       await seed.seedIfEmpty();
       await seed.seedForce();
       final products = await db.select(db.products).get();
-      expect(products.length, 24);
+      expect(products.length, 25);
       await db.close();
     });
   });
 
-  // -------------------------------------------------------------------------
-  // clearAll
-  // -------------------------------------------------------------------------
   group('clearAll', () {
     test('leaves database empty after clear', () async {
       final db = _makeDb();

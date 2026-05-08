@@ -292,6 +292,9 @@ void main() {
       repo = _FakeRepo(pendingCount: 3);
       notifier = SyncNotifier(
         repository: repo,
+        // Forced online so push paths are exercised; transitions are covered
+        // by sync_provider_test.dart's connectivity sub-suite.
+        isOnline: () => true,
         // Disable periodic timer in tests.
         periodicInterval: const Duration(days: 999),
       );

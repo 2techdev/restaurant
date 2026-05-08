@@ -35,14 +35,17 @@ void main() {
     expect(find.byKey(const Key('product_grid_column_toggle')), findsOneWidget);
   });
 
-  testWidgets('shows 2-sütun label when default is 2', (tester) async {
+  testWidgets('shows 2 SÜTUN label when default is 2', (tester) async {
+    // Label is uppercase in the rendered widget — preserves visual
+    // consistency with neighbouring rail buttons. Locale-aware: SÜTUN is
+    // the Turkish-uppercase form (preserved Ü / dotted İ rules).
     final container = ProviderContainer();
     addTearDown(container.dispose);
     await tester.pumpWidget(_harness(container));
     await tester.pumpAndSettle();
 
-    expect(find.text('2 sütun'), findsOneWidget);
-    expect(find.text('1 sütun'), findsNothing);
+    expect(find.text('2 SÜTUN'), findsOneWidget);
+    expect(find.text('1 SÜTUN'), findsNothing);
   });
 
   testWidgets('tap flips columns 2 → 1 and updates label', (tester) async {
@@ -57,7 +60,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(container.read(productGridColumnsProvider), 1);
-    expect(find.text('1 sütun'), findsOneWidget);
-    expect(find.text('2 sütun'), findsNothing);
+    expect(find.text('1 SÜTUN'), findsOneWidget);
+    expect(find.text('2 SÜTUN'), findsNothing);
   });
 }

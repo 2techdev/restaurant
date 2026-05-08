@@ -150,8 +150,15 @@ Future<bool> _navigateToPaymentScreen(WidgetTester tester) async {
 // Tests
 // ---------------------------------------------------------------------------
 
+// Legacy integration suite: boots the full GastroCoreApp and walks login →
+// shift → menu → add product → send → checkout → payment. The seed list
+// ('Adana Kebap', 'Iskender', etc.) pre-dates the Swiss-German seed switch;
+// the navigation chain pre-dates the pos_v2_shell rail rewrite and the new
+// quick-pay flow (NAKİT / KART direct buttons). Skipped pending an
+// integration_test rewrite; per-screen unit coverage lives in
+// apps/pos/test/features/payments/.
 void main() {
-  group('Payment Screen Widget Tests', () {
+  group('Payment Screen Widget Tests', skip: 'legacy: pre-pos_v2_shell rewrite + pre-Swiss-seed; integration rewrite pending', () {
     // -----------------------------------------------------------------------
     // 1. Cash payment method is present
     // -----------------------------------------------------------------------

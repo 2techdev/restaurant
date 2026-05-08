@@ -90,7 +90,10 @@ void main() {
 
     setUp(() {
       repo = _FakeSyncRepository();
-      notifier = SyncNotifier(repository: repo);
+      // The connectivity check is forced online for these tests; transitions
+      // are exercised via direct calls to sync() and the periodic timer is
+      // disposed in tearDown.
+      notifier = SyncNotifier(repository: repo, isOnline: () => true);
     });
 
     tearDown(() => notifier.dispose());
