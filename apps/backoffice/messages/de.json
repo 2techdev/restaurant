@@ -170,7 +170,33 @@
     "isRequired": "Pflicht",
     "lockedBadge": "HQ Gesperrt",
     "localBadge": "Lokal",
-    "lockedTooltip": "Dieses Produkt wurde von der Zentrale (HQ) gesperrt"
+    "lockedTooltip": "Dieses Produkt wurde von der Zentrale (HQ) gesperrt",
+    "import": {
+      "headerButton": "Aus Gastro Hub importieren",
+      "title": "Menü aus Gastro Hub importieren",
+      "codePlaceholder": "XXX-XXX",
+      "steps": { "input": "Code", "preview": "Vorschau", "result": "Ergebnis" },
+      "step1": {
+        "heading": "Verbindungscode eingeben",
+        "description": "Wenn Sie Ihr Menü zuvor auf gastro.2hub.ch eingerichtet haben, erstellen Sie dort einen Verbindungscode und fügen Sie ihn hier ein. Ihr bestehendes Menü wird in das POS-System kopiert.",
+        "codeLabel": "Verbindungscode",
+        "codeHint": "Format: XXX-XXX (z. B. M7K-9PQ). Codes sind 15 Minuten gültig.",
+        "previewButton": "Vorschau abrufen"
+      },
+      "step2": { "heading": "Vorschau", "description": "Prüfen Sie, was importiert wird, bevor Sie fortfahren.", "applyButton": "Importieren" },
+      "step3": {
+        "heading": "Menü erfolgreich importiert",
+        "description": "Ihr Menü wurde aus Gastro Hub übernommen.",
+        "categories": "Kategorien", "products": "Produkte", "modifiers": "Modifier-Gruppen",
+        "updated": "aktualisiert", "linkedAt": "Verknüpft am", "syncEventId": "Sync-Event-ID", "viewMenuButton": "Menü anzeigen"
+      },
+      "preview": {
+        "categories": "Kategorien", "products": "Produkte", "modifiers": "Modifier-Gruppen",
+        "new": "neu", "update": "Aktualisierung", "unchanged": "unverändert", "skip": "übersprungen", "error": "Fehler",
+        "warnings": "Hinweise", "rowReport": "Detaillierter Bericht ({count} Zeilen)",
+        "recordCol": "Datensatz", "statusCol": "Status", "moreRows": "weitere Zeilen"
+      }
+    }
   },
   "orders": {
     "title": "Bestellungen",

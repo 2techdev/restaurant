@@ -170,7 +170,33 @@
     "isRequired": "Required",
     "lockedBadge": "HQ Locked",
     "localBadge": "Local",
-    "lockedTooltip": "This product is locked by Headquarters (HQ)"
+    "lockedTooltip": "This product is locked by Headquarters (HQ)",
+    "import": {
+      "headerButton": "Import from Gastro Hub",
+      "title": "Import menu from Gastro Hub",
+      "codePlaceholder": "XXX-XXX",
+      "steps": { "input": "Code", "preview": "Preview", "result": "Result" },
+      "step1": {
+        "heading": "Enter connection code",
+        "description": "If you previously set up your menu on gastro.2hub.ch, generate a connection code there and paste it here. Your existing menu will be copied to the POS system.",
+        "codeLabel": "Connection code",
+        "codeHint": "Format: XXX-XXX (e.g. M7K-9PQ). Codes are valid for 15 minutes.",
+        "previewButton": "Get preview"
+      },
+      "step2": { "heading": "Preview", "description": "Review what will be imported before continuing.", "applyButton": "Import" },
+      "step3": {
+        "heading": "Menu imported successfully",
+        "description": "Your menu was successfully copied from Gastro Hub.",
+        "categories": "Categories", "products": "Products", "modifiers": "Modifier groups",
+        "updated": "updated", "linkedAt": "Linked at", "syncEventId": "Sync event ID", "viewMenuButton": "View menu"
+      },
+      "preview": {
+        "categories": "Categories", "products": "Products", "modifiers": "Modifier groups",
+        "new": "new", "update": "update", "unchanged": "unchanged", "skip": "skipped", "error": "errors",
+        "warnings": "Warnings", "rowReport": "Detailed report ({count} rows)",
+        "recordCol": "Record", "statusCol": "Status", "moreRows": "more rows"
+      }
+    }
   },
   "orders": {
     "title": "Orders",

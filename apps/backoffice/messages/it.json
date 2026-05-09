@@ -170,7 +170,33 @@
     "isRequired": "Obbligatorio",
     "lockedBadge": "Bloccato HQ",
     "localBadge": "Locale",
-    "lockedTooltip": "Questo prodotto è bloccato dalla sede centrale (HQ)"
+    "lockedTooltip": "Questo prodotto è bloccato dalla sede centrale (HQ)",
+    "import": {
+      "headerButton": "Importa da Gastro Hub",
+      "title": "Importa menu da Gastro Hub",
+      "codePlaceholder": "XXX-XXX",
+      "steps": { "input": "Codice", "preview": "Anteprima", "result": "Risultato" },
+      "step1": {
+        "heading": "Inserisci il codice di collegamento",
+        "description": "Se hai già configurato il tuo menu su gastro.2hub.ch, genera un codice di collegamento e incollalo qui. Il tuo menu sarà copiato nel sistema POS.",
+        "codeLabel": "Codice di collegamento",
+        "codeHint": "Formato: XXX-XXX (es. M7K-9PQ). I codici sono validi 15 minuti.",
+        "previewButton": "Ottieni anteprima"
+      },
+      "step2": { "heading": "Anteprima", "description": "Verifica cosa verrà importato prima di continuare.", "applyButton": "Importa" },
+      "step3": {
+        "heading": "Menu importato con successo",
+        "description": "Il tuo menu è stato copiato da Gastro Hub.",
+        "categories": "Categorie", "products": "Prodotti", "modifiers": "Gruppi modificatori",
+        "updated": "aggiornati", "linkedAt": "Collegato il", "syncEventId": "ID evento sync", "viewMenuButton": "Visualizza menu"
+      },
+      "preview": {
+        "categories": "Categorie", "products": "Prodotti", "modifiers": "Gruppi modificatori",
+        "new": "nuovo", "update": "aggiornamento", "unchanged": "invariato", "skip": "ignorato", "error": "errori",
+        "warnings": "Avvisi", "rowReport": "Report dettagliato ({count} righe)",
+        "recordCol": "Record", "statusCol": "Stato", "moreRows": "righe in più"
+      }
+    }
   },
   "orders": {
     "title": "Ordini",

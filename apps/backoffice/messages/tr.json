@@ -171,6 +171,54 @@
     "lockedBadge": "HQ Kilitli",
     "localBadge": "Yerel",
     "lockedTooltip": "Bu ürün merkez (HQ) tarafından kilitlendi",
+    "import": {
+      "headerButton": "Gastro Hub'dan İçe Aktar",
+      "title": "Gastro Hub'dan menüyü içe aktar",
+      "codePlaceholder": "XXX-XXX",
+      "steps": {
+        "input": "Kod",
+        "preview": "Önizleme",
+        "result": "Sonuç"
+      },
+      "step1": {
+        "heading": "Bağlantı kodunu girin",
+        "description": "Daha önce gastro.2hub.ch'de menünüzü kurduysanız, oradan bir bağlantı kodu üretip buraya yapıştırın. Mevcut menünüz POS sistemine kopyalanacak.",
+        "codeLabel": "Bağlantı kodu",
+        "codeHint": "Biçim: XXX-XXX (örn. M7K-9PQ). Kodlar 15 dakika geçerlidir.",
+        "previewButton": "Önizleme Al"
+      },
+      "step2": {
+        "heading": "Önizleme",
+        "description": "Devam etmeden önce nelerin içe aktarılacağını kontrol edin.",
+        "applyButton": "İçe Aktar"
+      },
+      "step3": {
+        "heading": "Menünüz başarıyla içe aktarıldı",
+        "description": "Gastro Hub'dan menü başarıyla alındı.",
+        "categories": "Kategoriler",
+        "products": "Ürünler",
+        "modifiers": "Modifier grupları",
+        "updated": "güncellendi",
+        "linkedAt": "Bağlantı zamanı",
+        "syncEventId": "Sync olay ID",
+        "viewMenuButton": "Menüyü Görüntüle"
+      },
+      "preview": {
+        "categories": "Kategoriler",
+        "products": "Ürünler",
+        "modifiers": "Modifier grupları",
+        "new": "yeni",
+        "update": "güncelleme",
+        "unchanged": "aynı",
+        "skip": "atlandı",
+        "error": "hata",
+        "warnings": "Uyarılar",
+        "rowReport": "Detaylı rapor ({count} satır)",
+        "recordCol": "Kayıt",
+        "statusCol": "Durum",
+        "moreRows": "satır daha"
+      }
+    },
     "productsPage": {
       "title": "Ürünler",
       "subtitle": "Menü ürünlerinizi yönetin, fiyatlandırın ve POS'a yayınlayın.",

@@ -170,7 +170,33 @@
     "isRequired": "Obligatoire",
     "lockedBadge": "Verrouillé HQ",
     "localBadge": "Local",
-    "lockedTooltip": "Ce produit est verrouillé par le siège (HQ)"
+    "lockedTooltip": "Ce produit est verrouillé par le siège (HQ)",
+    "import": {
+      "headerButton": "Importer depuis Gastro Hub",
+      "title": "Importer le menu depuis Gastro Hub",
+      "codePlaceholder": "XXX-XXX",
+      "steps": { "input": "Code", "preview": "Aperçu", "result": "Résultat" },
+      "step1": {
+        "heading": "Saisir le code de liaison",
+        "description": "Si vous avez déjà configuré votre menu sur gastro.2hub.ch, générez un code de liaison et collez-le ici. Votre menu sera copié dans le système POS.",
+        "codeLabel": "Code de liaison",
+        "codeHint": "Format : XXX-XXX (ex. M7K-9PQ). Les codes sont valides 15 minutes.",
+        "previewButton": "Obtenir l'aperçu"
+      },
+      "step2": { "heading": "Aperçu", "description": "Vérifiez ce qui sera importé avant de continuer.", "applyButton": "Importer" },
+      "step3": {
+        "heading": "Menu importé avec succès",
+        "description": "Votre menu a été copié depuis Gastro Hub.",
+        "categories": "Catégories", "products": "Produits", "modifiers": "Groupes de modificateurs",
+        "updated": "mis à jour", "linkedAt": "Lié le", "syncEventId": "ID d'événement sync", "viewMenuButton": "Voir le menu"
+      },
+      "preview": {
+        "categories": "Catégories", "products": "Produits", "modifiers": "Groupes de modificateurs",
+        "new": "nouveau", "update": "mise à jour", "unchanged": "inchangé", "skip": "ignoré", "error": "erreurs",
+        "warnings": "Avertissements", "rowReport": "Rapport détaillé ({count} lignes)",
+        "recordCol": "Enregistrement", "statusCol": "Statut", "moreRows": "lignes supplémentaires"
+      }
+    }
   },
   "orders": {
     "title": "Commandes",
