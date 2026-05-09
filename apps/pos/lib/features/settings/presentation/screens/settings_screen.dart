@@ -46,8 +46,11 @@ import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/favori
 import 'package:gastrocore_pos/core/services/backup_service.dart';
 import 'package:gastrocore_pos/features/auth/domain/entities/permission.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/fast_sale/domain/restaurant_config.dart';
+import 'package:gastrocore_pos/features/fast_sale/presentation/providers/restaurant_config_provider.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/backup_provider.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
+import 'package:gastrocore_pos/features/settings/presentation/widgets/tenant_switcher_pane.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_settings.dart';
 import 'package:gastrocore_pos/features/updates/domain/app_version.dart';
 import 'package:gastrocore_pos/features/updates/domain/entities/update_manifest.dart';
@@ -68,6 +71,7 @@ import 'package:intl/intl.dart';
 
 enum _Section {
   restaurant('Restaurant', Icons.storefront_rounded),
+  posMode('POS Modu', Icons.flash_on_rounded),
   printer('Printer', Icons.print_rounded),
   payment('Payment', Icons.payment_rounded),
   receipt('Receipt', Icons.receipt_long_rounded),
@@ -81,6 +85,7 @@ enum _Section {
   auditLog('Audit Log', Icons.history_rounded),
   loyalty('Treueprogramm', Icons.card_giftcard_rounded),
   demoData('Demo Data', Icons.science_outlined),
+  tenantSwitcher('Mağaza Seçici', Icons.store_rounded),
   upgrade('License & Upgrade', Icons.workspace_premium_rounded),
   updates('Güncelleme', Icons.system_update_alt_rounded),
   syncDlq('Senkron DLQ', Icons.error_outline_rounded),
@@ -134,16 +139,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _navigateBack() {
+    // Settings is opened from the POS sales shell; the user always wants
+    // to land back on `/pos`, not the analytics dashboard at `/home`.
+    // If the router has a closer entry on the stack we still pop first
+    // (preserves modal nesting), otherwise we go straight to POS.
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go('/home');
+      context.go(AppRoutes.pos);
     }
   }
 
   Widget _buildContent() {
     return switch (_selected) {
       _Section.restaurant => const _RestaurantSection(),
+      _Section.posMode => const _PosModeSection(),
       _Section.printer => const _PrinterSection(),
       _Section.payment => const _PaymentSection(),
       _Section.receipt => const _ReceiptSection(),
@@ -157,6 +167,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _Section.auditLog => _AuditLogLinkSection(onNavigate: _navigateBack),
       _Section.loyalty => const _LoyaltySection(),
       _Section.demoData => const _DemoDataSection(),
+      _Section.tenantSwitcher => const TenantSwitcherPane(),
       _Section.upgrade => const _UpgradeSection(),
       _Section.updates => const _UpdatesSection(),
       _Section.syncDlq => const _SyncDlqSection(),
@@ -176,13 +187,21 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final backLabel = l10n.settingsBackToPos;
     return Container(
       height: 56,
       color: AppColors.surfaceContainer,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
-          _IconBtn(icon: Icons.arrow_back_rounded, onTap: onBack),
+          // Leading icon-only back button — preserves the original
+          // affordance for users who learnt to look top-left.
+          Semantics(
+            button: true,
+            label: backLabel,
+            child: _IconBtn(icon: Icons.arrow_back_rounded, onTap: onBack),
+          ),
           const SizedBox(width: 12),
           _GastroCoreLogo(),
           const SizedBox(width: 16),
@@ -195,7 +214,13 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          _TextBtn(label: 'Back', onTap: onBack),
+          // Trailing labelled button — explicit "Zurück zum POS" /
+          // "POS'a Dön" so operators know exactly where Back lands them.
+          Semantics(
+            button: true,
+            label: backLabel,
+            child: _TextBtn(label: backLabel, onTap: onBack),
+          ),
         ],
       ),
     );
@@ -206,28 +231,46 @@ class _TopBar extends StatelessWidget {
 // Sidebar
 // ---------------------------------------------------------------------------
 
-class _Sidebar extends StatelessWidget {
+class _Sidebar extends ConsumerWidget {
   const _Sidebar({required this.selected, required this.onSelect});
 
   final _Section selected;
   final ValueChanged<_Section> onSelect;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The runtime tenant switcher tile only appears when the operator
+    // (or remote config) has flipped multiTenantSwitcherEnabled. The
+    // flag's default-false keeps pilot devices identical to the pre-
+    // multi-tenant build. While the AsyncValue is loading we hide the
+    // tile too — preferring not-shown to a flicker.
+    final settingsAsync = ref.watch(appSettingsProvider);
+    final showTenantSwitcher = settingsAsync.maybeWhen(
+      data: (s) => s.multiTenantSwitcherEnabled,
+      orElse: () => false,
+    );
+
+    final visible = _Section.values.where((s) {
+      if (s == _Section.tenantSwitcher && !showTenantSwitcher) return false;
+      return true;
+    });
+
     return Container(
       width: 220,
       color: AppColors.surface,
       padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        children: _Section.values
-            .map(
-              (s) => _SidebarItem(
-                section: s,
-                isSelected: s == selected,
-                onTap: () => onSelect(s),
-              ),
-            )
-            .toList(),
+      child: SingleChildScrollView(
+        child: Column(
+          children: visible
+              .map(
+                (s) => _SidebarItem(
+                  section: s,
+                  isSelected: s == selected,
+                  onTap: () => onSelect(s),
+                ),
+              )
+              .toList(),
+        ),
       ),
     );
   }
@@ -577,13 +620,17 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
 
     final notifier =
         ref.read(restaurantSettingsProvider.notifier);
-    await notifier.save(RestaurantSettings(
+    // Use copyWith so identity edits don't clobber operator preferences
+    // owned by other tabs (gang toggles, temporary-table flag, shift
+    // policy …). Falling back to a fresh entity if the repo hasn't
+    // loaded yet matches the pre-2026-04-23 behaviour.
+    final current = ref.read(restaurantSettingsProvider).valueOrNull ??
+        const RestaurantSettings();
+    await notifier.save(current.copyWith(
       name: _nameCtrl.text.trim(),
       address: _addressCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
       mwstNr: _mwstCtrl.text.trim(),
-      logoPath:
-          ref.read(restaurantSettingsProvider).valueOrNull?.logoPath,
     ));
     if (mounted) {
       _showSnack('Restaurant settings saved.');
@@ -687,6 +734,57 @@ class _RestaurantSectionState extends ConsumerState<_RestaurantSection> {
               onChanged: (v) => ref
                   .read(restaurantSettingsProvider.notifier)
                   .update((s) => s.copyWith(shiftStartRequired: v)),
+            ),
+            _Toggle(
+              label: 'Per-gang fire chip',
+              subtitle:
+                  'When off (pilot default) the global "Senden" footer '
+                  'sends every unsent item in one tap. Turn on for '
+                  'fine-dining workflows that fire each course on its '
+                  'own timer; the GÖNDER chip then reappears next to '
+                  'every gang section.',
+              value:
+                  settingsAsync.valueOrNull?.enablePerGangFire ?? false,
+              onChanged: (v) => ref
+                  .read(restaurantSettingsProvider.notifier)
+                  .update((s) => s.copyWith(enablePerGangFire: v)),
+            ),
+            _Toggle(
+              label: 'Allow temporary tables',
+              subtitle:
+                  'Lets cashiers spin up an ad-hoc table from the sales '
+                  'shell — type "150" on the numpad, ring up the round, '
+                  'and the table disappears once the bill is paid. '
+                  'Turn off to lock the table list to the floor plan.',
+              value: settingsAsync.valueOrNull?.allowTemporaryTables ??
+                  true,
+              onChanged: (v) => ref
+                  .read(restaurantSettingsProvider.notifier)
+                  .update((s) => s.copyWith(allowTemporaryTables: v)),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'PRODUCT TILE SIZE',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.0,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _PosTileSizeControls(
+              scale: (settingsAsync.valueOrNull?.posTileScale ?? 1.0)
+                  .clamp(0.7, 1.5)
+                  .toDouble(),
+              mode: settingsAsync.valueOrNull?.posTileMode ??
+                  PosTileMode.fixed,
+              onScaleChanged: (next) => ref
+                  .read(restaurantSettingsProvider.notifier)
+                  .update((s) => s.copyWith(posTileScale: next)),
+              onModeChanged: (next) => ref
+                  .read(restaurantSettingsProvider.notifier)
+                  .update((s) => s.copyWith(posTileMode: next)),
             ),
           ],
         ),
@@ -5666,7 +5764,7 @@ class _SyncDlqSection extends ConsumerWidget {
                 return ListView.separated(
                   itemCount: events.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) => _DlqTile(event: events[i]),
+                              itemBuilder: (_, i) => _DlqTile(event: events[i]),
                 );
               },
             ),
@@ -5761,6 +5859,515 @@ class _DlqTile extends ConsumerWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// M7 — POS product tile size selector
+// ---------------------------------------------------------------------------
+
+/// Composite control surfaced inside the WORKFLOW card on the Restaurant
+/// settings tab. Four pieces, all bound to the same `posTileScale`
+/// scalar plus the `posTileMode` enum:
+///
+///   * **AutoFit switch** — when on, the items grid in the sales shell
+///     packs the active category to fill the viewport (no scroll). The
+///     manual scale + presets are then irrelevant, so we grey them out.
+///   * **XS/S/M/L/XL preset shortcuts** — quick taps that snap the
+///     scalar to one of the canonical [PosTileSize] presets (0.7 /
+///     0.85 / 1.0 / 1.2 / 1.5). Disabled when AutoFit is on.
+///   * **Free-form slider** — 0.7 .. 1.5 in 0.05 steps. Drives the
+///     scalar directly so operators can dial in a value that doesn't
+///     match any preset. Disabled when AutoFit is on.
+///   * **Live preview tile** — a miniature `_PCard`-shaped card that
+///     renders product name + price using the current scale. Greyed
+///     out (faded) when AutoFit is on so the operator sees the manual
+///     control set is currently bypassed.
+class _PosTileSizeControls extends StatelessWidget {
+  const _PosTileSizeControls({
+    required this.scale,
+    required this.mode,
+    required this.onScaleChanged,
+    required this.onModeChanged,
+  });
+
+  /// Current `posTileScale` value, already clamped to `[0.7, 1.5]` by
+  /// the caller.
+  final double scale;
+
+  /// Current layout strategy. When [PosTileMode.autoFit] the manual
+  /// controls (segmented + slider + preview) render disabled.
+  final PosTileMode mode;
+
+  /// Setter wired to `restaurantSettingsProvider.update((s) =>
+  /// s.copyWith(posTileScale: next))`. Receives a raw double so the
+  /// slider can hand off any 0.05 step in range; the segmented preset
+  /// shortcut hands off canonical scales (0.7 / 0.85 / 1.0 / 1.2 / 1.5).
+  final ValueChanged<double> onScaleChanged;
+
+  /// Setter wired to `restaurantSettingsProvider.update((s) =>
+  /// s.copyWith(posTileMode: next))`. Driven by the AutoFit switch.
+  final ValueChanged<PosTileMode> onModeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final nearestPreset = PosTileSize.forScale(scale);
+    final autoFitOn = mode == PosTileMode.autoFit;
+    // Manual controls are bypassed while autoFit owns the layout —
+    // greyed-out look mirrors Material disabled affordances.
+    final disabled = autoFitOn;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // AutoFit switch. Sits at the top so the operator sees it before
+        // touching the manual controls below.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.posTileAutoFitLabel,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    l10n.posTileAutoFitDesc,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Switch(
+              key: const Key('tile-mode-autofit'),
+              value: autoFitOn,
+              onChanged: (v) => onModeChanged(
+                v ? PosTileMode.autoFit : PosTileMode.fixed,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        // Preset shortcuts (XS/S/M/L/XL). Stay live alongside the slider
+        // so a tap snaps the scalar back onto a canonical value. When
+        // autoFit is on, every button renders disabled (grey).
+        IgnorePointer(
+          ignoring: disabled,
+          child: Opacity(
+            opacity: disabled ? 0.45 : 1.0,
+            child: _PosTileSizeSegmented(
+              value: nearestPreset,
+              l10n: l10n,
+              onChanged: (size) => onScaleChanged(size.scale),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Free-form slider. divisions:16 → 0.05 step over [0.7, 1.5].
+        Opacity(
+          opacity: disabled ? 0.45 : 1.0,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'Slider',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.6,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${scale.toStringAsFixed(2)}x',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+              Slider(
+                min: 0.7,
+                max: 1.5,
+                divisions: 16,
+                value: scale.clamp(0.7, 1.5),
+                label: scale.toStringAsFixed(2),
+                onChanged: disabled
+                    ? null
+                    : (v) {
+                        // Snap to two decimals so the persisted scalar
+                        // tracks the slider's 0.05 step exactly. Avoids
+                        // 1.0500000000001 cruft.
+                        final snapped = (v * 20).round() / 20.0;
+                        onScaleChanged(snapped);
+                      },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Live preview demo tile — same colour palette and typography
+        // shape as `_PCard` on the sales shell so the operator gets a
+        // realistic before/after as they drag the slider. Faded when
+        // AutoFit is on (control set bypassed).
+        const Text(
+          'Vorschau',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.6,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: Opacity(
+            opacity: disabled ? 0.45 : 1.0,
+            child: _PosTileDemo(scale: scale),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Miniature replica of the sales-shell `_PCard` used on the settings
+/// screen's tile-size preview. Only mirrors the layout and typography
+/// scaling — no taps, no riverpod, no cart badge — so this widget can
+/// live in the settings file without dragging the v2 shell internals
+/// across module boundaries.
+class _PosTileDemo extends StatelessWidget {
+  const _PosTileDemo({required this.scale});
+
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    // Matches the canonical 180dp min tile width × 130dp row height
+    // from `_ItemsGrid`, scaled identically.
+    final width = 180.0 * scale;
+    final height = 130.0 * scale;
+    // Sample palette mirroring v2 category tints (warm orange) so the
+    // preview reads as a real product tile, not a generic card.
+    const bg = Color(0xFFE6884A);
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x24000000),
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Centred product name — mirrors the new `_PCard` layout.
+          Expanded(
+            child: Center(
+              child: Text(
+                'Demo Ürün',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 16 * scale,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  height: 1.15,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          // Price row, also centred to match the production tile.
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                'CHF',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11 * scale,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+              const SizedBox(width: 3),
+              Text(
+                '12.50',
+                style: TextStyle(
+                  fontFamily: 'WorkSans',
+                  fontSize: 18 * scale,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Five-button segmented control surfaced inside the WORKFLOW card on
+/// the Restaurant settings tab. Picks one of [PosTileSize.xs] / `s` /
+/// `m` / `l` / `xl`; the selected preset's `scale` factor flows
+/// through `RestaurantSettings.posTileScale` to every product tile in
+/// the pilot v2 sales shell (Schnellverkauf bar + items grid).
+class _PosTileSizeSegmented extends StatelessWidget {
+  const _PosTileSizeSegmented({
+    required this.value,
+    required this.l10n,
+    required this.onChanged,
+  });
+
+  final PosTileSize value;
+  final AppLocalizations l10n;
+  final ValueChanged<PosTileSize> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        children: [
+          for (final size in PosTileSize.values)
+            Expanded(
+              child: _PosTileSizeButton(
+                key: Key('tile-size-${size.name}'),
+                label: switch (size) {
+                  PosTileSize.xs => l10n.posTileSizeXs,
+                  PosTileSize.s => l10n.posTileSizeS,
+                  PosTileSize.m => l10n.posTileSizeM,
+                  PosTileSize.l => l10n.posTileSizeL,
+                  PosTileSize.xl => l10n.posTileSizeXl,
+                },
+                hint: '${size.scale}x',
+                isActive: size == value,
+                onTap: () => onChanged(size),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PosTileSizeButton extends StatelessWidget {
+  const _PosTileSizeButton({
+    super.key,
+    required this.label,
+    required this.hint,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  final String label;
+  final String hint;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isActive ? AppColors.primary : Colors.transparent,
+      borderRadius: BorderRadius.circular(6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isActive
+                      ? Colors.white
+                      : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                hint,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isActive
+                      ? Colors.white.withValues(alpha: 0.85)
+                      : AppColors.textSecondary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _PosModeSection — Fast Sale / Hybrid (Tisch + Schnell) toggle.
+// ---------------------------------------------------------------------------
+
+class _PosModeSection extends ConsumerWidget {
+  const _PosModeSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final effective = ref.watch(effectiveRestaurantConfigProvider);
+    final selected = effective.posMode;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.settingsPosMode,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _PosModeRadio(
+            value: PosMode.fastSale,
+            groupValue: selected,
+            title: l10n.settingsPosModeFastSale,
+            subtitle: l10n.settingsPosModeFastSaleDesc,
+            onChanged: (v) => _setMode(ref, v, effective.featureTisch),
+          ),
+          const SizedBox(height: 12),
+          _PosModeRadio(
+            value: PosMode.hybrid,
+            groupValue: selected,
+            title: l10n.settingsPosModeHybrid,
+            subtitle: l10n.settingsPosModeHybridDesc,
+            // Hybrid implies feature_tisch is on for this device.
+            onChanged: (v) => _setMode(ref, v, true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _setMode(WidgetRef ref, PosMode mode, bool featureTisch) async {
+    await ref.read(restaurantConfigOverrideProvider.notifier).setOverride(
+          RestaurantConfig(
+            posMode: mode,
+            featureTisch: mode == PosMode.hybrid ? true : featureTisch,
+          ),
+        );
+  }
+}
+
+class _PosModeRadio extends StatelessWidget {
+  const _PosModeRadio({
+    required this.value,
+    required this.groupValue,
+    required this.title,
+    required this.subtitle,
+    required this.onChanged,
+  });
+
+  final PosMode value;
+  final PosMode groupValue;
+  final String title;
+  final String subtitle;
+  final ValueChanged<PosMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = value == groupValue;
+    return InkWell(
+      onTap: () => onChanged(value),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF1D4ED8)
+                : const Color(0xFFE5E7EB),
+            width: isSelected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Radio<PosMode>(
+              value: value,
+              groupValue: groupValue,
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -13,6 +13,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -23,6 +24,7 @@ import 'package:gastrocore_pos/core/data/app_initializer.dart';
 import 'package:gastrocore_pos/core/data/seed_data.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
+import 'package:gastrocore_pos/core/tenant/active_tenant_provider.dart';
 import 'package:gastrocore_pos/features/brand_auth/presentation/providers/brand_auth_provider.dart';
 import 'package:gastrocore_pos/features/licensing/data/repositories/license_repository_impl.dart';
 import 'package:gastrocore_pos/features/sync/presentation/providers/sync_provider.dart';
@@ -34,6 +36,19 @@ void main() {
   // instead of a blank/black window on the pilot tablet.
   runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // Round-11 operator request: app-wide fullscreen — every screen
+    // (login, PIN, POS shell, Bons history, Reports, Settings) must
+    // run without the Android status bar / nav bar showing. The
+    // POS shell-only immersive call from round-10 only kicked in once
+    // the cashier was inside the till; intermediate routes still
+    // surfaced the system chrome. Setting it here in `main` once at
+    // startup, plus the native [`MainActivity.onWindowFocusChanged`]
+    // re-applier, keeps the chrome hidden across the entire session.
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.immersiveSticky,
+      overlays: const [],
+    );
 
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
@@ -113,11 +128,22 @@ Future<void> _bootstrap() async {
       prefs.getString('sync_server_url') ?? AppEndpoints.apiBaseUrl;
   final wsUrl = prefs.getString('ws_server_url') ?? AppEndpoints.wsBaseUrl;
 
+  // Hydrate the active tenant from SharedPreferences so a switcher choice
+  // made in a previous session survives a process restart. Falls back to
+  // the device's pinned primary tenant when no override is stored — pilot
+  // devices stay single-tenant unless the operator opts into the
+  // multiTenantSwitcherEnabled flag and picks a different tenant.
+  final activeTenantNotifier = ActiveTenantNotifier(
+    primaryTenantId: tenantId,
+    prefs: prefs,
+  );
+
   // Build the ProviderScope so we can restore brand auth before the first frame.
   final container = ProviderContainer(
     overrides: [
       databaseProvider.overrideWithValue(db),
       tenantIdProvider.overrideWithValue(tenantId),
+      activeTenantProvider.overrideWith((ref) => activeTenantNotifier),
       deviceIdProvider.overrideWith((ref) => deviceId),
       syncServerUrlProvider.overrideWith((ref) => syncUrl),
       wsServerUrlProvider.overrideWith((ref) => wsUrl),

@@ -13,10 +13,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/router/app_router.dart';
+import 'package:gastrocore_pos/core/tenant/active_tenant_provider.dart';
+import 'package:gastrocore_pos/core/tenant/user_tenant_repository.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/fast_sale/presentation/providers/restaurant_config_provider.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
+import 'package:gastrocore_pos/features/settings/presentation/widgets/tenant_switcher_pane.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/providers/shift_provider.dart';
 
 class PinLoginScreen extends ConsumerStatefulWidget {
@@ -113,6 +118,37 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
     });
   }
 
+  /// Show the tenant picker after a successful PIN login when:
+  ///   1. multiTenantSwitcherEnabled is true (off by default for pilot), AND
+  ///   2. The user has 2+ confirmed assignments in user_tenant_assignments.
+  /// Otherwise this is a no-op so pilot single-tenant flow stays untouched.
+  Future<void> _maybePromptTenant() async {
+    final settingsAsync = ref.read(appSettingsProvider);
+    final flagOn = settingsAsync.maybeWhen(
+      data: (s) => s.multiTenantSwitcherEnabled,
+      orElse: () => false,
+    );
+    if (!flagOn) return;
+
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    final repo = UserTenantRepository(ref.read(databaseProvider));
+    final assignments = await repo.getTenantsForUser(user.id);
+    final confirmed = assignments.where((a) => a.isConfirmed).toList();
+    if (confirmed.length < 2) return;
+
+    if (!mounted) return;
+    final picked = await showTenantPickerSheet(
+      context,
+      tenants: confirmed,
+      initialTenantId: ref.read(activeTenantProvider),
+    );
+    if (picked != null && picked.isNotEmpty) {
+      await ref.read(activeTenantProvider.notifier).switchTo(picked);
+    }
+  }
+
   Future<void> _onEnter() async {
     if (_pin.length < _pinLength || _isLoggingIn) return;
 
@@ -126,14 +162,35 @@ class _PinLoginScreenState extends ConsumerState<PinLoginScreen>
     if (!mounted) return;
 
     if (result == LoginResult.success) {
+      // Multi-tenant prompt — gated by AppSettings.multiTenantSwitcherEnabled.
+      // When the flag is on AND the operator has 2+ confirmed tenant
+      // assignments, surface "Hangi mağazada çalışacaksın?" before the
+      // shift / home routing fires. Switching the active tenant here lets
+      // every downstream screen (orders, payments, sync) read the right
+      // tenant via activeTenantProvider on first frame. When the flag is
+      // off (default for pilot), this whole block is skipped — pilot
+      // behaviour is unchanged.
+      await _maybePromptTenant();
+      if (!mounted) return;
+
       await ref.read(currentShiftProvider.notifier).loadCurrentShift();
       if (!mounted) return;
 
       final shift = ref.read(currentShiftProvider);
       final settings = ref.read(restaurantSettingsProvider).valueOrNull;
       final shiftRequired = settings?.shiftStartRequired ?? true;
+      // Restaurant config drives the home destination. featureTisch=on
+      // keeps the existing /order-center (floor plan + table service)
+      // flow as the main UI — that's the default for every dine-in
+      // pilot. Only snack-bar / bakery / food-truck pilots that opt
+      // out of tables (featureTisch=false) boot straight into
+      // /fast-sale.
+      final restaurantCfg = ref.read(effectiveRestaurantConfigProvider);
+      final home = restaurantCfg.featureTisch
+          ? AppRoutes.orderCenter
+          : AppRoutes.fastSale;
       if (shift != null || !shiftRequired) {
-        context.go(AppRoutes.orderCenter);
+        context.go(home);
       } else {
         context.go(AppRoutes.shiftOpen);
       }

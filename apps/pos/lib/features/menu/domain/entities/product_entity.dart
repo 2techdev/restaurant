@@ -80,6 +80,17 @@ class ProductEntity {
   /// floored at zero.
   final int? comboDiscountCents;
 
+  /// "Online'da popüler" — surfaced read-only in the linked-items overlay
+  /// tab. Authored in the Gastro Hub admin panel and synced down via
+  /// menu_sync (server migration 026 / local Drift v24). Default false.
+  final bool isPopularOnline;
+
+  /// Raw JSON blob (string-encoded) carrying the cloud allergen breakdown,
+  /// e.g. `{"contains":["gluten"],"mayContain":["nuts"],"freeFrom":[]}`.
+  /// Decoded only inside [LinkedItemsOverlayTab] — every other surface
+  /// ignores it. Null when no allergen info has been published yet.
+  final String? allergenInfo;
+
   const ProductEntity({
     required this.id,
     required this.tenantId,
@@ -104,6 +115,8 @@ class ProductEntity {
     this.defaultGangId,
     this.isCombo = false,
     this.comboDiscountCents,
+    this.isPopularOnline = false,
+    this.allergenInfo,
   });
 
   /// Whether this product has configurable modifiers.
@@ -134,6 +147,8 @@ class ProductEntity {
     String? Function()? defaultGangId,
     bool? isCombo,
     int? Function()? comboDiscountCents,
+    bool? isPopularOnline,
+    String? Function()? allergenInfo,
   }) {
     return ProductEntity(
       id: id ?? this.id,
@@ -163,6 +178,8 @@ class ProductEntity {
       comboDiscountCents: comboDiscountCents != null
           ? comboDiscountCents()
           : this.comboDiscountCents,
+      isPopularOnline: isPopularOnline ?? this.isPopularOnline,
+      allergenInfo: allergenInfo != null ? allergenInfo() : this.allergenInfo,
     );
   }
 

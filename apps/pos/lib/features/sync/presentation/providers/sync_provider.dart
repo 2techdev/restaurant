@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
 import 'package:gastrocore_pos/core/providers/connectivity_provider.dart';
+import 'package:gastrocore_pos/core/tenant/active_tenant_provider.dart';
+import 'package:gastrocore_pos/features/brand_auth/presentation/providers/brand_auth_provider.dart';
 import 'package:gastrocore_pos/features/sync/data/clients/sync_api_client.dart';
 import 'package:gastrocore_pos/features/sync/data/clients/websocket_sync_client.dart';
 import 'package:gastrocore_pos/features/sync/data/repositories/sync_repository_impl.dart';
@@ -24,7 +26,7 @@ final syncServerUrlProvider = StateProvider<String>(
 
 /// The cloud WebSocket base URL (defaults to [AppEndpoints.wsBaseUrl]).
 /// Exposed separately so REST and WS can live on different subdomains
-/// (e.g. `api.2hub.ch` + `ws.2hub.ch`). Overridable at runtime via
+/// (e.g. `api.gastrocore.ch` + `ws.gastrocore.ch`). Overridable at runtime via
 /// Settings → Sync.
 final wsServerUrlProvider = StateProvider<String>(
   (ref) => AppEndpoints.wsBaseUrl,
@@ -37,9 +39,27 @@ final wsServerUrlProvider = StateProvider<String>(
 /// The sync API HTTP client.
 final syncApiClientProvider = Provider<SyncApiClient>((ref) {
   final url = ref.watch(syncServerUrlProvider);
-  final client = SyncApiClient(baseUrl: url);
+  final tokenStorage = ref.watch(tokenStorageProvider);
+  final client = SyncApiClient(
+    baseUrl: url,
+    authTokenProvider: tokenStorage.readAccessToken,
+    // Resolve at request-time (not at provider build) so a runtime tenant
+    // switch via activeTenantProvider takes effect on the very next push /
+    // pull without rebuilding the HTTP client. Multi-tenant operators see
+    // the new X-Tenant-ID header immediately after picking a different
+    // store; pilot devices keep emitting the device's primary tenant.
+    tenantIdProvider: () => ref.read(activeTenantProvider),
+  );
   ref.onDispose(client.dispose);
   return client;
+});
+
+/// True when the brand session is in online mode (real cloud account).
+/// Local demo / offline-only sessions return false — sync push/pull and
+/// outbox enqueue are no-ops in that case.
+final isOnlineModeProvider = Provider<bool>((ref) {
+  final ctx = ref.watch(storeContextProvider);
+  return ctx?.isOnlineMode == true;
 });
 
 /// The sync repository (outbox + API).
@@ -101,14 +121,17 @@ class SyncState {
 class SyncNotifier extends StateNotifier<SyncState> {
   SyncNotifier({
     required SyncRepository repository,
+    required bool Function() isOnline,
     Duration periodicInterval = const Duration(minutes: 5),
   })  : _repo = repository,
+        _isOnline = isOnline,
         super(const SyncState()) {
     _refreshPendingCount();
     _periodicTimer = Timer.periodic(periodicInterval, (_) => sync());
   }
 
   final SyncRepository _repo;
+  final bool Function() _isOnline;
   bool _syncing = false;
   Timer? _periodicTimer;
 
@@ -136,6 +159,13 @@ class SyncNotifier extends StateNotifier<SyncState> {
   /// the second call returns immediately.
   Future<void> sync() async {
     if (_syncing) return;
+    // Local-demo / offline session: never reach out to the server. The
+    // outbox keeps growing locally so when the operator later upgrades
+    // to a cloud account everything can flush at once.
+    if (!_isOnline()) {
+      await _refreshPendingCount();
+      return;
+    }
     _syncing = true;
     state = state.copyWith(status: SyncStatus.syncing, lastError: null);
 
@@ -179,7 +209,10 @@ class SyncNotifier extends StateNotifier<SyncState> {
 /// Global sync state provider.
 final syncProvider = StateNotifierProvider<SyncNotifier, SyncState>((ref) {
   final repo = ref.watch(syncRepositoryProvider);
-  return SyncNotifier(repository: repo);
+  return SyncNotifier(
+    repository: repo,
+    isOnline: () => ref.read(isOnlineModeProvider),
+  );
 });
 
 /// Convenience provider: number of pending sync events.
@@ -205,7 +238,11 @@ final deadLetterEventsProvider =
 ///
 /// Connects automatically and triggers a pull sync when the server pushes a
 /// "new_events" notification. Also sends a heartbeat ping every 30 seconds.
-final webSocketSyncClientProvider = Provider<WebSocketSyncClient>((ref) {
+final webSocketSyncClientProvider = Provider<WebSocketSyncClient?>((ref) {
+  // Skip WebSocket connection entirely in local-demo mode — there is no
+  // server to talk to and the reconnect loop would burn battery.
+  if (!ref.watch(isOnlineModeProvider)) return null;
+
   final url = ref.watch(wsServerUrlProvider);
   final deviceId = ref.watch(deviceIdProvider);
   final tenantId = ref.watch(tenantIdProvider);

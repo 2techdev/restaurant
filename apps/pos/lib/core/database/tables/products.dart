@@ -46,6 +46,30 @@ class Products extends Table {
   IntColumn get syncStatus => integer().withDefault(const Constant(0))();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
+  /// Cloud-master menu version this product was last applied from.
+  /// Null for legacy rows authored before sync was enabled, or for rows
+  /// created locally in `RestaurantSettings.menuEditMode = local|hybrid`.
+  /// Stamped on every successful apply by [MenuSyncService] (v20).
+  IntColumn get cloudVersion => integer().nullable()();
+
+  /// "Online'da popüler" — surfaced in the read-only "Online ek bilgiler"
+  /// overlay tab in the product detail screen. Authored by the cashier
+  /// or marketing team in the Gastro Hub admin panel and pushed via the
+  /// menu-sync pipeline (server-side migration 026). The POS treats this
+  /// as a display-only signal — not used for ordering / pricing logic.
+  /// Default false for legacy and locally-authored rows.
+  BoolColumn get isPopularOnline =>
+      boolean().withDefault(const Constant(false))();
+
+  /// JSON-encoded allergen list from the online catalogue. Format mirrors
+  /// the Postgres JSONB column on the cloud side
+  /// (`{"contains":["gluten","lactose"],"mayContain":["nuts"],"freeFrom":["..."]}`).
+  /// Null = no allergen info synced yet. The POS deserialises only inside
+  /// the overlay tab; everything else ignores it. Source of truth is the
+  /// admin panel — the POS UI is read-only, with a tooltip pointing at
+  /// gastro.2hub.ch for edits.
+  TextColumn get allergenInfo => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

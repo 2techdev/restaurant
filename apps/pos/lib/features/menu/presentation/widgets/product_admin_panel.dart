@@ -19,6 +19,7 @@ import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dar
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
 import 'package:gastrocore_pos/features/menu/presentation/widgets/bulk_price_dialog.dart';
+import 'package:gastrocore_pos/features/menu/presentation/widgets/linked_items_overlay_tab.dart';
 import 'package:gastrocore_pos/features/backoffice/presentation/widgets/product_form_dialog.dart';
 import 'package:gastrocore_pos/shared/widgets/pos_button.dart';
 import 'package:gastrocore_pos/shared/widgets/pos_text_field.dart';
@@ -661,6 +662,15 @@ class _ProductGridCard extends StatelessWidget {
                   children: [
                     _TaxBadge(taxGroup: product.taxGroup),
                     const Spacer(),
+                    Tooltip(
+                      message: "Online ek bilgiler — gastro.2hub.ch'te yönetilir",
+                      child: _IconBtn(
+                        Icons.cloud_outlined,
+                        size: 16,
+                        onTap: () => showLinkedItemsOverlaySheet(context, product),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
                     _IconBtn(Icons.edit_rounded, size: 16, onTap: onEdit),
                     const SizedBox(width: 2),
                     _IconBtn(Icons.delete_outline_rounded,

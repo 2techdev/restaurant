@@ -115,7 +115,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 24;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -344,6 +344,23 @@ class AppDatabase extends _$AppDatabase {
           'ON user_tenant_assignments (user_id, tenant_id) '
           'WHERE is_deleted = 0',
         );
+      }
+      if (from < 24) {
+        // v24: linked-item online overlay — per-product
+        // is_popular_online flag + allergen_info JSON blob, mirroring
+        // the cloud Postgres `migration 026`. Authored in the Gastro Hub
+        // admin panel and pushed via menu-sync; the POS surfaces these
+        // fields read-only in the product detail "Online ek bilgiler"
+        // tab. Existing rows default to false / null — no behaviour
+        // change for ordering / pricing.
+        // Idempotent guard so a fresh install (which creates the latest
+        // Products schema via createAll) does not double-add the column.
+        if (!await _columnExists('products', 'is_popular_online')) {
+          await m.addColumn(products, products.isPopularOnline);
+        }
+        if (!await _columnExists('products', 'allergen_info')) {
+          await m.addColumn(products, products.allergenInfo);
+        }
       }
     },
     onCreate: (m) async {

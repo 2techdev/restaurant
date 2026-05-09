@@ -611,6 +611,8 @@ class MenuRepositoryImpl {
       defaultGangId: row.defaultGangId,
       isCombo: row.isCombo,
       comboDiscountCents: row.comboDiscountCents,
+      isPopularOnline: row.isPopularOnline,
+      allergenInfo: row.allergenInfo,
     );
   }
 
@@ -634,6 +636,8 @@ class MenuRepositoryImpl {
       defaultGangId: Value(entity.defaultGangId),
       isCombo: Value(entity.isCombo),
       comboDiscountCents: Value(entity.comboDiscountCents),
+      isPopularOnline: Value(entity.isPopularOnline),
+      allergenInfo: Value(entity.allergenInfo),
       createdAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
       isDeleted: const Value(false),
