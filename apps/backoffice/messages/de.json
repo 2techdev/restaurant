@@ -112,7 +112,9 @@
     "settingsIntegrations": "Integrationen",
     "settingsAudit": "Audit-Log",
     "comingSoon": "Demnächst",
-    "comingSoonHint": "Diese Funktion ist in Entwicklung — ausserhalb des Pilotumfangs."
+    "comingSoonHint": "Diese Funktion ist in Entwicklung — ausserhalb des Pilotumfangs.",
+    "tenants": "Tenants",
+    "superAdmin": "Super Admin"
   },
   "dashboard": {
     "todayRevenue": "Umsatz heute",

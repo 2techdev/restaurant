@@ -112,7 +112,9 @@
     "settingsIntegrations": "Entegrasyonlar",
     "settingsAudit": "Audit Log",
     "comingSoon": "Yakında",
-    "comingSoonHint": "Bu özellik geliştirilme aşamasında. Pilot kapsamı dışındadır."
+    "comingSoonHint": "Bu özellik geliştirilme aşamasında. Pilot kapsamı dışındadır.",
+    "tenants": "Tenants",
+    "superAdmin": "Süper Admin"
   },
   "dashboard": {
     "todayRevenue": "Günlük ciro",

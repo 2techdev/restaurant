@@ -112,7 +112,9 @@
     "settingsIntegrations": "Integrations",
     "settingsAudit": "Journal d'audit",
     "comingSoon": "Bientot disponible",
-    "comingSoonHint": "Fonctionnalite en cours de developpement. Hors du perimetre pilote."
+    "comingSoonHint": "Fonctionnalite en cours de developpement. Hors du perimetre pilote.",
+    "tenants": "Tenants",
+    "superAdmin": "Super Admin"
   },
   "dashboard": {
     "todayRevenue": "Chiffre d'affaires aujourd'hui",

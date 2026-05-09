@@ -112,7 +112,9 @@
     "settingsIntegrations": "Integrations",
     "settingsAudit": "Audit Log",
     "comingSoon": "Coming soon",
-    "comingSoonHint": "This feature is under development. Outside pilot scope."
+    "comingSoonHint": "This feature is under development. Outside pilot scope.",
+    "tenants": "Tenants",
+    "superAdmin": "Super Admin"
   },
   "dashboard": {
     "todayRevenue": "Today's Revenue",

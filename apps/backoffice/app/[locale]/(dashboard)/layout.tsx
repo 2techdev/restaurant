@@ -39,7 +39,11 @@ export default async function DashboardLayout({
             />
           ) : null}
           <div className="flex flex-1">
-            <Sidebar locale={locale} role={session.user.org_role ?? session.user.role} />
+            <Sidebar
+              locale={locale}
+              role={session.user.org_role ?? session.user.role}
+              isSuperAdmin={!!session.user.is_super_admin}
+            />
             <div className="flex flex-1 flex-col">
               <Topbar locale={locale} user={session.user} />
               <main className="flex-1 overflow-y-auto p-6">{children}</main>

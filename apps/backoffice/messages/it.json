@@ -112,7 +112,9 @@
     "settingsIntegrations": "Integrazioni",
     "settingsAudit": "Log audit",
     "comingSoon": "Prossimamente",
-    "comingSoonHint": "Funzionalita in sviluppo. Fuori dal perimetro pilota."
+    "comingSoonHint": "Funzionalita in sviluppo. Fuori dal perimetro pilota.",
+    "tenants": "Tenants",
+    "superAdmin": "Super Admin"
   },
   "dashboard": {
     "todayRevenue": "Fatturato oggi",
