@@ -50,7 +50,9 @@ Yapı: kategori başlıkları, her madde checkbox. Done olanlar `- [x]`, pending
 - [x] Audit enum 37
 - [x] Production API endpoint (api.gastrocore.ch)
 - [x] APK build pipeline (jolly-final lineage)
-- [x] Pilot APK: `pilot/app-pos-release.apk` (87.7 MB · sha256 3633cc49…)
+- [x] Pilot APK: `pilot/app-pos-release.apk` (85.04 MB · sha256 b99b4773… · Aşama 4 final 2026-05-09)
+- [x] **POS Multi-tenant runtime switcher** wire-up tamam (5/6 madde — schema v23 user_tenant_assignments + ActiveTenantNotifier override main.dart + Settings tenantSwitcher tile flag-gated + Pin-login post-login modal + SyncApiClient `X-Tenant-ID`. i18n ARB deferred — paralel agent çakışmasını önlemek için TR hardcoded). Default `multiTenantSwitcherEnabled = false` → pilot davranışı değişmez. 17 yeni unit test pass. Detay: `pilot/DEPLOY_LOG_2026-05-09.md`.
+- [x] **POS Linked Items overlay** read-only — schema v24 (`products.is_popular_online` + `allergen_info` JSONB-string), `LinkedItemsOverlayTab` widget + `showLinkedItemsOverlaySheet(...)`, admin panel `_ProductGridCard` cloud icon trigger, banner + tooltip ("gastro.2hub.ch'te yönetilir"). Cloud Postgres karşılığı paralel agent migration 026.
 
 ### DevOps
 - [x] Hetzner CPX22 sunucu (88.99.190.108, NBG1, Ubuntu 24.04)

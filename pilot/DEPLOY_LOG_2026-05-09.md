@@ -3,6 +3,205 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## Aşama 4 FINAL — Multi-tenant wire-up + Linked-items overlay + Pilot APK rebuild (2026-05-09 22:30 CEST)
+
+**Karar:** Önceki turda yazılan multi-tenant scaffolding'in 6-step wire-up'ı
++ Gastro Hub admin'inde yönetilen "Online ek bilgiler" (allergen + popularity)
+overlay'inin POS tarafında read-only sürümü. **88'e deploy YOK** — APK kullanıcı
+tablette manuel install edecek.
+
+### Multi-tenant wire-up (5/6, i18n deferred)
+
+| # | Dosya | Değişiklik |
+|---|---|---|
+| 1 | `apps/pos/lib/main.dart` | `ActiveTenantNotifier(primaryTenantId, prefs)` + `activeTenantProvider.overrideWith(...)` ProviderContainer'a eklendi. Saved override pref'ten okunuyor (process restart sonrası seçim hatırlanıyor). |
+| 2 | `apps/pos/lib/features/settings/presentation/screens/settings_screen.dart` | `_Section.tenantSwitcher` enum + `_Section.tenantSwitcher → TenantSwitcherPane()` builder case + `_Sidebar` ConsumerWidget'a çevrildi → `appSettingsProvider.maybeWhen(data: (s) => s.multiTenantSwitcherEnabled, orElse: () => false)` ile flag-gated. Default false → tile gizli, pilot davranışı değişmez. |
+| 3 | `apps/pos/lib/features/auth/presentation/screens/pin_login_screen.dart` | `_maybePromptTenant()` helper — login success + flag on + 2+ confirmed assignment ise `showTenantPickerSheet(...)` modal. Seçim sonrası `activeTenantProvider.notifier.switchTo(picked)`. Flag off → no-op. |
+| 4 | `apps/pos/lib/features/sync/presentation/providers/sync_provider.dart` | `SyncApiClient` provider'a `tenantIdProvider: () => ref.read(activeTenantProvider)` callback bağlandı. Runtime tenant switch sonrası bir sonraki push/pull'da `X-Tenant-ID` header anında değişir. |
+| 5 | i18n | **Deferred.** ARB dosyaları (DE/EN/FR/IT/TR) ve auto-gen `app_localizations*.dart` paralel agent'lar tarafından heavily modify edilmiş (her birine 59-300 satır ekleme). Hardcoded TR dize'ler `tenant_switcher_pane.dart` ve `pin_login_screen.dart` içinde kalıyor. Sonraki cycle'da tek pass'te 5 dil ARB ekle + `flutter gen-l10n`. |
+| 6 | (yok — flag default false olduğu için) | — |
+
+**Davranış:** Default `multiTenantSwitcherEnabled = false` → pilot APK ile pilot
+operatörünün gördüğü hiçbir şey değişmez. Flag flip edildiğinde Settings'de
+"Mağaza Seçici" tile görünür + login sonrası 2+ tenant varsa picker sheet açılır
++ sync header `X-Tenant-ID` aktif tenant ID'yi taşır.
+
+### Linked Items Overlay tab (read-only)
+
+| Dosya | Değişiklik |
+|---|---|
+| `apps/pos/lib/core/database/tables/products.dart` | + `BoolColumn isPopularOnline` (default false) + `TextColumn allergenInfo` (nullable, JSON-encoded) |
+| `apps/pos/lib/core/database/app_database.dart` | schemaVersion 23 → **24**; `if (from < 24)` migration: idempotent column adders (PRAGMA check ile fresh-install vs upgrade ayrımı). |
+| `apps/pos/lib/features/menu/domain/entities/product_entity.dart` | + `isPopularOnline` (default false) + `allergenInfo` (nullable) field + copyWith / constructor genişletildi |
+| `apps/pos/lib/features/menu/data/repositories/menu_repository_impl.dart` | `_productToEntity` + `_productToCompanion` mapper'ları yeni 2 alana wire'lı |
+| `apps/pos/lib/features/menu/presentation/widgets/linked_items_overlay_tab.dart` | **YENİ** — `LinkedItemsOverlayTab` widget + `showLinkedItemsOverlaySheet(context, product)` bottom-sheet helper. Banner ("salt-okunur"), `_PopularBadge`, `_ImagePreview` (Image.network http→fallback), `_AllergenPanel` (contains/mayContain/freeFrom decode + Wrap chip render) — her alanda tooltip "Bu alanlar Gastro Hub admin'inde yönetilir". |
+| `apps/pos/lib/features/menu/presentation/widgets/product_admin_panel.dart` | `_ProductGridCard` action row'una bulut icon eklendi → `showLinkedItemsOverlaySheet(context, product)` çağırır. Tooltip: "Online ek bilgiler — gastro.2hub.ch'te yönetilir". |
+
+**Cloud schema:** Server-side migration 026 paralel agent tarafından
+yazılıyor (Postgres `products.is_popular_online` + `allergen_info` JSONB).
+POS Drift v24 aynı kolonları offline-first tarafta sağlıyor; menu_sync
+pipeline pull edildiğinde değerler dolar.
+
+### Test
+- Build runner: 639 outputs in 72s ✓
+- `flutter analyze`: 11 info-level lint (8'i pre-existing, 2'si yeni file'da
+  `use_colored_box` cosmetic) — error/warning 0
+- `flutter test`: **1928 pass / 23 skip / 2 fail** (untracked
+  `fast_sale_screen_test.dart` paralel agent WIP — dokunulmadı)
+- Net regression: 0
+
+### Pilot APK rebuild
+
+| Field | Value |
+|---|---|
+| Path | `E:\Project\Restaurant\pilot\app-pos-release-asama4-final-20260509.apk` |
+| Latest pointer | `E:\Project\Restaurant\pilot\app-pos-release.apk` (overwritten) |
+| Size | **85.04 MB** (89,167,178 bytes) |
+| SHA256 | `B99B4773415B278F0042092241971AEEDDEB5CB18CD051759BF2DDBB08CFBD52` |
+| Build | `flutter build apk --release --flavor pos -t lib/main.dart` (190.3s) |
+| Tree-shake | MaterialIcons 1645184→43692 (97.3% red) + CupertinoIcons 257628→848 |
+
+Önceki APK `app-pos-release-asama4-20260509.apk` (88.92 MB) bozulmadı —
+rollback için duruyor.
+
+### Yasak / Yapılmayan
+- 88'e deploy yok (yeni endpoint yok; schema 026 paralel agent'ın işi).
+- Reservation tarafına dokunulmadı.
+- ARB dosyalarına dokunulmadı (paralel agent çakışmasını önlemek için).
+
+---
+
+## Aşama 4 — Sold-out 3-toggle UI re-apply + canlıya 88'e (2026-05-09 22:18 CEST)
+
+**Karar:** F1 paralel agent tarafından revert edilen sold-out 3-toggle UI'i
+sıfırdan re-apply + 88'e (POS prod kutusu, **doğru sunucu**) deploy. Bonus:
+POS Go endpoint'lerin de Docker multi-stage build ile binary swap edildi.
+
+**Servisler:** Backoffice (`backoffice.gastrocore.ch`, **systemd `backoffice.service`**, port 3001) + POS Go (`api.gastrocore.ch`, **systemd `gastrocore.service`**, port 8090) — `tech@88.99.190.108`.
+
+### 1. Backoffice 3-toggle UI
+
+**Dosyalar:**
+- `apps/backoffice/lib/api-types.ts` — `MenuProduct.is_available?: boolean` + `is_online_visible?: boolean` eklendi (paralel F1 commitleriyle uyumlu, `is_popular_online` + `allergen_info` overlay alanlarıyla yan yana duruyor).
+- `apps/backoffice/app/[locale]/(dashboard)/menu/products/products-client.tsx`:
+  - `toggleAvailable` mutation (`PATCH /menu/products/{id}/availability`) — optimistic update + rollback on error.
+  - `toggleOnlineVisible` mutation (`PATCH /menu/products/{id}/visibility`) — aynı pattern.
+  - `bulkSetAvailable(target: boolean)` async fonksiyon — filtrede görünür ürünleri sequential PATCH ile toplu stoğa al/çıkar.
+  - Tablo `Status` sütunu → `Toggles` (`min-w-[280px]`) 3 inline `ToggleCell`: Aktif / Stokta (warn-tone amber ring sold-out'ta) / Online'da.
+  - Mobile cards'a aynı 3 toggle.
+  - Toolbar'a bulk action (`Tümünü stoğa al` / `Tümünü stoktan çıkar`) + Loader2 busy spinner.
+  - `ToggleCell` helper component dosyanın altında (label + Switch + tone="warn" ring-2 amber için sold-out off-state).
+- `apps/backoffice/messages/tr.json` — `menu.productsPage.toggles.{active,available,onlineVisible}` + `menu.productsPage.bulkActions.{label,markAllAvailable,markAllUnavailable,markedAllAvailable,markedAllUnavailable}` + `menu.productsPage.col.toggles`. Diğer 4 dil (`de/en/fr/it`) `productsPage` namespace'ini hiç tanımıyordu (pre-existing); `useTranslations` defaultValue fallback'ı zaten kodlandı, build temiz çalışıyor. 5-dil tam i18n sonraki cycle.
+
+### 2. POS Go endpoint'leri
+
+**Yeni dosya:** `server/internal/menu/availability.go`
+- `handleSetProductAvailability` — `PATCH /api/v1/menu/products/{id}/availability` (Body `{is_available, reason?}`)
+- `handleSetProductVisibility` — `PATCH /api/v1/menu/products/{id}/visibility` (Body `{is_online_visible}`)
+- `maybeFireAvailabilityWebhook` feature-flagged stub (`AVAILABILITY_WEBHOOK_ENABLED=true` olunca paralel agent G'nin overlay sync consumer'ına POST eder; default off, kolon update'i zaten authoritative state).
+
+**Edit:** `server/internal/menu/module.go` — 2 yeni `mux.HandleFunc` route binding (mevcut paralel agent'ın `import-from-token` ve `overlay/products/{id}` route'larıyla yan yana, hiçbiri silinmedi).
+
+### 3. Migration 025
+
+`server/migrations/025_availability_split.up.sql` (önceki turdan paralel agent tarafından yazılan idempotent versiyon; benim yazdığımla aynı sözleşme).
+- 88 `gastro-postgres`'te `products.is_available` + `products.is_online_visible` ZATEN eklenmiş (önceki tur idempotent uygulamış); bu turda `INSERT INTO schema_migrations (version='025_availability_split') ON CONFLICT DO NOTHING` ile registry güncellendi. `schema_migrations` top: `025_availability_split, 024_super_admin_impersonation, 023_external_menu_refs, 022, …`.
+
+### 4. Backoffice deploy (88 systemd)
+
+**KRİTİK düzeltme:** `deploy_backoffice_hetzner.py` `HOST = 178.104.137.75` (yanlış sunucu, Reservation kutusu) → `88.99.190.108` (doğru POS kutusu) güncellendi. 88'de PM2 yok, **systemd `backoffice.service`** kullanılıyor (`/home/tech/backoffice/server.js`, port 3001, `EnvironmentFile=.env.production`). Deploy script PM2 odaklıydı → manual sync gerekti.
+
+**Manuel sync prosedürü (88'e):**
+1. KURAL 0 backup: `/home/tech/backups/backoffice-systemd-20260509-221443/code-snapshot/`
+2. `.env.production` (313 B, 9 anahtar) `/tmp/_env_prod_pre_swap`'e koru.
+3. `rsync -a --delete --exclude=.env --exclude=.env.production --exclude=node_modules /home/tech/gastro_backoffice/ /home/tech/backoffice/` (deploy script bunu yanlış path'e bırakmıştı, doğru path'e taşındı).
+4. `node_modules` ayrı kopyala (rsync exclude ettiği için).
+5. `.env.production` geri yüklendi (`grep -c "^[A-Z]" → 9 anahtar OK`).
+6. `sudo systemctl restart backoffice.service` → `active`, "Ready in 94ms", PID 3610253.
+
+**Build:** `npm run build` (Next.js 15.0.3) → BUILD_ID `U8Yo0SF78U5gxjWPp0S7O`. Ürün liste route prerendered: `/[locale]/menu/products` (8.43 kB / 209 kB First Load JS) × 5 locale.
+
+**Bundle doğrulama:** `grep -ho "toggles|Stokta|markAllAvailable" /home/tech/backoffice/.next/server/app/[locale]/(dashboard)/menu/products/page.js` → 3 hit ✓.
+
+### 5. POS Go deploy (88 systemd, Docker multi-stage build)
+
+**Bottleneck:** 88'de Go toolchain yok, source code yok (`/home/tech/gastrocore/server` pre-compiled binary olarak çalışıyor). Çözüm: **Docker multi-stage build** ile `golang:1.23-alpine` image'i içinde derle.
+
+**Adımlar:**
+1. Lokal `tar -czf E:/Project/Restaurant/gastrocore-server-src.tar.gz --exclude=.git server/` (37 MB).
+2. SFTP → `/tmp/gastrocore-server-src.tar.gz`.
+3. `docker run --rm -v /tmp/gastrocore-build-<TS>:/src -v /home/tech/.gocache -v /home/tech/.gomodcache -w /src golang:1.23-alpine sh -c "apk add --no-cache git gcc musl-dev && CGO_ENABLED=0 GOOS=linux go build -o /src/server-new ./cmd/server"` → 12 MB statically linked binary.
+4. Backup: `cp -a /home/tech/gastrocore/server /home/tech/gastrocore/server.bak.20260509-221732` (önceki binary 13 MB).
+5. `sudo systemctl stop gastrocore.service` → atomic swap → `chmod +x` → start.
+6. Service `active`, log: `database connected` + `server starting port=8090 version=1.0.0-beta.1`.
+
+**Smoke (POS Go):**
+- `GET /health` → **HTTP 200** ✓
+- `PATCH /api/v1/menu/products/test-id/availability` (no auth) → **HTTP 401** ✓ (endpoint LIVE, auth gating doğru reject — eskiden 404 dönerdi, artık 401)
+- `PATCH /api/v1/menu/products/test-id/visibility` (no auth) → **HTTP 401** ✓
+- journalctl: `"http request" method=PATCH path=/api/v1/menu/products/test-id/availability status=401`
+
+### 6. Public smoke (Cloudflare üzerinden)
+
+| URL | Status |
+|---|---|
+| `https://backoffice.gastrocore.ch/` | HTTP 200 |
+| `https://backoffice.gastrocore.ch/tr/login` | HTTP 200 |
+| `https://backoffice.gastrocore.ch/tr/menu/products` | HTTP 200 (login redirect → login page render) |
+| `https://api.gastrocore.ch/health` | HTTP 200 |
+
+### 7. Yedekler / rollback
+
+| Konum | Path | Boyut |
+|---|---|---|
+| Backoffice code | `/home/tech/backups/backoffice-systemd-20260509-221443/code-snapshot/` | ~ |
+| Backoffice deploy script (PM2 path) | `/home/tech/gastro_backoffice/` (yanlış path, sync sonrası mevcut) | ~ |
+| POS Go binary (önceki) | `/home/tech/gastrocore/server.bak.20260509-221732` | 13 MB |
+| Deploy tar (artifact) | `/tmp/gastrocore-server-src.tar.gz` | 37 MB |
+
+**Rollback (POS Go):**
+```bash
+ssh tech@88.99.190.108 'sudo systemctl stop gastrocore.service && \
+  cp /home/tech/gastrocore/server.bak.20260509-221732 /home/tech/gastrocore/server && \
+  sudo systemctl start gastrocore.service'
+```
+
+**Rollback (Backoffice):**
+```bash
+ssh tech@88.99.190.108 'sudo systemctl stop backoffice.service && \
+  rsync -a --delete /home/tech/backups/backoffice-systemd-20260509-221443/code-snapshot/ /home/tech/backoffice/ && \
+  sudo systemctl start backoffice.service'
+```
+
+### 8. Bağımlılık notu (eş zamanlı pipeline)
+
+- ✅ Backoffice 3-toggle UI canlıda (88, this turn)
+- ✅ POS Go availability/visibility endpoints canlıda (88, this turn)
+- ✅ Migration 025 88 gastro-postgres'te
+- ✅ Reservation Prisma migration `add_online_visibility` zaten 178 prod'da (önceki tur)
+- ⏳ Reservation dashboard 3-toggle (defer — backoffice tek edit noktası, brief §7 field ownership)
+- ⏳ POS app pilot APK already rebuilt (önceki tur, `pilot/app-pos-release-asama4-20260509.apk`)
+- ⏳ Webhook trigger (paralel agent G `AVAILABILITY_WEBHOOK_ENABLED=true` flip edince aktif)
+
+### 9. Yasak listesinin durumu
+
+✅ Reservation tarafına dokunulmadı (178 hiç) · ✅ jolly-final dokunulmadı · ✅ POS app değişikliği yok (long-press kaldırma önceki turdaydı) · ✅ AskUserQuestion kullanılmadı.
+
+**İmza:** Opus 4.7 · 3-toggle UI re-apply + 88'e POS Go binary swap
+
+---
+
+
+## 2026-05-09 — Cloud topology düzeltmesi (paralel agent yanlış sunucu deploy'u)
+
+- Bulgu: önceki Cloud Architecture notu 178'i POS gösteriyordu — yanlıştı
+- Gerçek: 88 = POS, 178 = Reservation
+- Etki: 5+ paralel agent F1/Modifier/F2/F3/sold-out/magic-link 178'e deploy etti
+  - 178'de hiçbir Cloudflare route POS endpoint'lerini almadı (sadece Reservation route)
+  - Tüm POS UI/endpoint güncellemeleri kullanıcı için görünmez kaldı
+- Düzeltme: ayrı agent 88'e re-deploy + 178 POS artifacts cleanup
+- Memory + Obsidian + DEPLOY_RUNBOOK güncellendi
+
 ## F1 Backoffice UI — recovered + deployed (2026-05-09 01:20 CEST)
 
 **Servis:** Servis 2 — Backoffice (`backoffice.gastrocore.ch`, PM2 `gastro-backoffice`, port 3002)
