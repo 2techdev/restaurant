@@ -3,6 +3,163 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-11 ~20:00 CEST — LAN-first v2: PeerRegistry + ConnectionStrategy + manual override + 04:00 cron
+
+**Servis:** Pilot tablet, KDS ekranı, Kiosk (manuel APK install, **88'e deploy YOK**)
+
+**Karar:** Önceki cycle'da inen LAN-first iskeleti operatör-grade'e taşındı.
+NetworkLocator artık tüm peer'leri keşfedip kayıt altına alıyor; manuel IP
+override (corporate WiFi + mDNS blokları için) operatöre Settings'te
+gösteriliyor; 24h timer wall-clock 04:00 local'e hizalandı (DST-safe); WS
+disconnect/reconnect mantığı ayrı bir ConnectionStrategy state machine'inde.
+
+### Mimari (genişletildi)
+
+```
+NetworkLocator
+  ├─ resolve()  priority chain
+  │   1. Manuel override (Settings'te girilirse) → HTTP probe → kabul
+  │   2. mDNS scan → her peer paralel HTTP probe → registry'ye yaz
+  │      → role=server tercih, yoksa ilk healthy
+  │   3. Cloud fallback
+  ├─ scheduleDailyReprobeAt(hour=4)  wall-clock aligned, DST-safe
+  ├─ tenantFilter  TXT record tenant_id eşleşmeyen peer'ler dropped
+  └─ onPeersDiscovered callback  PeerRegistry'ye besler
+
+PeerRegistry (StateNotifier<List<LanPeer>>)
+  ├─ replaceAll(scan sonuçları)  server first, sonra role/host sort
+  ├─ upsert(peer)  side-channel inserts
+  └─ clear()  tenant switch'te
+
+ConnectionStrategy (idle → resolving → connected → reconnecting → cooldown)
+  ├─ markConnected()  WS handshake başarılı, failure count sıfırla
+  ├─ markDisconnected()  N<3 → 5s backoff (reconnecting), N>=3 → 30s (cooldown)
+  ├─ forceRetry()  Settings → "Şimdi yenile"
+  └─ snapshots stream  UI ConnectionPhase + nextRetryAt göstersin diye
+```
+
+### Yeni / değişen dosyalar
+
+| Dosya | İş |
+|---|---|
+| `apps/pos/lib/core/network/peer_registry.dart` | **YENİ ~165 satır.** `PeerRole` enum (server/pos/kds/waiter/kiosk/ods/unknown) + `parse()` helper, `LanPeer` immutable model (host/port/role/tenantId/version/lastSeenAt/healthy + copyWith + equality), `PeerRegistry` StateNotifier (replaceAll/upsert/clear/activeServer). |
+| `apps/pos/lib/core/network/network_locator.dart` | Genişletildi: `tenantFilter` ctor param (TXT mismatch peer drop), `manualOverride` host/port (priority 1 — direct probe), `onPeersDiscovered` callback (registry feed), `DiscoveredPeer` enriched (roleRaw/tenantId/version), `PeersObserver` typedef, `scheduleDailyReprobeAt(hourLocal=4)` wall-clock cron + `_nextOccurrenceOfHour` DST-safe helper, `nextReprobeAt` getter, `setManualOverride()`. `resolve()` "winner" mantığı (role=server tercih). Eski `startDailyReprobe()` korundu. |
+| `apps/pos/lib/core/network/connection_strategy.dart` | **YENİ ~145 satır.** `ConnectionPhase` 5-state enum, `ConnectionSnapshot` immutable, `ConnectionStrategy` class — markConnected/Disconnected/forceRetry, snapshots stream, 3-strike-then-cooldown back-off (5s default, 30s extended). |
+| `apps/pos/lib/core/network/network_locator_provider.dart` | `connectionStrategyProvider` + `connectionSnapshotProvider` + `ConnectionSnapshotNotifier` (StateNotifier mirror). |
+| `apps/pos/lib/features/settings/presentation/widgets/network_status_pane.dart` | Genişletildi: TextField'lı `_ManualOverrideCard` (IP+port input, Aktif chip, Uygula/Temizle butonları, SharedPreferences persist), `_PeerListCard` (LAN'da bulunan tüm cihazlar role-rozeti + healthy dot + aktif sunucu işareti), "Sonraki tarama" satırı. |
+| `apps/pos/lib/main_waiter.dart`, `main_kds.dart`, `main_kiosk.dart` | Boot path: `PeerRegistry()` + `NetworkLocator(tenantFilter, onPeersDiscovered)` + manual override prefs'ten yükle + `scheduleDailyReprobeAt()` + `ConnectionStrategy(locator: locator)`. 3 yeni provider override (`connectionStrategyProvider`, `peerRegistryProvider`, mevcut `networkLocatorProvider`). Kiosk için ilk kez wire edildi. |
+| `apps/pos/pubspec.yaml` | `network_info_plus: ^5.0.3` eklendi (operatörün kendi LAN IP'sini Settings'te göstermek için; mevcut `multicast_dns` yerinde kalıyor — bonsoir alternatifi vardı, multicast_dns zaten LAN sync için kullanıldığı için ikinci stack açmak yerine onu wrap'ledik). |
+
+### Tests (+22)
+
+`test/core/network/peer_registry_test.dart` **YENİ — 12 test pass:** PeerRole.parse case-insensitive, null→unknown, LanPeer equality (host+port only), replaceAll sort (server-first/role/host), upsert insert+update, clear.
+
+`test/core/network/connection_strategy_test.dart` **YENİ — 10 test pass:** initial idle, markConnected resets failures, reconnecting under threshold, cooldown after 3, snapshots stream emissions, forceRetry triggers extra scan, dispose closes stream + no-op after; NetworkLocator manual override bypass, manual probe fail → mDNS fallback, tenantFilter drops other-tenant peers, onPeersDiscovered fires with full+healthy set, nextReprobeAt null then 04:00 after schedule.
+
+`flutter test --reporter compact` → **1973 pass / 23 skip / 2 fail** (untracked `fast_sale_screen_test.dart` paralel agent — dokunulmadı). **+22 net, 0 regresyon**.
+
+### Pilot APK'ları
+
+| Flavor | Path | Size | SHA256 |
+|---|---|---:|---|
+| **KDS** | `pilot/app-kds-release-lanfirst-v2-20260509.apk` | 62.50 MB | `AE3E01905DB95D6B8DC632FFF0AA9326A999A2F1C1CEA1D1DBB14EFB0B53D237` |
+| **Waiter** | `pilot/app-waiter-release-lanfirst-v2-20260509.apk` | 63.06 MB | `86C5967BB393E8C2D7A7FC92ABF304890ACAD94F1336961D7B689805AC130652` |
+
+Kiosk APK paralel agent'ın işi — bu cycle rebuild edilmedi, sadece
+`main_kiosk.dart` LAN-first overrides eklendi (paralel agent build edince
+otomatik dahil olur).
+
+### Settings akışı (operatör tarafı)
+
+1. Operatör Settings → Bağlantı Durumu açar
+2. Üst pill: anlık state (yeşil/turuncu/mavi/gri)
+3. Detay kart: mod / sunucu IP / API+WS URL / son keşif / **sonraki tarama (HH:MM)**
+4. "Şimdi yenile" butonu — anında re-resolve
+5. **Manuel sunucu IP kartı** — mDNS broadcast blokluysa IP+port elle yazılır
+   ("192.168.1.50" + "8090") → Uygula → SharedPreferences'a yazılır + locator
+   doğrudan o IP'ye gider. "Aktif" chip + "Temizle" CTA.
+6. **LAN'da bulunan cihazlar kartı** — tüm peer'ler, role rozeti + healthy
+   dot + aktif sunucu check icon. mDNS broadcast yokken boş state mesajı.
+
+### Yasak / Yapılmayan
+- 88'e deploy yok (server kodu değişmedi)
+- 178'e dokunulmadı
+- `pos_v2_shell` ve `fast_sale_screen` lineage'e dokunulmadı (brief yasağı)
+- Bonsoir paketi eklenmedi (existing multicast_dns ile redundant; tek stack)
+- WS client'ı ConnectionStrategy ile **henüz bağlanmadı** — strategy state
+  machine hazır, snapshots stream çalışıyor, ama mevcut WebSocketSyncClient
+  hâlâ kendi reconnect loop'unu kullanıyor. Wire-up `lib/features/sync/data/clients/websocket_sync_client.dart`'da
+  `markConnected/Disconnected` çağrıları ekleyince tam aktive olur — sonraki
+  cycle (refactor riskli, brief'te yoktu)
+- Server-side mDNS broadcaster (server/internal/discovery/...) hâlâ yok —
+  her boot cloud'a düşüyor (graceful, operatör Settings'te görür)
+- POS flavor APK rebuild — brief'te sadece KDS+Waiter
+
+### Rollback
+
+```
+adb install -r pilot/app-kds-release-lanfirst-20260509.apk   # önceki LAN-first v1
+adb install -r pilot/app-waiter-release-lanfirst-20260509.apk
+```
+
+---
+
+## 2026-05-11 ~18:35 CEST — Migration 028 modifier_groups + modifiers name_translations JSONB
+
+**Servis:** gastro-postgres (88.99.190.108) — schema-only değişiklik, server binary'e dokunulmadı.
+
+### Migration 028
+`server/migrations/028_modifier_translations.{up,down}.sql` — products + categories'nin migration 022 pattern'ini modifier'lara genişletiyor.
+
+```sql
+ALTER TABLE modifier_groups ADD COLUMN IF NOT EXISTS name_translations JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE modifiers       ADD COLUMN IF NOT EXISTS name_translations JSONB NOT NULL DEFAULT '{}'::jsonb;
+UPDATE modifier_groups SET name_translations = jsonb_build_object('de', name, 'tr', name) WHERE name_translations = '{}'::jsonb;
+UPDATE modifiers       SET name_translations = jsonb_build_object('de', name, 'tr', name) WHERE name_translations = '{}'::jsonb;
+```
+
+### Canlı uygulama (88)
+Script: `E:\Project\reservation\apply_028_modifier_translations.py` — SFTP up.sql → `docker cp` → `psql -f`. Postgres DDL implicit transactional, fail → atomik rollback.
+
+Pre-backup: `/home/tech/backups/modifier-pre-028-20260511-183456.sql.gz` (1.6K, pg_dump --data-only --table=modifier_groups --table=modifiers).
+
+Sonuç:
+- `ALTER TABLE` × 2 → kolonlar `jsonb DEFAULT '{}'::jsonb` ile eklendi
+- `UPDATE modifier_groups` → 6 row backfilled
+- `UPDATE modifiers` → 18 row backfilled
+- Sample doğrulama: `Boyut → {"de":"Boyut","tr":"Boyut"}`, `Klein → {"de":"Klein","tr":"Klein"}` ✓
+
+Mevcut UI/POS app etkilenmedi — `name` kolonu dokunulmadı, handler'lar yeni kolonu henüz SELECT/INSERT/UPDATE etmiyor.
+
+### Bilinçle ertelendi (sonraki seans, ayrı PR)
+
+| Görev | Neden ertelendi |
+|---|---|
+| **Go handler refactor** (`modifier_handlers.go` Create/Update body accept + SELECT name_translations) | Local repo branch'inde `modifier_handlers.go` mevcut değil (canlı binary farklı branch'te build'lenmiş). Handler PR'ı için canlı binary'nin source branch'i bulunmalı. Source-binary divergence'ı çözülmeden handler push etmek riskli. |
+| **Backoffice modifier panel multi-lang input** (5-dil mini-tab DE primary) | Paralel agent revert döngüsü bu dosyaları sürekli geri çekiyor (3+ seans). Schema canlı, UI eklenmesi mekanik ama revert riski yüksek. Ayrı seans → tek-shot deploy. |
+| **POS app modifier UI multi-lang** (`modifier_management_panel.dart` + Drift v25) | APK rebuild + jolly-final lineage + 5-dil text input + sync queue payload genişletme — 2-3 saatlik iş, tek seansta + handler ile birlikte. |
+| **5-dil UI mini-tab pattern** | Schema hazır, sync_queue payload genişletilebilir; tüm UI değişiklikleri handler PR'ı ile aynı turda yapılırsa coherence yüksek. |
+
+### Rollback
+```bash
+ssh tech@88.99.190.108
+docker cp /tmp/028_modifier_translations.down.sql gastro-postgres:/tmp/028.down.sql  # (sftp upload önce)
+docker exec gastro-postgres psql -U gastro -d gastro -f /tmp/028.down.sql
+# Data restore (kullanıcı yeni multi-lang yazmadıysa data loss yok — DROP COLUMN sonra UI hâlâ name kullanıyor):
+# gunzip -c /home/tech/backups/modifier-pre-028-20260511-183456.sql.gz | docker exec -i gastro-postgres psql -U gastro -d gastro
+```
+
+### Sonraki adım (single-shot deploy önerisi)
+1. Local'de canlı binary'nin source branch'ini bul (`git log --all --grep "modifier_handlers"` veya worktree taraması)
+2. `modifier_handlers.go`: Create/Update DTO'sunda `NameTranslations map[string]string` field; SELECT'lerde + INSERT/UPDATE'lerde dahil et
+3. Models: `ModifierGroup` + `Modifier` struct'larına `NameTranslations Translations` (mevcut Translations type'ı reuse, `translations.go`'da)
+4. Backoffice: `modifier-group-form.tsx` name input → 5-tab pattern (`products-client.tsx`'teki `LOCALES = ["tr","de","en","fr","it"]` pattern'ini kopyala)
+5. POS app: Drift schema v25 migration + UI text input mini-tab
+6. APK rebuild + canlı server binary swap + backoffice systemd restart
+7. Tek E2E smoke
+
+---
+
 ## 2026-05-11 ~19:00 CEST — LAN-first networking layer (POS/Waiter/KDS) + APK rebuilds
 
 **Servis:** Pilot tablet ve KDS ekranı (manuel APK install, **88'e deploy YOK**)
@@ -181,6 +338,50 @@ adb install -r E:\Project\Restaurant\pilot\app-waiter-release-20260509.apk
 ✅ Reservation (178) dokunulmadı · ✅ jolly-final POS satış lineage'i (`features/orders/`, `features/fast_sale/`, `features/payments/`) dokunulmadı · ✅ AskUserQuestion kullanılmadı · ✅ Sadece `features/kiosk_app/` (yeni feature) + `test/features/kiosk/` (yeni test)
 
 **İmza:** Opus 4.7 · Kiosk MVP iskelet (9 dosya, ~1100 satır) + APK build
+
+### Addendum — Kiosk pilot-ready rebuild (2026-05-11 ~18:39 CEST)
+
+Brief'in 4 kritik gap'i (flavor branching / Drift wire-in / order push / idle watchdog) + 5. tema **paralel agent tarafından kapatılmış** olarak bulundu. Benim önceki `features/kiosk_app/` iskeletim orphan (kullanılmıyor); paralel agent rakip path `features/kiosk/` üzerinde geniş bir MVP yazmış:
+
+| Brief gap | Paralel agent çözümü | Path |
+|---|---|---|
+| **Flavor entry** | `main_kiosk.dart` (landscape + immersive) + `lib/kiosk_app.dart` (root widget + idle Listener) | `lib/main_kiosk.dart`, `lib/kiosk_app.dart` |
+| **Drift wire-in** | `kioskCategoriesProvider` / `kioskProductsProvider` / `kioskSessionProvider` | `features/kiosk/presentation/providers/kiosk_provider.dart` |
+| **Order push (88 target)** | `KioskOrderService.submitOrder()` → `OrderRepositoryImpl.createTicket` (Drift transactional) + `KitchenRepositoryImpl.dispatch` + Swiss VAT 8.1%/2.6% split + 5-Rappen rounding | `features/kiosk/services/kiosk_order_service.dart` |
+| **Idle watchdog (60s)** | `Listener.onPointerDown` → `_resetInactivityTimer()` → `kioskRouter.go(KioskRoutes.welcome)` + `kioskSessionProvider.reset()` | `lib/kiosk_app.dart:62` |
+| **Theme** | `buildKioskTheme()` warm light kiosk-optimised | `features/kiosk/theme/kiosk_theme.dart` |
+
+Paralel agent extra scope: 7 screen (welcome / language / menu / **product_detail with modifier modal** / cart / **payment** / confirmation) + `KioskCartItem` domain entity + tax extraction helper.
+
+**Endpoint doğrulaması (88 ecosystem, Reservation/178 referansı YOK):**
+- `apiHost` = `api.gastrocore.ch` (88 / Cloudflare → Hetzner Go)
+- `wsHost` = `ws.gastrocore.ch` (88, gray-cloud)
+- Order push akışı: Drift → `sync_queue` → `wss://ws.gastrocore.ch/ws/sync` (88)
+- `gastro.2hub.ch` / `/api/public/[slug]/order` (Reservation) — kiosk dosyalarında grep boş ✓
+
+**Build & APK (rebuild):**
+- `flutter analyze` ✓ 18 issue (warnings + info, hiç error yok)
+- `flutter build apk --release --flavor kiosk -t lib/main_kiosk.dart` ✓ exit 0 (background `bk7kzb2lh`)
+
+| Property | Değer | Önceki APK ile karşılaştırma |
+|---|---|---|
+| **APK boyut** | 64,506,102 bytes (~61 MB) | Önceki 89 MB → **24 MB ↓** (kiosk-only tree-shake, POS/waiter/KDS dead-code elim) |
+| **SHA256** | `ed15c9b229fa5ecdec7c240a0aa0244f3ec071dbe8124d12e2bccd27cd970d91` | farklı (yeni entry + tree-shake) |
+| **Pilot artifact** | `pilot/app-kiosk-release-20260509.apk` | overwritten |
+| **Build timestamp** | May 11 18:39 CEST | yeni |
+
+**Pilot demo doğrulama (manuel install gerekli):**
+- `adb install -r pilot/app-kiosk-release-20260509.apk`
+- Açılış: landscape + immersive system UI; brand-login / PIN screen DEĞİL, **Welcome (Hoşgeldiniz / Willkommen)** screen
+- Dokun → language picker → menü (Drift catalogue) → cart → order type → place order → confirmation
+- 60s inaktivite → welcome'a auto-return
+
+**Yasaklara uyum (yine doğrulandı):**
+✅ Reservation (178) dokunulmadı · ✅ jolly-final POS satış lineage'i (`features/orders/`, `features/fast_sale/`, `features/payments/`) dokunulmadı (paralel agent kiosk_order_service `OrderRepositoryImpl`'i tüketir, satış lineage'ine dokunmaz) · ✅ AskUserQuestion kullanılmadı · ✅ Endpoint matrix **sadece 88** (`api.gastrocore.ch` / `ws.gastrocore.ch`)
+
+**Önceki turdaki orphan iskelet** (`features/kiosk_app/`, 9 dosya): build'e dahil değil (entry'den import zinciri yok), derleme bloker'ı değil ama temizlik adayı. Sonraki cycle'da `rm -rf features/kiosk_app/` ile silinebilir veya paralel agent path'iyle birleştirilebilir.
+
+**İmza:** Opus 4.7 · Kiosk pilot-ready APK rebuilt (paralel agent 4 gap'i kapatmış; ben recon + flutter analyze + `-t lib/main_kiosk.dart` rebuild + endpoint audit yaptım)
 
 ---
 
