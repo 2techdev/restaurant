@@ -3,6 +3,188 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-11 ~18:00 CEST — Garson App TR localize + "Hazır!" notifier + APK rebuild
+
+**Servis:** Garson handheld tablet (manuel APK install, **88'e deploy YOK**).
+
+**Karar:** Önceki turda Reservation worktree'inden tetiklenen garson app
+talebi orada cwd kısıtı yüzünden tamamlanamamıştı. Mevcut durum keşfedildi:
+**waiter flavor zaten tam MVP** (`com.gastrocore.waiter`, `lib/main_waiter.dart`,
+3-tab shell, login/tables/order/active-orders/menu, `WaiterOrderService` ile
+gang fire, WebSocket auto-sync). İki gerçek gap kapatıldı: (a) tüm operatör-
+gören dize'ler TR, (b) KDS "ready" hâline geçiş için anlık banner notifier.
+
+### Localized files (TR, operatör dili)
+
+| Dosya | Geçişler |
+|---|---|
+| `lib/features/waiter/presentation/screens/waiter_order_screen.dart` | "Menu" → "Menü", "Order" → "Sipariş", "Order sent to kitchen!" → "Sipariş mutfağa gönderildi!", "Bill requested — POS will handle payment" → "Hesap istendi — ödeme POS'tan alınacak", "Order marked as served" → "Sipariş \"servis edildi\" olarak işaretlendi" |
+| `lib/features/waiter/presentation/screens/table_select_screen.dart` | "Select Table" → "Masa Seç", "No tables on this floor" → "Bu katta masa yok", legend: Free/Occupied/My Tables/Reserved → Boş/Dolu/Masalarım/Rezerve, "Table X is Y" snackbar → "Masa X şu an \"Y\"", occupied label → "Dolu" |
+| `lib/features/waiter/presentation/widgets/waiter_bottom_nav.dart` | "Tables/Order/My Orders" → "Masalar/Sipariş/Siparişlerim" |
+| `lib/features/waiter/presentation/screens/waiter_menu_screen.dart` | "Search menu…" → "Menüde ara…", "No active products" → "Aktif ürün yok" |
+| `lib/features/waiter/presentation/screens/waiter_login_screen.dart` | "GastroCore Waiter" → "GastroCore Garson", "No staff found" → "Personel bulunamadı" |
+| `lib/features/waiter/presentation/screens/waiter_active_orders_screen.dart` | "My Orders" → "Siparişlerim", empty state ("No active orders" / "Head to Tables to start a new order") → "Aktif sipariş yok" / "Yeni sipariş için Masalar sekmesine git", "Order #" → "Sipariş #", "Just now" → "Az önce", status labels Open/In Kitchen/Cooking/Ready!/Served/Bill Req. → Açık/Mutfakta/Pişiyor/Hazır!/Servis Edildi/Hesap İst. |
+
+### "Hazır!" notifier — `WaiterReadyListener` (yeni)
+
+`lib/features/waiter/presentation/widgets/waiter_ready_listener.dart` **(NEW)**
+
+Polling-based notifier — her 15s'de bir `waiterActiveOrdersProvider`'ı
+invalidate eder, `ref.listen` ile snapshot diff'leyerek bir biletin durumu
+**transition ediyorsa → `TicketStatus.ready`** floating SnackBar gösterir
+("Sipariş #W7 hazır!"). Mantık:
+- İlk snapshot baseline kabul edilir (backlog "ready"ler için arka arkaya
+  banner basmaz)
+- `_announced` Set ile aynı bilet için ikinci kez yayın yapılmaz
+- Bilet "ready"den çıkarsa (servis edildi vs.) dedupe kaydı silinir →
+  bir sonraki "ready" turu tekrar bildirim verir
+
+Neden SSE değil: server tarafında dedicated `ticket-ready` channel yok;
+Go push pipeline'a yeni event tipi eklemek scope dışı. Yerel Drift sorgusu
+ucuz (network round-trip yok), 15s gecikme kuyruğa yetiyor. Direct SSE
+upgrade follow-up'a kuyrukta.
+
+**Wire-up:** `WaiterShellScreen` body → `WaiterReadyListener(child: child)`.
+Tek yerde, tab geçişleri arasında banner'lar korunuyor.
+
+### Tests (+3)
+
+`test/features/waiter/waiter_ready_listener_test.dart` **(NEW, 3 pass)**:
+- ilk snapshot ready içerse banner yok (operatör backlog'u görmüş varsayılır)
+- progress → ready transition'da banner bir kez fire
+- ready → served → ready döngüsü dedupe kaydını sıfırlıyor, banner yeniden
+
+Wider waiter testleri: 33 pre-existing test sağ (`waiter_order_service_test`,
+`waiter_flow_extended_test`). Tam suite: **1937 pass / 23 skip / 2 fail**
+(yine untracked `fast_sale_screen_test.dart` paralel agent — dokunulmadı).
+Net regression: 0.
+
+### Pilot APK rebuild — Waiter flavor
+
+| Field | Value |
+|---|---|
+| Path | `E:\Project\Restaurant\pilot\app-waiter-release-20260509.apk` |
+| Size | **62.94 MB** (65,996,862 bytes) |
+| SHA256 | `392718802F1060CCD956F96AD377838014108507FE4D7168E2BD656F97271D46` |
+| Build | `flutter build apk --release --flavor waiter -t lib/main_waiter.dart` (131.2s) |
+| Tree-shake | MaterialIcons 1645184→**5560** bytes (99.7% red — POS APK'tan agresif çünkü waiter daha az icon kullanıyor) + CupertinoIcons 257628→848 (99.7%) |
+| applicationId | `com.gastrocore.waiter` (POS APK'tan ayrı paket — aynı tablete yan yana yüklenebilir) |
+
+### Install komutu (pilot tablet)
+
+```
+adb install -r E:\Project\Restaurant\pilot\app-waiter-release-20260509.apk
+```
+
+Tablet üzerinde paket adı `com.gastrocore.waiter`, ikon "GastroCore Garson".
+POS APK (`com.gastrocore.gastrocore_pos`) bozulmaz — iki uygulama yan yana.
+
+### Yasak / Yapılmayan
+- 88'e deploy yok (sadece tablet APK install)
+- Reservation tarafına dokunulmadı
+- 5-dil ARB i18n yine deferred (ARB heavily modified, paralel agent çakışma riski)
+- Direct SSE "ready" channel: scope dışı, follow-up
+
+### Rollback
+
+Eski waiter APK yoksa, mevcut tabletin APK'sı zaten önceki sürüm.
+Yeni APK'yı kaldır:
+```
+adb uninstall com.gastrocore.waiter
+```
+
+---
+
+## 2026-05-11 ~17:00 CEST — D Aşama 3 POS-core push FULL pipeline (88 deploy + reservation code-only)
+
+**Servisler:** POS Go (88), Backoffice (88). Reservation tarafı kod hazır,
+**178'e deploy YOK** — saat kuralı (akşam 22:00+ serbest).
+
+### Karar
+
+D Stratejisi Aşama 3 yarımdı: Reservation tarafında lock guard + source flag +
+`/api/menu/source` GET yıllar önce inmişti, ama POS tarafında ne push endpoint
+ne auto-trigger ne retry job vardı. Bu turda full pipeline kapatıldı.
+
+### Migration 027 — `tenants` flag kolonları
+
+| Kolon | Tip | Default | Anlamı |
+|---|---|---|---|
+| `menu_core_source` | TEXT (CHECK) | `'GASTROHUB'` | Menü yetkisi: POS mu Hub mu? |
+| `modifier_source`  | TEXT (CHECK) | `'GASTROHUB'` | Modifier yetkisi (bağımsız) |
+| `gastrohub_restaurant_id` | TEXT | NULL | Push hedefi Reservation cuid |
+
+Ek: `idx_menu_sync_events_pending_retry` partial index — retry job tarayışı için.
+
+### Yeni / değişen dosyalar
+
+**Server (Go)**
+- `server/migrations/027_menu_core_source.up.sql` (+down) — flag kolonları + index
+- `server/internal/menu/push_handlers.go` (yeni) — `POST /api/v1/menu/push-to-reservation/{tenantId}`, `EnqueueMenuSyncEvent`, `PushSyncEventByID`, `TryPushAsync`, `ShouldPush`, `maybePush`. HMAC-SHA256(body) raw hex `X-Gastrocore-Signature`.
+- `server/internal/menu/source_handlers.go` (yeni) — `GET/PATCH /api/v1/menu/source`, admin/HQ role gate, partial COALESCE update
+- `server/internal/menu/sync_retry_job.go` (yeni) — 5dk tick, backoff 1/5/15/30/60 min, max 5 retry, sonra `failed`
+- `server/internal/menu/handlers.go` — create/update/delete (categories + products) → `maybePush(...)` çağrısı (push sadece `menu_core_source=GASTROCORE` ise tetiklenir, goroutine, HTTP response bloklanmaz)
+- `server/internal/menu/module.go` — yeni rotalar
+- `server/cmd/server/main.go` — `menu.StartSyncRetryJob(bgCtx, db)` startup, graceful shutdown'a `bgCancel()` eklendi
+
+**Backoffice**
+- `apps/backoffice/app/[locale]/(dashboard)/settings/menu-source/page.tsx` (yeni) — server component, "Menü Yönetimi" sayfası
+- `apps/backoffice/components/settings/menu-source-client.tsx` (yeni) — 2 ayrı radio kart (menu / modifier authority) + Hub mapping ID input + dirty-state save + warning when POS-mode without hubId
+- `apps/backoffice/lib/nav-config.ts` — settings group'a `settingsMenuSource` entry
+- `apps/backoffice/messages/{tr,de,en,fr,it}.json` — `menuSource.*` namespace + `settingsMenuSource` sidebar label, 5 dilde
+
+**Reservation (code only, NOT deployed)**
+- `E:/Project/reservation/src/app/api/gastrocore/menu/sync/route.ts` (yeni) — HMAC verify, authority guard (`menuCoreSource === 'GASTROCORE'` veya `modifierSource`), name-based matching, category/product/modifier_group/modifier × create/update/delete dispatch. CHF cents → Decimal dönüşümü içeriyor.
+
+### Deploy (88, 2026-05-11 ~17:00 CEST)
+
+1. SFTP `gastrocore-linux-amd64` (13.6 MB), `027_*.sql`, `backoffice-deploy-20260511-165405.tar.gz` (15.5 MB) → `/tmp`
+2. Migration: `psql -U gastro -d gastro < 027_menu_core_source.up.sql` — 3 ALTER + 1 CREATE INDEX OK
+3. `cp server` → `/home/tech/gastrocore/server` (önceki `server.bak.20260511-…-pre-d3`)
+4. `systemctl restart gastrocore` → active, log "menu-sync-retry: started interval_s=300" ✓
+5. Backoffice systemd stop → tar extract → standalone swap → start → active, **BUILD_ID=`ONhH6LbHXDy-tORRQLlSX`**
+
+### Smoke testleri (tümü ✓)
+
+| Test | Result |
+|---|---|
+| `GET /api/v1/menu/source` (Sushi Zen) | 200 `{"menu_core_source":"GASTROHUB","modifier_source":"GASTROHUB"}` |
+| `PATCH /menu/source` → GASTROCORE + fake hub id | 200 + payload returned + DB updated |
+| `PATCH /menu/source` `menuCoreSource:"INVALID"` | 400 `INVALID_SOURCE` |
+| `POST /push-to-reservation/{tid}` category.create | 200 envelope `{"eventId":"…","status":"failed","error":"upstream 401"}` (expected — 178'de receiver henüz deploy edilmedi, HMAC reddediyor) |
+| `menu_sync_events` row | `category.create` / `failed` / retry_count=1, error="401: {Unauthorized}" — retry job 5dk sonra tekrar deneyecek |
+| `/tr/settings/menu-source` | 307 → login (server-rendered route, no-session expected redirect) |
+| Retry job startup log | "menu-sync-retry: started" interval=300s ✓ |
+
+### Reservation tarafı (akşam deploy planı)
+
+Code-only landed at `E:/Project/reservation/src/app/api/gastrocore/menu/sync/route.ts`. Deploy steps when window opens (≥22:00 CEST):
+1. `npm run build` reservation
+2. SFTP tarball → 178 `/tmp`
+3. PM2 `reload reservation --update-env` (env değişmedi, ama receiver yeni kod path'i)
+4. Smoke: aynı `push-to-reservation` çağrısı bu kez 200 + remoteId döndürmeli
+
+Mutation flow E2E test:
+1. Backoffice /settings/menu-source → Sushi Zen için "POS'ta yönet" seç + Gastro Hub restaurant ID gir (gerçek cuid)
+2. `/menu` → "Yeni Ürün" → kaydet
+3. Reservation dashboard'unda aynı ürünün otomatik göründüğünü doğrula
+4. POS'tan silince Reservation'da da silindiğini doğrula
+5. 5dk içinde yapılan ardışık değişiklikler retry job tarafından sırayla işlenmeli (network blip simülasyonu için reservation'ı geçici restart)
+
+### Bekleyen / out-of-scope
+
+- Modifier (`modifier_groups` + `modifiers`) CRUD handler'larında `maybePush` çağrısı yok — modifier handler'ları henüz POS'ta tam CRUD değil, mevcut sadece `GET /api/v1/menu/modifiers`. Aşama 3.5'te POS modifier CRUD inince auto-trigger eklenecek.
+- Receiver tarafında external_menu_refs mirror tablosu yok — kategori/ürün name-based match. Cross-restaurant aynı isim çakışması teorik olarak mümkün; pratik pilot ölçeğinde sorun değil.
+- Audit log entry yok (audit_log.user_id FK boş bırakılamıyor, users tablosu admin için kullanılmıyor); slog `auto-push:` satırları journalctl üzerinden takip ediliyor.
+
+### Rollback
+
+POS Go: `cp /home/tech/gastrocore/server.bak.20260511-…-pre-d3 /home/tech/gastrocore/server && systemctl restart gastrocore`
+Backoffice: `ls /home/tech/backups/backoffice-pre-d3-*.tgz` → extract over `/home/tech/backoffice/` → restart
+Migration 027: `psql < 027_menu_core_source.down.sql` (tüm tenant'lar default `GASTROHUB`'a düşer; pending event'ler kalır — pencereyle elle drain et)
+
+---
+
 ## 2026-05-11 ~17:30 CEST — POS Modifier Management UI (4. tab Atamalar + TR localize + APK rebuild)
 
 **Servis:** Pilot tablet (manuel APK install, **88'e deploy YOK**)
