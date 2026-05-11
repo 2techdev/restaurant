@@ -37,7 +37,7 @@ class TableSelectScreen extends ConsumerWidget {
         backgroundColor: AppColors.surface,
         elevation: 0,
         title: const Text(
-          'Select Table',
+          'Masa Seç',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -179,7 +179,7 @@ class TableSelectScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Table ${table.name} is ${table.status.name}',
+              'Masa ${table.name} şu an "${table.status.name}"',
               style: const TextStyle(color: Colors.white),
             ),
             backgroundColor: AppColors.surfaceContainerHigh,

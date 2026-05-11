@@ -43,7 +43,7 @@ class WaiterBottomNav extends ConsumerWidget {
         const NavigationDestination(
           icon: Icon(Icons.table_restaurant_outlined),
           selectedIcon: Icon(Icons.table_restaurant, color: AppColors.primary),
-          label: 'Tables',
+          label: 'Masalar',
         ),
         NavigationDestination(
           icon: _BadgedIcon(
@@ -55,7 +55,7 @@ class WaiterBottomNav extends ConsumerWidget {
             count: itemCount,
             iconColor: AppColors.primary,
           ),
-          label: 'Order',
+          label: 'Sipariş',
         ),
         NavigationDestination(
           icon: _BadgedIcon(
@@ -67,7 +67,7 @@ class WaiterBottomNav extends ConsumerWidget {
             count: activeOrderCount,
             iconColor: AppColors.primary,
           ),
-          label: 'My Orders',
+          label: 'Siparişlerim',
         ),
       ],
     );

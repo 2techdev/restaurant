@@ -139,12 +139,12 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
           labelStyle: const TextStyle(
               fontSize: 13, fontWeight: FontWeight.w700),
           tabs: [
-            const Tab(text: 'Menu'),
+            const Tab(text: 'Menü'),
             Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Order'),
+                  const Text('Sipariş'),
                   if (itemCount > 0) ...[
                     const SizedBox(width: 6),
                     Container(
@@ -201,7 +201,7 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
       _tabController.animateTo(1);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Order sent to kitchen!',
+          content: Text('Sipariş mutfağa gönderildi!',
               style: TextStyle(fontWeight: FontWeight.w600)),
           backgroundColor: AppColors.green,
           behavior: SnackBarBehavior.floating,
@@ -216,7 +216,7 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Bill requested — POS will handle payment'),
+          content: Text('Hesap istendi — ödeme POS\'tan alınacak'),
           backgroundColor: AppColors.orange,
           behavior: SnackBarBehavior.floating,
         ),
@@ -233,7 +233,7 @@ class _WaiterOrderScreenState extends ConsumerState<WaiterOrderScreen>
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Order marked as served'),
+          content: Text('Sipariş "servis edildi" olarak işaretlendi'),
           backgroundColor: AppColors.green,
           behavior: SnackBarBehavior.floating,
         ),

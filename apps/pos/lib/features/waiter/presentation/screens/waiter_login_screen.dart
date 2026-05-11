@@ -139,7 +139,7 @@ class _WaiterLoginScreenState extends ConsumerState<WaiterLoginScreen> {
           data: (users) {
             if (users.isEmpty) {
               return const Center(
-                child: Text('No staff found',
+                child: Text('Personel bulunamadı',
                     style: TextStyle(color: AppColors.textDim)),
               );
             }
@@ -178,7 +178,7 @@ class _WaiterLoginScreenState extends ConsumerState<WaiterLoginScreen> {
               colors: [AppColors.primary, AppColors.primaryContainer],
             ).createShader(bounds),
             child: const Text(
-              'GastroCore Waiter',
+              'GastroCore Garson',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,

@@ -33,7 +33,7 @@ class WaiterActiveOrdersScreen extends ConsumerWidget {
         backgroundColor: AppColors.surface,
         elevation: 0,
         title: const Text(
-          'My Orders',
+          'Siparişlerim',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -79,7 +79,7 @@ class WaiterActiveOrdersScreen extends ConsumerWidget {
                             size: 72, color: AppColors.textDim),
                         SizedBox(height: 16),
                         Text(
-                          'No active orders',
+                          'Aktif sipariş yok',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -88,7 +88,7 @@ class WaiterActiveOrdersScreen extends ConsumerWidget {
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'Head to Tables to start a new order',
+                          'Yeni sipariş için Masalar sekmesine git',
                           style: TextStyle(
                               fontSize: 13, color: AppColors.textDim),
                         ),
@@ -198,7 +198,7 @@ class _OrderCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'Order #${order.orderNumber}',
+                        'Sipariş #${order.orderNumber}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -296,7 +296,7 @@ class _OrderCard extends StatelessWidget {
 
   String _elapsed(DateTime openedAt) {
     final diff = DateTime.now().difference(openedAt);
-    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 1) return 'Az önce';
     if (diff.inHours < 1) return '${diff.inMinutes}m ago';
     return '${diff.inHours}h ${diff.inMinutes % 60}m';
   }
@@ -333,17 +333,17 @@ class _StatusBadge extends StatelessWidget {
   String get _label {
     switch (status) {
       case TicketStatus.open:
-        return 'Open';
+        return 'Açık';
       case TicketStatus.sent:
-        return 'In Kitchen';
+        return 'Mutfakta';
       case TicketStatus.inProgress:
-        return 'Cooking';
+        return 'Pişiyor';
       case TicketStatus.ready:
-        return 'Ready!';
+        return 'Hazır!';
       case TicketStatus.served:
-        return 'Served';
+        return 'Servis Edildi';
       case TicketStatus.billRequested:
-        return 'Bill Req.';
+        return 'Hesap İst.';
       default:
         return status.name;
     }

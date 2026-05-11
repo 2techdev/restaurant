@@ -86,7 +86,7 @@ class _SearchBar extends ConsumerWidget {
             ref.read(waiterSearchQueryProvider.notifier).state = value,
         style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
         decoration: InputDecoration(
-          hintText: 'Search menu…',
+          hintText: 'Menüde ara…',
           hintStyle:
               const TextStyle(color: AppColors.textDim, fontSize: 15),
           prefixIcon:
