@@ -50,6 +50,7 @@ import 'package:gastrocore_pos/features/fast_sale/domain/restaurant_config.dart'
 import 'package:gastrocore_pos/features/fast_sale/presentation/providers/restaurant_config_provider.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/backup_provider.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
+import 'package:gastrocore_pos/features/settings/presentation/widgets/network_status_pane.dart';
 import 'package:gastrocore_pos/features/settings/presentation/widgets/tenant_switcher_pane.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/update_channel_settings.dart';
 import 'package:gastrocore_pos/features/updates/domain/app_version.dart';
@@ -86,6 +87,7 @@ enum _Section {
   loyalty('Treueprogramm', Icons.card_giftcard_rounded),
   demoData('Demo Data', Icons.science_outlined),
   tenantSwitcher('Mağaza Seçici', Icons.store_rounded),
+  networkStatus('Bağlantı Durumu', Icons.wifi_find_rounded),
   upgrade('License & Upgrade', Icons.workspace_premium_rounded),
   updates('Güncelleme', Icons.system_update_alt_rounded),
   syncDlq('Senkron DLQ', Icons.error_outline_rounded),
@@ -168,6 +170,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _Section.loyalty => const _LoyaltySection(),
       _Section.demoData => const _DemoDataSection(),
       _Section.tenantSwitcher => const TenantSwitcherPane(),
+      _Section.networkStatus => const NetworkStatusPane(),
       _Section.upgrade => const _UpgradeSection(),
       _Section.updates => const _UpdatesSection(),
       _Section.syncDlq => const _SyncDlqSection(),
