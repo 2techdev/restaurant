@@ -3,6 +3,226 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-11 ~17:30 CEST — POS Modifier Management UI (4. tab Atamalar + TR localize + APK rebuild)
+
+**Servis:** Pilot tablet (manuel APK install, **88'e deploy YOK**)
+
+**Karar:** Backoffice modifier UI tek-host olmaktan çıkıp POS tabletine de
+geliyor. Operatör vardiya sırasında menü değişikliği yaparken artık masaüstü
+admin paneline gitmek zorunda değil — POS shell içinden modifier grubu /
+opsiyon CRUD + ürüne grup ataması yapabiliyor.
+
+### Mevcut + yeni gap
+
+`ModifierManagementPanel` (`apps/pos/lib/features/menu/presentation/widgets/`)
+zaten 1000+ satır CRUD UI içeriyordu (group + option dialogs, delete confirm,
+selection-type seçici, default toggle, CHF delta render). Eksik olan: (a)
+İngilizce metinler → operatör için Türkçe, (b) ürüne grup atama UI hiç yoktu.
+
+### Yeni / değişen dosyalar
+
+| Dosya | Değişiklik |
+|---|---|
+| `apps/pos/lib/features/menu/presentation/widgets/product_modifier_assignment_panel.dart` | **YENİ ~480 satır.** Sol: ürün listesi (admin scope, kategori-bağımsız, search). Sağ: seçilen ürün için atanmış gruplar (sıra rozeti + çıkar butonu) + unassigned dropdown'dan ekleme. Snackbar feedback. Mutations `MenuRepositoryImpl.linkModifierGroupToProduct` / `unlinkModifierGroupFromProduct` (zaten var), sync_queue offline-first pipeline'a düşüyor. |
+| `apps/pos/lib/features/menu/presentation/screens/menu_management_screen.dart` | `_tabs`: 3 → **4** (Atamalar eklendi); başlık "Menu Management" → "Menü Yönetimi"; tüm tab label'ları TR. IndexedStack 4 child'lı. |
+| `apps/pos/lib/features/menu/presentation/widgets/modifier_management_panel.dart` | **Tam TR localize**: "Modifier Groups" → "Modifier Grupları", "Add Modifier Group" / "Add Option" / "Selection Type" / "Single Choice" / "Multiple Choice" / "Required" / "Min/Max Selections" / "Cancel" / "Save" / "Group Name" / "Option Name" / "Price Delta (CHF)" / "Pre-selected by default" / "Free" / "Single/Multiple" / "Required" badge, hint metinleri ("e.g. Size, Extras, Sauce" → "örn. Boyut, Ekstra, Sos"), delete confirm gövde metinleri. |
+
+### Tests (+3 yeni assertion)
+
+`apps/pos/test/features/menu/repository/menu_repository_test.dart` — `Product–ModifierGroup links` group altına 3 yeni assertion eklendi:
+- `unlink one group leaves siblings intact` — 3 grup ata, 1 kaldır → diğer 2 sağlam (chip remove UX guarantee).
+- `cross-product isolation: link to A does not affect B` — atamalar panelinin filter'ının kapsam izolasyonunu sağladığı doğrulanıyor.
+- `re-link after unlink restores the assignment with options` — kullanıcı yanlışlıkla kaldırıp tekrar ekleyince options listesi bütünüyle yeniden bağlanıyor.
+
+Test sayısı: 1928 → **1934 pass** / 23 skip / 2 fail (untracked `fast_sale_screen_test.dart` paralel agent — dokunulmadı). 0 regresyon.
+
+### i18n politikası
+
+5 ARB + 5 auto-gen `app_localizations*.dart` paralel agent'larca heavily modify
+edilmiş (önceki cycle gibi). Hardcoded TR string operatör profili için yeterli;
+DE/EN/FR/IT genişletmesi tek-pass `flutter gen-l10n` ile sonraki cycle'da.
+
+### Pilot APK rebuild
+
+| Field | Value |
+|---|---|
+| Path | `E:\Project\Restaurant\pilot\app-pos-release-modifier-ui-20260509.apk` |
+| Latest pointer | `E:\Project\Restaurant\pilot\app-pos-release.apk` (overwrote) |
+| Size | **85.13 MB** (89,265,482 bytes) |
+| SHA256 | `5EC4126C25DC57102770734D4420C82B02157B44453EDF575B2E95CAE797412B` |
+| Build | `flutter build apk --release --flavor pos -t lib/main.dart` (249.0s) |
+| Tree-shake | MaterialIcons 1645184→43692 (97.3% red) + CupertinoIcons 257628→848 (99.7% red) |
+
+Önceki APK `app-pos-release-asama4-final-20260509.apk` (85.04 MB · b99b4773…)
+korundu — rollback için duruyor.
+
+### Yasak / Yapılmayan
+- 88'e deploy yok (yeni endpoint yok; backoffice tarafı zaten 16:50 CEST canlı).
+- Reservation tarafına dokunulmadı.
+- 5-dil ARB i18n yine deferred (aynı paralel agent çakışma riski).
+- Multi-lang `name_translations` UI: backoffice DEVLOG'un belirttiği gibi server-side migration eksik; POS tarafında da skip.
+- Drag-drop reorder: scope dışı, sonraki cycle.
+
+### Rollback
+
+Önceki APK ile tablete tekrar install:
+```
+adb install -r E:\Project\Restaurant\pilot\app-pos-release-asama4-final-20260509.apk
+```
+
+---
+
+## KDS (Mutfak Ekranı) i18n + APK rebuild (2026-05-09 16:55 CEST)
+
+**Servis:** Mutfak ekranı — `apps/pos/lib/features/kds_app/` (jolly-final worktree, KDS flavor). Deploy değil; pilot tabletine elle install edilecek APK artefaktı.
+
+### Mevcut durum keşfi (brief'in büyük varsayımı yanlıştı)
+
+`apps/kds` veya `jolly-final/apps/kds` **yok**; KDS POS app'inin içinde **multi-flavor** olarak yaşıyor — `apps/pos/pubspec.yaml` flavor=`kds`, kod `features/kds_app/` modülünde. MVP scope'unun **~85%'i zaten uygulanmış**:
+
+- `kds_main_screen.dart` — full landscape grid, 3-tone urgency (green/yellow/red), tap-bump / long-press-recall, beep WAV synth + AudioPlayer, gang-grouped items list, stat chips (PENDING/COOKING/DONE TODAY), space/enter keyboard bump
+- `kds_login_screen.dart` + `kds_settings_screen.dart` + `kds_station_filter_screen.dart` (gang filter) + `kds_router.dart` (go_router)
+- `kds_providers.dart` — Riverpod `activeKitchenTicketsProvider`, `kdsStationFilterProvider`, `kdsLateThresholdProvider`, `kdsLargeFontProvider`, `kdsSoundAlertsProvider`
+- Backend stream: `KitchenRepository.completeTicket(id)` + `recallTicket(id)` (Drift local DB; cloud sync ayrı katmanda — menu_sync pattern)
+- Önceki APK (Aşama 4): `pilot/app-pos-release-asama4-20260509.apk`
+
+### Bu turda eklenen
+
+**1. Inline 5-locale label map** (`kds_main_screen.dart`):
+- `_kdsLabels` — 14 anahtar × 5 dil (en/de/tr/fr/it):
+  badgeNew, badgeCooking, badgeLate, statPending, statCooking, statDoneToday,
+  bump, allClear, orderPrefix, serverPrefix, ungrouped, liveSync, hintGesture,
+  kdsError
+- `_kdsLabel(BuildContext, String key)` — `Localizations.localeOf(context).languageCode` ile lookup, en fallback.
+- **Neden inline?** `flutter gen-l10n` sandbox build chain'inde değil; ARB değişiklikleri canlıya çıkmaz. Inline map deploy'u bloklamadan KDS'i 5 dilde teslim eder.
+
+**2. .arb dosyaları (5 dil)** — `apps/pos/lib/l10n/app_{en,de,tr,fr,it}.arb` aynı 14 anahtar `kds*` prefix'iyle eklendi. Sonraki gen-l10n regenerate'inde otomatik kullanılır (kanlı çıktığında inline map silinir).
+
+**3. Hardcoded string swap** (`kds_main_screen.dart`):
+- `_urgencyLabel` artık `BuildContext` alıyor → 'NEW/COOKING/LATE' lokalize
+- `_buildTopBar` stat chip'leri `_kdsLabel(context, 'statXxx')`
+- `_buildGrid` empty state "All clear — no active tickets" → lokal
+- `_buildTicketCard` "Order N" + "Server: name" → `orderPrefix` + `serverPrefix`
+- `_buildGangHeader` 'Andere' fallback → `_kdsLabel(context, 'ungrouped')`
+- "BUMP" buton → `_kdsLabel(context, 'bump')` (TR `HAZIR`, DE `FERTIG`, EN `READY`, FR `PRÊT`, IT `PRONTO`)
+- "KDS Error: $message" → `_kdsLabel(context, 'kdsError')`
+- Footer "Live sync active" + gesture hint → `liveSync` + `hintGesture`
+
+**4. Test:** `apps/pos/test/features/kds/kds_l10n_test.dart` (140 satır)
+- 14 key × 5 locale completeness matrix
+- TR non-ASCII assertions (YENİ, Hatası)
+- DE/FR/IT/EN value pinning (FERTIG/PRÊT/PRONTO/READY)
+- Replica map (private screen-side `_kdsLabels` ile lockstep — drift canary)
+
+### Build
+
+`flutter build apk --release` (background, ~5 dakika multi-flavor).
+
+| APK | Boyut | SHA256 | Konum |
+|---|---|---|---|
+| `app-kds-release.apk` (build dir) | 89,265,478 B | `f618688d8671a9075085a7785cb6fdcc12abc92257e567bcbb249c5d62018816` | `apps/pos/build/app/outputs/flutter-apk/` |
+| **Pilot artifact** | aynı | aynı | `pilot/app-kds-release-20260509.apk` |
+
+Önceki KDS APK `app-kds-release.apk` (May 9 00:51) korundu — pilot user için yedek. Yeni APK ayrı suffix'li `-20260509`.
+
+### Yasaklara uyum
+
+✅ Reservation (178) dokunulmadı · ✅ jolly-final POS satış lineage'i (`features/orders/`) dokunulmadı; sadece `features/kds_app/` ve ortak `l10n/` .arb'leri · ✅ AskUserQuestion kullanılmadı
+
+### Açık bırakılan iş (sonraki sprint için)
+
+- **gen-l10n entegrasyonu:** ARB anahtarları eklendi, ama `flutter gen-l10n` build step'ine girince inline map kaldırılıp `AppLocalizations.kdsXxx` getter'larıyla değiştirilmeli. Mevcut MVP davranışı korunur, kod temizlenir.
+- **Cloud SSE stream:** Şu an Drift local DB'den okuma (`activeKitchenTicketsProvider`); gerçek-zamanlı cloud push paralel agent G'nin push-to-reservation pattern'iyle (POS Go server `/api/v1/orders/stream` SSE/WS) tamamlanacak.
+- **Widget test (full):** mock Riverpod scope ile gerçek kds_main_screen render testi — l10n_test minimum coverage; widget render + bump button tap için ek 30 dakika scope.
+
+**İmza:** Opus 4.7 · KDS i18n MVP + APK rebuild
+
+---
+
+
+## 2026-05-11 ~16:50 CEST — Backoffice Modifier UI re-wire + deploy script systemd fix
+
+**Servis:** Backoffice (`backoffice.gastrocore.ch`, **systemd `backoffice.service`**, port 3001, 88.99.190.108)
+
+### Sorun
+Paralel agent revert döngüsü D Aşama 2 backoffice wiring'i bir kez daha söktü:
+- `modifiers-panel.tsx` combined endpoint mutation'lara dönmüş (`POST /menu/modifiers`)
+- `modifiers-client.tsx` read-only Alert banner geri gelmiş + `ModifiersPanel` orphan
+- `page.tsx` SSR initial data fetch + userRole prop iletmiyor
+- Sunucu D Aşama 2'den beri sadece SPLIT endpoint biliyor → panel mutations 404/yanlış-route
+
+### Re-wire (3 dosya)
+- `apps/backoffice/components/menu/modifiers-panel.tsx` — split endpoint orchestration restored: create POST `/menu/modifiers/groups` + per-option POST `/menu/modifiers/groups/{id}/options`; update diff-sync (PUT/POST/DELETE per option); delete DELETE `/menu/modifiers/groups/{id}` (server cascades).
+- `apps/backoffice/app/[locale]/(dashboard)/menu/modifiers/modifiers-client.tsx` — read-only Alert kaldırıldı, thin wrapper `<ModifiersPanel initial={initial} userRole={userRole} />`.
+- `apps/backoffice/app/[locale]/(dashboard)/menu/modifiers/page.tsx` — RSC server-side `fetchModifierGroups(session)` + `session.user.role` ile props iletilir.
+
+`server-data.ts:fetchModifierGroups` zaten mevcut (önceki D Aşama 2 kalıntısı), yeniden eklenmedi.
+
+### Deploy script bug — PM2 vs systemd, path mismatch
+`apps/backoffice/deploy_backoffice_hetzner.py` 88'in gerçek topology'sini bilmiyordu:
+
+| Field | Script varsayımı (yanlış) | 88'in gerçeği |
+|---|---|---|
+| Servis yöneticisi | PM2 `pm2 reload gastro-backoffice` | systemd `backoffice.service` |
+| Path | `/home/tech/gastro_backoffice/` | `/home/tech/backoffice/` |
+| Port | 3002 | 3001 |
+
+İlk run sonucu: build doğru tar oluşturuldu + yanlış path'e (`/home/tech/gastro_backoffice/`) extract edildi + `pm2 reload` "command not found" → **no-op deploy** (canlı backoffice etkilenmedi, eski build serve etmeye devam etti). Site bozulmadı, ama yeni build de canlı değildi.
+
+**Manuel recovery (atomic swap):**
+```bash
+TS=20260511-164800
+sudo cp -a /home/tech/backoffice /home/tech/backoffice_old_$TS              # snapshot
+sudo cp /home/tech/backoffice/.env.production /home/tech/gastro_backoffice/  # env carry
+sudo mv /home/tech/backoffice /home/tech/backoffice_failed_$TS               # rotate out old
+sudo mv /home/tech/gastro_backoffice /home/tech/backoffice                   # move new in
+sudo chown tech:tech /home/tech/backoffice/.env.production                   # systemd User=tech
+sudo chmod 600 /home/tech/backoffice/.env.production
+sudo systemctl restart backoffice.service
+```
+
+İlk restart fail: `.env.production` root-owned (sudo cp), tech user okuyamadı → EACCES. chown sonrası temiz.
+
+### Smoke (post-restart)
+- `systemctl is-active backoffice.service` → **active** (PID 25424+, "Ready in 73ms")
+- `curl http://127.0.0.1:3001/` → 307 (login redirect, expected)
+- `curl http://127.0.0.1:3001/tr/login` → **200**
+- `curl http://127.0.0.1:3001/tr/menu/modifiers` → 307 (auth gate, expected)
+- `curl https://backoffice.gastrocore.ch/tr/menu/modifiers` → 307 (CF → origin OK)
+- Build wire-up doğrulama:
+  - `grep -rl "menu/modifiers/groups" .next` → `server/chunks/4048.js` + `static/chunks/3528-….js` ✓
+  - `readOnlyNotice` artık `app/[locale]/(dashboard)/menu/modifiers/page.js` içinde yok ✓
+- Build ID timestamp: `2026-05-11 14:46:28 UTC`
+
+### Script fix
+`deploy_backoffice_hetzner.py` güncellendi:
+- `REMOTE_PROD = "/home/tech/backoffice"` (was `gastro_backoffice`)
+- `SYSTEMD_SERVICE = "backoffice.service"` + `SERVICE_PORT = 3001` constants
+- Step 10: `pm2 reload` → `sudo systemctl restart`, `pm2 describe` → `systemctl is-active`, env-chown step eklendi
+- Smoke: `pm2 logs` → `journalctl -u backoffice.service`, port probe `ss -tlnp :3001`
+- Rollback komutu güncellendi (mv + chown + systemctl)
+- Eski `PM2_APP` constant uyarıyla korundu (legacy log filtreler için)
+
+### Bilinçli skip
+- Multi-lang `name_translations` UI: backend'de modifier tablolarında `name_translations` kolonu YOK (D Aşama 2'de migration eklenmedi) → UI gönderse de server discard eder. Schema epic'i bekliyor.
+- Drag-drop sort order: @dnd-kit dependency + ~100 satır TS, scope dışı.
+- Product-level "modifier groups" tab (ürün düzenleme sayfasında ata/kaldır): backend hazır (`POST/DELETE /api/v1/menu/products/{pid}/modifier-groups`), UI ayrı epic.
+- Tests (`menu-modifiers-ui.test.tsx`): mevcut UI test infrastructure'ı (Vitest/Playwright) projelerde inconsistent, scope dışı; canlı smoke + manuel doğrulama.
+
+### Rollback (varsa)
+```bash
+ssh tech@88.99.190.108
+sudo systemctl stop backoffice.service
+sudo mv /home/tech/backoffice /home/tech/backoffice_failed_$(date +%s)
+sudo mv /home/tech/backoffice_old_20260511-164800 /home/tech/backoffice
+sudo chown tech:tech /home/tech/backoffice/.env.production
+sudo systemctl start backoffice.service
+```
+
+Rollback artifact'leri: `/home/tech/backoffice_failed_20260511-164800` (eski production) + `/home/tech/backoffice_old_20260511-164800` (pre-recovery snapshot).
+
+---
+
 ## Aşama 4 FINAL — Multi-tenant wire-up + Linked-items overlay + Pilot APK rebuild (2026-05-09 22:30 CEST)
 
 **Karar:** Önceki turda yazılan multi-tenant scaffolding'in 6-step wire-up'ı

@@ -50,7 +50,8 @@ Yapı: kategori başlıkları, her madde checkbox. Done olanlar `- [x]`, pending
 - [x] Audit enum 37
 - [x] Production API endpoint (api.gastrocore.ch)
 - [x] APK build pipeline (jolly-final lineage)
-- [x] Pilot APK: `pilot/app-pos-release.apk` (85.04 MB · sha256 b99b4773… · Aşama 4 final 2026-05-09)
+- [x] Pilot APK: `pilot/app-pos-release.apk` (85.13 MB · sha256 5ec4126c… · POS Modifier UI 2026-05-11)
+- [x] **POS Modifier Management UI** (2026-05-11) — Menü Yönetimi'ne 4. tab "Atamalar" eklendi (`ProductModifierAssignmentPanel`, ~480 satır): ürün seç → atanmış modifier gruplar (sıra rozeti + çıkar) + unassigned dropdown ile ekle. Mevcut `ModifierManagementPanel` tam TR localize edildi (Grup CRUD + Opsiyon CRUD + delete confirm + meta badges). Repository `linkModifierGroupToProduct/unlinkModifierGroupFromProduct` zaten vardı; +3 regression test (isolation, sibling-safe unlink, re-link round-trip). Detay: `pilot/DEPLOY_LOG_2026-05-09.md`.
 - [x] **POS Multi-tenant runtime switcher** wire-up tamam (5/6 madde — schema v23 user_tenant_assignments + ActiveTenantNotifier override main.dart + Settings tenantSwitcher tile flag-gated + Pin-login post-login modal + SyncApiClient `X-Tenant-ID`. i18n ARB deferred — paralel agent çakışmasını önlemek için TR hardcoded). Default `multiTenantSwitcherEnabled = false` → pilot davranışı değişmez. 17 yeni unit test pass. Detay: `pilot/DEPLOY_LOG_2026-05-09.md`.
 - [x] **POS Linked Items overlay** read-only — schema v24 (`products.is_popular_online` + `allergen_info` JSONB-string), `LinkedItemsOverlayTab` widget + `showLinkedItemsOverlaySheet(...)`, admin panel `_ProductGridCard` cloud icon trigger, banner + tooltip ("gastro.2hub.ch'te yönetilir"). Cloud Postgres karşılığı paralel agent migration 026.
 
