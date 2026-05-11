@@ -44,6 +44,10 @@ dependencies:
   shelf: ^1.4.2
   shelf_router: ^1.1.4
   multicast_dns: ^0.3.2+1
+  # LAN-first NetworkLocator: surfaces the device's own LAN IP in Settings
+  # so the operator can sanity-check which subnet the tablet is on (and
+  # whether it matches the POS server they're trying to reach).
+  network_info_plus: ^5.0.3
 
   # Navigation
   go_router: ^14.8.1
@@ -70,6 +74,11 @@ dependencies:
   # Encrypted storage for security-sensitive values (JWT tokens, device tokens)
   # Uses Keystore on Android and Keychain on iOS.
   flutter_secure_storage: ^9.2.2
+
+  # Hardware identifiers for device pairing fingerprint (model, OS, ID).
+  # Used so the same physical tablet can be tied to the same `pos_devices` row
+  # across re-pairs (server hashes the fingerprint on register).
+  device_info_plus: ^10.1.2
 
   # Runtime permission requests (camera, bluetooth, storage)
   permission_handler: ^11.3.1
@@ -135,3 +144,10 @@ flutter:
     - assets/images/staff/luca_bernasconi.svg
     - assets/images/staff/anna_fischer.svg
     - assets/images/staff/mehmet_yilmaz.svg
+    # Round-16: Swiss banknote / coin photos for the cash dialog. Drop
+    # PNG files named `chf_5.png`, `chf_10.png`, `chf_20.png`, `chf_50.png`,
+    # `chf_100.png`, `chf_200.png` into `assets/swiss_money/` and they
+    # render automatically. Until then the dialog falls back to a
+    # stylized illustration (per-denomination colour + Swiss cross +
+    # big "5/10/20/50/100/200" number).
+    - assets/swiss_money/

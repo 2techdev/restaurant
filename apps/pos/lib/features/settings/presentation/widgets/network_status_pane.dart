@@ -8,9 +8,11 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gastrocore_pos/core/network/network_locator.dart';
 import 'package:gastrocore_pos/core/network/network_locator_provider.dart';
+import 'package:gastrocore_pos/core/network/peer_registry.dart';
 
 class NetworkStatusPane extends ConsumerStatefulWidget {
   const NetworkStatusPane({super.key});
@@ -21,12 +23,41 @@ class NetworkStatusPane extends ConsumerStatefulWidget {
 
 class _NetworkStatusPaneState extends ConsumerState<NetworkStatusPane> {
   bool _refreshing = false;
+  final _manualCtrl = TextEditingController();
+  final _portCtrl = TextEditingController(text: '8090');
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-populate the input from whatever the locator currently has —
+    // visible immediately so the operator can confirm the current override.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final loc = ref.read(networkLocatorProvider);
+      final mo = loc.manualOverride;
+      if (mo != null) {
+        _manualCtrl.text = mo.host;
+        _portCtrl.text = '${mo.port}';
+        if (mounted) setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _manualCtrl.dispose();
+    _portCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final snapshot = ref.watch(networkEndpointStateProvider);
     final endpoint = snapshot.endpoint;
     final isLan = endpoint.isLan;
+    final peers = ref.watch(peerRegistryProvider);
+    final locator = ref.watch(networkLocatorProvider);
+    final nextReprobe = locator.nextReprobeAt;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -65,6 +96,12 @@ class _NetworkStatusPaneState extends ConsumerState<NetworkStatusPane> {
                     : 'Henüz tarama yok',
                 icon: Icons.history,
               ),
+              if (nextReprobe != null)
+                _row(
+                  label: 'Sonraki tarama',
+                  value: _fmtDate(nextReprobe),
+                  icon: Icons.schedule,
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -82,10 +119,67 @@ class _NetworkStatusPaneState extends ConsumerState<NetworkStatusPane> {
                 : 'Şimdi yenile (LAN re-probe)'),
           ),
           const SizedBox(height: 24),
+          _ManualOverrideCard(
+            hostCtrl: _manualCtrl,
+            portCtrl: _portCtrl,
+            onApply: _applyManualOverride,
+            onClear: _clearManualOverride,
+            currentOverride: locator.manualOverride,
+          ),
+          const SizedBox(height: 16),
+          _PeerListCard(peers: peers, activeHost: endpoint.peerHost),
+          const SizedBox(height: 16),
           _ExplainCard(),
         ],
       ),
     );
+  }
+
+  Future<void> _applyManualOverride() async {
+    final host = _manualCtrl.text.trim();
+    if (host.isEmpty) return;
+    final port = int.tryParse(_portCtrl.text.trim()) ?? 8090;
+    setState(() => _refreshing = true);
+    try {
+      // Persist BEFORE applying so a crash mid-resolve still survives a
+      // restart — the prefs entry is the source of truth on next boot.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('network_manual_host', host);
+      await prefs.setInt('network_manual_port', port);
+
+      await ref
+          .read(networkLocatorProvider)
+          .setManualOverride(host: host, port: port);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Manual override aktif: $host:$port')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
+
+  Future<void> _clearManualOverride() async {
+    _manualCtrl.clear();
+    _portCtrl.text = '8090';
+    setState(() => _refreshing = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('network_manual_host');
+      await prefs.remove('network_manual_port');
+
+      await ref
+          .read(networkLocatorProvider)
+          .setManualOverride(host: null);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Manual override kaldırıldı')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
   }
 
   Future<void> _reprobe() async {
@@ -213,6 +307,230 @@ class _DetailCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: children,
+      ),
+    );
+  }
+}
+
+class _ManualOverrideCard extends StatelessWidget {
+  const _ManualOverrideCard({
+    required this.hostCtrl,
+    required this.portCtrl,
+    required this.onApply,
+    required this.onClear,
+    required this.currentOverride,
+  });
+
+  final TextEditingController hostCtrl;
+  final TextEditingController portCtrl;
+  final Future<void> Function() onApply;
+  final Future<void> Function() onClear;
+  final ({String host, int port})? currentOverride;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.edit_rounded,
+                  size: 18, color: Color(0xFF666666)),
+              const SizedBox(width: 8),
+              const Text(
+                'Manual sunucu IP (opsiyonel)',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              if (currentOverride != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Aktif',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.green.shade900,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'mDNS broadcast blokluysa (örn. corporate WiFi) POS sunucusunun '
+            'IP adresini buraya yazın. Boş bırakırsanız otomatik keşif.',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextField(
+                  controller: hostCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'IP veya hostname',
+                    hintText: '192.168.1.50',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 1,
+                child: TextField(
+                  controller: portCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Port',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              FilledButton.icon(
+                onPressed: onApply,
+                icon: const Icon(Icons.save_rounded, size: 16),
+                label: const Text('Uygula'),
+              ),
+              const SizedBox(width: 8),
+              if (currentOverride != null)
+                OutlinedButton.icon(
+                  onPressed: onClear,
+                  icon: const Icon(Icons.clear_rounded, size: 16),
+                  label: const Text('Temizle'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PeerListCard extends StatelessWidget {
+  const _PeerListCard({required this.peers, required this.activeHost});
+
+  final List<LanPeer> peers;
+  final String? activeHost;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.devices_other_rounded,
+                  size: 18, color: Color(0xFF666666)),
+              const SizedBox(width: 8),
+              const Text(
+                'LAN\'da bulunan cihazlar',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              Text(
+                '${peers.length}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          if (peers.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Bu ağda başka GastroCore cihazı görünmüyor. '
+                'Sunucu mDNS broadcast yapmıyor olabilir veya cihazlar '
+                'farklı WiFi\'ye bağlı.',
+                style:
+                    TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            )
+          else
+            ...peers.map((p) => _PeerRow(peer: p, isActive: p.host == activeHost)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PeerRow extends StatelessWidget {
+  const _PeerRow({required this.peer, required this.isActive});
+
+  final LanPeer peer;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(
+            peer.healthy ? Icons.circle : Icons.circle_outlined,
+            size: 10,
+            color: peer.healthy ? Colors.green : Colors.grey.shade400,
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.blueGrey.shade50,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              peer.role.label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Colors.blueGrey.shade700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${peer.host}:${peer.port}',
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (isActive)
+            const Padding(
+              padding: EdgeInsets.only(left: 6),
+              child: Icon(Icons.check_circle, size: 14, color: Colors.green),
+            ),
+        ],
       ),
     );
   }

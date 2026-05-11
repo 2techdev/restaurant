@@ -22,6 +22,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gastrocore_pos/core/config/app_endpoints.dart';
+import 'package:gastrocore_pos/core/network/connection_strategy.dart';
 import 'package:gastrocore_pos/core/network/network_locator.dart';
 
 /// The shared [NetworkLocator] singleton.
@@ -58,6 +59,43 @@ final resolvedApiBaseUrlProvider = Provider<String>((ref) {
 final resolvedWsBaseUrlProvider = Provider<String>((ref) {
   return ref.watch(networkEndpointStateProvider).endpoint.wsBaseUrl;
 });
+
+/// [ConnectionStrategy] singleton — owns the WS reconnect back-off
+/// state machine on top of the locator. Like [networkLocatorProvider] this
+/// must be overridden at the flavor root (a single shared strategy across
+/// the app lifetime).
+final connectionStrategyProvider = Provider<ConnectionStrategy>((ref) {
+  throw UnimplementedError(
+    'connectionStrategyProvider must be overridden in main_{flavor}.dart. '
+    'Construct with ConnectionStrategy(locator: locator).',
+  );
+});
+
+/// Live snapshot of the strategy phase + peer state + endpoint, mirrored
+/// for the UI to watch without coupling to the strategy's stream API.
+final connectionSnapshotProvider =
+    StateNotifierProvider<ConnectionSnapshotNotifier, ConnectionSnapshot>(
+  (ref) {
+    final strategy = ref.watch(connectionStrategyProvider);
+    return ConnectionSnapshotNotifier(strategy);
+  },
+);
+
+class ConnectionSnapshotNotifier extends StateNotifier<ConnectionSnapshot> {
+  ConnectionSnapshotNotifier(this._strategy)
+      : super(_strategy.snapshot) {
+    _sub = _strategy.snapshots.listen((s) => state = s);
+  }
+
+  final ConnectionStrategy _strategy;
+  StreamSubscription<ConnectionSnapshot>? _sub;
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+}
 
 // ---------------------------------------------------------------------------
 // State + notifier

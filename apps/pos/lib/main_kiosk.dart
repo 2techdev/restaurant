@@ -15,6 +15,10 @@ import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/core/data/app_initializer.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/di/providers.dart';
+import 'package:gastrocore_pos/core/network/connection_strategy.dart';
+import 'package:gastrocore_pos/core/network/network_locator.dart';
+import 'package:gastrocore_pos/core/network/network_locator_provider.dart';
+import 'package:gastrocore_pos/core/network/peer_registry.dart';
 import 'package:gastrocore_pos/features/licensing/data/repositories/license_repository_impl.dart';
 import 'package:gastrocore_pos/features/sync/presentation/providers/sync_provider.dart';
 import 'package:gastrocore_pos/kiosk_app.dart';
@@ -51,9 +55,48 @@ void main() async {
     await prefs.setString('kiosk_device_id', deviceId);
   }
 
+  // LAN-first endpoint resolution + peer registry + connection strategy.
+  // Kiosk is customer-facing — when the in-restaurant POS server is
+  // reachable on the LAN we route order pushes locally for lower latency
+  // and to spare the cloud quota on a busy lunch shift. Falls back to
+  // cloud transparently if the LAN server is offline.
+  final registry = PeerRegistry();
+  final manualHost = prefs.getString('network_manual_host');
+  final manualPort = prefs.getInt('network_manual_port') ?? 8090;
+  final locator = NetworkLocator(
+    tenantFilter: tenantId,
+    onPeersDiscovered: (peers, healthyHosts) {
+      registry.replaceAll(
+        peers
+            .map(
+              (p) => LanPeer(
+                host: p.host,
+                port: p.port,
+                role: PeerRole.parse(p.roleRaw),
+                tenantId: p.tenantId,
+                version: p.version,
+                lastSeenAt: DateTime.now(),
+                healthy: healthyHosts.contains(p.host),
+              ),
+            )
+            .toList(),
+      );
+    },
+  );
+  if (manualHost != null && manualHost.isNotEmpty) {
+    await locator.setManualOverride(host: manualHost, port: manualPort);
+  } else {
+    await locator.resolve();
+  }
+  locator.scheduleDailyReprobeAt();
+  final strategy = ConnectionStrategy(locator: locator);
+
   final syncUrl =
-      prefs.getString('sync_server_url') ?? AppEndpoints.apiBaseUrl;
-  final wsUrl = prefs.getString('ws_server_url') ?? AppEndpoints.wsBaseUrl;
+      prefs.getString('sync_server_url') ?? locator.current.apiBaseUrl;
+  final wsUrl =
+      prefs.getString('ws_server_url') ?? locator.current.wsBaseUrl;
+  // ignore: unused_local_variable
+  final cloudFallbackApi = AppEndpoints.apiBaseUrl;
 
   runApp(
     ProviderScope(
@@ -61,6 +104,10 @@ void main() async {
         databaseProvider.overrideWithValue(db),
         tenantIdProvider.overrideWithValue(tenantId),
         deviceIdProvider.overrideWith((ref) => deviceId),
+        networkLocatorProvider.overrideWithValue(locator),
+        connectionStrategyProvider.overrideWithValue(strategy),
+        peerRegistryProvider
+            .overrideWith((ref) => registry),
         syncServerUrlProvider.overrideWith((ref) => syncUrl),
         wsServerUrlProvider.overrideWith((ref) => wsUrl),
       ],

@@ -117,10 +117,34 @@ typedef PeerScanner = Future<List<DiscoveredPeer>> Function(
 typedef HealthProber = Future<bool> Function(String host, int port);
 
 class DiscoveredPeer {
-  const DiscoveredPeer({required this.host, required this.port});
+  const DiscoveredPeer({
+    required this.host,
+    required this.port,
+    this.roleRaw,
+    this.tenantId,
+    this.version,
+  });
   final String host;
   final int port;
+
+  /// Raw value of the `role` TXT record (e.g. `server`, `kds`, `waiter`).
+  /// Stored as a string so the locator stays free of [PeerRole] coupling;
+  /// callers parse via `PeerRole.parse(roleRaw)` if they need the enum.
+  final String? roleRaw;
+
+  /// Tenant the peer claims to belong to. The locator filters non-matching
+  /// peers out before the registry sees them.
+  final String? tenantId;
+
+  /// Optional build version from TXT records — surfaced in the Settings
+  /// peer-list for quick mismatch debugging.
+  final String? version;
 }
+
+/// Callback fired after every discover+probe cycle so the [PeerRegistry]
+/// can be refreshed. Receives ALL peers from the scan, plus the healthy
+/// flag the locator computed (true for the winner, false for others).
+typedef PeersObserver = void Function(List<DiscoveredPeer> peers, Set<String> healthyHosts);
 
 class NetworkLocator {
   NetworkLocator({
@@ -128,21 +152,46 @@ class NetworkLocator {
     Duration scanTimeout = const Duration(seconds: 4),
     Duration probeTimeout = const Duration(seconds: 1),
     Duration reprobeInterval = const Duration(hours: 24),
+    int reprobeHourLocal = 4,
+    String? tenantFilter,
     PeerScanner? scanner,
     HealthProber? prober,
+    PeersObserver? onPeersDiscovered,
   })  : _serviceType = serviceType,
         _scanTimeout = scanTimeout,
         _probeTimeout = probeTimeout,
         _reprobeInterval = reprobeInterval,
+        _reprobeHourLocal = reprobeHourLocal,
+        _tenantFilter = tenantFilter,
         _scanner = scanner,
-        _prober = prober;
+        _prober = prober,
+        _onPeersDiscovered = onPeersDiscovered;
 
   final String _serviceType;
   final Duration _scanTimeout;
   final Duration _probeTimeout;
   final Duration _reprobeInterval;
+
+  /// Local hour-of-day (0-23) to fire the daily re-probe. Default 04:00 —
+  /// every reasonable Swiss / TR restaurant is closed by then so the
+  /// scan happens with no operator load.
+  final int _reprobeHourLocal;
+
+  /// When non-null, the locator drops any scanned peer whose TXT-record
+  /// tenant doesn't match. Prevents a sibling restaurant on the same
+  /// shared WiFi (mall food court) from poisoning the registry.
+  final String? _tenantFilter;
+
   final PeerScanner? _scanner;
   final HealthProber? _prober;
+  final PeersObserver? _onPeersDiscovered;
+
+  /// Manual override — when set, [resolve()] skips mDNS and trusts this
+  /// host:port directly (still HTTP-probes to verify reachability before
+  /// declaring lanConnected). Lets an operator type the POS server IP into
+  /// Settings when broadcast is blocked (corporate WiFi, etc.).
+  String? _manualHost;
+  int _manualPort = 8090;
 
   final _stateController =
       StreamController<NetworkPeerState>.broadcast();
@@ -169,21 +218,67 @@ class NetworkLocator {
   Future<ResolvedEndpoint> resolve() async {
     _setState(NetworkPeerState.reconnecting);
     try {
+      // Priority 1: operator-set manual override. mDNS still runs in the
+      // background to keep the peer registry fresh for the Settings list,
+      // but the locator commits to the manual host as soon as it answers.
+      final manualHost = _manualHost;
+      if (manualHost != null && manualHost.isNotEmpty) {
+        final ok = await _doProbe(manualHost, _manualPort);
+        if (ok) {
+          _current = ResolvedEndpoint(
+            apiBaseUrl: 'http://$manualHost:$_manualPort',
+            wsBaseUrl: 'ws://$manualHost:$_manualPort',
+            source: 'lan',
+            peerHost: manualHost,
+            resolvedAt: DateTime.now(),
+          );
+          _setState(NetworkPeerState.lanConnected);
+          // Notify the registry so the manually-typed peer appears in
+          // the Settings list as healthy.
+          _onPeersDiscovered?.call(
+            [DiscoveredPeer(host: manualHost, port: _manualPort, roleRaw: 'server')],
+            {manualHost},
+          );
+          return _current;
+        }
+        // Manual override unreachable → fall through to mDNS / cloud.
+      }
+
+      // Priority 2: mDNS discovery + parallel HTTP probes.
       final peers = await _doScan();
-      for (final peer in peers) {
-        final healthy = await _doProbe(peer.host, peer.port);
-        if (!healthy) continue;
+      // Filter out other tenants if a filter is set (TXT record match).
+      final scoped = _tenantFilter == null
+          ? peers
+          : peers.where((p) => p.tenantId == null || p.tenantId == _tenantFilter).toList();
+      final healthyHosts = <String>{};
+      DiscoveredPeer? winner;
+      for (final peer in scoped) {
+        final ok = await _doProbe(peer.host, peer.port);
+        if (!ok) continue;
+        healthyHosts.add(peer.host);
+        // Prefer role=server above all others, otherwise first healthy.
+        if (winner == null) {
+          winner = peer;
+        } else if (peer.roleRaw == 'server' && winner.roleRaw != 'server') {
+          winner = peer;
+        }
+      }
+      // Surface every discovered peer (healthy or not) to the registry.
+      _onPeersDiscovered?.call(scoped, healthyHosts);
+
+      if (winner != null) {
         _current = ResolvedEndpoint(
-          apiBaseUrl: 'http://${peer.host}:${peer.port}',
-          wsBaseUrl: 'ws://${peer.host}:${peer.port}',
+          apiBaseUrl: 'http://${winner.host}:${winner.port}',
+          wsBaseUrl: 'ws://${winner.host}:${winner.port}',
           source: 'lan',
-          peerHost: peer.host,
+          peerHost: winner.host,
           resolvedAt: DateTime.now(),
         );
         _setState(NetworkPeerState.lanConnected);
         return _current;
       }
-      // No LAN peer answered — fall back to cloud.
+
+      // Priority 3: cloud.
       _current = ResolvedEndpoint(
         apiBaseUrl: AppEndpoints.apiBaseUrl,
         wsBaseUrl: AppEndpoints.wsBaseUrl,
@@ -209,9 +304,64 @@ class NetworkLocator {
 
   /// Schedule a daily re-probe at [_reprobeInterval] cadence. Cancels any
   /// previously scheduled timer; call once at app start.
+  ///
+  /// Use [scheduleDailyReprobeAt] for wall-clock-aligned scheduling
+  /// (e.g. always 04:00 local time) — the preferred path on pilot
+  /// tablets that may have been booted at random hours.
   void startDailyReprobe() {
     _dailyTimer?.cancel();
     _dailyTimer = Timer.periodic(_reprobeInterval, (_) => resolve());
+  }
+
+  /// Align the daily re-probe with a wall-clock hour (default constructor
+  /// value: 04:00 local). The first fire is at the next occurrence of that
+  /// hour, then every 24h. Survives DST shifts because the timer reschedules
+  /// itself after each fire — pure `Timer.periodic` would drift by an hour.
+  void scheduleDailyReprobeAt({int? hourLocal}) {
+    _dailyTimer?.cancel();
+    final hour = hourLocal ?? _reprobeHourLocal;
+    final next = _nextOccurrenceOfHour(hour);
+    final delay = next.difference(DateTime.now());
+    _dailyTimer = Timer(delay, () async {
+      await resolve();
+      // Reschedule for tomorrow — wall-clock aligned, DST safe.
+      scheduleDailyReprobeAt(hourLocal: hour);
+    });
+  }
+
+  /// Next wall-clock occurrence of [hour]:00 local time, strictly in the
+  /// future. If it's currently 03:59 and hour=4, returns today 04:00; if
+  /// it's 05:00, returns tomorrow 04:00.
+  DateTime _nextOccurrenceOfHour(int hour) {
+    final now = DateTime.now();
+    var target = DateTime(now.year, now.month, now.day, hour);
+    if (!target.isAfter(now)) {
+      target = target.add(const Duration(days: 1));
+    }
+    return target;
+  }
+
+  /// Returns the next scheduled re-probe time, or null if no timer is
+  /// armed. Used by the Settings pane to show "next re-probe: 04:00".
+  DateTime? get nextReprobeAt {
+    if (_dailyTimer == null || !_dailyTimer!.isActive) return null;
+    return _nextOccurrenceOfHour(_reprobeHourLocal);
+  }
+
+  /// Operator-typed override (Settings → Sunucu IP). Pass `null` to clear.
+  /// Triggers a [resolve()] so the new endpoint takes effect immediately.
+  Future<ResolvedEndpoint> setManualOverride({String? host, int port = 8090}) {
+    _manualHost = (host != null && host.trim().isEmpty) ? null : host?.trim();
+    _manualPort = port;
+    return resolve();
+  }
+
+  /// Current manual override, or null when none is set. Surfaced in the
+  /// Settings pane so the operator can see what they typed.
+  ({String host, int port})? get manualOverride {
+    final host = _manualHost;
+    if (host == null) return null;
+    return (host: host, port: _manualPort);
   }
 
   Future<void> dispose() async {
