@@ -15,14 +15,16 @@ import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provide
 import 'package:gastrocore_pos/features/menu/presentation/widgets/product_admin_panel.dart';
 import 'package:gastrocore_pos/features/menu/presentation/widgets/category_management_panel.dart';
 import 'package:gastrocore_pos/features/menu/presentation/widgets/modifier_management_panel.dart';
+import 'package:gastrocore_pos/features/menu/presentation/widgets/product_modifier_assignment_panel.dart';
 
 class MenuManagementScreen extends ConsumerWidget {
   const MenuManagementScreen({super.key});
 
   static const _tabs = [
-    _TabItem(label: 'Products', icon: Icons.inventory_2_outlined),
-    _TabItem(label: 'Categories', icon: Icons.category_outlined),
-    _TabItem(label: 'Modifiers', icon: Icons.tune_rounded),
+    _TabItem(label: 'Ürünler', icon: Icons.inventory_2_outlined),
+    _TabItem(label: 'Kategoriler', icon: Icons.category_outlined),
+    _TabItem(label: 'Modifier Grupları', icon: Icons.tune_rounded),
+    _TabItem(label: 'Atamalar', icon: Icons.link_rounded),
   ];
 
   @override
@@ -68,7 +70,7 @@ class MenuManagementScreen extends ConsumerWidget {
           ),
           const SizedBox(width: 12),
           const Text(
-            'Menu Management',
+            'Menü Yönetimi',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -148,6 +150,7 @@ class MenuManagementScreen extends ConsumerWidget {
         ProductAdminPanel(),
         CategoryManagementPanel(),
         ModifierManagementPanel(),
+        ProductModifierAssignmentPanel(),
       ],
     );
   }

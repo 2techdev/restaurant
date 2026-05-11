@@ -596,6 +596,63 @@ void main() {
       final linked = await repo.getModifierGroupsForProduct(product.id);
       expect(linked, hasLength(2));
     });
+
+    // Backs the [ProductModifierAssignmentPanel] guarantee: removing one
+    // assignment must not collateral-cascade onto sibling groups linked to
+    // the same product. Regression test for the "remove chip" UX where
+    // operators sometimes tap the wrong group expecting only that one to
+    // detach.
+    test('unlink one group leaves siblings intact', () async {
+      final group2 = makeModifierGroup(name: 'Extras');
+      final group3 = makeModifierGroup(name: 'Sauce');
+      await repo.createModifierGroup(group2);
+      await repo.createModifierGroup(group3);
+
+      await repo.linkModifierGroupToProduct(product.id, group.id, 0);
+      await repo.linkModifierGroupToProduct(product.id, group2.id, 1);
+      await repo.linkModifierGroupToProduct(product.id, group3.id, 2);
+
+      await repo.unlinkModifierGroupFromProduct(product.id, group2.id);
+
+      final linked = await repo.getModifierGroupsForProduct(product.id);
+      expect(linked, hasLength(2));
+      expect(linked.map((g) => g.id).toSet(), {group.id, group3.id});
+    });
+
+    // [ProductModifierAssignmentPanel] lets the operator pick from a list
+    // of UNASSIGNED groups. The candidate list is computed in-widget as
+    // `all - assigned(productId)` per product; this test pins down that
+    // linking to product A really does leave product B untouched (the data
+    // backing the widget's filter must keep the two scopes separate).
+    test('cross-product isolation: link to A does not affect B', () async {
+      final productB = makeProduct(categoryId: cat.id, name: 'Pizza');
+      await repo.createProduct(productB);
+
+      await repo.linkModifierGroupToProduct(product.id, group.id, 0);
+
+      final linkedA = await repo.getModifierGroupsForProduct(product.id);
+      final linkedB = await repo.getModifierGroupsForProduct(productB.id);
+
+      expect(linkedA, hasLength(1));
+      expect(linkedB, isEmpty);
+    });
+
+    // After an unlink/re-link round-trip the group should be findable again
+    // with its full options list — the panel relies on this to refresh the
+    // sub-list after the operator hits "Ekle" on a previously detached
+    // group without forcing a screen rebuild.
+    test('re-link after unlink restores the assignment with options', () async {
+      await repo.createModifier(makeModifier(groupId: group.id, name: 'S'));
+      await repo.createModifier(makeModifier(groupId: group.id, name: 'L'));
+
+      await repo.linkModifierGroupToProduct(product.id, group.id, 0);
+      await repo.unlinkModifierGroupFromProduct(product.id, group.id);
+      await repo.linkModifierGroupToProduct(product.id, group.id, 0);
+
+      final linked = await repo.getModifierGroupsForProduct(product.id);
+      expect(linked, hasLength(1));
+      expect(linked.first.modifiers, hasLength(2));
+    });
   });
 
   // =========================================================================

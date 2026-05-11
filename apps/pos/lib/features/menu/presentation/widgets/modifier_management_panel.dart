@@ -82,7 +82,7 @@ class _ModifierManagementPanelState
             child: Row(
               children: [
                 const Text(
-                  'Modifier Groups',
+                  'Modifier Grupları',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -121,7 +121,7 @@ class _ModifierManagementPanelState
           Padding(
             padding: const EdgeInsets.all(16),
             child: PosGradientButton(
-              label: 'Add Modifier Group',
+              label: 'Yeni Modifier Grubu',
               icon: Icons.add_rounded,
               height: 44,
               onPressed: _showGroupDialog,
@@ -141,7 +141,7 @@ class _ModifierManagementPanelState
             Icon(Icons.tune_rounded, size: 40, color: AppColors.textDim),
             SizedBox(height: 12),
             Text(
-              'No modifier groups yet',
+              'Henüz modifier grubu yok',
               style: TextStyle(color: AppColors.textDim, fontSize: 13),
             ),
           ],
@@ -196,7 +196,7 @@ class _ModifierManagementPanelState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        selectedGroup?.name ?? 'Select a Group',
+                        selectedGroup?.name ?? 'Bir grup seç',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -212,7 +212,7 @@ class _ModifierManagementPanelState
                 ),
                 if (selectedGroup != null)
                   PosGradientButton(
-                    label: 'Add Option',
+                    label: 'Opsiyon Ekle',
                     icon: Icons.add_rounded,
                     height: 40,
                     expand: false,
@@ -227,7 +227,7 @@ class _ModifierManagementPanelState
             child: selectedGroup == null
                 ? const Center(
                     child: Text(
-                      'Select a modifier group to manage its options.',
+                      'Opsiyonlarını yönetmek için bir grup seçin.',
                       style: TextStyle(
                           color: AppColors.textDim, fontSize: 13),
                     ),
@@ -250,12 +250,12 @@ class _ModifierManagementPanelState
                 size: 40, color: AppColors.textDim),
             const SizedBox(height: 12),
             const Text(
-              'No options yet',
+              'Henüz opsiyon yok',
               style: TextStyle(color: AppColors.textDim, fontSize: 13),
             ),
             const SizedBox(height: 20),
             PosGradientButton(
-              label: 'Add First Option',
+              label: 'İlk Opsiyonu Ekle',
               icon: Icons.add_rounded,
               height: 44,
               expand: false,
@@ -309,8 +309,8 @@ class _ModifierManagementPanelState
                   children: [
                     Text(
                       existing != null
-                          ? 'Edit Modifier Group'
-                          : 'Add Modifier Group',
+                          ? 'Modifier Grubunu Düzenle'
+                          : 'Yeni Modifier Grubu',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -321,22 +321,22 @@ class _ModifierManagementPanelState
 
                     // Name
                     PosTextField(
-                      label: 'Group Name',
-                      hint: 'e.g. Size, Extras, Sauce',
+                      label: 'Grup Adı',
+                      hint: 'örn. Boyut, Ekstra, Sos',
                       controller: nameCtrl,
                       autofocus: true,
                     ),
                     const SizedBox(height: 20),
 
                     // Selection type
-                    const _FieldLabel('Selection Type'),
+                    const _FieldLabel('Seçim Tipi'),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
                           child: _SelectionTypeButton(
-                            label: 'Single Choice',
-                            subtitle: 'Radio — exactly one',
+                            label: 'Tek Seçim',
+                            subtitle: 'Radio — tam olarak bir',
                             isSelected: selectionType ==
                                 ModifierSelectionType.single,
                             onTap: () => setDialog(() =>
@@ -346,8 +346,8 @@ class _ModifierManagementPanelState
                         const SizedBox(width: 8),
                         Expanded(
                           child: _SelectionTypeButton(
-                            label: 'Multiple Choice',
-                            subtitle: 'Checkbox — many',
+                            label: 'Çoklu Seçim',
+                            subtitle: 'Checkbox — birden fazla',
                             isSelected: selectionType ==
                                 ModifierSelectionType.multiple,
                             onTap: () => setDialog(() => selectionType =
@@ -360,8 +360,8 @@ class _ModifierManagementPanelState
 
                     // Required toggle
                     _ToggleRow(
-                      label: 'Required',
-                      subtitle: 'Staff must make a selection before adding to order',
+                      label: 'Zorunlu',
+                      subtitle: 'Personel sipariş eklemeden önce seçim yapmak zorunda',
                       value: isRequired,
                       onChanged: (v) => setDialog(() => isRequired = v),
                     ),
@@ -373,7 +373,7 @@ class _ModifierManagementPanelState
                         children: [
                           Expanded(
                             child: _NumericStepField(
-                              label: 'Min Selections',
+                              label: 'Min. Seçim',
                               value: minSel,
                               min: 0,
                               max: maxSel,
@@ -384,7 +384,7 @@ class _ModifierManagementPanelState
                           const SizedBox(width: 12),
                           Expanded(
                             child: _NumericStepField(
-                              label: 'Max Selections',
+                              label: 'Maks. Seçim',
                               value: maxSel,
                               min: minSel > 0 ? minSel : 1,
                               max: 20,
@@ -402,14 +402,14 @@ class _ModifierManagementPanelState
                       children: [
                         Expanded(
                           child: PosGhostButton(
-                            label: 'Cancel',
+                            label: 'İptal',
                             onPressed: () => Navigator.pop(ctx),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: PosGradientButton(
-                            label: 'Save',
+                            label: 'Kaydet',
                             height: 44,
                             onPressed: () => Navigator.pop(ctx, true),
                           ),
@@ -498,7 +498,7 @@ class _ModifierManagementPanelState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    existing != null ? 'Edit Option' : 'Add Option',
+                    existing != null ? 'Opsiyonu Düzenle' : 'Opsiyon Ekle',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -509,8 +509,8 @@ class _ModifierManagementPanelState
 
                   // Name
                   PosTextField(
-                    label: 'Option Name',
-                    hint: 'e.g. Large, Extra Cheese, No Onion',
+                    label: 'Opsiyon Adı',
+                    hint: 'örn. Büyük, Ekstra Peynir, Soğansız',
                     controller: nameCtrl,
                     autofocus: true,
                   ),
@@ -518,15 +518,15 @@ class _ModifierManagementPanelState
 
                   // Price delta
                   PosTextField(
-                    label: 'Price Delta (CHF)',
-                    hint: '0.00  (use negative for discount)',
+                    label: 'Fiyat Farkı (CHF)',
+                    hint: '0.00 (indirim için negatif değer)',
                     controller: priceCtrl,
                     keyboardType: const TextInputType.numberWithOptions(
                         signed: true, decimal: true),
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Positive = surcharge  ·  Negative = discount  ·  0 = free',
+                    'Pozitif = ek ücret · Negatif = indirim · 0 = ücretsiz',
                     style: TextStyle(
                         fontSize: 11, color: AppColors.textDim),
                   ),
@@ -534,8 +534,8 @@ class _ModifierManagementPanelState
 
                   // Default toggle
                   _ToggleRow(
-                    label: 'Pre-selected by default',
-                    subtitle: 'This option will be selected when the dialog opens',
+                    label: 'Varsayılan olarak seçili',
+                    subtitle: 'Dialog açıldığında bu opsiyon otomatik seçili gelir',
                     value: isDefault,
                     onChanged: (v) => setDialog(() => isDefault = v),
                   ),
@@ -546,14 +546,14 @@ class _ModifierManagementPanelState
                     children: [
                       Expanded(
                         child: PosGhostButton(
-                          label: 'Cancel',
+                          label: 'İptal',
                           onPressed: () => Navigator.pop(ctx),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: PosGradientButton(
-                          label: 'Save',
+                          label: 'Kaydet',
                           height: 44,
                           onPressed: () => Navigator.pop(ctx, true),
                         ),
@@ -620,8 +620,8 @@ class _ModifierManagementPanelState
 
   Future<void> _confirmDeleteGroup(ModifierGroupEntity group) async {
     final confirmed = await _deleteDialog(
-      'Delete Modifier Group',
-      'Delete "${group.name}" and all its options? Products linked to this group will no longer show these options.',
+      'Modifier Grubunu Sil',
+      '"${group.name}" ve tüm opsiyonları silinsin mi? Bu gruba bağlı ürünler artık bu seçenekleri göstermeyecek.',
     );
     if (confirmed == true) {
       if (_selectedGroupId == group.id) {
@@ -634,8 +634,8 @@ class _ModifierManagementPanelState
 
   Future<void> _confirmDeleteModifier(ModifierEntity modifier) async {
     final confirmed = await _deleteDialog(
-      'Delete Option',
-      'Delete "${modifier.name}"?',
+      'Opsiyonu Sil',
+      '"${modifier.name}" silinsin mi?',
     );
     if (confirmed == true) {
       await ref.read(menuRepositoryProvider).deleteModifier(modifier.id);
@@ -682,14 +682,14 @@ class _ModifierManagementPanelState
                   children: [
                     Expanded(
                       child: PosGhostButton(
-                        label: 'Cancel',
+                        label: 'İptal',
                         onPressed: () => Navigator.pop(ctx, false),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: PosSolidButton(
-                        label: 'Delete',
+                        label: 'Sil',
                         color: AppColors.red,
                         height: 44,
                         onPressed: () => Navigator.pop(ctx, true),
@@ -775,8 +775,8 @@ class _GroupRow extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${group.modifiers.length} option${group.modifiers.length == 1 ? '' : 's'}'
-                        ' · ${group.selectionType == ModifierSelectionType.single ? 'Single' : 'Multiple'}',
+                        '${group.modifiers.length} opsiyon'
+                        ' · ${group.selectionType == ModifierSelectionType.single ? 'Tek' : 'Çoklu'}',
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppColors.textDim,
@@ -818,7 +818,7 @@ class _ModifierOptionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final delta = modifier.priceDelta;
     final deltaStr = delta == 0
-        ? 'Free'
+        ? 'Ücretsiz'
         : delta > 0
             ? '+CHF ${(delta / 100).toStringAsFixed(2)}'
             : '-CHF ${(delta.abs() / 100).toStringAsFixed(2)}';
@@ -914,15 +914,15 @@ class _GroupMetaBadges extends StatelessWidget {
       children: [
         _Badge(
           label: group.selectionType == ModifierSelectionType.single
-              ? 'Single'
-              : 'Multiple',
+              ? 'Tek'
+              : 'Çoklu',
           color: AppColors.primary,
         ),
-        if (group.isRequired) const _Badge(label: 'Required', color: AppColors.orange),
+        if (group.isRequired) const _Badge(label: 'Zorunlu', color: AppColors.orange),
         if (group.selectionType == ModifierSelectionType.multiple)
           _Badge(
             label:
-                'min ${group.minSelections} · max ${group.maxSelections}',
+                'min ${group.minSelections} · maks ${group.maxSelections}',
             color: AppColors.textDim,
           ),
       ],
