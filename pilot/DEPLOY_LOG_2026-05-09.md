@@ -3,6 +3,511 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-11 ~22:30 CEST — Promotions migration 030 + handler enrich + happy-hour wired (code only — deploy QUEUED)
+
+**Servisler:** POS Go (88) — şema/binary GÜNCELLEME GEREKTİRİYOR; Backoffice
+(88) — handler kontratı değişti, GÜNCELLEME GEREKTİRİYOR. **Bu cycle deploy
+ÇALIŞTIRILMADI** (aşağıya bakın); commit `36af7f9` üzerinde bekliyor.
+
+### Karar
+
+Recon "Promotions sayfası boş onu da yapar mısın" yanıltıcıydı: backoffice'in
+`/promotions` altında 3 alt sayfa zaten yaşıyordu (Campaigns + Discounts
+live, Happy Hour localStorage stub). POS Go server'da 11 endpoint mevcut
+(migration 016'da `discounts` + `campaigns` tabloları). Gerçek gap:
+
+1. **Happy Hour backend yok** — localStorage'a yazıyordu, restart sonrası
+   kayboluyordu.
+2. **Schema brief'in istediği zengin alanlardan yoksun** — promo_code,
+   days_of_week, hours_from/to, max_uses/used_count, is_stackable,
+   name_translations / description_translations, HAPPY_HOUR type enum
+   değeri — hiçbiri yoktu.
+
+### Migration 030 — `discounts_enrich`
+
+`server/migrations/030_discounts_enrich.up.sql` (+ down):
+- `type` CHECK constraint relax → `HAPPY_HOUR` admit
+- 9 yeni kolon: `name_translations` JSONB, `description` TEXT,
+  `description_translations` JSONB, `days_of_week` int[]
+  (default `{0..6}` = her gün), `hours_from` TIME, `hours_to` TIME,
+  `max_uses` INT, `used_count` INT default 0, `promo_code` TEXT,
+  `is_stackable` BOOLEAN default false
+- 2 yeni index:
+  - `idx_discounts_tenant_promo_code` (UNIQUE, partial WHERE promo_code IS NOT NULL AND is_deleted=false)
+  - `idx_discounts_days_of_week` (GIN, partial WHERE is_deleted=false)
+- Tüm ALTER'lar `IF NOT EXISTS` ile idempotent — fresh install ve
+  re-run güvenli.
+
+### Go handler enrichment
+
+`server/internal/promotions/handlers.go`:
+- `Discount` struct: 9 yeni alan + JSON tag (omitempty for nullable).
+- `discountReq` request DTO: aynı alanlar nullable pointer ile (operatör
+  omit'ederse mevcut değer korunur).
+- `isValidType()`: HAPPY_HOUR eklendi.
+- INSERT 22 placeholder, UPDATE 21 placeholder (COALESCE/CASE ile omit
+  durumunda mevcut değer korunuyor — kısmi update güvenli).
+- `scanDiscount` 24 sütunu okuyor.
+- `jsonOrEmpty()` helper: nullable JSON blob → `{}` normalize (JSONB NOT
+  NULL DEFAULT contract).
+
+### Backoffice happy-hour rewire
+
+`apps/backoffice/app/[locale]/(dashboard)/promotions/happy-hour/happy-hour-client.tsx`:
+- localStorage tamamen kaldırıldı.
+- TanStack Query + `clientFetch` → `/api/v1/discounts`.
+- Filtre: `hours_from && hours_to` set olan kayıtlar = happy-hour kuralı.
+  `/promotions/discounts` sayfası yine her şeyi gösterir; happy-hour
+  sayfası alt-küme.
+- UI Mon-first day picker ↔ schema ISO 0=Sun..6=Sat int[] mapping (`DAY_TO_INT` / `INT_TO_DAY`).
+- Mutations: POST `/discounts`, PUT `/discounts/{id}`, DELETE.
+- "Backend tarafı geliştiriliyor" warning banner kaldırıldı.
+
+### i18n
+
+TR (`messages/tr.json`) → +3 anahtar (`deletedToast`, `saveError`, `deleteError`).
+**DE/EN/FR/IT** için `promotions.happyHour` namespace'i hiç yoktu;
+genişletme sonraki cycle'da tek pass'te yapılacak. Pilot operatörü
+Türkçe (user memory), bu cycle blocking değil.
+
+### Deploy — NEDEN ÇALIŞTIRILMADI
+
+| Bileşen | Bloker |
+|---|---|
+| POS Go server | Yerel makinede `go` ve `docker` yok — sandbox'tan compile mümkün değil. `deploy_backend.py` 192.168.1.134 (LAN) hedefliyor, 88 değil. 88 deploy mekanizması: docker-compose pull (cihazlarda manuel) veya CI build. |
+| Backoffice | Sunucudan ÖNCE deploy edilirse handler kontratı eşleşmez (happy-hour POST'u yeni alanlar gönderiyor, eski server 500 atar). Sıra zorunlu: server → backoffice. |
+
+**Commit `36af7f9` jolly-final'in main repo branch'inde
+(`claude/super-admin-impersonation`) hazır bekliyor.** Bir sonraki Go
+build/deploy'lu cycle:
+1. `cd E:/Project/Restaurant/server && go build -o gastrocore-linux-amd64 ./cmd/server` (veya docker build)
+2. SFTP `gastrocore-linux-amd64` → 88 `/tmp/`
+3. `psql -U gastro -d gastro < server/migrations/030_discounts_enrich.up.sql`
+4. `sudo cp /tmp/gastrocore-linux-amd64 /home/tech/gastrocore/server && sudo systemctl restart gastrocore`
+5. Smoke: `curl https://api.gastrocore.ch/api/v1/discounts -H "X-Tenant-ID: ..."`
+6. `cd apps/backoffice && python deploy_backoffice_hetzner.py`
+
+### Doğrulama (yerel)
+
+- Migration SQL syntax review (PostgreSQL-uyumlu, IF NOT EXISTS guard'ları)
+- Go handler placeholder/arg count audit (22 INSERT / 21 UPDATE / 24 SELECT — manuel doğrulandı, Go compile yapılamadı)
+- happy-hour-client TypeScript syntax doğru görünüyor (ESLint/tsc lokal sandbox'tan koşturulamadı; backoffice dev server bu worktree'den başlatılamıyor — preview lock)
+
+### Yasak / Yapılmayan
+
+- 178'e dokunulmadı (Reservation Campaign modeli ayrı, brief yasağı)
+- jolly-final worktree'ye dokunulmadı (POS Flutter app — brief yasağı)
+- Discounts form UI'da multi-lang name + day-of-week + time picker + promo_code + max_uses + is_stackable kontrolleri eklenmedi → sonraki cycle (schema + API hazır)
+- DE/EN/FR/IT i18n genişlemesi → sonraki cycle
+- max_uses server-side enforcement (counter increment payment path'inde) → sonraki cycle
+
+### Rollback
+
+Migration 030 reversible: `psql < server/migrations/030_discounts_enrich.down.sql`.
+Handler regression için önceki binary geri yüklenebilir (`/home/tech/gastrocore/server.bak.<TS>`).
+
+---
+
+## 2026-05-11 ~21:45 CEST — Tenant switcher async race fix + magic-link rewrite verification
+
+**Servis:** Backoffice (88). Go server dokunulmadı.
+
+### Kullanıcı bulgusu
+
+İki şikayet bir arada geldi:
+1. "Magic-link tekrar başarısız — token 7CC-QHC"
+2. "Üstten restoran değişince birşey değişmiyor"
+
+### Tanı
+
+**Şikayet 1 — false alarm.** POS Go log + DB audit gösterdi ki 21:22 deploy ettiğim 5-phase rewrite gerçekten çalıştı:
+
+```
+GO LOG  19:40:47 POST /menu/import-from-token 200 116ms (preview)
+        19:40:50 POST /menu/import-from-token 200 1392ms (apply)
+
+DB FRESH 30M:
+  Burger House: 186 new products, 15 new cats, 7 new MGs, 267 new refs
+
+FINAL STATE (Burger House):
+  prods=209  with_image=187  cats=20  MG=9  mods=63  links=238  refs=267
+```
+
+Pre-rewrite (seed-only) modifier groups=2, mods=6, links=12. **+7/+57/+226** sayıları yeni import'tan geliyor. Pipeline 100% çalışıyor. Kullanıcı `Burger House` tenant'ına bakmıyordu / tenant switcher bozuk olduğu için switcher'da Sushi Zen seçili kalmıştı.
+
+**Şikayet 2 — gerçek bug.** `components/shell/tenant-context.tsx`:
+
+```ts
+// ÖNCE — fetch fire-and-forget, router.refresh BEFORE cookie lands:
+const setActiveAndPersist = (id) => {
+  setActive(id);
+  fetch("/api/auth/tenant", { ... });  // ← async, await yok
+};
+// onSelect:
+setActive(id); router.refresh();  // ← cookie henüz set edilmemiş
+```
+
+Sonuç: `router.refresh()` eski `bo_tenant` cookie ile RSC fetch ediyor, X-Tenant-ID header yine eski tenant. React Query cache da hiç invalidate olmuyor — client-side query'ler eski veriyi göstermeye devam ediyor.
+
+### Fix
+
+**`components/shell/tenant-context.tsx`** — `setActive` artık async Promise döner:
+1. **Optimistic client-side update**: `setActive(id)` (React state) + `writeTenantCookieClient(id)` (document.cookie, httpOnly:false halini hemen yazar)
+2. **Server POST await edilir** (`/api/auth/tenant` httpOnly cookie'yi de yazar)
+3. **`qc.invalidateQueries()` await edilir** — tüm cache'ler yeni X-Tenant-ID ile re-fetch için işaretlenir
+4. Caller (TenantSwitcher / CommandPalette) **AWAIT eder** sonra `router.refresh()` çağırır
+
+**`components/shell/tenant-switcher.tsx`** — `onSelect` async, `await setActive(id); router.refresh();`
+
+**`components/shell/command-palette.tsx`** — aynı pattern
+
+### Sözleşme değişikliği
+
+`TenantContextValue.setActive` artık `(id: string) => Promise<void>`. Hem TenantSwitcher hem CommandPalette güncellendi; başka çağıran yok (grep doğrulandı).
+
+### Deploy (88, 21:45 CEST)
+
+Backoffice tarball 15.5 MB → BUILD_ID **`aiBBOEKfPw4CLKq3wZNbq`** `active`.
+
+### Smoke
+
+API per-tenant doğru veriyi dönüyor (JWT + X-Tenant-ID):
+
+```
+Burger House  TOTAL=209  with_image=187   price samples: 1300, 1450, 450, 650, 800
+Sushi Zen     TOTAL=195  with_image=1     (eski import, image bug öncesi)
+Pizzeria      TOTAL=23   with_image=0     (seed)
+```
+
+### Kullanıcı talimatı
+
+1. **Hard refresh** (Ctrl+Shift+R) — yeni BO bundle yüklenir, `useQueryClient` artık tenant-context'te bağlı
+2. Üst-sağ **tenant switcher** → "Burger House" seç → bekle ~500ms → liste otomatik yenilenir, 209 ürün, 187 resim, 9 modifier grup görünmeli
+3. Switcher'dan Sushi Zen'e geç → liste anında değişmeli, 195 ürün gelmeli
+4. Sushi Zen'i de yeni pipeline ile yenilemek isterse: 195 ürünü soft-delete edip yeni token ile re-import (ben yapayım, söylesin)
+
+### Rollback
+
+```bash
+sudo systemctl stop backoffice
+tar -xzf /home/tech/backups/backoffice-pre-tswitch-*.tgz -C /home/tech/backoffice
+sudo systemctl start backoffice
+```
+
+---
+
+## 2026-05-11 ~21:22 CEST — Magic-link FULL apply rewrite (5-phase + image + modifiers + links) + UI toggle cleanup
+
+**Servis:** POS Go (88), Backoffice (88). 178 dokunulmadı.
+
+### Kök sebep (kullanıcı bulgusu)
+
+Önceki import handler `applySnapshotMinimal` **sadece categories + products** üzerinde dönüyordu. Snapshot'taki `extraGroups`, `extraOptions`, `extraLinks` SLICE'LARI hiç tüketilmiyordu. Sonuç: kullanıcı 195 ürün görüyor ama:
+- Modifier groups (extra grupları) = pre-seed 2 tane (hiç eklenmemiş)
+- Modifier options = pre-seed 6 tane
+- Product↔modifier_group bağlantıları = pre-seed 12 tane
+- `image_path` = 194/195 NULL (Reservation `image` field'ı Go struct'ında zaten yoktu, geçen turda eklendi ama wire'lı kalmıştı)
+- Önceki "import 100% başarılı" raporu yanılgıydı — sadece product/category row'ları sayıldı
+
+### Değişen dosyalar
+
+**Server (Go) — `server/internal/menu/import_token.go` ~500 satır rewrite:**
+
+| Struct/Func | Değişiklik |
+|---|---|
+| `menuIRItem` | `IsPopular *bool` eklendi |
+| `menuIRExtraGroup` | `MinSelect`, `MaxSelect`, `SortOrder` eklendi |
+| `menuIRExtraOption` | `IsDefault`, `SortOrder` eklendi |
+| `menuIRExtraLink` (yeni) | `ExtraGroupName`, `Target` (`CATEGORY`/`ITEM`), `TargetCategoryName`, `TargetItemName` — Reservation'dan **name-based references** geliyor |
+| `menuIR.ExtraLinks` | yeni field |
+| `applyStats` | `ModifierGroupsAdded`, `ModifierGroupsUpdated`, `ProductModifierLinks` eklendi |
+| `applySnapshotMinimal()` | **5-phase rewrite** (aşağı) |
+| `upsertCategory` / `upsertModifierGroup` / `upsertModifier` / `upsertProduct` / `assignModifierGroup` | yeni dedicated helper'lar, hepsi idempotent |
+| `upsertExternalRefInbound` | `external_menu_refs` mirror, `last_sync_from='gastrohub'` (push_handlers'ın `'pos'` versiyonu ile çakışmıyor) |
+| `normalizeImageURL` | `http(s)://` → as-is; `/uploads/...` → `GASTROHUB_BASE_URL` prefix; `//cdn...` → `https:` prefix |
+
+**5-phase pipeline:**
+
+1. **Categories** — name-keyed; local UUID map oluşturulur
+2. **Modifier groups** — `extraGroups[]` → `modifier_groups` (SINGLE/MULTI type mapping, min/max/required)
+3. **Modifier options** — `extraOptions[]` → `modifiers` (group adına resolve, `price_delta` cents)
+4. **Products** — kategori adına resolve, image `normalizeImageURL`'den geçer, price `chfToCents`
+5. **Extra links** — `extraLinks[]` → `product_modifier_groups` M:N. `ITEM` target: (categoryName, itemName) compound resolve. `CATEGORY` target: o kategorideki tüm ürünlere fan-out
+
+Her entity için **external_menu_refs upsert** — sonraki POS→Reservation push'ı local UUID + remote ID mapping'ini kullanabilir.
+
+**Backoffice — `app/[locale]/(dashboard)/menu/products/products-client.tsx`:**
+- Operatör isteğiyle **"Stokta" toggle KALDIRILDI** — POS sold-out POS-side kontrol edilir, backoffice yalnızca catalog (`is_active`) + online channel (`is_online_visible`) gösterir
+- Bulk "Tümünü stoğa al / çıkar" butonları kaldırıldı
+- `toggleAvailable` mutation + `bulkSetAvailable` + `bulkBusy` state silindi (yaklaşık 60 satır dead code)
+- Hem desktop table hem mobile card path'lerinden kaldırıldı
+
+### Cleanup (son 24h yanlış import wipe)
+
+```
+PREVIEW           : Burger House 173 product
+SOFT_DEL_PRODUCTS : UPDATE 173
+SOFT_DEL_CATS     : UPDATE 15
+AFTER             : Burger House 23 prods / 5 cats (seed state restored)
+                    Pizzeria Da Mario 23/5 (touched)
+                    Sushi Zen 195/21 (eski import korundu, 2 gün önce)
+```
+
+Sushi Zen'in eski import'u (172 ürün, image yok) **bilinçli olarak korundu** — kullanıcı re-import isterse o tenant'ı da wipe edebilir.
+
+### Deploy (88, 21:22 CEST)
+
+- gastrocore binary 13.6 MB → systemctl restart `active`
+- backoffice tarball 15.5 MB → BUILD_ID `tfdpq-eeLD046GCpGZOps` `active`
+
+### Kullanıcı talimatı (smoke + verification)
+
+1. **Burger House** için `gastro.2hub.ch` admin'den **yeni magic-link token üret**
+2. Backoffice → `/menu/connect-gastrohub` → token yapıştır → "Önizleme Al" → "İçe Aktar"
+3. Step 3 (Sonuç) ekranında stats görmeli:
+   - Kategoriler: ~15 yeni
+   - Ürünler: ~173 yeni
+   - Modifier grupları: N yeni (Reservation'da kaç grup varsa)
+   - Modifier seçenekleri: M yeni
+   - Ürün ↔ Modifier bağlantısı: K yeni
+4. `/menu/products` listesinde:
+   - **Fiyatlar CHF 19.90, 14.00, 12.00 vs.** (cents doğru, frontend doğru bölme)
+   - **Resimler var** (R2 cdn.2hub.ch URL'leri)
+   - **Kategori sütunu dolu** ("Falafel", "Pasta", "Pide" vs.)
+   - **Sadece 2 toggle**: Aktif, Online'da var (Stokta YOK)
+5. Sushi Zen için tekrar import istiyorsa: önce mevcut 195'i wipe etmek lazım (yardım iste, manuel komut)
+
+### Smoke verification (kullanıcı re-import sonrası DB query):
+
+```sql
+SELECT t.name, 
+  (SELECT COUNT(*) FROM products WHERE tenant_id=t.id AND is_deleted=false) AS prods,
+  (SELECT COUNT(*) FROM products WHERE tenant_id=t.id AND is_deleted=false AND image_path IS NOT NULL AND image_path != '') AS with_image,
+  (SELECT COUNT(*) FROM categories WHERE tenant_id=t.id AND is_deleted=false) AS cats,
+  (SELECT COUNT(*) FROM modifier_groups WHERE tenant_id=t.id AND is_deleted=false) AS mgs,
+  (SELECT COUNT(*) FROM modifiers WHERE tenant_id=t.id AND is_deleted=false) AS mods,
+  (SELECT COUNT(*) FROM product_modifier_groups pmg JOIN products p ON p.id=pmg.product_id WHERE p.tenant_id=t.id) AS links,
+  (SELECT COUNT(*) FROM external_menu_refs WHERE tenant_id=t.id) AS refs
+FROM tenants t ORDER BY t.name;
+```
+
+Burger House satırında **with_image > 0**, **mgs > 2** (seed dışında), **links > 12** (seed dışında), **refs > 0** olmalı.
+
+### Rollback
+
+```bash
+# POS Go
+cp /home/tech/gastrocore/server.bak.20260511-…-pre-rewrite /home/tech/gastrocore/server
+sudo systemctl restart gastrocore
+# Backoffice
+sudo systemctl stop backoffice
+tar -xzf /home/tech/backups/backoffice-pre-rewrite-*.tgz -C /home/tech/backoffice
+sudo systemctl start backoffice
+```
+
+---
+
+## 2026-05-11 ~21:15 CEST — Swiss MWST split-rate (8.1 / 2.6 / alcohol-always-8.1) backend wire-up
+
+**Servis:** POS Go DB schema (88 canlı uygulandı) + Reservation Go-side/TS-side helper'lar + Reservation order route. Reservation prod migrate **akşam 22:00+ deploy ile** uygulanacak (iş saati yasağı).
+
+### Operatör kuralı (2026-05-11)
+| Senaryo | Yiyecek / non-alkol | Alkol |
+|---|---|---|
+| Dine-in (içerde tüketim, Mitnehmen=no) | **8.1%** | **8.1%** |
+| Takeaway + Lieferung | **2.6%** | **8.1%** (exception) |
+
+Reservation `(public)/[slug]/order` yalnız TAKEAWAY/DELIVERY destekliyor (DINE_IN orada anlamsız), POS app dine-in dahil hepsini destekler.
+
+### Schema değişiklikleri
+- `server/migrations/029_product_is_alcoholic.{up,down}.sql` — POS Go `products.is_alcoholic BOOLEAN NOT NULL DEFAULT FALSE` + COMMENT açıklama.
+- `prisma/schema.prisma` — Reservation `MenuItem.isAlcoholic Boolean @default(false)` field eklendi.
+- `prisma/migrations/20260511190000_menu_item_is_alcoholic/migration.sql` — `ALTER TABLE "MenuItem" ADD COLUMN "isAlcoholic" BOOLEAN NOT NULL DEFAULT false;`
+
+### Helper modülleri (single source of truth)
+- **POS Go** `server/internal/shared/vat/vat.go` — `CalculateVATRate(isAlcoholic, orderType)` + `CalculateOrderVAT(lines, orderType)` + `VATPortion()` + sabitler (VATDineIn 0.081, VATTakeawayDelivery 0.026, VATAlcohol 0.081). Per-line breakdown ile receipt printing'i destekliyor. `vat_test.go` — 4 test (rate table, rappen rounding, mixed basket, dine-in single bucket).
+- **Reservation** `src/lib/vat-calculator.ts` — aynı API: `calculateVatRate`, `calculateOrderVat` (per-line breakdown), `vatPortion`, OrderType `"DINE_IN" | "TAKEAWAY" | "DELIVERY"`. `TAX_RATE` legacy constant (2.6%, single-rate) hâlâ duruyor — yeni kod helper kullanmalı.
+
+### Reservation order route refactor (`src/app/api/public/[slug]/order/route.ts`)
+- `prisma.menuItem.findMany` select'ine `isAlcoholic: true` eklendi.
+- `ValidatedItem` type'ına `isAlcoholic: boolean` field; her item bu flag'i taşıyor.
+- Eski:
+  ```ts
+  const taxAmount = Math.round(totalAmount * TAX_RATE / (1 + TAX_RATE) * 100) / 100;
+  ```
+- Yeni:
+  ```ts
+  const vatLines: OrderLineForVat[] = validatedItems.map(it => ({
+    grossLineTotal: it.totalPrice,
+    isAlcoholic: it.isAlcoholic,
+  }));
+  if (deliveryFee > 0) vatLines.push({ grossLineTotal: deliveryFee, isAlcoholic: false });
+  const vatBreakdown = calculateOrderVat(vatLines, data.orderType);
+  const taxAmount = vatBreakdown.taxAmount;
+  ```
+- Delivery fee non-alcohol line gibi davranıyor (rate = takeaway/delivery food rate). Discount VAT-bearing değil (Swiss receipt convention).
+- Mevcut data'da tüm `isAlcoholic = false` → operatör backoffice'ten flag atmaya başlayana kadar tüm sepetler 2.6% (pre-migration davranışla aynı, hiçbir kullanıcı görünür değişiklik yok).
+
+### 029 canlı uygulama (88)
+- pg_dump pre-backup: `/home/tech/backups/products-pre-029-20260511-211430.sql.gz` (25K)
+- `ALTER TABLE` + `COMMENT` çalıştı → 414 rows hepsi `is_alcoholic = FALSE`
+- Atomic DDL — fail → implicit rollback
+
+### Bilinçle ertelendi (sonraki seans, ayrı PR)
+
+| Görev | Neden ertelendi |
+|---|---|
+| **Backoffice product edit form alcohol toggle** + 5-dil label | products-client.tsx + form schema değişikliği, paralel agent revert riski (modifier UI 3+ seans revert'lendi); UI tek-shot deploy ile birleştirmek daha güvenli. |
+| **POS Go order/payment handler refactor** (VAT helper'ı çağırsın) | Live binary'nin source branch'i bulunmalı (önceki seansta gözlemlendiği üzere local repo'daki menu handler'lar live'da yok — branch divergence). Helper modül hazır, handler kullanıma alındığında mekanik. |
+| **POS Flutter `swiss_vat_calculator.dart` + payment screen refactor** | Drift schema bump + APK rebuild + jolly-final lineage. Müstakil epic. |
+| **Receipt VAT breakdown** (`MWST 8.1%: CHF X.XX` + `MWST 2.6%: CHF Y.YY`) | Helper API hazır (`byRate` map), receipt template + ESC/POS render ayrı iş. |
+| **tax_profiles seed update** alcohol categorization için | Seed script paralel agent zone'unda, ayrı PR. |
+| **Reservation prod Prisma migrate** | İş saati yasağı — 22:00+ saatinde `deploy_hetzner_safe.py` çalıştığında `npx prisma migrate deploy` otomatik uygulayacak. Migration file commit-ready. |
+
+### Behaviour check (mevcut + post-deploy)
+- 029 uygulanmış canlı 88'de: yeni kolon, default FALSE → tüm hesaplar eski davranışı korur.
+- Reservation prod migrate olduğunda: aynı durum (default FALSE → eski davranış).
+- Operatör backoffice'ten ilk alkol ürünü flag'leyene kadar görünür değişiklik yok.
+- İlk alkol flag'i atıldıktan sonra mixed sepet (pizza + bira takeaway): pizza 2.6%, bira 8.1%, tax breakdown response'ta `byRate: {"0.026":..., "0.081":...}` döner.
+
+### Test
+- Go `vat_test.go`: 4 unit test (rate table, rappen rounding, mixed basket, dine-in single bucket). Standart `go test ./...` ile çalışır.
+- TS: helper saf fonksiyon, deploy + smoke order ile E2E doğrulanacak (lokal preview canlı DB/auth gerektirir, smoke uygulanamaz).
+
+### Rollback
+```bash
+# POS Go DB
+ssh tech@88.99.190.108
+echo 'ALTER TABLE products DROP COLUMN IF EXISTS is_alcoholic;' | docker exec -i gastro-postgres psql -U gastro -d gastro
+
+# Reservation (lokal migration henüz prod'a gitmedi)
+# prisma/migrations/20260511190000_menu_item_is_alcoholic dizinini sil + schema.prisma'dan isAlcoholic satırını çıkar
+# Reservation Helper modülü ve order route değişikliği lokal commit — geri almak için git revert.
+```
+
+---
+
+## 2026-05-11 ~18:45 CEST — KDS Cloud SSE wire-up (POS Go 88 deploy + Flutter client + 178 akşam prep)
+
+**Servis:** POS Go (88 deploy). Flutter SSE client kod hazır (main worktree).
+Pilot APK rebuild **deferred** — cross-branch state, bkz. "Açık konular" altında.
+
+### Karar
+
+KDS app şu an Drift local streams + WS hub (`/ws/kds`) üzerinden besleniyor.
+WS kanalı bazı Caddy/nginx ortamlarında flaky proxy davranışı gösteriyor.
+SSE paralel transport olarak ekleniyor — aynı broadcast fan-out'a takılıyor,
+operatör Settings'ten "SSE modu" toggle'ı ile transport seçebilecek.
+
+### Yeni / değişen dosyalar
+
+**Server (Go) — 6 dosya:**
+- `server/internal/kds/hub.go` — `kdsSubscriber` struct + `Subscribe(id, tenantID, station) <-chan []byte` + `Unsubscribe(id)`. `broadcast()` artık WS clients + SSE subscribers'ı paralel besliyor. Yeni `NotifyOrderCreated(...)` helper.
+- `server/internal/orders/stream_handler.go` (yeni) — `GET /api/v1/orders/stream` SSE handler. `text/event-stream` + `X-Accel-Buffering: no` + 25s heartbeat comment. İlk frame `event: ready` data `subscriber_id`+`tenant_id`. KDS event frame: `event: kds` data: KDSNotification JSON. `kdsBroker` interface ile DI — circular import yok.
+- `server/internal/orders/module.go` — yeni rota; `/orders/stream` literal path'i `/orders/{id}` ÖNCE register edildi.
+- `server/internal/orders/handlers.go` — `handleCreateOrder` artık başarılı insert sonrası `kdsBrokerRef.NotifyOrderCreated(...)` çağırıyor (nil-safe).
+- `server/internal/shared/middleware/middleware.go` — `statusWriter.Flush()` eklendi (`http.Flusher`). Logger wrapper'ı önceden SSE handler'ın Flush çağrısını kaybediyordu → "STREAMING_UNSUPPORTED" 500. İlk smoke ile ortaya çıktı.
+- `server/cmd/server/main.go` — `orders.SetKdsBroker(kdsHub)` startup wire-up; auth gate exemption listesine `/api/v1/orders/stream` eklendi (mirror /ws/kds auth modeli).
+
+**Flutter (main worktree, super-admin-impersonation) — 5 dosya:**
+- `apps/pos/lib/features/kds_app/data/kds_stream_service.dart` (yeni) — `KdsStreamService`. `http.Client().send()` long-lived GET, `utf8.decoder` stream, manuel SSE parser (event:/data:/comment, blank-line separator). Idle watchdog 60s. Exp backoff reconnect 1/2/4/8/16/32/64s cap 60. Aynı `KdsEvent` shape emit eder.
+- `apps/pos/lib/features/kds_app/presentation/providers/kds_providers.dart` — `kdsRealtimeTransportProvider` (`'ws'` | `'sse'`, default `'ws'`).
+- `apps/pos/lib/features/kds_app/presentation/providers/kds_realtime_provider.dart` — `kdsStreamClientProvider` (null when transport ≠ 'sse'). SSE state → `KdsWsState` mapper.
+- `apps/pos/lib/features/kds_app/presentation/screens/kds_main_screen.dart` — `initState`'de hem WS hem stream provider read; SSE provider gated.
+- `apps/pos/lib/features/kds_app/presentation/screens/kds_settings_screen.dart` — yeni "Realtime Bağlantı" bölümü, `SwitchListTile` "SSE modu" toggle, SharedPreferences `kds_realtime_transport` persist.
+
+`flutter analyze lib/features/kds_app` → No issues found.
+
+### Deploy (88, 2026-05-11 ~18:43 CEST)
+
+1. Cross-compile `gastrocore-linux-amd64` 13.6 MB
+2. SFTP → `/tmp/gastrocore-new`
+3. backup `server.bak.20260511-…-pre-sse`, install, `systemctl restart gastrocore`
+4. **Flusher fix:** ilk smoke STREAMING_UNSUPPORTED 500 verdi → middleware patch → ikinci binary push → final active
+5. Boot logs: `server starting port=8090` + `menu-sync-retry: started interval_s=300` ✓
+
+### Smoke tests (tümü ✓)
+
+| Test | Result |
+|---|---|
+| `GET /orders/stream` no params | 400 `MISSING_TENANT_ID` |
+| `GET /orders/stream?tenant_id=…&device_id=…` | 200 + `event: ready` handshake |
+| Concurrent: stream tail + `POST /orders` | Order 201 → SSE frame içinde ~50ms: `event: kds\ndata: {"type":"order.created","ticket":{…}}` |
+| `flutter analyze` (kds_app) | clean |
+
+Real captured E2E frame:
+
+```
+: gastrocore-kds-stream connected
+event: ready
+data: {"subscriber_id":"bf989670-3c9c-4ae5-b847-3e057e705230","tenant_id":"0b289fc4-…"}
+
+event: kds
+data: {"type":"order.created","tenant_id":"0b289fc4-…","ticket":{"id":"685da898-…","order_number":1088,"channel":"smoke"}}
+```
+
+### Açık konular — KDS APK rebuild deferred
+
+SSE Flutter client kodu main worktree'de (`claude/super-admin-impersonation`); ancak:
+
+1. **Memory rule (jolly-final lineage):** Pilot APK her zaman jolly-final worktree'den build. jolly-final'da KDS realtime infrastructure (`kds_ws_client.dart`, `kds_realtime_provider.dart`) henüz yok — branch sadece basic providers + screens + LAN-first içeriyor. Cross-branch port gerekli (WS infrastructure + SSE service'i jolly-final'a aktarmak).
+2. **Main worktree build error:** super-admin-impersonation branch'inde `action_buttons`, `restaurant_settings.shiftStartRequired`, `payments/receipt_counter_dao` Drift schema drift compile error'ları var (KDS feature'la alakasız, başka bir paralel agent WIP). `build_runner build --delete-conflicting-outputs` çalıştı ama actionButtons tablosu generated kodda yok.
+
+**Sonraki sprint plan:**
+- Jolly-final'a port: `kds_ws_client.dart` + `kds_realtime_provider.dart` (mevcut) + `kds_stream_service.dart` (yeni) + transport toggle UI
+- Veya: main worktree'deki action_buttons + payments schema drift'i temizle, APK orada build et
+
+Server-side SSE endpoint 88'de canlı — kullanıcı yeni APK gelmeden manuel curl smoke yapabilir (yukarıdaki E2E örneği).
+
+### 178 akşam deploy hazırlık (≥22:00 CEST)
+
+D Aşama 3 receiver endpoint (`src/app/api/gastrocore/menu/sync/route.ts`) önceki turda commit edildi; bu deploy onu canlıya alıyor.
+
+**Pre-deploy check (this turn, ✓):**
+
+| Check | Result |
+|---|---|
+| `preflight_css_guard()` (deploy_hetzner_safe.py) | `no-store + immutable present in next.config` ✓ |
+| SSH 178 probe | uptime 32 days, sudo passwordless = root ✓ |
+| pm2 reservation | `online`, pid 1708407 ✓ |
+| Disk free `/home/tech` | 130G (10% used) ✓ |
+| Node | v20.20.2 ✓ |
+| `GASTROCORE_SERVICE_SECRET` in 178 `.env` | OK (POS HMAC için sync'li) |
+| Receiver route deployed? | NO — `.next/server/app/api/gastrocore/menu/sync` yok (beklenen) |
+
+**Çalıştırılacak adımlar (kopyala-yapıştır):**
+
+```powershell
+# 1. Local build (Windows host)
+Set-Location E:\Project\reservation
+npm run build
+
+# 2. Deploy (CSS guard otomatik koşar)
+python deploy_hetzner_safe.py
+
+# 3. Smoke: 88'den 178'e gerçek push
+# (D Aşama 3 turunda kullanılan smoke script'i tekrarla — bu sefer 'applied' beklenir)
+```
+
+E2E mutation flow test:
+1. Backoffice `/settings/menu-source` → Sushi Zen "POS'ta yönet" + gerçek Reservation `restaurant.id` (cuid)
+2. Backoffice `/menu` → yeni ürün ekle
+3. 1-2s içinde Reservation dashboard'da görünmeli
+4. Server log: `[menu-sync] product.create restaurant=sushi-zen action=created id=…` satırı
+
+**Rollback:**
+
+```bash
+ssh tech@178.104.137.75
+cd /home/tech
+ls -1t reservation_standalone_old_* | head -1
+mv reservation_standalone reservation_standalone_failed_$(date +%s)
+mv reservation_standalone_old_<TS> reservation_standalone
+pm2 reload reservation --update-env
+```
+
+---
+
 ## 2026-05-11 ~20:00 CEST — LAN-first v2: PeerRegistry + ConnectionStrategy + manual override + 04:00 cron
 
 **Servis:** Pilot tablet, KDS ekranı, Kiosk (manuel APK install, **88'e deploy YOK**)
