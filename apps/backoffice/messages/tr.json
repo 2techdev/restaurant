@@ -110,6 +110,7 @@
     "settingsNotifications": "Bildirimler",
     "settingsApiKeys": "API Anahtarları",
     "settingsIntegrations": "Entegrasyonlar",
+    "settingsMenuSource": "Menü Yönetimi",
     "settingsAudit": "Audit Log",
     "comingSoon": "Yakında",
     "comingSoonHint": "Bu özellik geliştirilme aşamasında. Pilot kapsamı dışındadır.",
@@ -221,11 +222,32 @@
         "moreRows": "satır daha"
       }
     },
+    "productDetail": {
+      "backToList": "Ürün listesine dön",
+      "notFound": "Ürün bulunamadı.",
+      "overlay": {
+        "title": "Online Overlay",
+        "subtitle": "Bu alanlar Gastro Hub admin panelinden yönetilir. POS yalnızca yansıtır.",
+        "readOnly": "Salt-okunur",
+        "image": "Yüksek-çözünürlüklü görsel",
+        "noImage": "Görsel yok — Gastro Hub'dan ekleyin.",
+        "popularOnline": "Online Popüler rozeti",
+        "yes": "Evet",
+        "no": "Hayır",
+        "allergens": "Alerjen bilgisi",
+        "noAllergens": "Alerjen bilgisi belirtilmemiş.",
+        "descriptionLong": "Uzun açıklama (vitrin)",
+        "noDescription": "Açıklama belirtilmemiş.",
+        "editHint": "Bu alanları düzenlemek için Gastro Hub admin paneline gidin.",
+        "openGastroHub": "Gastro Hub'da Aç"
+      }
+    },
     "productsPage": {
       "title": "Ürünler",
       "subtitle": "Menü ürünlerinizi yönetin, fiyatlandırın ve POS'a yayınlayın.",
       "newProduct": "Yeni Ürün",
       "editProduct": "Ürünü Düzenle",
+      "viewOverlay": "Online overlay",
       "listHeader": "{count, plural, =0 {Ürün yok} =1 {1 ürün} other {# ürün}}",
       "emptyState": "Bu filtreye uygun ürün yok — Yeni Ürün ekleyin.",
       "createdToast": "Ürün oluşturuldu",
@@ -250,11 +272,24 @@
         "prices": "Fiyat (Std / Paket / Teslim)",
         "tax": "KDV",
         "status": "Aktif",
+        "toggles": "Durum",
         "description": "Açıklama",
         "allergens": "Alerjenler",
         "image": "Görsel URL",
         "displayOrder": "Sıra",
         "active": "Aktif"
+      },
+      "toggles": {
+        "active": "Aktif",
+        "available": "Stokta",
+        "onlineVisible": "Online'da"
+      },
+      "bulkActions": {
+        "label": "Toplu",
+        "markAllAvailable": "Tümünü stoğa al",
+        "markAllUnavailable": "Tümünü stoktan çıkar",
+        "markedAllAvailable": "Tümü stoğa alındı",
+        "markedAllUnavailable": "Tümü stoktan çıkarıldı"
       },
       "price": {
         "standard": "Standart",
@@ -867,6 +902,9 @@
       "emptyState": "Henüz happy hour kuralı yok.",
       "createdToast": "Kural oluşturuldu",
       "updatedToast": "Kural güncellendi",
+      "deletedToast": "Kural silindi",
+      "saveError": "Kaydedilemedi",
+      "deleteError": "Silinemedi",
       "formHint": "Saat aralığı + günler + indirim. Birden çok kural eşleşirse sıralı uygulanır.",
       "namePlaceholder": "Aperitivo Saati",
       "col": {
@@ -1118,9 +1156,37 @@
       "genericError": "Giriş yapılamadı. Tekrar deneyin."
     }
   },
+  "menuSource": {
+    "title": "Menü Yönetimi",
+    "subtitle": "Menü ve modifier verisinin sahibi kim? Düzenlemeler nereden yapılıyor?",
+    "savedToast": "Menü yönetim ayarları kaydedildi.",
+    "menuAuthority": {
+      "title": "Menü yetkisi",
+      "description": "Kategoriler ve ürünleri kim yönetiyor?",
+      "optionGastrohub": "Gastro Hub'da yönet",
+      "optionGastrohubHint": "Menü Reservation tarafında düzenlenir; POS sadece okur. (Default)",
+      "optionGastrocore": "POS'ta yönet",
+      "optionGastrocoreHint": "Menü burada düzenlenir; her değişiklik Gastro Hub'a otomatik gönderilir."
+    },
+    "modifierAuthority": {
+      "title": "Modifier yetkisi",
+      "description": "Ekstra grupları ve seçenekleri kim yönetiyor?",
+      "optionGastrohub": "Gastro Hub'da yönet",
+      "optionGastrohubHint": "Modifier grupları Reservation tarafında düzenlenir.",
+      "optionGastrocore": "POS'ta yönet",
+      "optionGastrocoreHint": "Modifier grupları burada düzenlenir; her değişiklik Gastro Hub'a gönderilir."
+    },
+    "hubMapping": {
+      "title": "Gastro Hub eşleştirmesi",
+      "description": "POS push'larının doğru restorana gitmesi için Reservation tarafındaki restaurant.id gerekli.",
+      "fieldLabel": "Gastro Hub restaurant ID",
+      "hint": "Reservation veritabanındaki cuid değeri. Gastro Hub admin'inden alın.",
+      "warningRequired": "POS'ta yönet seçildiğinde Gastro Hub restaurant ID zorunludur, aksi halde push'lar başarısız olur."
+    }
+  },
   "impersonation": {
-    "activeAs": "<target>{targetEmail}</target> olarak giriyorsun. Süper Admin: <super>{superAdminEmail}</super>.",
-    "exitButton": "Çıkış",
-    "exiting": "Çıkılıyor…"
+    "activeAs": "<target>{targetEmail}</target> olarak görüntülüyorsunuz. Süper Admin: <super>{superAdminEmail}</super>.",
+    "exitButton": "Sonlandır",
+    "exiting": "Sonlandırılıyor…"
   }
 }
