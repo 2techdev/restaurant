@@ -3,6 +3,187 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-11 ~19:00 CEST — LAN-first networking layer (POS/Waiter/KDS) + APK rebuilds
+
+**Servis:** Pilot tablet ve KDS ekranı (manuel APK install, **88'e deploy YOK**)
+
+**Karar:** Restoran içi trafik artık bulut sunucusuna gitmeden yerel WiFi
+üzerinden POS sunucusuna doğrudan akar. Cihazlar mDNS keşfiyle yerel POS
+server'ı bulur, HTTP health probe ile doğrular, bulamazsa `api.gastrocore.ch`
+buluta düşer. Günde bir (default 24h) yeniden tarama, IP değişimlerini
+otomatik karşılar. Settings'te canlı durum (yeşil "LAN bağlı: 192.168.x.x"
+veya turuncu "Bulut fallback") + manuel "Şimdi yenile" CTA.
+
+### Mimari
+
+```
+boot → NetworkLocator.resolve()
+        ├─ mDNS scan (_gastrocore._tcp, 4s timeout)
+        ├─ HTTP probe GET http://<peer>:<port>/health (1s timeout each)
+        ├─ İlk 200 → ResolvedEndpoint(source: 'lan', api/ws: http://lan-ip:8090)
+        └─ Hepsi fail → ResolvedEndpoint(source: 'cloud', AppEndpoints)
+       → startDailyReprobe() (24h cadence)
+       → ProviderScope override: networkLocatorProvider + syncServerUrlProvider + wsServerUrlProvider
+```
+
+### Yeni / değişen dosyalar
+
+| Dosya | İş |
+|---|---|
+| `apps/pos/lib/core/network/network_locator.dart` | **YENİ ~280 satır.** `NetworkLocator` servisi: `resolve()` (discover+probe), `startDailyReprobe()` timer, `stateChanges` broadcast stream, `dispose()`. Pluggable `PeerScanner` + `HealthProber` hooks for tests. Default impl: `MDnsClient` + `package:http` GET /health. Hata yutucu — herhangi bir exception cloud'a fallback eder, app crash etmez. |
+| `apps/pos/lib/core/network/network_locator_provider.dart` | **YENİ ~115 satır.** Riverpod wiring: `networkLocatorProvider` (must override at root), `networkEndpointStateProvider` (StateNotifier mirror), `resolvedApiBaseUrlProvider` / `resolvedWsBaseUrlProvider`. Notifier abone olur `stateChanges`'e, UI güncellenir. `reprobe()` "Şimdi yenile" butonuna bağlı. |
+| `apps/pos/lib/features/settings/presentation/widgets/network_status_pane.dart` | **YENİ ~220 satır.** Settings altında `_Section.networkStatus` paneli: renkli state pill (taranıyor/LAN/cloud/reconnecting), detay kart (mod, peer IP, API, WS, son keşif), "Şimdi yenile" FilledButton, "LAN-first nasıl çalışır" açıklama kartı. SelectableText URL'ler için. |
+| `apps/pos/lib/features/settings/presentation/screens/settings_screen.dart` | `_Section.networkStatus` enum entry + `_buildContent` switch eklendi (tenantSwitcher ile upgrade arasına). NetworkStatusPane import edildi. |
+| `apps/pos/lib/main_waiter.dart` | Boot path'e `NetworkLocator()` + `await locator.resolve()` + `startDailyReprobe()` + override `networkLocatorProvider` + override `syncServerUrlProvider`/`wsServerUrlProvider` `resolved.apiBaseUrl` ile (SharedPreferences manual override hâlâ kazanır — operatör escape hatch). |
+| `apps/pos/lib/main_kds.dart` | Aynı pattern (KDS özellikle kazanır: kitchen → POS ticket-pull trafiği yüksek, intra-restaurant). |
+| `apps/pos/android/app/src/main/AndroidManifest.xml` | `CHANGE_WIFI_MULTICAST_STATE` permission eklendi (Android 12+'da UDP multicast için zorunlu). |
+
+### Tests (+8)
+
+`apps/pos/test/core/network/network_locator_test.dart` **YENİ — 8 test pass:**
+- Boş peer listesi → cloud fallback, `state==cloudFallback`
+- Scanner exception → graceful cloud fallback (crash etmez)
+- İlk state `discovering`, current default cloud
+- State stream'i emit'leri (reconnecting → cloudFallback)
+- Repeat resolve idempotent, fresh timestamp
+- Dispose timer + stream temizler
+- `ResolvedEndpoint.isLan` ayırt eder
+- `copyWith` un-touched field'ları korur
+
+`flutter test --reporter compact` → **1951 pass / 23 skip / 2 fail** (yine
+untracked `fast_sale_screen_test.dart` paralel agent — dokunulmadı). +14 net,
+0 regresyon.
+
+### Pilot APK'ları
+
+| Flavor | Path | Size | SHA256 |
+|---|---|---:|---|
+| **KDS** | `pilot/app-kds-release-lanfirst-20260509.apk` | 62.50 MB | `448558815D90707B7D864842763F2F358EDD48CB03F7348ECD2C4D013BC8F948` |
+| **Waiter** | `pilot/app-waiter-release-lanfirst-20260509.apk` | 63.06 MB | `B57902A8639212F3C35936D4654D8D7083DFA7754A0D5DB800DA710CFF4A1254` |
+
+Builder commands:
+```
+flutter build apk --release --flavor kds    -t lib/main_kds.dart      # 97.5s
+flutter build apk --release --flavor waiter -t lib/main_waiter.dart   # 95.8s
+```
+
+Önceki APK'lar (`app-waiter-release-20260509.apk` 62.94 MB, eski KDS sürüm)
+korundu — rollback için. POS flavor için yeniden build yapılmadı (POS'a
+LAN-first override aynı pattern'i alabilir ama brief'te POS APK rebuild
+istenmemişti; gelecek cycle).
+
+### Web kiosk için
+
+**Skip.** Web kiosk modu browser-based — mDNS native API yok, multicast
+socket'lere erişemiyor. LAN-first sadece native Flutter app'lere uygulandı
+(POS / Waiter / KDS — bu cycle waiter+KDS rebuild). Capacitor/Cordova
+bridge ile native mDNS API çağrısı teorik olarak mümkün ama ayrı epic;
+follow-up'a not edildi.
+
+### Server tarafı (bonus, deferred)
+
+POS Go server `avahi-daemon` (Linux) veya manuel UDP multicast ile
+`_gastrocore._tcp` servis kaydını broadcast etmeli. Şu an bu kayıt YOK,
+yani locator LAN'da hiçbir peer bulamayacak ve **her boot cloud fallback'e
+düşecek**. Bu sprint Flutter-tarafı altyapısı; server-side mDNS broadcaster
+bir sonraki sprint'in işi:
+- `server/internal/discovery/mdns_broadcaster.go` (yeni) — port 5353 UDP
+  multicast yayını, TXT records: `tenant_id`, `role=server`
+- systemd `gastrocore.service` ExecStart'a broadcast goroutine
+- Caddy reverse-proxy'de port 5353 expose et (Hetzner firewall)
+
+Bu eksik LAN-first'ün asıl değerini bloke ediyor — operatör Settings'te
+"Bulut fallback" göreceğine yöneticisiyle konuşur. Pre-pilot demo için
+şimdilik kabul edilebilir; restoran kurulumunda server-side broadcaster
+şart.
+
+### Install
+
+```
+adb install -r E:\Project\Restaurant\pilot\app-kds-release-lanfirst-20260509.apk
+adb install -r E:\Project\Restaurant\pilot\app-waiter-release-lanfirst-20260509.apk
+```
+
+### Yasak / Yapılmayan
+- 88'e deploy yok (sunucu kodu hiç değişmedi)
+- 178'e dokunulmadı
+- POS flavor APK rebuild (sonraki cycle; aynı override eklenebilir)
+- Web kiosk LAN-first (browser sınırı, follow-up)
+- Server-side mDNS broadcaster (deferred — yukarıda belgelendi)
+- 5-dil ARB i18n (paralel agent çakışma riski; hardcoded TR)
+
+### Rollback
+
+```
+adb install -r E:\Project\Restaurant\pilot\app-waiter-release-20260509.apk
+# KDS için önceki "linked items" build pilot/'ta varsa onu install et
+```
+
+---
+
+## Native Kiosk MVP — apps/pos kiosk flavor (2026-05-11 ~17:30 CEST)
+
+**Servis:** Pilot tablet (manuel APK install, **deploy YOK**)
+
+**Karar:** Self-service customer ordering Flutter app, KDS multi-flavor pattern'ini takip ediyor. `features/kiosk_app/` modülü sıfırdan kuruldu (kiosk klasörü yoktu, Gradle flavor `com.gastrocore.kiosk` zaten line 64 build.gradle.kts'te tanımlıydı).
+
+### Sıfırdan kurulan dosyalar (9)
+
+| Dosya | İçerik |
+|---|---|
+| `lib/features/kiosk_app/i18n/kiosk_l10n.dart` | Inline 5-locale label map (27 anahtar × 5 dil = 135 string). `kioskLabel(BuildContext, key)` + `kioskLabelFor(localeCode, key)` resolver + `debugKioskLabelsMap` test getter + `kioskLabelKeys` canon + `kioskSupportedLocales` list. |
+| `lib/features/kiosk_app/router/kiosk_router.dart` | `KioskRoutes` (welcome / menu / cart / checkout / thanks/:orderNumber) + `createKioskRouter()` GoRouter factory. Standalone — flavor entry-point wire-in post-MVP. |
+| `lib/features/kiosk_app/presentation/providers/kiosk_providers.dart` | Riverpod state: `kioskLocaleProvider` (session-sticky lang), `kioskOrderTypeProvider` (dineIn/takeaway + tableNumber), `kioskCartProvider` (KioskCartNotifier — add/remove/setQuantity/clear, CHF cents int math, no float drift). |
+| `lib/features/kiosk_app/presentation/screens/kiosk_welcome_screen.dart` | Full-screen hero gradient (primary → primaryContainer), 72pt "Hoşgeldiniz/Willkommen/Bienvenue…" headline, large "Tap to order" CTA, 5-language picker chip row (selected → white pill). Whole screen tappable to advance to /menu. |
+| `lib/features/kiosk_app/presentation/screens/kiosk_menu_screen.dart` | Left 220px category rail (All + 4 demo) + right product grid (responsive 2-5 cols, 260px min width). Tap card → add to cart + snackbar. Floating cart bar at the bottom (item count + total + arrow) when cart non-empty. Mock catalogue (4 cats × 8 products) — Drift wire-in post-MVP. |
+| `lib/features/kiosk_app/presentation/screens/kiosk_cart_screen.dart` | Line items list with +/- quantity controls, line total, remove icon. Total bar at bottom: Continue (back to /menu) + Checkout buttons. Empty state with shopping_basket icon + Continue CTA. |
+| `lib/features/kiosk_app/presentation/screens/kiosk_checkout_screen.dart` | Order type 2-card picker (Dine in vs Takeaway, icon + label, selected fills with primary). Table number TextField shown only when dineIn. Order summary card (line items + total). Place order button disabled when cart empty or table missing. Generates local order number `K<HHMMSS>` and routes to /thanks. **TODO:** push to POS Go `/api/v1/orders` — post-MVP wire-in. |
+| `lib/features/kiosk_app/presentation/screens/kiosk_thanks_screen.dart` | Large check icon, "Order placed!" heading, order number + estimated time number cards, auto-return to /welcome after 12 s. "New order" button cancels auto-timer and returns immediately. |
+| `test/features/kiosk/kiosk_l10n_test.dart` | 27 key × 5 locale completeness matrix + TR non-ASCII assertions (Hoşgeldiniz, Sipariş Ver, Paket) + EN/DE/FR/IT CTA value pinning + brief-verbiage check ("Hier essen" / "Mitnehmen") + unknown-locale → en fallback + orphan-key canon ↔ map mismatch detection. |
+
+### i18n coverage (5 dil)
+
+27 anahtar × 5 locale = **135 string** inline. Anahtar grupları:
+- **Welcome:** welcomeHeadline, welcomeStartCta, welcomeSubtitle, pickLanguage
+- **Menu:** menuHeading, categoriesAll, addToCart, unavailable
+- **Cart:** cartHeading, cartEmpty, cartTotal, cartCheckout, cartCancel, cartContinue, cartRemove
+- **Checkout:** pickOrderType, orderTypeDineIn, orderTypeTakeaway, tableNumber, placeOrder
+- **Thanks:** thanksHeading, thanksSubtitle, thanksOrderNumber, thanksEstimate, thanksNewOrder
+- **Misc:** idleWarning, connectionOffline
+
+### Build
+
+`flutter analyze lib/features/kiosk_app/ test/features/kiosk/` → 1 unused-local warning (fixed) + 4 info lint — no compile-blocker.
+
+`flutter build apk --release --flavor kiosk` ✓ (PID `bcaq392ts`, exit 0).
+
+| Property | Değer |
+|---|---|
+| APK boyut | 89,265,510 bytes (~85 MB) |
+| **SHA256** | `2a9483abd3509b6d8e1cda065e0cbcabd5add4c55193f78f58125accec273636` |
+| Pilot artifact | `pilot/app-kiosk-release-20260509.apk` |
+| Build kaynağı | `apps/pos/build/app/outputs/flutter-apk/app-kiosk-release.apk` (May 11 18:22 CEST) |
+
+### Brief'ten henüz yapılmamış (post-MVP, ayrı sprint)
+
+- **LAN-first mDNS networking** — paralel agent Waiter app için aynı pattern yazıyor; `lib/core/network/network_locator.dart` shared module landed olunca kiosk de tüketecek
+- **Order push → POS Go `/api/v1/orders`** — `_placeOrder()` içine 1-satır mutation (mevcut `OrderRepository`)
+- **Drift wire-in** — mock `_demoProducts` yerine `menuRepositoryProvider`
+- **Modifier multi-step modal** — mevcut `ProductOptionsBottomSheet` reuse
+- **Payment (TWINT / card)** — mevcut `PaymentScreen` + Wallee POS terminal pattern
+- **Idle timeout watchdog** (60s) — root scaffold wrapper, GestureDetector pan/tap reset
+- **Theme: Restaurant.primaryColor** — `themeCustomizationProvider` zaten var, kiosk shell tüketecek
+- **Receipt print / QR** — `printer_service.dart` + QR widget
+- **App.dart flavor branching** — `--dart-define=APP_FLAVOR=kiosk` veya Gradle BuildConfig ile flavor detect → `createKioskRouter()` mount. Şu an default POS router'a düşüyor; APK çalıştırılınca POS PIN screen geliyor (kiosk_app modülü compile içinde ama entry'den erişilemiyor). Bu wire-in pilot demosu öncesi tamamlanmalı (15 dk iş).
+
+### Yasaklara uyum
+
+✅ Reservation (178) dokunulmadı · ✅ jolly-final POS satış lineage'i (`features/orders/`, `features/fast_sale/`, `features/payments/`) dokunulmadı · ✅ AskUserQuestion kullanılmadı · ✅ Sadece `features/kiosk_app/` (yeni feature) + `test/features/kiosk/` (yeni test)
+
+**İmza:** Opus 4.7 · Kiosk MVP iskelet (9 dosya, ~1100 satır) + APK build
+
+---
+
 ## 2026-05-11 ~18:00 CEST — Garson App TR localize + "Hazır!" notifier + APK rebuild
 
 **Servis:** Garson handheld tablet (manuel APK install, **88'e deploy YOK**).
