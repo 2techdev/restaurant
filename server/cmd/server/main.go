@@ -39,6 +39,7 @@ import (
 	"github.com/gastrocore/server/internal/shared/config"
 	"github.com/gastrocore/server/internal/shared/database"
 	"github.com/gastrocore/server/internal/shared/middleware"
+	"github.com/gastrocore/server/internal/partner"
 	"github.com/gastrocore/server/internal/stations"
 	"github.com/gastrocore/server/internal/stores"
 	"github.com/gastrocore/server/internal/suppliers"
@@ -119,6 +120,7 @@ func main() {
 	usersModule := users.NewModule(db, cfg)
 	printersModule := printers.NewModule(db)
 	orgModule := org.NewModule(db, syncModule.SyncHub())
+	partnerModule := partner.NewModule(db, cfg)
 
 	// Coverage extension (016)
 	feedbackModule := feedback.NewModule(db)
@@ -195,6 +197,7 @@ func main() {
 	usersModule.RegisterRoutes(mux)
 	printersModule.RegisterRoutes(mux)
 	orgModule.RegisterRoutes(mux)
+	partnerModule.RegisterRoutes(mux)
 
 	// Coverage extension (016)
 	feedbackModule.RegisterRoutes(mux)
@@ -223,13 +226,14 @@ func main() {
 	// publicAPIPaths lists auth endpoints that do NOT require a Bearer token.
 	// Online ordering and health/docs paths are excluded by prefix below.
 	publicAPIPaths := map[string]bool{
-		"/api/v1/auth/device/register": true,
-		"/api/v1/auth/device/token":    true,
-		"/api/v1/auth/admin/login":     true,
-		"/api/v1/auth/login":           true, // POS app email+password login
-		"/api/v1/auth/register":        true,
-		"/api/v1/auth/pin-login":       true,
-		"/api/v1/auth/token/refresh":   true,
+		"/api/v1/auth/device/register":  true,
+		"/api/v1/auth/device/token":     true,
+		"/api/v1/auth/admin/login":      true,
+		"/api/v1/auth/login":            true, // POS app email+password login
+		"/api/v1/auth/register":         true,
+		"/api/v1/auth/pin-login":        true,
+		"/api/v1/auth/token/refresh":    true,
+		"/api/v1/partner/auth/login":    true, // partner portal login
 	}
 
 	authMW := middleware.AuthRequired(authModule.ValidateToken)
