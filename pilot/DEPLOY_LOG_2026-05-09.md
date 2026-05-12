@@ -3,6 +3,67 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-12 ~23:45 CEST — MyPOS race koşulu düzeltildi (ödeme isteğinde "Terminal not connected (state: CONNECTING)")
+
+**Kapsam:** POS Flutter app dialog'u + Android plugin'i. Backend ve diğer apps **etkilenmedi**.
+
+### Raporlanan hata
+
+Operatör test'te: "kanka app i açınca terminal bağlanıyor tamam mı bence ödeme isteklerinde hata yapıyorsun". Screenshot: KART TERMİNALİ dialog, CHF 32.78, "BAĞLANIYOR" state'inde takılı, sonrasında "REDDEDİLDİ" + error: `Terminal not connected (state: CONNECTING)`.
+
+### Kök neden — iki katmanda yarış + bir ölümcül bonus
+
+1. **Dialog her açılışta `client.connect()` çağırıyordu.** Bu plugin'in `handleConfigure`'ında state'i HER SEFER CONNECTING'e demote ediyordu (`MyPosPlugin.kt` line 137: `updateConnectionState(CONNECTING, "configure called")`). App startup'ta CONNECTED olan terminal, dialog açıldığında geri CONNECTING'e düşüyor, SDK 1-3 s sonra tekrar CONNECTED diyor — ama dialog bu arada `processPayment` tetikliyor.
+
+2. **Plugin'in `ensureConnectionBeforePayment`'ı zero-tolerance:** `if (connectionState != CONNECTED) → hemen onError`. CONNECTING'e sabretmiyordu → race direkt decline.
+
+3. **Ölümcül bonus:** Dialog'un `dispose()`'u her kapanışta `client.disconnect()` çağırıyordu → kalıcı terminal session'ı yıkıyor → bir sonraki ödeme baştan handshake yapmak zorunda → tekrar race. (Bu yüzden TWINT chip APK'sında bile sorun devam ediyordu — TEST ET çalışıyor çünkü o kendi connect-disconnect döngüsünde, ödeme akışını etkilemiyor.)
+
+### Düzeltmeler
+
+**`apps/pos/lib/features/payments/presentation/widgets/mypos_payment_dialog.dart`:**
+- `_run()` artık önce `checkConnection()` ile SDK'dan gerçek bağlantı durumunu soruyor.
+  - Zaten bağlıysa: configure ATLA, doğrudan processPayment/twintPurchase.
+  - Bağlı değilse: configure çağır + 200 ms aralıklarla 4 sn poll et, SDK CONNECTED diyene kadar bekle. Timeout'ta net hata.
+- `dispose()` artık `disconnect()` ÇAĞIRMIYOR — terminal session app-wide kalıcı; regresyona düşmesin diye yorum yazıldı.
+- onConnectionStateChanged callback'i sadece `_state == connecting` iken state'i değiştiriyor (race ile süpürmesin).
+
+**`apps/pos/android/app/src/main/kotlin/com/gastrocore/gastrocore_pos/MyPosPlugin.kt`:**
+- `ensureConnectionBeforePayment` defense-in-depth: state=CONNECTING ise 200 ms aralıklarla 3 sn boyunca CONNECTED'e dönmesini bekliyor, settle olunca payment'a düşüyor. Timeout'ta net hata mesajı ("handshake timed out").
+- Ping-then-payment akışı `runPingThenPayment` helper'ına çıkarıldı.
+
+### Build notu
+
+`flutter build apk --release` Windows'ta multi-flavor projeyi locate edemeyip "Gradle build failed to produce an .apk file" diyebiliyor — ama gerçek build başarılı oluyor (önceki deploy'larda da olmuştu). Bu sefer ilk denemede 1.5 saat takılan bir stale build daemon yüzünden process zombileri kalmıştı; TaskStop ile temizlendi, gradle direct invoke ile başarılı build (4m 57s).
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                  (canlı slot — overwrite)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-fix-20260512.apk               (versiyonlu kopya)
+size       : 90'143'842 bytes (≈86.0 MiB)
+sha256     : fff6d10d4b06fd8595579a11bccbfa3092b89ebcfa4a09edda1ba4ec856e958e
+built from : claude/pilot-final commit f79ab2d (jolly-final worktree)
+flavor     : pos (assemblePosRelease)
+```
+
+### Test sırası (sahada)
+
+1. APK yükle → app aç → logcat'te `🔗 SDK onConnected` görmen lazım (yoksa terminal IP/port hatalı).
+2. Settings ▸ Payment ▸ MYPOS KART TERMİNALİ → **BAĞLANTIYI TEST ET** → ✓ yanıt veriyor (önceki davranış korunmuş olmalı).
+3. POS sepet → ürün ekle → **KART** chip (veya TWINT) →
+   - Dialog **doğrudan "BEKLENİYOR"** göstermeli, "BAĞLANIYOR"da takılmamalı.
+   - Logcat'te `⏳ Pre-payment: state=CONNECTED, ...` veya hiçbir wait mesajı olmamalı (state zaten CONNECTED ise plugin direkt geçer).
+   - Kart yaklaştır → ONAYLANDI → 600 ms sonra dialog kapanır + adisyon kapanır + receipt.
+4. **Edge test (terminal restart simulation):** Terminal'i fiziksel restartla, app açık dur → ödeme isteği →
+   - Dialog `client.connect()` tetikler → state CONNECTING → plugin 3 sn'ye kadar bekler → SDK reconnect olursa ödeme geçer.
+5. **Logcat hâlâ "Terminal not connected" derse:** `adb logcat | grep -iE "mypos|payment|slave|sdk"` çıktısını gönder, ek diagnose yapayım.
+
+### Rollback
+
+Düzeltme öncesi son APK SHA `7ccc7a99a85c...` (21:55 entry, TWINT chip dahil ama race bug var). Settings'ten MYPOS toggle kapatmak da geçerli — manuel akışlara döner.
+
+
 ## 2026-05-12 ~21:55 CEST — POS cart footer'ına 3. TWINT quick-pay chip (BAR / KARTE / TWINT)
 
 **Kapsam:** POS Flutter app shell footer'ı. Sadece `pos_v2_shell.dart` dokunuldu. Backend ve diğer apps **etkilenmedi**.
