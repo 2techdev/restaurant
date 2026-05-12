@@ -148,6 +148,12 @@ export const NAV_CONFIG: NavEntry[] = [
     ],
   },
   {
+    kind: "leaf",
+    href: (l) => `/${l}/team`,
+    labelKey: "team",
+    icon: "Users",
+  },
+  {
     kind: "group",
     id: "users",
     labelKey: "users",

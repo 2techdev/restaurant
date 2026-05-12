@@ -239,6 +239,34 @@ export async function fetchAdminUsers(session: SessionPayload): Promise<AdminUse
   }
 }
 
+/**
+ * Tenant-level POS staff (app_users) — waiter, kitchen, manager, cashier, kiosk.
+ * Returned by GET /api/v1/users, scoped to the active tenant.
+ */
+export interface TeamUserRow {
+  id: string;
+  name: string;
+  email?: string | null;
+  role: string;
+  is_active: boolean;
+  store_id?: string | null;
+  last_login?: string | null;
+  last_login_at?: string | null;
+}
+
+export async function fetchTeamUsers(session: SessionPayload): Promise<TeamUserRow[]> {
+  try {
+    const data = await apiGet<TeamUserRow[] | { data: TeamUserRow[] }>("/users", {
+      token: session.token,
+      tenantId: session.tenantId,
+    });
+    if (Array.isArray(data)) return data;
+    return Array.isArray(data?.data) ? data.data : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchAggregateStats(session: SessionPayload): Promise<AggregateStats | null> {
   try {
     return await apiGet<AggregateStats>("/admin/dashboard", {
