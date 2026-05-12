@@ -29,6 +29,7 @@ import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
 import 'package:gastrocore_pos/features/payments/data/hardware/ecocash/ecocash_client.dart';
+import 'package:gastrocore_pos/features/payments/data/hardware/mypos/mypos_client.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -1287,6 +1288,11 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
   final _myposIpCtrl = TextEditingController();
   final _myposPortCtrl = TextEditingController();
   final _myposCurrencyCtrl = TextEditingController();
+  final _myposLangCtrl = TextEditingController();
+  final _myposMerchantCtrl = TextEditingController();
+  final _myposTerminalCtrl = TextEditingController();
+  bool _myposTesting = false;
+  String? _myposTestResult;
   final _ccBaseUrlCtrl = TextEditingController();
   final _ccDeviceIdCtrl = TextEditingController();
   final _ccClientIdCtrl = TextEditingController();
@@ -1304,6 +1310,9 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
     _myposIpCtrl.dispose();
     _myposPortCtrl.dispose();
     _myposCurrencyCtrl.dispose();
+    _myposLangCtrl.dispose();
+    _myposMerchantCtrl.dispose();
+    _myposTerminalCtrl.dispose();
     _ccBaseUrlCtrl.dispose();
     _ccDeviceIdCtrl.dispose();
     _ccClientIdCtrl.dispose();
@@ -1320,6 +1329,9 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
     _myposIpCtrl.text = s.mypos.ip;
     _myposPortCtrl.text = s.mypos.port.toString();
     _myposCurrencyCtrl.text = s.mypos.currency;
+    _myposLangCtrl.text = s.mypos.language;
+    _myposMerchantCtrl.text = s.mypos.merchantId;
+    _myposTerminalCtrl.text = s.mypos.terminalId;
     _ccBaseUrlCtrl.text = s.cashCollector.baseUrl;
     _ccDeviceIdCtrl.text = s.cashCollector.deviceId;
     _ccClientIdCtrl.text = s.cashCollector.clientId;
@@ -1338,10 +1350,13 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
                 int.tryParse(_walleePortCtrl.text.trim()) ?? 50000,
             posId: _walleePosIdCtrl.text.trim(),
           ),
-          mypos: MyPosConfig(
+          mypos: current.mypos.copyWith(
             ip: _myposIpCtrl.text.trim(),
-            port: int.tryParse(_myposPortCtrl.text.trim()) ?? 50100,
+            port: int.tryParse(_myposPortCtrl.text.trim()) ?? 60180,
             currency: _myposCurrencyCtrl.text.trim().toUpperCase(),
+            language: _myposLangCtrl.text.trim().toLowerCase(),
+            merchantId: _myposMerchantCtrl.text.trim(),
+            terminalId: _myposTerminalCtrl.text.trim(),
           ),
           cashCollector: current.cashCollector.copyWith(
             baseUrl: _ccBaseUrlCtrl.text.trim(),
@@ -1352,6 +1367,45 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
           ),
         ));
     if (mounted) _showSnack('Payment settings saved.');
+  }
+
+  /// Probes the MyPOS Sigma terminal: opens a fresh client with the
+  /// fields currently in the form, runs configure+connect, and ping
+  /// the terminal. Cleans up afterwards (best-effort disconnect).
+  Future<void> _testMyPos() async {
+    setState(() {
+      _myposTesting = true;
+      _myposTestResult = null;
+    });
+    final client = MyPosClient(
+      terminalIp: _myposIpCtrl.text.trim(),
+      terminalPort: int.tryParse(_myposPortCtrl.text.trim()) ?? 60180,
+    );
+    try {
+      final connected = await client.connect();
+      if (!connected) {
+        if (!mounted) return;
+        setState(() => _myposTestResult =
+            '✗ Configure başarısız. IP/Port doğru mu? Terminal açık mı?');
+        return;
+      }
+      // SDK fires onConnectionChanged async; pingTerminal forces a round-trip
+      // so we wait for a real answer instead of trusting "configured".
+      final ping = await client.pingTerminal();
+      if (!mounted) return;
+      setState(() => _myposTestResult = ping
+          ? '✓ ${_myposIpCtrl.text.trim()}:${_myposPortCtrl.text.trim()} '
+              'terminal yanıt veriyor.'
+          : '✗ Terminale ulaşıldı ama PING yanıt vermedi (cihaz uykuda olabilir).');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _myposTestResult = '✗ $e');
+    } finally {
+      try {
+        await client.disconnect();
+      } catch (_) {}
+      if (mounted) setState(() => _myposTesting = false);
+    }
   }
 
   /// Probes the kiosk by logging in and pulling /api/get/status. Updates
@@ -1454,25 +1508,90 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
           ],
         ),
         _Card(
-          title: 'MYPOS TERMINAL',
+          title: 'MYPOS KART TERMİNALİ (Sigma)',
           children: [
+            const Text(
+              'Açık olduğunda, KART ve TWINT ödemeleri direkt MyPOS Sigma '
+              'terminaline yönlendirilir: müşteri kartı yaklaştırır / '
+              'PIN girer veya TWINT QR’ı okutur. Terminal sonucu yazınca '
+              'adisyon otomatik kapanır. Kapalıyken eski manuel akış '
+              '(tek-tap KART / manuel TWINT onayı) kullanılır.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            _Toggle(
+              label: 'MyPOS terminalini kullan',
+              subtitle:
+                  'KART + TWINT seçilince ÖDE tuşu terminali tetikler',
+              value: settings.mypos.enabled,
+              onChanged: (v) => ref
+                  .read(paymentSettingsProvider.notifier)
+                  .update(
+                    (s) => s.copyWith(mypos: s.mypos.copyWith(enabled: v)),
+                  ),
+            ),
+            const SizedBox(height: 8),
             _Field(
               label: 'Terminal IP',
               controller: _myposIpCtrl,
-              hint: '192.168.1.201',
+              hint: '192.168.1.131',
             ),
             _Field(
-              label: 'Port',
+              label: 'Port (Sigma default 60180)',
               controller: _myposPortCtrl,
-              hint: '50100',
+              hint: '60180',
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             ),
             _Field(
-              label: 'Currency',
+              label: 'Para Birimi',
               controller: _myposCurrencyCtrl,
               hint: 'CHF',
               keyboardType: TextInputType.text,
+            ),
+            _Field(
+              label: 'Terminal Dili (de / fr / it / en)',
+              controller: _myposLangCtrl,
+              hint: 'de',
+            ),
+            _Field(
+              label: 'Merchant ID (opsiyonel)',
+              controller: _myposMerchantCtrl,
+              hint: 'MyPOS tarafından sağlanır',
+            ),
+            _Field(
+              label: 'Terminal ID (opsiyonel)',
+              controller: _myposTerminalCtrl,
+              hint: 'MyPOS tarafından sağlanır',
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: _myposTesting ? null : _testMyPos,
+                  icon: _myposTesting
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.network_check_rounded, size: 16),
+                  label: const Text('BAĞLANTIYI TEST ET'),
+                ),
+                const SizedBox(width: 12),
+                if (_myposTestResult != null)
+                  Expanded(
+                    child: Text(
+                      _myposTestResult!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _myposTestResult!.startsWith('✓')
+                            ? AppColors.green
+                            : AppColors.red,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),

@@ -35,6 +35,7 @@ import 'package:gastrocore_pos/features/payments/domain/entities/voucher_entity.
 import 'package:gastrocore_pos/features/payments/domain/mixed_tender_calculator.dart';
 import 'package:gastrocore_pos/features/payments/presentation/providers/refund_provider.dart';
 import 'package:gastrocore_pos/features/payments/presentation/widgets/cash_collector_dialog.dart';
+import 'package:gastrocore_pos/features/payments/presentation/widgets/mypos_payment_dialog.dart';
 import 'package:gastrocore_pos/features/payments/presentation/widgets/voucher_dialog.dart';
 import 'package:gastrocore_pos/features/printing/data/receipt_print_facade.dart';
 import 'package:gastrocore_pos/features/printing/domain/ch_receipt_renderer.dart';
@@ -90,6 +91,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   /// ticket re-attempts the device.
   bool _cashCollectorBypassed = false;
 
+  /// MyPOS terminal result for the card / TWINT leg of this sale. Non-null
+  /// once the terminal has approved the payment. Drives the receipt
+  /// reference (transaction id, auth code, card type) and prevents
+  /// double-submitting.
+  MyPosPaymentResult? _myposResult;
+
+  /// One-shot bypass when the operator picks "Manuel'e geç" in the MyPOS
+  /// dialog. Restores the numpad/legacy flow for the current ticket only.
+  bool _myposBypassed = false;
+
   TicketEntity? _ticket;
 
   // --- Derived totals ------------------------------------------------------
@@ -133,6 +144,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   String? _referenceFor(_Method m) {
+    // MyPOS approval overrides the static label for the terminal-driven
+    // methods so the receipt / audit row carries the SDK transaction id
+    // and the card type (or "TWINT") right after the prefix.
+    if (_myposResult != null &&
+        (m == _Method.karte || m == _Method.twint)) {
+      final r = _myposResult!;
+      final tag = m == _Method.twint
+          ? 'MYPOS:TWINT'
+          : 'MYPOS:${r.cardType ?? "CARD"}';
+      return '$tag:${r.transactionId}';
+    }
     return switch (m) {
       _Method.twint => 'TWINT',
       _Method.gutschein =>
@@ -196,6 +218,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     return collector?.enabled == true;
   }
 
+  /// True when KART (and likewise TWINT) should hand off to the MyPOS
+  /// Sigma terminal: setting on, method is KART or TWINT, and operator
+  /// hasn't bypassed for this ticket.
+  bool get _myposActive {
+    if (_method != _Method.karte && _method != _Method.twint) return false;
+    if (_myposBypassed) return false;
+    final mypos = ref.read(paymentSettingsProvider).valueOrNull?.mypos;
+    return mypos?.enabled == true;
+  }
+
   bool get _canPay {
     if (_submitting || _grandTotal <= 0) return false;
     if (_calc.hasTenders && _liveCalc.isFullyPaid) return true;
@@ -207,6 +239,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       if (_cashCollectorActive) return true;
       return _enteredCents >= target;
     }
+    // KART / TWINT via MyPOS: terminal owns the amount, no numpad needed.
+    if (_myposActive) return true;
     return true; // Non-cash methods assume exact-outstanding tender.
   }
 
@@ -366,6 +400,49 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   Future<void> _submit() async {
     if (!_canPay) return;
+
+    // MyPOS terminal intercept — when KART or TWINT is selected and the
+    // Sigma terminal is enabled, hand the leg straight to the device. The
+    // dialog blocks until the terminal returns an approval / decline; on
+    // fallback we drop back to the manual flow for this ticket.
+    if (_myposActive) {
+      final myposCfg = ref.read(paymentSettingsProvider).valueOrNull!.mypos;
+      final outstanding = _outstanding > 0 ? _outstanding : _grandTotal;
+      final flow = _method == _Method.twint ? MyPosFlow.twint : MyPosFlow.card;
+      final result = await showMyPosPaymentDialog(
+        context,
+        config: myposCfg,
+        amountCents: outstanding,
+        flow: flow,
+      );
+      if (!mounted) return;
+      if (result == null) return; // operator cancelled, terminal idle
+      if (result.fallbackToManual) {
+        setState(() {
+          _myposBypassed = true;
+          _amountStr = '';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Manuel ödeme kaydına geçildi.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+      if (!result.approved) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Terminal reddetti: ${result.errorMessage ?? "bilinmeyen hata"}',
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        return;
+      }
+      setState(() => _myposResult = result);
+    }
 
     // Cash Collector intercept — when the operator picked BAR and the kiosk
     // is enabled in Settings, hand the cash leg to the device. The dialog
@@ -1000,8 +1077,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           onTap: () => setState(() {
             _method = m;
             // Switching methods clears the one-shot manual bypass so a
-            // KARTE→BAR roundtrip re-arms the Cash Collector flow.
+            // KARTE→BAR roundtrip re-arms the Cash Collector / MyPOS flow.
             if (m == _Method.bar) _cashCollectorBypassed = false;
+            if (m == _Method.karte || m == _Method.twint) {
+              _myposBypassed = false;
+            }
           }),
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -1198,12 +1278,84 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       if (_cashCollectorActive) return _buildCollectorBanner();
       return _buildNumpad();
     }
+    // KART / TWINT via MyPOS: the terminal owns the amount and the UI.
+    // The numpad would be misleading (partial tendering isn't supported
+    // by the device for these flows), so we hide it and show the banner.
+    if (_myposActive) return _buildMyPosBanner();
     return Column(
       children: [
         _buildTerminalBanner(),
         const SizedBox(height: AppTokens.space8),
         Expanded(child: _buildNumpad()),
       ],
+    );
+  }
+
+  /// Placeholder shown in place of the numpad when the MyPOS terminal is
+  /// wired up for the active method. ÖDE itself opens the live dialog.
+  Widget _buildMyPosBanner() {
+    final isTwint = _method == _Method.twint;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: GcColors.surfaceContainerLowest,
+        border: Border.all(color: GcColors.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.space24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Icon(
+              isTwint ? Icons.qr_code_2_rounded : Icons.credit_card_rounded,
+              size: 56,
+              color: GcColors.primary,
+            ),
+            const SizedBox(height: AppTokens.space12),
+            Text(
+              isTwint ? 'TWINT TERMİNALİ HAZIR' : 'KART TERMİNALİ HAZIR',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.4,
+                color: GcColors.onSurface,
+              ),
+            ),
+            const SizedBox(height: AppTokens.space8),
+            Text(
+              isTwint
+                  ? 'ÖDE tuşuna basın. Terminal TWINT QR’ı gösterecek; '
+                      'müşteri telefonuyla okutsun.'
+                  : 'ÖDE tuşuna basın. Terminal kart bekleyecek; '
+                      'müşteri yaklaştırsın / taksın + PIN.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: GcColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppTokens.space16),
+            OutlinedButton.icon(
+              onPressed: _submitting
+                  ? null
+                  : () => setState(() {
+                        _myposBypassed = true;
+                        _amountStr = '';
+                      }),
+              icon: const Icon(Icons.keyboard_rounded, size: 16),
+              label: const Text('MANUEL’E GEÇ'),
+              style: OutlinedButton.styleFrom(
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.zero,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
