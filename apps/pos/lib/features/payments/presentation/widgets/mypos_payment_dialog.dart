@@ -126,12 +126,12 @@ class _MyPosPaymentDialogState extends State<_MyPosPaymentDialog> {
   @override
   void dispose() {
     _disposed = true;
-    // Best-effort disconnect — leaves terminal idle for the next op.
-    unawaited(() async {
-      try {
-        await _client?.disconnect();
-      } catch (_) {}
-    }());
+    // Intentionally NO disconnect() here. The terminal session is shared
+    // across the app: bootstrap connects once at app startup and we keep
+    // it warm so the next sale doesn't pay the 1-3 s SDK handshake again.
+    // Pre-v3 this dispose called disconnect() and every dialog close
+    // tore down the session — which then raced the next payment into a
+    // "Terminal not connected (state: CONNECTING)" decline.
     super.dispose();
   }
 
@@ -141,7 +141,7 @@ class _MyPosPaymentDialogState extends State<_MyPosPaymentDialog> {
       terminalPort: widget.config.port,
       onConnectionStateChanged: (connected, state, reason) {
         if (_disposed || !mounted) return;
-        if (connected) {
+        if (connected && _state == _DialogState.connecting) {
           setState(() {
             _state = _DialogState.awaitingCard;
             _statusText = widget.flow == MyPosFlow.twint
@@ -153,16 +153,44 @@ class _MyPosPaymentDialogState extends State<_MyPosPaymentDialog> {
     );
     _client = client;
 
-    final connected = await client.connect();
+    // Native plugin's `handleConfigure` always flips state to CONNECTING
+    // (line 137 of MyPosPlugin.kt) and the SDK fires onConnected ~1-3s
+    // later. If we call connect() again here when the terminal is already
+    // connected from app startup, we *demote* it back to CONNECTING and
+    // race the SDK on the way back up — which is exactly how the
+    // "Terminal not connected (state: CONNECTING)" decline reproduces.
+    //
+    // Probe the plugin first; only configure if it's actually offline.
+    final alreadyConnected = await client.checkConnection();
     if (!mounted || _disposed) return;
-    if (!connected) {
-      _fail('Terminale bağlanılamadı. IP/Port’u kontrol et veya manuel’e geç.');
-      return;
+
+    if (!alreadyConnected) {
+      final configured = await client.connect();
+      if (!mounted || _disposed) return;
+      if (!configured) {
+        _fail('Terminale bağlanılamadı. IP/Port’u kontrol et veya manuel’e geç.');
+        return;
+      }
+      // Poll for actual SDK-level connection (configure success ≠ TCP up).
+      // 4 s window is enough for the Sigma; if longer, the SDK is broken.
+      final deadline =
+          DateTime.now().add(const Duration(seconds: 4));
+      var ready = false;
+      while (DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        if (_disposed) return;
+        if (await client.checkConnection()) {
+          ready = true;
+          break;
+        }
+      }
+      if (!mounted || _disposed) return;
+      if (!ready) {
+        _fail('Terminal bağlantısı doğrulanamadı (4 s). Cihazı kontrol et.');
+        return;
+      }
     }
 
-    // SDK fires onConnectionChanged async — we kick the payment immediately
-    // so the cashier doesn't see a spinner. SDK queues the call internally
-    // until ready.
     setState(() {
       _state = _DialogState.awaitingCard;
       _statusText = widget.flow == MyPosFlow.twint

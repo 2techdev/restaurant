@@ -332,11 +332,43 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
         onReady: () -> Unit,
         onError: (String) -> Unit,
     ) {
+        // Pre-v3 (2026-05-12 fix): the dialog could race the SDK — a fresh
+        // configure() leaves state=CONNECTING for ~1-3 s before onConnected
+        // fires, and the payment request that came in right after was
+        // hard-rejected here with "Terminal not connected (state: CONNECTING)".
+        // Now we tolerate a brief CONNECTING window: poll up to 3 s at 200 ms
+        // intervals, only fail if the state hasn't settled by then.
         if (connectionState != ConnectionState.CONNECTED) {
-            onError("Terminal not connected (state: $connectionState)")
+            sendLog("⏳ Pre-payment: state=$connectionState, waiting up to 3 s for handshake")
+            val startWait = System.currentTimeMillis()
+            val deadlineMs = 3000L
+            val pollMs = 200L
+            val poller = object : Runnable {
+                override fun run() {
+                    if (connectionState == ConnectionState.CONNECTED) {
+                        val waited = System.currentTimeMillis() - startWait
+                        sendLog("✅ Pre-payment: settled after ${waited}ms — proceeding")
+                        runPingThenPayment(onReady, onError)
+                        return
+                    }
+                    if (System.currentTimeMillis() - startWait >= deadlineMs) {
+                        onError("Terminal not connected (state: $connectionState) — handshake timed out")
+                        return
+                    }
+                    mainHandler.postDelayed(this, pollMs)
+                }
+            }
+            mainHandler.post(poller)
             return
         }
 
+        runPingThenPayment(onReady, onError)
+    }
+
+    private fun runPingThenPayment(
+        onReady: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
         // Send real PING and wait for response before proceeding
         sendLog("🔍 Pre-payment PING verification...")
         val startTime = System.currentTimeMillis()
@@ -348,7 +380,7 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
             return
         }
 
-        // Wait up to 3 s for ping response
+        // Wait up to 2 s for ping response
         mainHandler.postDelayed({
             val elapsed = System.currentTimeMillis() - startTime
             if (connectionState == ConnectionState.CONNECTED) {
