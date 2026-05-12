@@ -172,7 +172,7 @@ export function RefundsClient() {
                     #{r.order_id}
                   </TableCell>
                   <TableCell className="font-mono tabular-nums">
-                    {formatChf(r.amount_cents / 100)}
+                    {formatChf(r.amount_cents)}
                   </TableCell>
                   <TableCell className="max-w-[280px] truncate">
                     {r.reason}

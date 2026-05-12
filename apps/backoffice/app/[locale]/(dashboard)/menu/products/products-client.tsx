@@ -336,11 +336,11 @@ export function ProductsClient({ initialProducts, initialCategories }: Props) {
                       <TableCell>{catName(p.category_id)}</TableCell>
                       <TableCell>
                         <span className="font-mono text-[12px] tabular-nums">
-                          {formatChf((p.price ?? 0) / 100)}
+                          {formatChf(p.price ?? 0)}
                           {p.price_takeaway != null &&
-                            ` / ${formatChf(p.price_takeaway / 100)}`}
+                            ` / ${formatChf(p.price_takeaway)}`}
                           {p.price_delivery != null &&
-                            ` / ${formatChf(p.price_delivery / 100)}`}
+                            ` / ${formatChf(p.price_delivery)}`}
                         </span>
                       </TableCell>
                       <TableCell className="text-xs">{p.tax_group}</TableCell>
@@ -396,7 +396,7 @@ export function ProductsClient({ initialProducts, initialCategories }: Props) {
                         {catName(p.category_id)}
                       </div>
                       <div className="text-xs font-mono mt-1 tabular-nums">
-                        {formatChf((p.price ?? 0) / 100)}
+                        {formatChf(p.price ?? 0)}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

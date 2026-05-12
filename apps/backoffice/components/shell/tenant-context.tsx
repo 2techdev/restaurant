@@ -9,7 +9,8 @@ interface TenantContextValue {
   activeTenantId: string;
   /** "all" mode = HQ aggregate görünümü */
   isAllMode: boolean;
-  setActive: (id: string) => void;
+  /** Resolves only after the bo_tenant cookie has been set by the server. */
+  setActive: (id: string) => Promise<void>;
 }
 
 const Ctx = React.createContext<TenantContextValue | null>(null);
@@ -27,9 +28,12 @@ export function TenantContextProvider({
 }) {
   const [active, setActive] = React.useState(activeTenantId);
 
-  const setActiveAndPersist = React.useCallback((id: string) => {
+  const setActiveAndPersist = React.useCallback(async (id: string) => {
     setActive(id);
-    fetch("/api/auth/tenant", {
+    // Must await — caller (TenantSwitcher) needs the bo_tenant Set-Cookie to
+    // land before triggering a reload, otherwise SSR re-renders with the old
+    // tenant. Regressed once before (jolly-final pre-pilot); keep awaited.
+    await fetch("/api/auth/tenant", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tenantId: id }),

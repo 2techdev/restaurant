@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Check, ChevronsUpDown, Building2 } from "lucide-react";
 import {
@@ -23,7 +22,6 @@ import { cn } from "@/lib/utils";
  */
 export function TenantSwitcher() {
   const t = useTranslations("tenant");
-  const router = useRouter();
   const { user, tenants, activeTenantId, setActive } = useTenant();
   const isHq = canManageHq(user.role);
 
@@ -40,9 +38,14 @@ export function TenantSwitcher() {
     ? `${tenants.length} lokasyon`
     : `Tek Restoran · ${tenantUid ?? tenantShort}`;
 
-  const onSelect = (id: string) => {
-    setActive(id);
-    router.refresh();
+  const onSelect = async (id: string) => {
+    if (id === activeTenantId) return;
+    await setActive(id);
+    // Hard reload — router.refresh() only re-renders RSC, leaving the
+    // @tanstack/react-query caches (queryKey: ["menu-products"], etc.)
+    // populated with the previous tenant's data. A full navigation guarantees
+    // a clean SSR + fresh client store with the new bo_tenant cookie.
+    window.location.reload();
   };
 
   return (

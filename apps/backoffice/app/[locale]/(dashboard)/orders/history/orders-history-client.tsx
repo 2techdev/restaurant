@@ -157,7 +157,7 @@ export function OrdersHistoryClient() {
         header: t("col.total"),
         cell: ({ row }) => (
           <span className="font-mono tabular-nums">
-            {formatChf((row.original.total ?? 0) / 100)}
+            {formatChf(row.original.total ?? 0)}
           </span>
         ),
       },
@@ -331,7 +331,7 @@ export function OrdersHistoryClient() {
                   <div className="flex items-center justify-between mt-1 text-sm text-muted-foreground">
                     <span>{formatDateTime(o.created_at)}</span>
                     <span className="font-mono tabular-nums text-foreground">
-                      {formatChf((o.total ?? 0) / 100)}
+                      {formatChf(o.total ?? 0)}
                     </span>
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
@@ -433,7 +433,7 @@ function OrderDetailDialog({
           <Row label={t("status")} value={order.status} />
           <Row label={t("date")} value={formatDateTime(order.created_at)} />
           <Row label={t("channel")} value={order.channel} />
-          <Row label={t("total")} value={formatChf((order.total ?? 0) / 100)} />
+          <Row label={t("total")} value={formatChf(order.total ?? 0)} />
           {order.customer_name && (
             <Row label={t("customer")} value={order.customer_name} />
           )}
@@ -454,9 +454,9 @@ function OrderDetailDialog({
                     </span>
                     <span className="font-mono tabular-nums">
                       {formatChf(
-                        ((it as { price?: number; total?: number }).price ??
+                        (it as { price?: number; total?: number }).price ??
                           (it as { total?: number }).total ??
-                          0) / 100
+                          0
                       )}
                     </span>
                   </li>
