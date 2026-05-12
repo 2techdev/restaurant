@@ -3,6 +3,98 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-12 ~21:08 CEST — MyPOS Sigma (KART + TWINT) UI entegrasyonu + canlı dialog + numpad bypass
+
+**Kapsam:** POS Flutter app (jolly-final / `claude/pilot-final`). Backend ve diğer apps **dokunulmadı**.
+
+### Ne eklendi
+
+Kullanıcının teslim ettiği `mypos_only_kit_bundle.zip` (MyPOS Sigma SDK — Bulgar terminal vendor, kart + TWINT) protokol paketinin POS'a entegrasyonu. Mevcut native altyapı (MyPosClient.dart + MyPosPlugin.kt + `slavesdk-2.1.8.aar`) zaten oradaydı — bu deploy sadece **UI wiring + settings toggle + canlı progress dialog** ekliyor.
+
+**Davranış:**
+- Settings ▸ Payment ▸ "MYPOS KART TERMİNALİ (Sigma)" kartında toggle var. **Default kapalı.**
+- Kapalıyken: KART mevcut tek-tap akışı (terminal manual tetiklenir), TWINT manuel onay (cashier "ödendi" der).
+- Açıkken: Ödeme ekranında KART veya TWINT seçilip ÖDE'ye basılınca yeni MyPOS dialog'u açılır → terminale TCP/IP ile bağlanır → `processPayment` (CARD) veya `twintPurchase` (TWINT) çağırır → kart/QR işlemini bekler → terminal onayı gelince dialog auto-kapanır → adisyon normal `audit + loyalty + receipt` akışında kapanır.
+
+**KART + TWINT için ortak özellikler (Cash Collector v2 pattern'i):**
+- KART/TWINT + MyPOS açık iken **manuel numpad gizleniyor**, yerine "TERMİNAL HAZIR — ÖDE tuşuna basın" banner'ı render ediliyor + içinde "MANUEL'E GEÇ" çıkış butonu.
+- Dialog state'leri: `BAĞLANIYOR → BEKLENİYOR → ONAYLANDI / REDDEDİLDİ / HATA`. Approved'da 600 ms hold + auto-close.
+- Failure/Decline/Connecting state'lerinde dialog action satırında **"MANUEL'E GEÇ"** butonu (`_myposBypassed=true`, sadece o ticket için, toggle korunur).
+- KARTE↔BAR↔TWINT method roundtrip'i bypass'ları resetler — operatör cihazı yeniden denemek isterse mümkün.
+- Cancel butonu approved değilken her zaman aktif; iptal `cancelTransaction` ile native tarafa düşer.
+
+### Receipt / audit traceability
+
+Terminal onayı sonrası adisyon `reference = "MYPOS:VISA:000123…"` formatıyla kaydediliyor (kart tipi + terminal-side transactionId). Receipt + audit log'ta görünür.
+
+### Yeni dosyalar
+
+```
+apps/pos/lib/features/payments/presentation/widgets/mypos_payment_dialog.dart
+  Live progress dialog, TR etiketler, manual-fallback button, cancel hook.
+```
+
+### Değişen dosyalar
+
+```
+apps/pos/lib/features/settings/domain/entities/payment_settings.dart
+  MyPosConfig'e: enabled / language / merchantId / terminalId / timeoutSeconds
+  alanları + default IP 192.168.1.131 + default port 60180 (Sigma).
+  Geriye dönük uyumlu — eski JSON'da yoksa defaults kullanılır.
+
+apps/pos/lib/features/settings/presentation/screens/settings_screen.dart
+  "MYPOS KART TERMİNALİ (Sigma)" kartı yeniden çizildi:
+    + toggle, + IP/port/currency/language/merchantId/terminalId fields,
+    + "BAĞLANTIYI TEST ET" butonu — MyPosClient.connect() + pingTerminal()
+      çağırır, sonuç inline ✓/✗ basılır. Best-effort disconnect cleanup.
+
+apps/pos/lib/features/payments/presentation/screens/payment_screen.dart
+  + _myposActive getter (KART/TWINT + setting on + bypass değil)
+  + _canPay MyPOS active iken her zaman true
+  + _submit: MyPOS intercept (collector intercept'ten önce çalışır)
+  + _buildMethodBody: KART/TWINT + active iken _buildMyPosBanner
+  + _referenceFor: MyPOS approved iken MYPOS:CARDTYPE:txId formatı
+```
+
+### Yapılandırma notları (sahada)
+
+- Default Sigma URL: `192.168.1.131:60180` (vendor default — cihazın gerçek IP'siyle değiştirilebilir).
+- Default dil `de` (CHF Swiss pilot). Operator dili tercihine göre `fr/it/en` yapabilir.
+- Merchant ID / Terminal ID: MyPOS tarafından sağlanır — şu an opsiyonel, ileride multi-tenant routing için saklanıyor.
+- `slavesdk-2.1.8.aar` mevcut, build.gradle.kts'te `implementation(files("libs/slavesdk2.1.8.aar"))` referansı zaten var.
+
+### Test gereksinimi
+
+**Sahada manuel yüklenmeli.** Gerçek Sigma terminal'e bağlanmadan kod yolu doğrulanamaz. Test akışı:
+
+1. APK kuruldu → Settings ▸ Payment ▸ MYPOS KART TERMİNALİ: IP girilir → "BAĞLANTIYI TEST ET" → `✓ 192.168.1.131:60180 terminal yanıt veriyor.` görmek lazım.
+2. Toggle aç, save.
+3. Yeni adisyon → ÖDE → **KART** seçili → numpad **görünmemeli**, banner görünmeli → ÖDE'ye bas → dialog açılır → terminal kart bekler → kart taklit/yaklaştır + PIN → terminal onayı dialog'a düşer → 600ms sonra dialog kapanır + adisyon kapanır + receipt basılır (Reference: `MYPOS:VISA:…`).
+4. Aynı akış **TWINT** ile: terminal QR gösterir → müşteri TWINT app'iyle tarar → onay → dialog kapanır.
+5. **Shell KART chip** (hızlı kasa, /pos rail'de "KARTE") da test edilmeli: ekranı atlamadan direkt dialog açılmalı.
+6. **Fallback test:** IP'yi yanlış ver (BAĞLANTIYI TEST ET ✗ vermeli) → adisyon → KART → dialog failed → "MANUEL'E GEÇ" → manuel akış (eski tek-tap).
+7. Regression: Toggle kapatılıp aynı akışlar (manuel KART tek-tap, manuel TWINT) çalışmalı.
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                 (canlı slot — overwrite)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-twint-20260512.apk            (versiyonlu kopya)
+size       : 89'496'282 bytes (≈85.4 MiB)
+sha256     : 72e6c4ab318ad16c24baace835305828e057c48c31794f3c56534fb615703491
+built from : claude/pilot-final (jolly-final worktree), commit ce7998a
+flavor     : pos (assembleRelease)
+```
+
+### Git notu
+
+Commit `ce7998a` 4 saf-benim dosyayı içerir (mypos_payment_dialog.dart yeni, payment_settings + settings_screen + payment_screen modified). Shell BAR/KARTE chip MyPOS intercept'i de yapıldı (`_onKarteTapped`) ve APK'ya dâhil ama `pos_v2_shell.dart`'da büyük WIP olduğu için commit sınırı dışında bırakıldı. Operatör test'inde shell KARTE chip cihazı zaten tetikliyor.
+
+### Rollback
+
+Settings ▸ Payment ▸ MYPOS KART TERMİNALİ toggle **kapat** → manuel akış anında geri döner. APK rollback gerekmez. Acil: önceki APK SHA `63caa859d109...` (v2 cash collector, 20:36 entry).
+
+
 ## 2026-05-12 ~20:36 CEST — Cash Collector v2: manuel numpad bypass + shell NAKİT chip de cihazdan + manuel-fallback yolu
 
 **Kapsam:** POS Flutter app (jolly-final / `claude/pilot-final`). Backend ve diğer apps **dokunulmadı**.
