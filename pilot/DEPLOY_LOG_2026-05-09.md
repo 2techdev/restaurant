@@ -3,6 +3,67 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-12 ~20:36 CEST — Cash Collector v2: manuel numpad bypass + shell NAKİT chip de cihazdan + manuel-fallback yolu
+
+**Kapsam:** POS Flutter app (jolly-final / `claude/pilot-final`). Backend ve diğer apps **dokunulmadı**.
+
+### v1 raporlanan hata
+
+Kasiyer BAR ödemeye basınca hâlâ eski Barzahlung ekranı (5/10/20/50/100/200 chips + numpad) açılıyordu. Beklenen: BAR'a basar basmaz manuel numpad **görünmesin**, cihaz direkt devreye girsin.
+
+Ana neden: BAR'ın iki giriş noktası var, v1 sadece birini yakalıyordu.
+
+1. **`pos_v2_shell._onBarTapped`** — rail "NAKİT" chip (hızlı kasa akışı, supermarket-style cash dialog'u açar). Operatör'ün screenshot'ta gördüğü ekran buydu. v1 burayı atlamıştı.
+2. **`payment_screen._submit`** — tam ödeme ekranı, ÖDE tuşundan sonra. v1'de yakalandı ama numpad ekranda görünür kalıyordu.
+
+### v2'de düzeltilenler
+
+**`pos_v2_shell.dart` `_onBarTapped`:** collector toggle açıksa `showCashCollectorDialog` direkt açılır (manuel dialog atlanır). Sonuç `result.collected` → `tenderedOverride` olarak `_quickSettle`'a verilir. `fallbackToManual` ve `refund > 0` snackbar'ları wired.
+
+**`payment_screen.dart`:**
+- `_cashCollectorActive` getter: method=BAR + setting açık + ticket için bypass devreye girmemiş.
+- `_buildMethodBody` BAR yolu artık aktifken numpad yerine **"KASA OTOMATI HAZIR — ÖDE tuşuna basın"** banner'ı render ediyor + içinde "MANUEL NAKİT GİRİŞİNE GEÇ" çıkış butonu.
+- `_submit` dialog'dan `fallbackToManual` dönerse `_cashCollectorBypassed=true` set ediyor (one-shot, sadece o ticket için); snackbar bildiriyor, numpad görünür hale geliyor.
+- KARTE→BAR roundtrip'i bypass'ı resetler — operatör cihazı yeniden denemek isterse mümkün.
+
+**`cash_collector_dialog.dart`:**
+- `CashCollectorResult.fallbackToManual: bool` flag + statik `manualFallback` sentinel eklendi.
+- Action satırı yeniden çizildi: `state=failed AND collected==0` iken İptal butonunun yanında **"MANUEL GİRİŞE GEÇ"** (tertiary, filled) butonu çıkar. Cash inserted olduktan sonra (collected>0) gizlenir — escrow para kaybolmasın diye.
+
+### Edge case kapsamı
+
+| Durum | Davranış |
+|---|---|
+| Kiosk offline / TCP timeout | Dialog 5xxx/HTTP/1004 hatasında `failed` state'e düşer → "Manuel girişe geç" butonu çıkar → fallback ile manuel dialog açılır |
+| Donanım jam / 5xxx | Aynı failed state, aynı yol |
+| Müşteri parayı koyduktan sonra iptal | İki kademeli onay korunuyor + fallback butonu collected>0 iken **gizleniyor** (escrow korunur) |
+| Operatör KARTE→BAR yapar | Bypass resetlenir, cihaz tekrar denenir |
+| Toggle kapatılıp açılırsa | Eski uncomitted'a takılmadan settings notifier rebuild ediyor — sorun yok |
+
+### Yapılandırma değişmedi
+
+Default kiosk URL `http://192.168.1.149:8080/`, device_id `00141`, client_id `2`, token_pass `123456`. Yerinde değiştirilebilir (Settings ▸ Payment ▸ KASA OTOMATI).
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                 (canlı slot — overwrite)
+E:/Project/Restaurant/pilot/app-pos-release-cashcollector-v2-20260512.apk        (versiyonlu kopya)
+size       : 89'332'294 bytes (≈85.2 MiB)
+sha256     : 63caa859d109a445a675de18f8a6e962642c0238ecc2210fcde89a87c47051ea
+built from : claude/pilot-final (jolly-final worktree), commit 026b4cb
+flavor     : pos (assembleRelease)
+```
+
+### Git notu
+
+Commit `026b4cb` yalnız iki "saf benim" dosyayı içerir (payment_screen.dart, cash_collector_dialog.dart). `pos_v2_shell.dart` üzerindeki shell BAR chip entegrasyonu da yapıldı ve APK'ya dâhil ama o dosyada büyük WIP (supermarket cash dialog feature, henüz commit'lenmemiş user work) olduğu için commit sınırına dâhil edilmedi. Operatör test'e geçtiğinde shell BAR chip cihazı zaten tetikliyor; ileride o dosya kendi WIP commit'i içinde kaydedilebilir.
+
+### Rollback
+
+Settings ▸ Payment ▸ KASA OTOMATI toggle **kapat** → manuel akış anında geri döner. APK rollback gerekmez. Acil durum: önceki APK SHA `bec6598f199f...` (v1, 16:05 entry).
+
+
 ## 2026-05-12 ~16:05 CEST — Cash Collector (EcoCash V4.2) entegre + POS APK yeniden derlendi (sahaya yüklenmeye hazır)
 
 **Kapsam:** POS Flutter app (jolly-final / `claude/pilot-final`). Backoffice ve POS Go sunucusu **dokunulmadı**.
