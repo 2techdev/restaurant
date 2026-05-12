@@ -45,8 +45,19 @@ export function LoginForm() {
         body: JSON.stringify(data),
       });
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        setServerError(j.message || tAuth("loginError"));
+        const j = (await res.json().catch(() => ({}))) as {
+          code?: string;
+          message?: string;
+        };
+        // Map server error codes to localised strings; fall back to the
+        // raw message from the backend if the code is unknown.
+        const localised =
+          j.code === "WRONG_PORTAL"
+            ? tAuth("wrongPortal")
+            : j.code === "ACCOUNT_INACTIVE"
+            ? tAuth("accountInactive")
+            : null;
+        setServerError(localised || j.message || tAuth("loginError"));
         return;
       }
       router.push(from || "/");

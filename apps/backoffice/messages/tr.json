@@ -37,6 +37,8 @@
     "rememberMe": "Oturumu açık tut",
     "loginSubtitle": "Restoran müdürleri için erişim",
     "loginError": "Geçersiz e-posta veya şifre",
+    "wrongPortal": "Bu hesap backoffice girişi için uygun değil. POS personeli POS uygulamasını kullanmalı.",
+    "accountInactive": "Hesap pasifleştirilmiş. Yöneticinizle iletişime geçin.",
     "loggedInAs": "Giriş yapan: {name}"
   },
   "nav": {

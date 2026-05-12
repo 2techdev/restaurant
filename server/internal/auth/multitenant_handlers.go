@@ -310,8 +310,19 @@ func (m *Module) handleLogin(w http.ResponseWriter, r *http.Request) {
 	`, req.Email).Scan(&userID, &orgID, &storeID, &displayName, &role, &passwordHash, &isActive)
 
 	if err == sql.ErrNoRows {
-		// Constant-time dummy verify to prevent user enumeration
+		// Constant-time dummy verify to prevent timing leaks.
 		crypto.VerifyPassword(req.Password, "pbkdf2$sha256$100000$AAAA$BBBB")
+		// Cross-table hint: an admin_users email landing on POS login means the
+		// operator picked the wrong app. Surface a clear redirect message.
+		var adminExists bool
+		_ = m.db.QueryRowContext(r.Context(),
+			`SELECT EXISTS(SELECT 1 FROM admin_users WHERE email=$1 AND status='active')`,
+			req.Email).Scan(&adminExists)
+		if adminExists {
+			response.Error(w, http.StatusForbidden, "WRONG_PORTAL",
+				"Bu hesap backoffice yöneticisine ait. POS girişi için restorana özel POS Operatörü hesabıyla giriş yapın.")
+			return
+		}
 		response.Error(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email or password")
 		return
 	}
@@ -327,6 +338,11 @@ func (m *Module) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	if !isActive {
 		response.Error(w, http.StatusForbidden, "ACCOUNT_INACTIVE", "Account is suspended or inactive")
+		return
+	}
+	if !posAllowedRoles[role] {
+		response.Error(w, http.StatusForbidden, "WRONG_PORTAL",
+			"Bu hesap POS girişi için uygun değil. Restorana özel POS Operatörü hesabıyla giriş yapın.")
 		return
 	}
 

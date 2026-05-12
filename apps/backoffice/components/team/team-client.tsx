@@ -72,10 +72,13 @@ export function TeamClient({
   initial,
   canWrite,
   currentUserId,
+  isHQ = false,
 }: {
   initial: TeamUserRow[];
   canWrite: boolean;
   currentUserId: string;
+  /** HQ_ADMIN / HQ_MANAGER / super admin — relaxed role-create hierarchy. */
+  isHQ?: boolean;
 }) {
   const t = useTranslations("team");
   const tCommon = useTranslations("common");
@@ -294,6 +297,7 @@ export function TeamClient({
         open={formOpen}
         onOpenChange={setFormOpen}
         initial={editing}
+        isHQ={isHQ}
         onSaved={(cred) => {
           setFormOpen(false);
           refresh();
@@ -343,11 +347,13 @@ function TeamFormDialog({
   open,
   onOpenChange,
   initial,
+  isHQ,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial: TeamUserRow | null;
+  isHQ: boolean;
   onSaved: (credential: CreatedCredential | null) => void;
 }) {
   const t = useTranslations("team");

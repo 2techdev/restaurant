@@ -226,6 +226,9 @@ func main() {
 		"/api/v1/auth/device/register": true,
 		"/api/v1/auth/device/token":    true,
 		"/api/v1/auth/admin/login":     true,
+		"/api/v1/auth/login":           true, // POS app email+password login
+		"/api/v1/auth/register":        true,
+		"/api/v1/auth/pin-login":       true,
 		"/api/v1/auth/token/refresh":   true,
 	}
 

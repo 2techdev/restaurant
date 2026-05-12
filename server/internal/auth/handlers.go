@@ -191,7 +191,7 @@ type adminUserInfo struct {
 //   admin            → HQ_ADMIN              (full org control + destructive ops)
 //   brand_manager    → HQ_MANAGER            (org control without destructive ops)
 //   store_manager    → RESTAURANT_MANAGER    (single-tenant manager)
-//   viewer / waiter  → ""                    (no HQ surface)
+//   viewer           → ""                    (read-only, no HQ surface)
 func mapAdminRoleToOrgRole(adminRole string) string {
 	switch adminRole {
 	case "admin":
@@ -203,6 +203,31 @@ func mapAdminRoleToOrgRole(adminRole string) string {
 	default:
 		return ""
 	}
+}
+
+// backofficeAllowedRoles is the set of admin_users.role values that may sign
+// into the backoffice via /api/v1/auth/admin/login. A row whose role is not
+// in this set (e.g. a stray "waiter") will be rejected with 403 even if its
+// password verifies — defence in depth against accidental table contamination.
+var backofficeAllowedRoles = map[string]bool{
+	"admin":         true,
+	"brand_manager": true,
+	"store_manager": true,
+	"viewer":        true,
+}
+
+// posAllowedRoles is the set of app_users.role values that may sign into the
+// POS app via /api/v1/auth/login. HQ-tier roles (super_admin, org_admin,
+// owner, brand_manager, store_manager) are intentionally excluded — those
+// accounts belong in admin_users and should not POS-login even if they leak
+// into app_users.
+var posAllowedRoles = map[string]bool{
+	"manager": true,
+	"cashier": true,
+	"waiter":  true,
+	"kitchen": true,
+	"kds":     true,
+	"kiosk":   true,
 }
 
 // handleAdminLogin authenticates a web dashboard admin by email and password.
@@ -238,8 +263,20 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	`, req.Email).Scan(&userID, &orgID, &name, &role, &status, &passwordHash, &storeIDs, &isSuperAdmin)
 
 	if err == sql.ErrNoRows {
-		// Use constant-time response to prevent user enumeration.
+		// Constant-time dummy verify so admin_users misses don't time-leak.
 		crypto.VerifyPassword(req.Password, "pbkdf2$sha256$100000$AAAA$BBBB")
+		// Cross-table hint: if this email actually exists in app_users we tell
+		// the operator they're at the wrong portal — UX gain worth the small
+		// enumeration trade-off for this pilot.
+		var appExists bool
+		_ = m.db.QueryRowContext(r.Context(),
+			`SELECT EXISTS(SELECT 1 FROM app_users WHERE email=$1 AND is_active=TRUE)`,
+			req.Email).Scan(&appExists)
+		if appExists {
+			response.Error(w, http.StatusForbidden, "WRONG_PORTAL",
+				"Bu hesap POS personeline ait. POS uygulamasından giriş yapın.")
+			return
+		}
 		response.Error(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email or password")
 		return
 	}
@@ -257,6 +294,11 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusForbidden, "ACCOUNT_INACTIVE", "Account is suspended or inactive")
 		return
 	}
+	if !backofficeAllowedRoles[role] {
+		response.Error(w, http.StatusForbidden, "WRONG_PORTAL",
+			"Bu hesap backoffice girişi için uygun değil. POS personeli POS uygulamasına giriş yapmalı.")
+		return
+	}
 
 	// Update last_login_at.
 	_, _ = m.db.ExecContext(r.Context(), `
@@ -265,8 +307,18 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 
 	orgRole := mapAdminRoleToOrgRole(role)
 
+	// Tenant scoping: HQ-tier accounts (HQ_ADMIN / HQ_MANAGER / super admin)
+	// keep the org as their default tenant context and may switch to any
+	// tenant in their org via X-Tenant-ID. RESTAURANT_MANAGER (and other
+	// single-restaurant roles) are pinned to their first assigned store_id
+	// so downstream queries cannot accidentally pierce into sibling tenants.
+	claimTenantID := orgID
+	if orgRole == "RESTAURANT_MANAGER" && len(storeIDs) > 0 {
+		claimTenantID = storeIDs[0]
+	}
+
 	token, err := m.jwt.GenerateToken(Claims{
-		TenantID:       orgID,
+		TenantID:       claimTenantID,
 		UserID:         userID,
 		Role:           role,
 		OrganizationID: orgID,
@@ -281,7 +333,7 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	refreshExpiry := 7 * 24 * time.Hour
 	jwtRefresh := NewJWTService(m.cfg.JWTSecret, refreshExpiry)
 	refreshToken, _ := jwtRefresh.GenerateToken(Claims{
-		TenantID:       orgID,
+		TenantID:       claimTenantID,
 		UserID:         userID,
 		Role:           role + "_refresh",
 		OrganizationID: orgID,

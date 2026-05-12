@@ -37,6 +37,8 @@
     "rememberMe": "Angemeldet bleiben",
     "loginSubtitle": "Zugang für Restaurant-Manager",
     "loginError": "Ungültige E-Mail oder Passwort",
+    "wrongPortal": "Dieses Konto kann sich nicht im Backoffice anmelden. POS-Personal muss die POS-App verwenden.",
+    "accountInactive": "Konto ist deaktiviert. Wenden Sie sich an den Administrator.",
     "loggedInAs": "Angemeldet als: {name}"
   },
   "nav": {

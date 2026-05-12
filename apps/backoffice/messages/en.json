@@ -37,6 +37,8 @@
     "rememberMe": "Remember me",
     "loginSubtitle": "Access for restaurant managers",
     "loginError": "Invalid email or password",
+    "wrongPortal": "This account cannot sign in to the backoffice. POS staff must use the POS app.",
+    "accountInactive": "Account is suspended. Contact your administrator.",
     "loggedInAs": "Signed in as: {name}"
   },
   "nav": {

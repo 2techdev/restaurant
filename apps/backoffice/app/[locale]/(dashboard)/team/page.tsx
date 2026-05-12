@@ -37,6 +37,7 @@ export default async function TeamPage({ params }: { params: Promise<{ locale: s
   const initial = await fetchTeamUsers(session);
   const role = session.user.org_role ?? session.user.role ?? "";
   const canWrite = MANAGER_ROLES.has(role) || !!session.user.is_super_admin;
+  const isHQ = role === "HQ_ADMIN" || role === "HQ_MANAGER" || !!session.user.is_super_admin;
 
   return (
     <div className="space-y-6">
@@ -46,7 +47,12 @@ export default async function TeamPage({ params }: { params: Promise<{ locale: s
           <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
         </div>
       </div>
-      <TeamClient initial={initial} canWrite={canWrite} currentUserId={session.user.id} />
+      <TeamClient
+        initial={initial}
+        canWrite={canWrite}
+        currentUserId={session.user.id}
+        isHQ={isHQ}
+      />
     </div>
   );
 }

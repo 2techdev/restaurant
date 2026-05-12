@@ -27,6 +27,28 @@ export function TenantSwitcher() {
   const { user, tenants, activeTenantId, setActive } = useTenant();
   const isHq = canManageHq(user.role);
 
+  // Single-tenant operators (RESTAURANT_MANAGER + staff) never see a
+  // switcher — they're pinned to their own tenant by the backend tenant_id
+  // claim and offering a switcher would be misleading. We also bail when the
+  // user happens to own exactly one tenant (no choices to make).
+  if (!isHq || tenants.length <= 1) {
+    const only = tenants[0];
+    if (!only) return null;
+    return (
+      <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+        <Avatar initial={only.name[0] ?? "?"} />
+        <div className="flex flex-col items-start leading-tight min-w-0">
+          <span className="text-[12px] font-medium text-foreground truncate max-w-[180px]">
+            {only.name}
+          </span>
+          <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[180px]">
+            Tek Restoran
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   const activeTenant = tenants.find((x) => x.id === activeTenantId);
   const aggregate = activeTenantId === "all";
   const label = aggregate ? t("all") : activeTenant?.name ?? t("switcher");

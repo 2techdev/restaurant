@@ -37,6 +37,8 @@
     "rememberMe": "Se souvenir de moi",
     "loginSubtitle": "Accès pour les responsables de restaurant",
     "loginError": "E-mail ou mot de passe invalide",
+    "wrongPortal": "Ce compte ne peut pas se connecter au backoffice. Le personnel POS doit utiliser l'app POS.",
+    "accountInactive": "Compte désactivé. Contactez votre administrateur.",
     "loggedInAs": "Connecté: {name}"
   },
   "nav": {

@@ -24,21 +24,41 @@ type AppUser struct {
 	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
 }
 
-// handleList returns all app_users for the tenant (across all stores).
+// handleList returns app_users scoped to the caller's tenant context.
+//
+// HQ_ADMIN / HQ_MANAGER / super admin see every staff member in the active
+// tenant context (driven by X-Tenant-ID — middleware will swap tenant_id
+// for them). RESTAURANT_MANAGER and lower roles are pinned to the JWT-stamped
+// tenant_id by middleware, so the same query naturally scopes to their store.
+//
 // GET /api/v1/users
 func (m *Module) handleList(w http.ResponseWriter, r *http.Request) {
-	orgID := middleware.GetTenantID(r.Context())
-	if !uuid.IsValid(orgID) {
+	tenantID := middleware.GetTenantID(r.Context())
+	orgID := middleware.GetOrganizationID(r.Context())
+	if !uuid.IsValid(tenantID) {
 		response.Error(w, http.StatusUnauthorized, "UNAUTHORIZED", "Tenant context required")
 		return
+	}
+	// Decide query scope: if tenantID == orgID, it's an HQ-wide listing;
+	// otherwise it's a single-restaurant slice. Backwards compatible —
+	// when middleware can't distinguish (e.g. token without org claim)
+	// we fall through to org-wide.
+	queryOrg := orgID
+	if queryOrg == "" {
+		queryOrg = tenantID
+	}
+	storeFilter := ""
+	if tenantID != queryOrg {
+		storeFilter = tenantID
 	}
 	rows, err := m.db.QueryContext(r.Context(), `
 		SELECT id, COALESCE(display_name, COALESCE(email,'')) AS name,
 		       email, role, is_active, store_id::TEXT, last_login
 		FROM app_users
 		WHERE organization_id = $1
+		  AND ($2 = '' OR store_id::TEXT = $2)
 		ORDER BY role, display_name
-	`, orgID)
+	`, queryOrg, storeFilter)
 	if err != nil {
 		slog.Error("users: list", "error", err)
 		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to list users")
@@ -86,10 +106,15 @@ type upsertRequest struct {
 // unset, the first active store of the tenant is used.
 // POST /api/v1/users
 func (m *Module) handleCreate(w http.ResponseWriter, r *http.Request) {
-	orgID := middleware.GetTenantID(r.Context())
-	if !uuid.IsValid(orgID) {
+	tenantID := middleware.GetTenantID(r.Context())
+	orgID := middleware.GetOrganizationID(r.Context())
+	orgRole := middleware.GetOrgRole(r.Context())
+	if !uuid.IsValid(tenantID) {
 		response.Error(w, http.StatusUnauthorized, "UNAUTHORIZED", "Tenant context required")
 		return
+	}
+	if orgID == "" {
+		orgID = tenantID
 	}
 	var req upsertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -107,6 +132,13 @@ func (m *Module) handleCreate(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "INVALID_ROLE", "unknown role")
 		return
 	}
+	// Role hierarchy: only HQ-tier accounts may mint HQ-tier app_users rows.
+	// A RESTAURANT_MANAGER (or any non-HQ caller) is capped to POS staff.
+	if !isHQTier(orgRole) && !posCreatableRoles[req.Role] {
+		response.Error(w, http.StatusForbidden, "ROLE_NOT_ALLOWED",
+			"Bu rolü oluşturma yetkiniz yok. Yalnızca POS personeli (müdür, kasiyer, garson, mutfak, kiosk) oluşturabilirsiniz.")
+		return
+	}
 	pass := ""
 	if req.Password != nil {
 		pass = *req.Password
@@ -120,6 +152,12 @@ func (m *Module) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Non-HQ callers cannot specify a foreign store_id: ignore whatever the
+	// client sent and pin to the JWT-stamped tenant (== caller's own store).
+	if !isHQTier(orgRole) {
+		t := tenantID
+		req.StoreID = &t
+	}
 	storeID, err := resolveStoreID(r, m.db, orgID, req.StoreID)
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "NO_STORE", "No store available for tenant")
@@ -175,11 +213,16 @@ func (m *Module) handleCreate(w http.ResponseWriter, r *http.Request) {
 // handleUpdate updates an existing app_user (name/email/role/active/pin/password).
 // PUT /api/v1/users/{id}
 func (m *Module) handleUpdate(w http.ResponseWriter, r *http.Request) {
-	orgID := middleware.GetTenantID(r.Context())
+	tenantID := middleware.GetTenantID(r.Context())
+	orgID := middleware.GetOrganizationID(r.Context())
+	orgRole := middleware.GetOrgRole(r.Context())
 	id := r.PathValue("id")
-	if !uuid.IsValid(orgID) || !uuid.IsValid(id) {
+	if !uuid.IsValid(tenantID) || !uuid.IsValid(id) {
 		response.Error(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid tenant or id")
 		return
+	}
+	if orgID == "" {
+		orgID = tenantID
 	}
 	var req upsertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -189,6 +232,18 @@ func (m *Module) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.Role != "" && !validRole(req.Role) {
 		response.Error(w, http.StatusBadRequest, "INVALID_ROLE", "unknown role")
 		return
+	}
+	if req.Role != "" && !isHQTier(orgRole) && !posCreatableRoles[req.Role] {
+		response.Error(w, http.StatusForbidden, "ROLE_NOT_ALLOWED",
+			"Bu role atama yetkiniz yok.")
+		return
+	}
+	// Tenant-scope ownership check: non-HQ callers may only touch users in
+	// their own store. The UPDATE WHERE clause adds the store filter so a
+	// hand-crafted PUT cannot reach across tenants.
+	storeFilter := ""
+	if !isHQTier(orgRole) {
+		storeFilter = tenantID
 	}
 
 	// Build optional password/pin hashes.
@@ -233,8 +288,10 @@ func (m *Module) handleUpdate(w http.ResponseWriter, r *http.Request) {
 			password_hash = COALESCE($7, password_hash),
 			pin_hash = COALESCE($8, pin_hash),
 			updated_at = NOW()
-		WHERE id = $1 AND organization_id = $2
-	`, id, orgID, req.Name, emailParam, req.Role, req.IsActive, passwordHash, pinHash)
+		WHERE id = $1
+		  AND organization_id = $2
+		  AND ($9 = '' OR store_id::TEXT = $9)
+	`, id, orgID, req.Name, emailParam, req.Role, req.IsActive, passwordHash, pinHash, storeFilter)
 	if err != nil {
 		slog.Error("users: update", "error", err)
 		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to update user")
@@ -250,16 +307,26 @@ func (m *Module) handleUpdate(w http.ResponseWriter, r *http.Request) {
 // handleDelete soft-deletes by setting is_active=FALSE.
 // DELETE /api/v1/users/{id}
 func (m *Module) handleDelete(w http.ResponseWriter, r *http.Request) {
-	orgID := middleware.GetTenantID(r.Context())
+	tenantID := middleware.GetTenantID(r.Context())
+	orgID := middleware.GetOrganizationID(r.Context())
+	orgRole := middleware.GetOrgRole(r.Context())
 	id := r.PathValue("id")
-	if !uuid.IsValid(orgID) || !uuid.IsValid(id) {
+	if !uuid.IsValid(tenantID) || !uuid.IsValid(id) {
 		response.Error(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid tenant or id")
 		return
+	}
+	if orgID == "" {
+		orgID = tenantID
+	}
+	storeFilter := ""
+	if !isHQTier(orgRole) {
+		storeFilter = tenantID
 	}
 	result, err := m.db.ExecContext(r.Context(), `
 		UPDATE app_users SET is_active = FALSE, updated_at = NOW()
 		WHERE id = $1 AND organization_id = $2
-	`, id, orgID)
+		  AND ($3 = '' OR store_id::TEXT = $3)
+	`, id, orgID, storeFilter)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to delete user")
 		return
@@ -274,11 +341,20 @@ func (m *Module) handleDelete(w http.ResponseWriter, r *http.Request) {
 // handleResetPin resets the PIN for a user.
 // POST /api/v1/users/{id}/pin
 func (m *Module) handleResetPin(w http.ResponseWriter, r *http.Request) {
-	orgID := middleware.GetTenantID(r.Context())
+	tenantID := middleware.GetTenantID(r.Context())
+	orgID := middleware.GetOrganizationID(r.Context())
+	orgRole := middleware.GetOrgRole(r.Context())
 	id := r.PathValue("id")
-	if !uuid.IsValid(orgID) || !uuid.IsValid(id) {
+	if !uuid.IsValid(tenantID) || !uuid.IsValid(id) {
 		response.Error(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid tenant or id")
 		return
+	}
+	if orgID == "" {
+		orgID = tenantID
+	}
+	storeFilter := ""
+	if !isHQTier(orgRole) {
+		storeFilter = tenantID
 	}
 	var req struct {
 		PIN string `json:"pin"`
@@ -299,7 +375,8 @@ func (m *Module) handleResetPin(w http.ResponseWriter, r *http.Request) {
 	result, err := m.db.ExecContext(r.Context(), `
 		UPDATE app_users SET pin_hash = $3, updated_at = NOW()
 		WHERE id = $1 AND organization_id = $2
-	`, id, orgID, h)
+		  AND ($4 = '' OR store_id::TEXT = $4)
+	`, id, orgID, h, storeFilter)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "DB_ERROR", "Failed to reset pin")
 		return
@@ -356,19 +433,37 @@ func resolveStoreID(r *http.Request, db *sql.DB, orgID string, reqStoreID *strin
 }
 
 var knownRoles = map[string]bool{
-	"super_admin":    true,
-	"org_admin":      true,
-	"owner":          true,
-	"brand_manager":  true,
-	"store_manager":  true,
-	"manager":        true,
-	"cashier":        true,
-	"waiter":         true,
-	"kitchen":        true,
-	"kds":            true,
-	"kiosk":          true,
+	"super_admin":   true,
+	"org_admin":     true,
+	"owner":         true,
+	"brand_manager": true,
+	"store_manager": true,
+	"manager":       true,
+	"cashier":       true,
+	"waiter":        true,
+	"kitchen":       true,
+	"kds":           true,
+	"kiosk":         true,
+}
+
+// posCreatableRoles is the subset of app_users.role values that a
+// RESTAURANT_MANAGER (or any non-HQ caller) is allowed to mint or assign.
+// HQ-tier roles must be created through admin_users by an HQ admin.
+var posCreatableRoles = map[string]bool{
+	"manager": true,
+	"cashier": true,
+	"waiter":  true,
+	"kitchen": true,
+	"kds":     true,
+	"kiosk":   true,
 }
 
 func validRole(role string) bool {
 	return knownRoles[role]
+}
+
+// isHQTier reports whether the caller carries an HQ-level org_role claim.
+// Used by tenant-scope guards in the team CRUD handlers.
+func isHQTier(orgRole string) bool {
+	return orgRole == "HQ_ADMIN" || orgRole == "HQ_MANAGER"
 }
