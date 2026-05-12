@@ -1,8 +1,8 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { fetchCategories, fetchProducts, fetchModifierGroups, fetchPublishHistory } from "@/lib/server-data";
-import { MenuTabs } from "@/components/menu/menu-tabs";
+import { fetchCategories, fetchPublishHistory } from "@/lib/server-data";
+import { CategoriesPanel } from "@/components/menu/categories-panel";
 import { MenuPublishButton } from "@/components/menu/menu-publish-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Building2 } from "lucide-react";
@@ -23,10 +23,8 @@ export default async function MasterMenuPage({ params }: { params: Promise<{ loc
   const t = await getTranslations({ locale, namespace: "menu" });
   const tHq = await getTranslations({ locale, namespace: "hq" });
 
-  const [categories, products, modifierGroups, history] = await Promise.all([
+  const [categories, history] = await Promise.all([
     fetchCategories(session),
-    fetchProducts(session),
-    fetchModifierGroups(session),
     fetchPublishHistory(session),
   ]);
 
@@ -42,16 +40,11 @@ export default async function MasterMenuPage({ params }: { params: Promise<{ loc
       </Alert>
 
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">{tHq("masterMenu")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{tHq("masterMenu")} — {t("categories")}</h1>
         <MenuPublishButton history={history} />
       </div>
 
-      <MenuTabs
-        initialCategories={categories}
-        initialProducts={products}
-        initialModifierGroups={modifierGroups}
-        userRole={session.user.role}
-      />
+      <CategoriesPanel initial={categories} userRole={session.user.role} />
     </div>
   );
 }

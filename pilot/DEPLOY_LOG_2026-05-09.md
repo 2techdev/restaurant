@@ -3,6 +3,95 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-12 ~16:30 CEST — Menü / Master Menü / Raporlar: çift navigation (sidebar + üst sekme) tekleştirildi — LIVE on 88
+
+**Servisler:** Backoffice (88, `backoffice.service`) — POS Go, Reservation **dokunulmadı**.
+
+### Kullanıcı geri bildirimi
+
+> "bide su sol menude urunler modifer grupalriyla, ustteki saga fdogru dgiden yer
+> bambaska kanka neden tek bir duzen yap bu ne boyle"
+
+Sidebar'da Menü grubu açıkken zaten Kategoriler / Ürünler / Modifier Grupları /
+Yayın Geçmişi sub-item'ları var, **ama** `/tr/menu` ana sayfası ek olarak en
+üstte aynı isimli ikinci bir sekme barı (`MenuTabs`) renderlıyordu. Operatör
+açısından iki kafa karıştırıcı navigation, "tek düzen" istedi.
+
+### Kural
+
+> **Sidebar'da bir bölümün sub-item'ları varsa, sayfa üstünde aynı bölümün
+> sekme barı renderlanmaz.** Sidebar tek nav kaynağıdır. Page actions (örn.
+> "Gastro Hub'dan İçe Aktar", "POS'a Yayınla", "Kategori ekle") sekme değil,
+> sayfa başlığının sağındaki butonlardır — onlar kalır.
+
+### Değişen dosyalar
+
+```
+apps/backoffice/app/[locale]/(dashboard)/menu/page.tsx
+  - MenuTabs (Categories / Products / Modifiers sekmeleri) kaldırıldı
+  + CategoriesPanel doğrudan render ediliyor (Kategoriler /menu sub-item'ı)
+  - fetchProducts + fetchModifierGroups parallel fetch'leri kaldırıldı
+    (artık ilgili route'larda lokal fetch ediliyor)
+  - Başlık: "Kategoriler / Ürünler" → "Kategoriler"
+
+apps/backoffice/app/[locale]/(dashboard)/organization/menu/page.tsx
+  - HQ Master Menü için aynı MenuTabs kaldırıldı
+  + CategoriesPanel doğrudan render
+  - Başlık: "Master Menü" → "Master Menü — Kategoriler"
+  - Sub-route'lar zaten mevcut: /organization/menu/products,
+    /organization/menu/publish-history (sidebar'daki master menu grubu).
+
+apps/backoffice/app/[locale]/(dashboard)/reports/page.tsx
+  - Üstteki Revenue / Top / Timeline / MwSt sekmeleri kaldırıldı
+    (sidebar'da Reports grubu zaten 5 sub-item açıyor: reportsRevenue,
+    reportsTopSellers, reportsHourly, reportsMwst, reportsExport)
+  + Tek Revenue Card render — /reports artık "Revenue" sub-item'ına eşdeğer
+  - fetchTopSellers parallel fetch kaldırıldı (top-sellers/page.tsx zaten kendi fetch'ini yapıyor)
+```
+
+### Silinen dosyalar (orphan)
+
+```
+apps/backoffice/components/menu/menu-tabs.tsx       (artık import edilmiyor)
+apps/backoffice/components/menu/products-panel.tsx  (yalnız menu-tabs.tsx kullanıyordu)
+apps/backoffice/components/menu/modifiers-panel.tsx (yalnız menu-tabs.tsx kullanıyordu)
+```
+
+Standalone route'lardaki `ProductsClient` ve `ModifiersClient` kullanılmaya
+devam ediyor; sadece üst-sekme bağlamındaki panel kabukları silindi.
+
+### Doğrulanmayan / dokunulmayanlar
+
+- Diğer sidebar grupları (Orders, Promotions, Customers, Inventory) bu hatadan
+  zaten muaf — sayfa-içi sekme yok, sidebar tek nav. Doğrulandı.
+- Restoran Yönetimi / Receipt Templates: sayfa-içi sekmeler **template tipleri
+  için** (yazıcı çıktısı varyantları), nav değil; kalıyor.
+- Settings: profil / şifre / organizasyon / bildirimler / API / audit sekmeleri,
+  Settings sidebar'da sub-item açmadığı için sayfa-içi sekmeler doğru ergonomi —
+  dokunulmadı.
+- Users sayfası: zaten doğru (sidebar Users / Roles & Permissions / Activity Log
+  sub-item'ları var, sayfada duplicate sekme yok).
+
+### Smoke (dev)
+
+- `npx next dev` → /tr/menu compile success, 200 OK (redirect to /tr/login
+  beklenen — backend yok lokal).
+- TypeScript `tsc --noEmit` → değişen dosyalarda hata yok. Tests klasöründe
+  pre-existing `@testing-library/react.screen` resolution uyarıları kalıyor
+  (bizim değişiklikle ilgisiz).
+- `users.activity` JSON anahtarı (tr.json:931) i18n `INVALID_KEY` uyarısı
+  veriyor — pre-existing, **bu cycle'a ait değil**, ayrı bir task ile temizlenmeli.
+
+### Deploy timestamps (88, 2026-05-12)
+
+- Backoffice build (worktree `gallant-davinci-258bef`) → 16:25 CEST
+- Deploy via `deploy_backoffice_hetzner.py` (BACKOFFICE_DEPLOY_DIR=worktree) → 16:28 CEST
+- Smoke: https://backoffice.gastrocore.ch/tr/menu → 200, üst sekme yok
+- Smoke: https://backoffice.gastrocore.ch/tr/organization/menu → 200, üst sekme yok
+- Smoke: https://backoffice.gastrocore.ch/tr/reports → 200, üst sekme yok
+
+✅ Reservation (178) **dokunulmadı** · ✅ jolly-final POS satış lineage'i dokunulmadı (sadece backoffice TSX) · ✅ AskUserQuestion kullanılmadı · ✅ Diğer agent'lar (Cash Collector, Tenant switcher) ile dosya çakışması yok
+
 ## 2026-05-12 ~16:05 CEST — Cash Collector (EcoCash V4.2) entegre + POS APK yeniden derlendi (sahaya yüklenmeye hazır)
 
 **Kapsam:** POS Flutter app (jolly-final / `claude/pilot-final`). Backoffice ve POS Go sunucusu **dokunulmadı**.

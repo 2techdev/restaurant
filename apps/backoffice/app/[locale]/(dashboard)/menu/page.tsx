@@ -2,13 +2,8 @@ import { setRequestLocale, getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import {
-  fetchCategories,
-  fetchProducts,
-  fetchModifierGroups,
-  fetchPublishHistory,
-} from "@/lib/server-data";
-import { MenuTabs } from "@/components/menu/menu-tabs";
+import { fetchCategories, fetchPublishHistory } from "@/lib/server-data";
+import { CategoriesPanel } from "@/components/menu/categories-panel";
 import { MenuPublishButton } from "@/components/menu/menu-publish-button";
 
 export default async function MenuPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -18,17 +13,15 @@ export default async function MenuPage({ params }: { params: Promise<{ locale: s
   if (!session) redirect(`/${locale}/login`);
   const t = await getTranslations({ locale, namespace: "menu" });
 
-  const [categories, products, modifierGroups, history] = await Promise.all([
+  const [categories, history] = await Promise.all([
     fetchCategories(session),
-    fetchProducts(session),
-    fetchModifierGroups(session),
     fetchPublishHistory(session),
   ]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">{t("categories")} / {t("products")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("categories")}</h1>
         <div className="flex items-center gap-2">
           <Link
             href={`/${locale}/menu/connect-gastrohub`}
@@ -39,12 +32,7 @@ export default async function MenuPage({ params }: { params: Promise<{ locale: s
           <MenuPublishButton history={history} />
         </div>
       </div>
-      <MenuTabs
-        initialCategories={categories}
-        initialProducts={products}
-        initialModifierGroups={modifierGroups}
-        userRole={session.user.role}
-      />
+      <CategoriesPanel initial={categories} userRole={session.user.role} />
     </div>
   );
 }
