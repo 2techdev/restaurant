@@ -28,6 +28,7 @@ import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/app_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/loyalty_settings.dart';
+import 'package:gastrocore_pos/features/payments/data/hardware/ecocash/ecocash_client.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/payment_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/printer_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
@@ -1286,6 +1287,13 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
   final _myposIpCtrl = TextEditingController();
   final _myposPortCtrl = TextEditingController();
   final _myposCurrencyCtrl = TextEditingController();
+  final _ccBaseUrlCtrl = TextEditingController();
+  final _ccDeviceIdCtrl = TextEditingController();
+  final _ccClientIdCtrl = TextEditingController();
+  final _ccTokenPassCtrl = TextEditingController();
+  final _ccCurrencyCtrl = TextEditingController();
+  bool _ccTesting = false;
+  String? _ccTestResult;
   bool _initialised = false;
 
   @override
@@ -1296,6 +1304,11 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
     _myposIpCtrl.dispose();
     _myposPortCtrl.dispose();
     _myposCurrencyCtrl.dispose();
+    _ccBaseUrlCtrl.dispose();
+    _ccDeviceIdCtrl.dispose();
+    _ccClientIdCtrl.dispose();
+    _ccTokenPassCtrl.dispose();
+    _ccCurrencyCtrl.dispose();
     super.dispose();
   }
 
@@ -1307,6 +1320,11 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
     _myposIpCtrl.text = s.mypos.ip;
     _myposPortCtrl.text = s.mypos.port.toString();
     _myposCurrencyCtrl.text = s.mypos.currency;
+    _ccBaseUrlCtrl.text = s.cashCollector.baseUrl;
+    _ccDeviceIdCtrl.text = s.cashCollector.deviceId;
+    _ccClientIdCtrl.text = s.cashCollector.clientId;
+    _ccTokenPassCtrl.text = s.cashCollector.tokenPass;
+    _ccCurrencyCtrl.text = s.cashCollector.currency;
     _initialised = true;
   }
 
@@ -1325,8 +1343,48 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
             port: int.tryParse(_myposPortCtrl.text.trim()) ?? 50100,
             currency: _myposCurrencyCtrl.text.trim().toUpperCase(),
           ),
+          cashCollector: current.cashCollector.copyWith(
+            baseUrl: _ccBaseUrlCtrl.text.trim(),
+            deviceId: _ccDeviceIdCtrl.text.trim(),
+            clientId: _ccClientIdCtrl.text.trim(),
+            tokenPass: _ccTokenPassCtrl.text.trim(),
+            currency: _ccCurrencyCtrl.text.trim().toUpperCase(),
+          ),
         ));
     if (mounted) _showSnack('Payment settings saved.');
+  }
+
+  /// Probes the kiosk by logging in and pulling /api/get/status. Updates
+  /// [_ccTestResult] with a short message — no other state changes, so the
+  /// operator can run it before saving to validate the inputs first.
+  Future<void> _testCashCollector() async {
+    setState(() {
+      _ccTesting = true;
+      _ccTestResult = null;
+    });
+    final client = EcoCashClient(EcoCashConfig(
+      baseUrl: _ccBaseUrlCtrl.text.trim(),
+      deviceId: _ccDeviceIdCtrl.text.trim(),
+      clientId: _ccClientIdCtrl.text.trim(),
+      tokenPass: _ccTokenPassCtrl.text.trim(),
+      currency: _ccCurrencyCtrl.text.trim().toUpperCase(),
+    ));
+    try {
+      await client.login();
+      final status = await client.getStatus();
+      if (!mounted) return;
+      setState(() => _ccTestResult =
+          '✓ ${status.deviceId} · ${status.softwareVer} · status=${status.status}');
+    } on EcoCashException catch (e) {
+      if (!mounted) return;
+      setState(() => _ccTestResult = '✗ [${e.code}] ${e.message}');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _ccTestResult = '✗ $e');
+    } finally {
+      client.close();
+      if (mounted) setState(() => _ccTesting = false);
+    }
   }
 
   @override
@@ -1415,6 +1473,84 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
               controller: _myposCurrencyCtrl,
               hint: 'CHF',
               keyboardType: TextInputType.text,
+            ),
+          ],
+        ),
+        _Card(
+          title: 'KASA OTOMATI (EcoCash V4.2)',
+          children: [
+            const Text(
+              'Açık olduğunda, BAR ödeme yöntemi kasa otomatına yönlendirilir: '
+              'müşteri parayı cihaza yerleştirir, cihaz para üstünü otomatik verir. '
+              'Kapalıyken ödeme ekranındaki manuel nakit girişi çalışır.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            _Toggle(
+              label: 'Kasa otomatını kullan',
+              subtitle:
+                  'BAR seçildiğinde ÖDE tuşu cihazı tetikler ve müşteriden para alır',
+              value: settings.cashCollector.enabled,
+              onChanged: (v) => ref
+                  .read(paymentSettingsProvider.notifier)
+                  .update((s) =>
+                      s.copyWith(cashCollector: s.cashCollector.copyWith(enabled: v))),
+            ),
+            const SizedBox(height: 8),
+            _Field(
+              label: 'Cihaz URL',
+              controller: _ccBaseUrlCtrl,
+              hint: 'http://192.168.1.149:8080/',
+              keyboardType: TextInputType.url,
+            ),
+            _Field(
+              label: 'Cihaz ID (device_id)',
+              controller: _ccDeviceIdCtrl,
+              hint: '00141',
+            ),
+            _Field(
+              label: 'Terminal ID (client_id)',
+              controller: _ccClientIdCtrl,
+              hint: '2',
+            ),
+            _Field(
+              label: 'Token Parolası',
+              controller: _ccTokenPassCtrl,
+              hint: '123456 (varsayılan — değiştirin)',
+            ),
+            _Field(
+              label: 'Para Birimi',
+              controller: _ccCurrencyCtrl,
+              hint: 'CHF',
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: _ccTesting ? null : _testCashCollector,
+                  icon: _ccTesting
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.network_check_rounded, size: 16),
+                  label: const Text('BAĞLANTIYI TEST ET'),
+                ),
+                const SizedBox(width: 12),
+                if (_ccTestResult != null)
+                  Expanded(
+                    child: Text(
+                      _ccTestResult!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _ccTestResult!.startsWith('✓')
+                            ? AppColors.green
+                            : AppColors.red,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),

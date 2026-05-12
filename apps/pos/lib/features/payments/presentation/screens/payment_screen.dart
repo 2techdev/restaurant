@@ -34,7 +34,12 @@ import 'package:gastrocore_pos/features/payments/domain/entities/payment_entity.
 import 'package:gastrocore_pos/features/payments/domain/entities/voucher_entity.dart';
 import 'package:gastrocore_pos/features/payments/domain/mixed_tender_calculator.dart';
 import 'package:gastrocore_pos/features/payments/presentation/providers/refund_provider.dart';
+import 'package:gastrocore_pos/features/payments/presentation/widgets/cash_collector_dialog.dart';
 import 'package:gastrocore_pos/features/payments/presentation/widgets/voucher_dialog.dart';
+import 'package:gastrocore_pos/features/printing/data/receipt_print_facade.dart';
+import 'package:gastrocore_pos/features/printing/domain/ch_receipt_renderer.dart';
+import 'package:gastrocore_pos/features/printing/printing_providers.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 
 /// Local tender selection.
 enum _Method { bar, karte, twint, gutschein }
@@ -72,6 +77,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   bool _paymentComplete = false;
   bool _submitting = false;
+
+  /// Result from the Cash Collector kiosk for the cash leg of this sale.
+  /// Non-null only when the operator picked BAR with the collector enabled
+  /// AND the device successfully accepted cash. We hold it so the change
+  /// indicator and completion view show what the device actually dispensed.
+  CashCollectorResult? _cashCollectorResult;
 
   TicketEntity? _ticket;
 
@@ -161,6 +172,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   int get _changeAmount {
     if (_method != _Method.bar) return 0;
+    // Cash Collector path: the device computed and dispensed change for us.
+    if (_cashCollectorResult != null) return _cashCollectorResult!.dispensed;
     final target = _outstanding;
     if (_enteredCents <= target) return 0;
     return _enteredCents - target;
@@ -170,7 +183,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     if (_submitting || _grandTotal <= 0) return false;
     if (_calc.hasTenders && _liveCalc.isFullyPaid) return true;
     final target = _outstanding;
-    if (_method == _Method.bar) return _enteredCents >= target;
+    if (_method == _Method.bar) {
+      // When the Cash Collector is wired up, the operator doesn't have to
+      // pre-enter the tendered amount on the numpad — the kiosk collects
+      // it from the customer directly.
+      final collector = ref
+          .read(paymentSettingsProvider)
+          .valueOrNull
+          ?.cashCollector;
+      if (collector?.enabled == true) return true;
+      return _enteredCents >= target;
+    }
     return true; // Non-cash methods assume exact-outstanding tender.
   }
 
@@ -330,6 +353,39 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   Future<void> _submit() async {
     if (!_canPay) return;
+
+    // Cash Collector intercept — when the operator picked BAR and the kiosk
+    // is enabled in Settings, hand the cash leg to the device. The dialog
+    // returns the actual collected/dispensed amounts on success, or null if
+    // the operator cancelled before any cash was accepted (in which case we
+    // abort the whole _submit so they can pick another tender).
+    final paymentSettings = ref.read(paymentSettingsProvider).valueOrNull;
+    final collectorCfg = paymentSettings?.cashCollector;
+    if (_method == _Method.bar &&
+        collectorCfg != null &&
+        collectorCfg.enabled) {
+      final outstanding = _outstanding > 0 ? _outstanding : _grandTotal;
+      final result = await showCashCollectorDialog(
+        context,
+        config: collectorCfg,
+        saleAmountCents: outstanding,
+      );
+      if (!mounted) return;
+      if (result == null) return; // cancelled
+      setState(() => _cashCollectorResult = result);
+      if (result.refund > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Cihaz ${(result.refund / 100).toStringAsFixed(2)} CHF '
+              'iade veremedi — elden geri verin.',
+            ),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+    }
+
     setState(() => _submitting = true);
 
     final tenantId = ref.read(tenantIdProvider);
@@ -393,6 +449,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       ref.read(currentTicketProvider.notifier).clear();
       if (!mounted) return;
       setState(() => _paymentComplete = true);
+
+      // Auto-print on payment — fire-and-forget. The receipt screen still
+      // shows even if the printer is unreachable, so the cashier always has
+      // a fallback (manual print button on the receipt screen).
+      unawaited(_autoPrintIfEnabled(receivedBy: receivedBy));
+
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) context.go(AppRoutes.receiptFor(widget.ticketId));
       });
@@ -403,6 +465,65 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         SnackBar(content: Text('Ödeme hatası: $e')),
       );
     }
+  }
+
+  /// Honours the `autoPrintOnPayment` printer setting: pulls the customer
+  /// receipt template from the local DAO and dispatches via the
+  /// [ReceiptPrintFacade]. Errors are swallowed (printer offline shouldn't
+  /// block UX) but the rendered text is still computed so the receipt
+  /// screen's manual fallback shows the same content.
+  Future<void> _autoPrintIfEnabled({required String receivedBy}) async {
+    final settings = ref.read(printerSettingsProvider).valueOrNull;
+    if (settings == null || !settings.autoPrintOnPayment) return;
+
+    final ticket = _ticket;
+    if (ticket == null) return;
+
+    final items = _items.map(_toReceiptItem).toList(growable: false);
+    final paymentLabel = switch (_method) {
+      _Method.bar => 'Bargeld',
+      _Method.karte => 'Karte',
+      _Method.twint => 'TWINT',
+      _Method.gutschein => 'Gutschein',
+    };
+
+    final req = ReceiptPrintRequest(
+      orderNo: ticket.orderNumber,
+      orderTime: ticket.openedAt,
+      tableOrTakeaway: ticket.tableId ?? 'Takeaway',
+      cashierName: receivedBy,
+      customerName: _linkedCustomer?.name ?? '',
+      items: items,
+      discount: ticket.discountAmount / 100.0,
+      tip: _tipAmount / 100.0,
+      paymentMethod: paymentLabel,
+      isCash: _method == _Method.bar,
+    );
+
+    final facade = ref.read(receiptPrintFacadeProvider);
+    try {
+      await facade.printReceipt(req);
+    } catch (_) {
+      // Auto-print is best-effort — the receipt screen has a manual button.
+    }
+  }
+
+  /// Maps an OrderItemEntity to the renderer's ReceiptItem. Computes the
+  /// effective VAT rate from the line's tax fraction so per-item rates are
+  /// honoured (food vs alcohol vs accommodation may differ on the same bill).
+  static ReceiptItem _toReceiptItem(OrderItemEntity it) {
+    final unit = it.unitPrice / 100.0;
+    final net = it.subtotal - it.taxAmount;
+    final rate = (net > 0 && it.taxAmount > 0)
+        ? (it.taxAmount / net) * 100.0
+        : (it.taxGroup == 'accommodation' ? 3.8 : 8.1);
+    final roundedRate = (rate * 10).round() / 10.0;
+    return ReceiptItem(
+      qty: it.quantity.round().clamp(1, 1 << 30),
+      name: it.productName,
+      unitPrice: unit,
+      vatRate: roundedRate,
+    );
   }
 
   /// Resolve the tender list that will actually hit the repository.

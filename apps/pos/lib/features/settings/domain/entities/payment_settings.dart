@@ -128,6 +128,94 @@ class MyPosConfig {
   int get hashCode => Object.hash(ip, port, currency);
 }
 
+/// EcoCash V4.2 cash recycler kiosk configuration.
+///
+/// The kiosk speaks HTTP/JSON on port 8080 over the local network. When
+/// [enabled] is true, the BAR (cash) tender on the payment screen routes
+/// through the kiosk: the device accepts notes/coins from the customer and
+/// auto-dispenses change, instead of the cashier manually entering the
+/// tendered amount on the numpad. When false the cash flow is unchanged.
+class CashCollectorConfig {
+  const CashCollectorConfig({
+    this.enabled = false,
+    this.baseUrl = 'http://192.168.1.149:8080/',
+    this.deviceId = '00141',
+    this.clientId = '2',
+    this.tokenPass = '123456',
+    this.currency = 'CHF',
+  });
+
+  /// Master switch. When false the existing manual cash flow is used.
+  final bool enabled;
+
+  /// Base URL of the EcoCashSerivce1117 service (trailing slash optional).
+  final String baseUrl;
+
+  /// Device identifier provisioned on the kiosk (e.g. "00141").
+  final String deviceId;
+
+  /// Terminal / client identifier (e.g. "2"). Also used as `user_name`.
+  final String clientId;
+
+  /// Cleartext token password (MD5'd on the wire). Change from default in
+  /// every production deployment.
+  final String tokenPass;
+
+  /// ISO 4217 currency code for display formatting (CHF for Swiss pilot).
+  final String currency;
+
+  CashCollectorConfig copyWith({
+    bool? enabled,
+    String? baseUrl,
+    String? deviceId,
+    String? clientId,
+    String? tokenPass,
+    String? currency,
+  }) =>
+      CashCollectorConfig(
+        enabled: enabled ?? this.enabled,
+        baseUrl: baseUrl ?? this.baseUrl,
+        deviceId: deviceId ?? this.deviceId,
+        clientId: clientId ?? this.clientId,
+        tokenPass: tokenPass ?? this.tokenPass,
+        currency: currency ?? this.currency,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'enabled': enabled,
+        'baseUrl': baseUrl,
+        'deviceId': deviceId,
+        'clientId': clientId,
+        'tokenPass': tokenPass,
+        'currency': currency,
+      };
+
+  factory CashCollectorConfig.fromJson(Map<String, dynamic> json) =>
+      CashCollectorConfig(
+        enabled: (json['enabled'] as bool?) ?? false,
+        baseUrl: (json['baseUrl'] as String?) ?? 'http://192.168.1.149:8080/',
+        deviceId: (json['deviceId'] as String?) ?? '00141',
+        clientId: (json['clientId'] as String?) ?? '2',
+        tokenPass: (json['tokenPass'] as String?) ?? '123456',
+        currency: (json['currency'] as String?) ?? 'CHF',
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CashCollectorConfig &&
+          enabled == other.enabled &&
+          baseUrl == other.baseUrl &&
+          deviceId == other.deviceId &&
+          clientId == other.clientId &&
+          tokenPass == other.tokenPass &&
+          currency == other.currency;
+
+  @override
+  int get hashCode =>
+      Object.hash(enabled, baseUrl, deviceId, clientId, tokenPass, currency);
+}
+
 /// Top-level payment settings aggregating gateway selection and per-gateway
 /// configurations.
 class PaymentSettings {
@@ -135,6 +223,7 @@ class PaymentSettings {
     this.activeGateway = PaymentGateway.none,
     this.wallee = const WalleeConfig(),
     this.mypos = const MyPosConfig(),
+    this.cashCollector = const CashCollectorConfig(),
   });
 
   /// Which hardware gateway is currently active.
@@ -146,21 +235,28 @@ class PaymentSettings {
   /// MyPOS terminal configuration (persisted even when not active).
   final MyPosConfig mypos;
 
+  /// EcoCash cash recycler configuration. Independent of [activeGateway]
+  /// (cash collector handles BAR, the gateway handles KARTE/TWINT).
+  final CashCollectorConfig cashCollector;
+
   PaymentSettings copyWith({
     PaymentGateway? activeGateway,
     WalleeConfig? wallee,
     MyPosConfig? mypos,
+    CashCollectorConfig? cashCollector,
   }) =>
       PaymentSettings(
         activeGateway: activeGateway ?? this.activeGateway,
         wallee: wallee ?? this.wallee,
         mypos: mypos ?? this.mypos,
+        cashCollector: cashCollector ?? this.cashCollector,
       );
 
   Map<String, dynamic> toJson() => {
         'activeGateway': activeGateway.name,
         'wallee': wallee.toJson(),
         'mypos': mypos.toJson(),
+        'cashCollector': cashCollector.toJson(),
       };
 
   factory PaymentSettings.fromJson(Map<String, dynamic> json) =>
@@ -174,6 +270,10 @@ class PaymentSettings {
         mypos: json['mypos'] != null
             ? MyPosConfig.fromJson(json['mypos'] as Map<String, dynamic>)
             : const MyPosConfig(),
+        cashCollector: json['cashCollector'] != null
+            ? CashCollectorConfig.fromJson(
+                json['cashCollector'] as Map<String, dynamic>)
+            : const CashCollectorConfig(),
       );
 
   String toJsonString() => jsonEncode(toJson());
@@ -187,8 +287,9 @@ class PaymentSettings {
       other is PaymentSettings &&
           activeGateway == other.activeGateway &&
           wallee == other.wallee &&
-          mypos == other.mypos;
+          mypos == other.mypos &&
+          cashCollector == other.cashCollector;
 
   @override
-  int get hashCode => Object.hash(activeGateway, wallee, mypos);
+  int get hashCode => Object.hash(activeGateway, wallee, mypos, cashCollector);
 }
