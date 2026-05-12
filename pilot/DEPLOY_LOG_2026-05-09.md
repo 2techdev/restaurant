@@ -3,6 +3,687 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-12 ~16:05 CEST — Cash Collector (EcoCash V4.2) entegre + POS APK yeniden derlendi (sahaya yüklenmeye hazır)
+
+**Kapsam:** POS Flutter app (jolly-final / `claude/pilot-final`). Backoffice ve POS Go sunucusu **dokunulmadı**.
+
+### Ne eklendi
+
+Kullanıcının teslim ettiği `cashcollector-integration.zip` (Shenzhen Diversity Kiosk Tech, EcoCash V4.2 — ITL Spectral banknot + TwinCoin coin recycler, HTTP/JSON API port 8080) protokol paketi POS'a entegre edildi.
+
+**Davranış:**
+- Settings ▸ Payment ▸ "KASA OTOMATI (EcoCash V4.2)" kartında bir toggle var. **Varsayılan kapalı.**
+- Kapalıyken: BAR (nakit) ödemesi mevcut manuel akışta çalışır (numpad'den alınan tutar gir, üstü hesaplansın).
+- Açıkken: Ödeme ekranında BAR seçilip ÖDE'ye basılınca yeni "KASA OTOMATI" diyaloğu açılır. Diyalog cihaza bağlanır, `/api/trans/sale` ile satışı başlatır, 500 ms'de bir `/api/get/transaction` çağırıp alınan/üstü/iade tutarlarını canlı gösterir. Cihaz toplamı tahsil edip para üstünü dağıtınca diyalog kapanır ve normal ödeme akışı (audit + loyalty + receipt) `tenderedAmount = collected` ile devam eder.
+
+**Hata yolları:**
+- Token timeout (`code: "1004"`): client otomatik re-auth.
+- "1106 — no info yet" diyalog ilk 500 ms'de tolere edilir.
+- 5xxx donanım hataları (jam, çekmece açık, vb): cihaz `error_message` ile döner, diyalog "İptal" düğmesine düşer; operatör cihazı temizleyip manuel nakit moduna geri dönebilir.
+- Para iade gerekiyorsa (`refund > 0`): snackbar ile operatör uyarılır ("X CHF iade veremedi — elden geri verin").
+- Müşteri parayı koyduktan sonra iptal: iki kademeli onay (yanlışlıkla iptali engeller), onaylanırsa cihaz parayı geri dağıtır.
+
+### Yeni dosyalar
+
+```
+apps/pos/lib/features/payments/data/hardware/ecocash/ecocash_models.dart
+apps/pos/lib/features/payments/data/hardware/ecocash/ecocash_client.dart       (package:http + crypto.md5 — yeni dep yok)
+apps/pos/lib/features/payments/data/hardware/ecocash/cash_collector_sale_engine.dart
+apps/pos/lib/features/payments/presentation/widgets/cash_collector_dialog.dart  (canlı satış diyaloğu, Türkçe etiketler)
+```
+
+### Değişen dosyalar
+
+```
+apps/pos/lib/features/settings/domain/entities/payment_settings.dart
+  + CashCollectorConfig (enabled / baseUrl / deviceId / clientId / tokenPass / currency)
+  + PaymentSettings.cashCollector field (geriye dönük uyumlu — eski JSON'da yoksa default boş config)
+
+apps/pos/lib/features/payments/presentation/screens/payment_screen.dart
+  + _submit() başında collector intercept (BAR + enabled → diyalog → result.collected ile devam)
+  + _canPay BAR için: collector açıksa numpad zorunlu değil
+  + _changeAmount BAR için: collector sonucu varsa dispensed_amount kullan
+
+apps/pos/lib/features/settings/presentation/screens/settings_screen.dart
+  + _PaymentSection altına "KASA OTOMATI" kartı:
+    toggle + URL/deviceId/clientId/tokenPass/currency alanları + "BAĞLANTIYI TEST ET" butonu
+    (test: login + /api/get/status, dönen device_id + sw_ver + status code basılır)
+
+apps/pos/android/app/src/main/res/xml/network_security_config.xml
+  + base-config cleartext=true (KISIK kiosk HTTP only — LAN private IP'ler için TLS zorunluluğu kaldırıldı.
+    Public domain'ler için sistem trust store hâlâ TLS uyguluyor.)
+```
+
+### Yapılandırma notları (sahada)
+
+- Default kiosk URL: `http://192.168.1.149:8080/` (kit reference IP — gerçek cihazın IP'siyle değiştirilebilir).
+- Default device_id: `00141`, client_id: `2`, token_pass: `123456` (üretimde **MUTLAKA** değiştirilmeli — kiosk PC'sinde `Setting.ini`).
+- Currency: `CHF`. Tutarlar minor units (rappen) olarak telde gidip geliyor; UI `_fmt(cents)` ile gösteriyor.
+
+### Test gereksinimi
+
+Bu deploy **sahaya manuel yüklenmeli**. APK pilot/ altında bekliyor; gerçek EcoCash cihazına bağlanmadan kod yolu doğrulanamaz. Test akışı:
+
+1. APK kuruldu → Settings ▸ Payment ▸ KASA OTOMATI: URL/device_id girilir → "BAĞLANTIYI TEST ET" → `✓ 00141 · V4.2 S251117 · status=1` görmek lazım.
+2. Toggle açılır, Settings save edilir.
+3. Yeni adisyon → ÖDE → BAR seçili → ÖDE tuşu → diyalog açılır → cihaza para yatırılır → para üstü dağıtılınca diyalog kapanır → adisyon kapanır + receipt basılır.
+4. Toggle kapatılıp aynı akış manuel mod ile yeniden test edilir (regression).
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                              (canlı slot — overrride)
+E:/Project/Restaurant/pilot/app-pos-release-cashcollector-20260512.apk        (versiyonlu kopya)
+size      : 89'332'238 bytes (≈85.2 MiB)
+sha256    : bec6598f199f8a6f874d53e25b83731f86c47bf351a025bb070699c6026dffb5
+built from: claude/pilot-final (jolly-final worktree)
+flavor    : pos (assembleRelease)
+```
+
+### Rollback
+
+Cihaz hatası veya kullanıcı geri dönmek isterse: Settings ▸ Payment ▸ KASA OTOMATI toggle'ı **kapat** ve save. Manuel nakit akışı hiç dokunulmadı, anında geri döner. APK rollback'ine gerek yok.
+
+
+## 2026-05-12 ~14:36 CEST — Süper Admin Tenants page: yanlış data (organizations) → doğru data (tenants), restoranlar listede — LIVE on 88
+
+**Servisler:** POS Go (88, `gastrocore.service`) + Backoffice (88, `backoffice.service`) — Reservation (178) **dokunulmadı**.
+
+### Tanı
+
+Kullanıcı ekran görüntüsü: "Tenants — Süper Admin" sayfasında 2 satır, ikisi de "GastroCore HQ" (organization), her ikisinde "Admin yok / 0 / —" ve Giriş yap. Beklenen: 3 restoran (Burger House, Pizzeria Da Mario, Sushi Zen).
+
+DB probe sonucu:
+- `organizations`: 2 satır, ikisi de "GastroCore HQ" (duplicate org rows — biri orphan, organization_memberships yok)
+- `tenants`: 3 satır (Burger House / Pizzeria Da Mario / Sushi Zen) — hepsi `bfebcb0d-…` org'a bağlı
+- `admin_users`: 1 satır (admin@gastrocore.ch, is_super_admin yok ama role=admin) → bu HQ admin'i, per-tenant admin yok
+- `users` / `app_users`: boş (POS operator user'ları henüz yok)
+
+Sebep: `server/internal/auth/impersonation_handlers.go::handleListTenants` query `FROM organizations` yapıyordu — 2 dupe org satırı UI'a düşüyordu. Yapması gereken: `FROM tenants` ile restoran satırlarını dönüp parent org adını LEFT JOIN ile context olarak eklemek.
+
+### Backend fix
+
+`server/internal/auth/impersonation_handlers.go`:
+- `tenantInfo` struct'a `tenant_id` + `tenant_name` fields eklendi (önceki `organization_id` + `organization_name` parent context olarak kaldı).
+- `handleListTenants` SQL `FROM tenants t LEFT JOIN organizations o ON o.id = t.organization_id WHERE COALESCE(t.is_deleted,FALSE)=FALSE ORDER BY t.name`. Sub-select'ler admin_users'da `organization_id = t.organization_id` üzerinden owner email/name/id/last_active arar.
+- Scan sırası tenant_id, tenant_name, organization_id, organization_name, admin_count, owner_*, last_active.
+- DB-level verify: query 3 satır döner (Burger House / Pizzeria Da Mario / Sushi Zen, hepsi "GastroCore HQ" parent org context'iyle, admin_count=0 çünkü mevcut tek admin super_admin filter'ında).
+
+### Frontend fix
+
+`apps/backoffice/lib/api-types.ts` — `TenantInfo` interface'ine `tenant_id` + `tenant_name` zorunlu fields eklendi.
+
+`apps/backoffice/app/[locale]/(dashboard)/admin/tenants/tenants-client.tsx`:
+- Primary key React row key `tenant.organization_id` → `tenant.tenant_id`
+- Tablo Restoran sütunu artık `tenant_name` (büyük), altında küçük `organization_name` parent context
+- `impersonate()` fonksiyonu → `loginAs()` — iki modlu:
+  1. `tenant.owner_user_id` varsa → önce `/api/auth/tenant` ile tenant cookie set + sonra `/api/admin/impersonate` (mevcut akış)
+  2. Owner yoksa (current pilot state) → sadece `/api/auth/tenant` çağrısı, super-admin'in bo_tenant cookie'sini hedef tenant'a switch + dashboard'a navigate
+- Button `disabled={!owner_user_id}` kaldırıldı — artık her tenant satırında tıklanır, mode otomatik
+- Title attribute tenant'a göre dinamik: owner varsa "Login as…", yoksa "Switch active tenant (no per-tenant admin yet)"
+
+### Deploy timestamps (88, 2026-05-12)
+
+| Adım | Sonuç |
+|---|---|
+| Go source tar (242 dosya, 313 KB) → `golang:1.23-alpine` cross-compile | 8.4 MB binary |
+| Backup `server.bak.20260512-143526` | OK |
+| `systemctl restart gastrocore.service` | active, "Started 12:35:38 UTC" |
+| DB-level SQL verify: 3 satır (Burger House / Pizzeria Da Mario / Sushi Zen) ✓ |
+| Backoffice `npm run build` | ✓ Compiled successfully |
+| Backoffice tar (2474 dosya, 16.0 MB) → SFTP → rotate → extract | OK |
+| `.env-restore` (R2 keys korundu) | "env.production restored", 582 byte |
+| `systemctl restart backoffice.service` | active, "Ready in 83ms" |
+
+### Post-deploy smoke (public)
+
+- `GET https://api.gastrocore.ch/api/v1/admin/tenants` no-auth → 401 UNAUTHORIZED ✓
+- Direct SQL exec on `gastro-postgres` (same query handler runs) → 3 satır ✓
+- Page server bundle `admin/tenants/page.js` (7.3 KB) `tenant_name`+`tenant_id` literal'i içeriyor, eski sadece-organization mantığı yok ✓
+- Static chunk `page-860ccc56bb1e664e.js` hem `/api/auth/tenant` hem `/api/admin/impersonate` URL pattern'lerini bundled içeriyor (loginAs iki-modlu akış) ✓
+
+### Rollback
+
+```bash
+# Go server (eski organizations query'sine dön)
+sudo systemctl stop gastrocore.service
+cp /home/tech/gastrocore/server.bak.20260512-143526 /home/tech/gastrocore/server
+sudo systemctl start gastrocore.service
+
+# Backoffice
+sudo systemctl stop backoffice.service
+sudo mv /home/tech/backoffice /home/tech/backoffice_failed_post-tenants
+sudo mv /home/tech/backoffice_old_20260512-143613 /home/tech/backoffice
+sudo systemctl start backoffice.service
+```
+
+### Yasaklara uyum
+
+✅ Reservation (178) **dokunulmadı** · ✅ jolly-final POS satış lineage'i dokunulmadı (handleListTenants admin-only impersonation flow, sales pipeline'a girmiyor) · ✅ AskUserQuestion kullanılmadı · ✅ Endpoint matrix **sadece 88**
+
+### Bekleyen post-MVP (defer)
+
+- Duplicate `organizations` satırlarını temizle (`bfebcb0d-…` aktif, `7562f3ae-…` orphan — DELETE veya UPDATE ile birleştir, ama tek admin user FK referansı var, dikkat). Şu an yeni query orphan'ı zaten gizliyor çünkü orphan'a bağlı tenant yok.
+- Per-tenant admin user yaratma akışı — şu an "Giriş yap" tenant cookie switch'le çalışıyor (super admin yetkili olduğu için yeterli), ama gerçek HQ multi-tenant senaryosunda her tenant'ın kendi org_admin/manager user'ı olmalı + impersonation tam target_user_id ile çalışsın.
+- `impersonate` endpoint'i şu an `admin_users.organization_id` üzerinden owner buluyor — per-tenant role atama (organization_memberships'e role kolonu) gelince filter ona göre daraltılmalı.
+
+---
+
+## 2026-05-12 ~13:01 CEST — Kategoriler Excel-style inline edit + duplicate products route consolidation — LIVE on 88
+
+**Servisler:** POS Go (88, `gastrocore.service`) + Backoffice (88, `backoffice.service`) — Reservation (178) **dokunulmadı**.
+
+### Karar
+
+İki paralel kullanıcı isteği aynı deploy'da toplandı:
+
+**A.** Kategoriler tab'ında products grid'iyle aynı Excel-style inline edit pattern uygulansın (Ad, Sıra, Renk, Aktif tıkla → düzenle, tek click).
+
+**B.** "Merkezi Yönetim → Ürünler" sayfası ile "Menü → Ürünler" sayfası farklı UI'ler ("aynı ekran olmuyor neden?") — `/organization/menu/products` aslında master-menu backend stub'ı, page comment'inde "Pilot v1: showing current tenant menu" yazıyor → bu cycle'da `/menu/products`'a redirect, sidebar entry gizlendi, backend hazır olunca geri açılacak.
+
+### Go server (88) — 4 yeni category PATCH endpoint
+
+`server/internal/menu/category_fields.go` (yeni, ~180 satır) — products pattern (`name.go`/`category.go`/`prices.go`) ile aynı şablon. Hiçbiri `org.CheckMutation` çağırmıyor çünkü org policy şu an category-scoped değil (sadece product-scoped).
+
+| Route | Body | Açıklama |
+|---|---|---|
+| `PATCH /menu/categories/{id}/name` | `{name}` | Trim + non-empty validation |
+| `PATCH /menu/categories/{id}/order` | `{display_order:int}` | `>= 0` validation |
+| `PATCH /menu/categories/{id}/color` | `{color:"#RRGGBB"\|null}` | `#` prefix kontrolü, `null` → SET NULL |
+| `PATCH /menu/categories/{id}/active` | `{is_active:bool}` | Pointer field zorunlu |
+
+`module.go`'ya 4 route binding eklendi.
+
+### Backoffice — `categories-panel.tsx` refactor
+
+`apps/backoffice/components/menu/categories-panel.tsx` tamamen Excel-style'a alındı:
+- 4 mutation: `setName / setOrder / setColor / setActive` (DRY için `useFieldMutation<TInput>` jenerik wrapper — Rules-of-Hooks uyumlu, "use" prefix'i ESLint için)
+- Optimistic cache update + rollback on error + toast (products pattern ile aynı)
+- 3 yeni inline cell component:
+  - `CategoryNameCell` — `NameCell` ile aynı pattern (button → Input autoFocus → select-on-focus → Enter/Blur commit)
+  - `OrderCell` — `PriceInputCell`'in integer varyantı (parseInt, min=0)
+  - `ColorCell` — **native HTML5 `<input type="color">`** label içine saklı, görsel swatch + üzerine tıkla → OS-native color picker. Mevcut renk varsa yanında `✕` ile clear.
+- Aktif badge → `<Switch>` toggle, anlık DB flip
+- Pencil + Trash icon'ları korundu (icon/emoji + translations dialog'da kalır — single-cell click'le iyi oturmuyor)
+- Yeni "Add" Plus butonu, full Create dialog akışı korundu
+
+### Backoffice — duplicate products fix
+
+**Route:** `apps/backoffice/app/[locale]/(dashboard)/organization/menu/products/page.tsx`
+- Önceki: server component → `canManageHq` gate → `MasterProductsClient` (modal-edit, eski 2-fiyat sütun UI)
+- Yeni: tek satır `redirect(\`/${locale}/menu/products\`)` — Next.js 308 (server side)
+- Component (`MasterProductsClient`) repo'da kalır; backend `/api/v1/admin/menu/*` hazır olduğunda restore edilebilir
+
+**Sidebar:** `apps/backoffice/lib/nav-config.ts` "master-menu" grubundan `masterMenuProducts` entry'si kaldırıldı. HQ kullanıcı sidebar'da artık sadece "Master Kategoriler" + "Yayın Geçmişi" görür — "Ürünler" sadece "Menü" grubunda var. Backend hazır olunca yorum satırı geri açılır.
+
+### Deploy timestamps (88, 2026-05-12)
+
+| Adım | Sonuç |
+|---|---|
+| Go source tar (241 dosya, 313 KB) → docker `golang:1.23-alpine` cross-compile | 8.4 MB binary |
+| Backup `server.bak.20260512-130026` | OK |
+| `systemctl restart gastrocore.service` | active, "Started 11:00:37 UTC" |
+| Go smoke: 4 cat PATCH endpoint (no auth) → **401** her biri | endpoint live ✓ |
+| Backoffice `npm run build` | ✓ Compiled, yeni warnings yok |
+| Backoffice tar (2474 dosya, 16.0 MB) → SFTP → rotate → extract | OK |
+| `.env-restore` (R2 keys korundu) | "env.production restored", 582 byte |
+| `systemctl restart backoffice.service` | active, "Ready in 94ms" |
+
+### Post-deploy smoke (public)
+
+- 4 endpoint each: `PATCH /api/v1/menu/categories/{bogus}/{name|order|color|active}` no-auth → **401 UNAUTHORIZED** ✓
+- `https://backoffice.gastrocore.ch/tr/organization/menu/products` no-auth → 307 (auth middleware redirects to /tr/login with `from=...`). Auth'lu user'da page-level `redirect()` çalışacak; bundle inspection:
+  - Server bundle 2896 byte (tiny — pure redirect wrapper, no `MasterProductsClient`) ✓
+  - `grep -c redirect|RedirectError` = 1 ✓
+- Static chunk `9718-c72eb7d2a7f1c0e2.js` 4 cat PATCH URL pattern'ı içeriyor ✓
+- `https://backoffice.gastrocore.ch/tr/login` → 200 ✓
+- `https://api.gastrocore.ch/health` → 200 ✓
+
+### Rollback
+
+```bash
+# Go server (yeni category endpoints'i devre dışı bırakır; eski PUT hala çalışır)
+sudo systemctl stop gastrocore.service
+cp /home/tech/gastrocore/server.bak.20260512-130026 /home/tech/gastrocore/server
+sudo systemctl start gastrocore.service
+
+# Backoffice (eski dialog-edit + master products UI restore)
+sudo systemctl stop backoffice.service
+sudo mv /home/tech/backoffice /home/tech/backoffice_failed_post-cat
+sudo mv /home/tech/backoffice_old_20260512-130048 /home/tech/backoffice
+sudo systemctl start backoffice.service
+```
+
+### Yasaklara uyum
+
+✅ Reservation (178) **dokunulmadı** · ✅ jolly-final POS satış lineage'i dokunulmadı (yeni `category_fields.go` ayrı dosya, mevcut `handleUpdateCategory` PUT korundu) · ✅ AskUserQuestion kullanılmadı · ✅ Endpoint matrix **sadece 88**
+
+### Bekleyen post-MVP (defer)
+
+- **Master menu backend hazır olunca:** `/organization/menu/products` redirect'ini kaldır, `MasterProductsClient` restore et, sidebar nav-config'de `masterMenuProducts` yorum satırını geri aç. Aynı zamanda master UI'ı Excel-style ile uyumlu hale getir (lock-policy kolonu ek, paylaşılan grid component).
+- Drag-to-reorder kategoriler (display_order inline çalışır ama drag handle yok)
+- Color presets popover (şu an OS-native picker — kullanıcı isterse Reservation'ın preset chip rail'i port edilebilir)
+- Translations + icon/emoji inline (şu an dialog'da, post-MVP)
+
+---
+
+## 2026-05-12 ~08:05 CEST — Product edit dialog refactor: image upload (R2), KDV dropdown kaldırıldı, 🍷 is_alcoholic toggle, otomatik VAT info — LIVE on 88
+
+**Servisler:** POS Go (88, `gastrocore.service`) + Backoffice (88, `backoffice.service`) — Reservation (178) **dokunulmadı**.
+
+### Karar
+
+Operatör ürün düzenleme dialog'unda 4 düzeltme istedi:
+1. Görsel URL text alanı zor → **drag-drop + click-to-browse ImageUploader** + Cloudflare R2 backend
+2. KDV dropdown ("Standart %7.7" — eski oran ayrıca dropdown gereksiz) → **TAMAMEN KALDIRILDI**, yerine otomatik hesaplanan oran satırı
+3. **🍷 Alkollü ürün toggle** — `is_alcoholic` (migration 029 zaten yaptı, sadece UI bağlanmıştı)
+4. **Otomatik VAT info** — alcohol + price tier'a göre dinamik metin ("Dine-in 8.1% · Pickup/Delivery 2.6%" veya "Tüm kanallar 8.1% alkol istisnası")
+
+### Backoffice — yeni dosyalar
+
+- **`apps/backoffice/lib/s3.ts`** (~50 satır) — Cloudflare R2 client (S3-compatible), `uploadToS3()` + `isS3Configured()`. Reservation pattern'inden trimmed: no compress, no SEO. AWS SDK v3 dep eklendi (`@aws-sdk/client-s3 ^3.700`).
+- **`apps/backoffice/app/api/upload/route.ts`** (~110 satır) — POST `/api/upload`, multipart parse, image validation (JPG/PNG/WebP, max 5MB), tenant-scoped key `backoffice/{tenant_slug}/{timestamp}-{name}.{ext}` → R2 PutObject → return `{success, data:{url, filename, size, mime}}`. Auth via `getSession()` cookie.
+- **`apps/backoffice/components/ui/image-uploader.tsx`** (~170 satır) — Drag/drop alanı + click-to-browse + 32x32 preview + "Resmi kaldır" (✕ button) + collapsible advanced URL field. Upload sırasında Loader2 spinner + error toast.
+
+### Backoffice — ProductSheet refactor
+
+`apps/backoffice/app/[locale]/(dashboard)/menu/products/products-client.tsx`:
+- `TAX_GROUPS` constant + `tax_group` Select dropdown **kaldırıldı**; field zod'da kalır (default `"standard"`) ve payload'a backwards-compat için yine gönderiliyor (mevcut ürünlerin tax_group değeri kaybolmasın)
+- Yeni `is_alcoholic` zod field (default false) + UI toggle 🍷 "Alkollü ürün" label
+- VAT info satırı `form.watch("is_alcoholic")` ile dinamik:
+  - `false`: "Dine-in 8.1% MWST · Pickup/Delivery 2.6% MWST (auto)"
+  - `true`: "Tüm kanallar: 8.1% MWST (alkol istisnası — her zaman standart oran)"
+- `<Input placeholder="https://…">` → `<ImageUploader value=… onChange=…>`
+- Payload'a `is_alcoholic` eklendi
+
+### Go server (88)
+
+`server/internal/menu/handlers.go` + `models.go`:
+- `Product` struct: `IsAlcoholic bool` field (json `is_alcoholic`)
+- `handleListProducts`: SELECT'e `COALESCE(is_alcoholic, false)` + Scan'e `&p.IsAlcoholic`
+- `handleCreateProduct`: request struct + INSERT SQL'e `is_alcoholic` ($14), placeholder numaraları kaydırıldı ($18 → $19)
+- `handleUpdateProduct`: request struct + UPDATE SQL'e `is_alcoholic=$10`, placeholder'lar kaydırıldı
+
+DB şemasında `is_alcoholic` migration 029'da zaten mevcut → migration gerekmedi, sadece handler kod path'leri eklendi. Mevcut rows `false` default'undan kazanır.
+
+### Env vars
+
+`/home/tech/backoffice/.env.production`'a 5 Cloudflare R2 key eklendi (idempotent script `inject_r2_env.py`):
+- `S3_ENDPOINT` (`<accountid>.r2.cloudflarestorage.com`)
+- `S3_ACCESS_KEY` / `S3_SECRET_KEY`
+- `S3_BUCKET=gastrocore`
+- `S3_PUBLIC_URL=https://cdn.2hub.ch`
+
+Reservation `.env.production.hetzner`'den port edildi — aynı bucket, aynı CDN. .env boyutu 313 → 582 byte. Deploy sonrası `.env-restore` adımı sayesinde sonraki cycle'larda otomatik korunacak.
+
+### i18n (5 dil)
+
+`apps/backoffice/messages/{tr,de,en,fr,it}.json` → `menu.productsPage.alcoholic.*` ve `image.*` namespace'leri:
+- `alcoholic.label` (Alkollü ürün / Alkoholisches Produkt / Alcoholic product / Produit alcoolisé / Prodotto alcolico)
+- `alcoholic.taxInfoFood` ve `alcoholic.taxInfoAlcohol`
+- `image.dropHint` / `image.chooseFile` / `image.remove` / `image.advancedUrl` / `image.uploading` / `image.uploadFailed`
+
+Toplam 9 anahtar × 5 dil = 45 yeni string.
+
+### Deploy timestamps (88, 2026-05-12)
+
+| Adım | Sonuç |
+|---|---|
+| `npm install --legacy-peer-deps` (`@aws-sdk/client-s3` + 91 transitive deps) | OK |
+| Backoffice `npm run build` | ✓ Compiled, `/api/upload` route registered |
+| `inject_r2_env.py` 5 S3 key append | 313 → 582 byte, idempotent |
+| Go binary tar/build (`golang:1.23-alpine` cross-compile) | 8.4 MB, OK |
+| Backup `server.bak.20260512-080414` | OK |
+| `systemctl restart gastrocore.service` | active, "Started 06:04:25 UTC" |
+| Backoffice tar (2474 dosya, 16.0 MB) → SFTP → rotate → extract | OK |
+| `.env-restore` (R2 key'ler korundu) | "env.production restored", 582 byte |
+| `systemctl restart backoffice.service` | active, "Ready in 76ms" 1. denemede |
+
+### Post-deploy smoke (public)
+
+- `https://api.gastrocore.ch/health` → 200 ✓
+- `https://backoffice.gastrocore.ch/tr/login` → 200 ✓
+- `https://backoffice.gastrocore.ch/api/upload` POST no-auth → **401** `{"success":false,"error":"Unauthorized"}` ✓ (route registered, session check active)
+- Static chunk `page-96b94cc0dee2e0ca.js` `/api/upload` referansı içeriyor ✓ (ImageUploader bundled)
+- Server page.js: eski `Standart (%7.7)` / `İndirimli (%2.5)` literal'leri yok (tax dropdown gerçekten kaldırılmış), `is_alcoholic` field bağlı ✓
+- DB column `products.is_alcoholic` mevcut (migration 029 reaffirmed) ✓
+
+### Rollback
+
+```bash
+# Go server
+sudo systemctl stop gastrocore.service
+cp /home/tech/gastrocore/server.bak.20260512-080414 /home/tech/gastrocore/server
+sudo systemctl start gastrocore.service
+
+# Backoffice
+sudo systemctl stop backoffice.service
+sudo mv /home/tech/backoffice /home/tech/backoffice_failed_post-imgupload
+sudo mv /home/tech/backoffice_old_20260512-080434 /home/tech/backoffice
+sudo chown tech:tech /home/tech/backoffice/.env.production
+sudo systemctl start backoffice.service
+```
+
+Not: R2 env key'leri rotation dir'de korunduğu için rollback sonrası da çalışır.
+
+### Yasaklara uyum
+
+✅ Reservation (178) **dokunulmadı** (R2 key'leri sadece okundu, deploy edilmedi) · ✅ jolly-final POS satış lineage'i dokunulmadı (yeni `is_alcoholic` field eklendi ama mevcut order/pricing flow değişmedi) · ✅ AskUserQuestion kullanılmadı · ✅ Endpoint matrix **sadece 88**
+
+### Bekleyen post-MVP (defer)
+
+- Image compression (Reservation'da `compressImage()` var; backoffice şu an raw PutObject — 5MB sınır var ama JPEG compression yok)
+- SEO alt-text generation (Reservation'da var, backoffice'te skip)
+- VAT calculator end-to-end test — order create'de gerçekten `is_alcoholic + orderType` doğru oranı seçiyor mu (`server/internal/shared/vat/vat.go` zaten var ama bu cycle'da new product create + sales flow integrationtest yapılmadı)
+- ProductSheet `tax_group` field şu an payload'da default `"standard"` ile gidiyor; eski non-standard değerler PUT round-trip'inde kaybolabilir → ProductSheet load sırasında ekleniyor (`product.tax_group || "standard"`) ama yine de cleanup için tax_group kolonu post-MVP'de DROP edilebilir (mevcut iş akışı bozulmadan)
+
+---
+
+## 2026-05-12 ~07:50 CEST — Products grid: ⭐ Beliebt kaldırıldı, Kategori inline editable, Excel-style fiyat hücreleri (zaten vardı) — LIVE on 88
+
+**Servisler:** POS Go (88, `gastrocore.service`) + Backoffice (88, `backoffice.service`) — Reservation (178) **dokunulmadı**.
+
+### Karar
+
+Önceki cycle'da eklenen ⭐ Beliebt kolonu kullanıcı talebiyle kaldırıldı ("backoffice.gastrocore.ch için ihtiyaç yok — Reservation overlay zaten yönetir"). Yerine kategori kolonu Excel-style inline editable yapıldı: tıkla → dropdown → seç → optimistic update. Fiyat hücreleri (Standart/Abholung/Lieferung) zaten önceki cycle'da `PriceInputCell` ile inline editable, sadece UX teyit edildi.
+
+### Backoffice UI (88)
+
+`apps/backoffice/app/[locale]/(dashboard)/menu/products/products-client.tsx`:
+- ⭐ Beliebt `TableHead` + `TableCell` + mobile `ToggleCell` kaldırıldı (tablo 9 kolon → 8 kolon)
+- `togglePopular` mutation silindi; `is_popular_online` field DB'de kalsın ama UI'da gösterilmiyor (Reservation overlay'ı yönetir)
+- Yeni `setCategory` mutation — `PATCH /menu/products/{id}/category` body `{category_id}`, optimistic cache update + rollback on error
+- `<TableCell>{catName(p.category_id)}</TableCell>` → `<CategoryCell ... />` (yeni helper component)
+- `CategoryCell` helper (`PriceInputCell` ile aynı pattern): plain text default → click → focused `<select>` (autoFocus + defaultValue) → change/blur → commit; Escape ile silently exit; `FULLY_LOCKED` policy_lock disable
+
+### Go server (88) — yeni `/category` route
+
+`server/internal/menu/category.go` (yeni dosya, ~100 satır):
+- `PATCH /api/v1/menu/products/{id}/category` body `{category_id: "<uuid>"}` → `UPDATE products SET category_id = $1 WHERE id = $2 AND tenant_id = $3 AND is_deleted = false`
+- HQ lock: `org.Mutation{ChangeOther: true}` → FULLY_LOCKED block, PRICE_LOCKED OK (kategori değişimi fiyat-değişimi sayılmaz)
+- Target kategori aynı tenant'a ait mi pre-check (`SELECT EXISTS`) → 400 INVALID_CATEGORY anlamlı mesaj
+- `module.go`'da route binding: `mux.HandleFunc("PATCH /api/v1/menu/products/{id}/category", m.handleSetProductCategory)`
+
+Migration yok — `products.category_id` zaten mevcut FK.
+
+### Deploy script `.env.production` preserve fix — KALICI
+
+Önceki cycle'da `apps/backoffice/deploy_backoffice_hetzner.py` her deploy'da `.env.production`'ı kaybediyordu ("Failed to load environment files" döngüsü). Bu cycle'da script kalıcı düzeltildi:
+- `env-bak` step: `for f in .env .env.production .env.local; do [ -f $f ] && cp $backup; done` — backup'a 3 varyantı kopyalar
+- `env-restore` step: rotation'dan **3 varyantı** restore eder, daha önceki tek `.env` check'i Next.js standalone konvansiyonuyla uyuşmuyordu
+- **Bu deploy'da test edildi:** "env.production restored" mesajı görüldü, manuel recovery gerekmedi, service 1. denemede aktif oldu
+
+### Deploy timestamps (88, 2026-05-12)
+
+| Adım | Sonuç |
+|---|---|
+| Go source tar (239 dosya, 311 KB) → SFTP → `golang:1.23-alpine` cross-compile | 8.4 MB binary, OK |
+| Binary backup `server.bak.20260512-074927` | OK |
+| `systemctl restart gastrocore.service` | active, "Started 05:49:40 UTC" |
+| Go smoke `/health` → 200; `PATCH /category` (no auth) → **401** | endpoint live ✓ |
+| Backoffice `npm run build` lokal | ✓ Compiled successfully |
+| Backoffice tar (2239 dosya, 15.7 MB) → SFTP → rotate → extract | OK |
+| `.env.production` script tarafından restore edildi (fix doğrulandı) | "env.production restored" görüldü, manuel recovery YOK |
+| `systemctl restart backoffice.service` | active, 1. denemede ready |
+
+### Post-deploy smoke (public)
+
+- `https://api.gastrocore.ch/health` → 200 ✓
+- `https://api.gastrocore.ch/api/v1/menu/products/{bogus}/category` (no auth) → 401 UNAUTHORIZED ✓ (yeni route live)
+- `https://api.gastrocore.ch/api/v1/menu/products/{bogus}/popular` (no auth) → 401 ✓ (önceki route hala live)
+- `https://backoffice.gastrocore.ch/` → 307 (login redirect) ✓
+- `https://backoffice.gastrocore.ch/tr/login` → 200 ✓
+- Bundle inspection: `menu/products/page.js` **"Beliebt" string'i içermiyor** ✓ (kolon kaldırıldı), `Standard|Abholung|Lieferung` 1'er kez var (header), `/category` static chunk'ta refersi var (CategoryCell mutation bundled) ✓
+
+### Rollback
+
+```bash
+# Go server
+sudo systemctl stop gastrocore.service
+cp /home/tech/gastrocore/server.bak.20260512-074927 /home/tech/gastrocore/server
+sudo systemctl start gastrocore.service
+
+# Backoffice
+sudo systemctl stop backoffice.service
+sudo mv /home/tech/backoffice /home/tech/backoffice_failed_post-cat
+sudo mv /home/tech/backoffice_old_20260512-075010 /home/tech/backoffice
+sudo chown tech:tech /home/tech/backoffice/.env.production
+sudo systemctl start backoffice.service
+```
+
+### Yasaklara uyum
+
+✅ Reservation (178) **dokunulmadı** (Beliebt = Reservation overlay alanı, görüntü oradadan yönetilir) · ✅ jolly-final POS satış lineage'i dokunulmadı (`category.go` ayrı dosya, `handleUpdateProduct` PUT korundu) · ✅ AskUserQuestion kullanılmadı · ✅ Endpoint matrix **sadece 88**
+
+### Bekleyen post-MVP (defer)
+
+- i18n `menu.productsPage.col.beliebt` key'i şu an unused — temizleme veya gelecek kullanım için bırak (5 dil × 1 key = 5 string ölü ağırlık)
+- Tab key chain Standart → Abholung → Lieferung → next-row Standart (şu an Tab default browser sıralaması)
+- Kategori cell'inde keyboard typing arama (combo select) — şu an native select, çok kategorili tenant'larda scroll uzun olabilir
+
+---
+
+## 2026-05-11 ~22:30 CEST — Reservation menu UI birebir clone → backoffice products (BILD kolonu, ⭐ Beliebt, kategori chip filter, 5-dil i18n) — LIVE on 88
+
+**Servisler:** POS Go (88, `gastrocore.service`) + Backoffice (88, `backoffice.service`) — Reservation (178) **dokunulmadı**.
+
+### Karar
+
+Operatör ekran görüntüsü ile gastro.2hub.ch admin menü UI'sini örnek gösterip ("gastro hub un mantığını alsana baba tertemiz yapmışız burada") backoffice products grid'i Reservation pattern'iyle birebir clone edilsin istedi. Yenilenmiş layout: title + stats line + kategori chip pill filter + BILD thumbnail kolonu + ⭐ Beliebt toggle (`is_popular_online`), MWST kolon çıkarıldı, ONLINE'DA toggle "Beliebt" ile yer değiştirdi.
+
+### Backoffice UI (88)
+
+`apps/backoffice/app/[locale]/(dashboard)/menu/products/products-client.tsx`:
+- Header: tek "Speisekarte" başlık + "N Produkte (X Pizza, Y Burger, …)" istatistik satırı (Reservation pattern'le birebir)
+- Kategori filtresi: Select → **chip pill rail** (Alle + her kategori, seçili olan `bg-red-600 text-white`, scroll horizontal)
+- Tablo kolonları: `BILD / NAME / KATEGORIE / STANDARD / ABHOLUNG / LIEFERUNG / AKTIV / ⭐ BELIEBT / AKTIONEN` — eski MWST kolonu kaldırıldı
+- BILD `<td>`: 10x10 thumbnail (`p.image_path` varsa `<img>`, yoksa 🍽️ placeholder)
+- AKTIV switch (`is_active`, `policy_lock=FULLY_LOCKED` ise disabled)
+- ⭐ BELIEBT switch (`is_popular_online`) — yeni `togglePopular` mutation, optimistic + rollback
+- Mobile card layout aynı toggle değişimini yansıtıyor (online_visible → popular_online)
+
+### Go server (88) — yeni `/popular` route
+
+`server/internal/menu/popular.go` (yeni dosya, ~70 satır):
+- `PATCH /api/v1/menu/products/{id}/popular` body `{is_popular_online: bool}` → `UPDATE products SET is_popular_online = $1 WHERE id = $2 AND tenant_id = $3 AND is_deleted = false`
+- Auth: middleware tenant context zorunlu (401 UNAUTHORIZED yoksa)
+- Rows = 0 → 404 NOT_FOUND
+- `module.go`'da route binding: `mux.HandleFunc("PATCH /api/v1/menu/products/{id}/popular", m.handleSetProductPopular)`
+
+DB şemasında `is_popular_online` zaten migration 026'da eklenmişti (overlay field, default false) → **migration gerekmedi**, sadece binary refresh.
+
+### i18n (5 dil)
+
+`apps/backoffice/messages/{tr,de,en,fr,it}.json` — `menu.productsPage` namespace'ine:
+- `col.standard` (Standart/Standard/Standard/Standard/Standard)
+- `col.aktiv` (Aktif/Aktiv/Active/Actif/Attivo)
+- `col.beliebt` (Beğenilen/Beliebt/Popular/Populaire/Popolare)
+- `productsLabel` (Ürün/Produkte/Products/Produits/Prodotti)
+
+Önceki cycle'da eklenmiş `col.{mitnehmen,abholung,lieferung,image,...}` ve namespace base'i 5 dilde mevcut — sadece eksik 4 anahtar tamamlandı.
+
+### Type fix
+
+`apps/backoffice/lib/api-types.ts` — duplicate `is_popular_online?: boolean` field ilk tanımdan kaldırıldı (line 96-97); kanonik tanım `// Aşama 4 overlay` (line 116) kaldı. İlk build TS2300 "Duplicate identifier" verdi, tek satır kaldırınca build temiz.
+
+### Deploy timestamps (88, 2026-05-11)
+
+| Adım | Sonuç |
+|---|---|
+| Probe 88 — `gastrocore-server` Docker container YOK, native binary `/home/tech/gastrocore/server` systemd | Topoloji düzeltildi (DEPLOY_RUNBOOK §Servis 3 Docker varsayımı yanlış — native binary) |
+| Go source tar (238 dosya, 310 KB) → SFTP → `golang:1.23-alpine` cross-compile | 8.4 MB binary, OK |
+| Backup `server.bak.20260511-222850` (13 MB önceki) | OK |
+| `systemctl restart gastrocore.service` | active, "Started 20:29:02 UTC" |
+| POS Go smoke `/health` → 200 / `PATCH /popular` (no auth, bogus UUID) → **401** | endpoint live ✓ (route registered, auth middleware reached) |
+| Backoffice `npm run build` lokal (Windows) — duplicate type fix sonrası | ✓ Compiled successfully |
+| Backoffice tar (2239 dosya, 15.7 MB) → SFTP → rotate → extract | OK |
+| **Incident (tekrar):** deploy script rotation dir'de `.env` arıyor ama dosyanın gerçek adı `.env.production` → service "Failed to load environment files" döngüsü | predicted in `deploy_freeze_window.md` memory + previous DEVLOG |
+| **Recovery:** `cp /home/tech/backoffice_old_20260511-222919/.env.production /home/tech/backoffice/ && chmod 600 && systemctl restart` | active, "Ready in 71ms" |
+
+### Post-recovery smoke
+
+- `http://127.0.0.1:8090/health` → 200 ✓ ({"status":"ok","components":{"database":"ok"}})
+- `PATCH /api/v1/menu/products/{bogus}/popular` (no auth) → 401 UNAUTHORIZED ✓ (route exists, middleware hits)
+- `http://127.0.0.1:3001/tr/login` → 200 ✓
+- `https://backoffice.gastrocore.ch/` → 307 (login redirect) ✓
+- `https://backoffice.gastrocore.ch/tr/login` → 200 ✓
+
+### Rollback
+
+```bash
+# Go server önceki binary'ye dön
+sudo systemctl stop gastrocore.service
+cp /home/tech/gastrocore/server.bak.20260511-222850 /home/tech/gastrocore/server
+sudo systemctl start gastrocore.service
+
+# Backoffice rotation dir geri yükle
+sudo systemctl stop backoffice.service
+mv /home/tech/backoffice /home/tech/backoffice_failed_post-uiclone
+mv /home/tech/backoffice_old_20260511-222919 /home/tech/backoffice
+sudo systemctl start backoffice.service
+```
+
+### Yasaklara uyum
+
+✅ Reservation (178) **dokunulmadı** · ✅ jolly-final POS satış lineage'i dokunulmadı (yeni `popular.go` ayrı dosya, mevcut `handleUpdateProduct` korundu) · ✅ migration yok (kolon zaten 026'da mevcuttu) · ✅ AskUserQuestion kullanılmadı · ✅ Endpoint matrix **sadece 88**
+
+### Bekleyen post-MVP (defer)
+
+- Artikel/Kategorien tab geçişi (şu an sadece Artikel görüntüleniyor)
+- PDF Export buton
+- Toplu Düzenle (legacy) modal full
+- "Save All" dirty-rows pattern (Reservation'da var, backoffice immediate-save kalıyor)
+- **Deploy script `.env.production` preserve mantığı** — script `*.env` glob ile arasın veya rotation_dir/.env.production fallback eklesin (bu cycle'da yine recovery gerekti, KALICI FIX şart)
+
+---
+
+## 2026-05-11 ~22:00 CEST — Excel-style products grid (3-tier pricing, migration 031, full pipeline LIVE on 88)
+
+**Servisler:** POS Go (88, `gastrocore.service`) + Backoffice (88, `backoffice.service`) — Reservation (178) **dokunulmadı**.
+
+### Karar
+
+Operatör Excel-style inline-edit isteğiyle product list 3 ayrı fiyat tier'ına (Mitnehmen / Abholung / Lieferung) bölündü. Reservation MenuItem `priceStandard/priceTakeaway/priceDelivery` pattern'ini birebir taşır, magic-link import sırasında otomatik mapping.
+
+### Migration 031
+
+`server/migrations/031_three_price_tiers.up.sql` (+down):
+- `products.price_mitnehmen BIGINT` (dine-in cents) / `price_abholung BIGINT` / `price_lieferung BIGINT`, hepsi nullable
+- NULL = `price` (legacy) fallback'ı; backfill UPDATE 600 satır 88'de
+- `INSERT INTO schema_migrations ('031_three_price_tiers')` OK
+
+### Go server (88)
+
+- `server/internal/menu/prices.go` (yeni) — `PATCH /api/v1/menu/products/{id}/prices`, body `{price_mitnehmen?, price_abholung?, price_lieferung?}` her biri optional, COALESCE-only UPDATE
+- `handlers.go` `handleListProducts` SELECT + Scan'ine 3 yeni kolon
+- `models.go` `Product` struct'a 3 `*int64` field (omitempty)
+- `import_token.go` `menuIRItem` JSON struct'ına `priceTakeaway` + `priceDelivery` optional, `upsertProduct` INSERT/UPDATE branch'lerinde 3 tier mapping (Reservation `priceStandard → price_mitnehmen`; takeaway/delivery yoksa standart inherit; UPDATE COALESCE ile operatör tweak'leri korur)
+- `module.go` yeni route binding
+
+### Backoffice UI (88)
+
+`apps/backoffice/app/[locale]/(dashboard)/menu/products/products-client.tsx`:
+- Table header tek `Prices` kolonu → **3 ayrı kolon** (`Mitnehmen` / `Abholung` / `Lieferung`, 110px sabit genişlik)
+- Her satırda 3 `PriceInputCell` (yeni helper) — click → Input mode, blur/Enter → commit, Escape → revert. `policy_lock` PRICE_LOCKED/FULLY_LOCKED ise read-only
+- `setPrices` mutation — per-tier PATCH (sadece touched field body'de), optimistic cache update + rollback on error
+- `api-types.ts` `MenuProduct`: 3 yeni optional cents field
+- Header i18n key: `col.{mitnehmen,abholung,lieferung}` defaultValue fallback (5-dil full namespace sonraki cycle)
+
+### Deploy timestamps (88, 2026-05-11)
+
+| Adım | Sonuç |
+|---|---|
+| Go source SFTP (37 MB) → docker `golang:1.23-alpine` multi-stage build | 13 MB binary |
+| Migration 031 apply `gastro-postgres` | 3 ALTER + UPDATE 600 + schema_migrations OK |
+| Binary backup `server.bak.pre-031-20260511-215636` (14 MB önceki) | OK |
+| `systemctl restart gastrocore.service` | active, "Ready in 53ms" |
+| POS Go smoke `/health` → 200 / `PATCH /prices` (no auth) → **401** | endpoint live ✓ |
+| Backoffice build → tar → SFTP → `systemctl restart backoffice` | OK |
+| **Incident:** `.env.production` deploy script tarafından restore edilmedi → service "Failed to load environment files" döngüsü → public 502 |
+| **Recovery:** `cp /home/tech/backoffice_old_20260511-215755/.env.production /home/tech/backoffice/ && chmod 600 && systemctl restart` | active, "Ready in 68ms", public 200 |
+
+### Post-recovery smoke
+
+- `https://api.gastrocore.ch/health` → 200 ✓
+- `https://backoffice.gastrocore.ch/` → 200 ✓
+- `https://backoffice.gastrocore.ch/tr/menu/products` → 200 ✓
+- Server bundle: `price_mitnehmen` + `Mitnehmen` string'leri `/menu/products/page.js`'te bulundu ✓
+- DB sample (post-migration): `Yuzu Lemonade|650|650|650|650`, `Margherita|1450|1450|1450|1450`, `Marinara|1300|1300|1300|1300` — 3 tier hepsi `price` ile eşit (backfill OK)
+
+### Rollback
+
+```bash
+# Go server önceki binary'ye dön
+sudo systemctl stop gastrocore.service
+cp /home/tech/gastrocore/server.bak.pre-031-20260511-215636 /home/tech/gastrocore/server
+sudo systemctl start gastrocore.service
+
+# Backoffice rotation dir geri yükle
+sudo systemctl stop backoffice.service
+mv /home/tech/backoffice /home/tech/backoffice_failed_post-031
+mv /home/tech/backoffice_old_20260511-215755 /home/tech/backoffice
+sudo systemctl start backoffice.service
+
+# Migration rollback (legacy `price` kolonu hayatta — app çökmez)
+docker exec -i gastro-postgres psql -U gastro -d gastro < 031_three_price_tiers.down.sql
+```
+
+### Yasaklara uyum
+
+✅ Reservation (178) **dokunulmadı** (sadece import_token.go'da Reservation snapshot JSON'u için optional alan: `priceTakeaway`/`priceDelivery` — receiver tarafı, push yok) · ✅ jolly-final POS satış lineage'i dokunulmadı (yeni `prices.go` ayrı dosya, mevcut `handleUpdateProduct` lock-check pipeline korundu) · ✅ AskUserQuestion kullanılmadı · ✅ Endpoint matrix **sadece 88** (`api.gastrocore.ch` / `ws.gastrocore.ch`)
+
+### Bekleyen post-MVP (defer)
+
+- 5 dil tam i18n (TR/DE/EN/FR/IT namespace) — şu an defaultValue fallback
+- Mobile cards 3 tier UX
+- React-table column sort + filter chips
+- Bulk action toolbar tam (kategori değiştir / sil / aktif yap toplu)
+- Image inline edit (mevcut tek button)
+- MWST badge — paralel VAT agent (migration 029 alcohol kolonu) finalize edince entegre
+- Deploy script `.env.production` preserve mantığı düzeltilmeli (bu turun incident'ı)
+
+**İmza:** Opus 4.7 · Excel-style 3-tier pricing pipeline + .env recovery (full stack: migration + Go + UI + 88 deploy)
+
+### Addendum — Raw i18n key fix (2026-05-11 ~22:15 CEST)
+
+Önceki tur productsPage namespace `tr.json`'da vardı ama DE/EN/FR/IT'de yoktu → 4 dilde sayfa raw key gösteriyordu (`menu.productsPage.title`, `col.mitnehmen`, vs.). next-intl `defaultValue` parametresi sadece o spesifik `t(key, {defaultValue})` çağrısı için fallback üretir; namespace'in tamamı eksikse diğer key'ler raw döner.
+
+**Düzeltme — 5 dile tam productsPage namespace (TR'ye ek key'ler + DE/EN/FR/IT'e komple çeviri):**
+
+| Locale | productsPage öncesi | Sonrası |
+|---|---|---|
+| TR | var, eksik `col.mitnehmen/abholung/lieferung` + `bulk` namespace | ✓ tam (mitnehmen/abholung/lieferung + bulk + defaultBadge) |
+| DE | yok | ✓ komple — title "Speisekarte", col `Mitnehmen / Abholung / Lieferung`, bulk `Alle aktivieren / deaktivieren / Kategorie ändern / Löschen` |
+| EN | yok | ✓ komple — title "Menu", col `Dine-in / Takeaway / Delivery` |
+| FR | yok | ✓ komple — title "Carte", col `Sur place / À emporter / Livraison` |
+| IT | yok | ✓ komple — title "Menu", col `Sul posto / Asporto / Consegna` |
+
+Tüm 5 dilde 22 anahtar × 5 locale = **110 string** yeni eklendi (title, subtitle, filter.*, col.*, toggles.*, bulk.*, price.*, allergen.*, toast'lar, deleteConfirm*, defaultBadge).
+
+**Deploy 88 (2026-05-11 22:14 CEST):**
+- `npm run build` (Next.js 15.0.3) → BUILD_ID `KTRm180-k_LHncfku80F6`, 5 locale prerender × `/menu/products` 8.72 kB
+- `python deploy_backoffice_hetzner.py` → backup `backoffice-20260511-221459/code-snapshot/`
+- **Incident (tekrar):** `.env.production` yine deploy script tarafından restore edilmedi → service "activating" döngü → recovery `cp /home/tech/backoffice_old_20260511-221459/.env.production /home/tech/backoffice/` + chmod 600 + systemctl restart → "RESTORED"
+- Deploy script `.env.production` preserve bug'ı **kalıcı** — bir sonraki cycle'da fix gerekli (rsync exclude pattern veya .env preserve adımı)
+
+**Smoke (5 dil, post-recovery):**
+
+| Locale | URL | HTTP | Body | Raw `menu.productsPage.` count | Bulunan label'lar |
+|---|---|---|---|---|---|
+| TR | `/tr/menu/products` | 200 | 57827 B | **0** | Menü, Mitnehmen, Abholung, Lieferung |
+| DE | `/de/menu/products` | 200 | 47813 B | **0** | Speisekarte, Menü, Mitnehmen, Abholung, Lieferung |
+| EN | `/en/menu/products` | 200 | 46253 B | **0** | (login page render; translations bundle'da, login sonrası grid) |
+| FR | `/fr/menu/products` | 200 | 47582 B | **0** | Carte, Sur place |
+| IT | `/it/menu/products` | 200 | 47084 B | **0** | Asporto, Sul posto |
+
+**Raw key kontrolü:** Tüm 5 dilde public HTML response'da `menu.productsPage.` literal'i **bulunmadı** (count=0). next-intl resolution çalışıyor.
+
+**Kullanıcı için hatırlatma:** Hard refresh (Ctrl+Shift+R) — eski bundle'lar tarayıcı cache'inde olabilir. Service worker cache yok ama Cloudflare HTML edge cache 5 dk olabilir.
+
+**İmza:** Opus 4.7 · i18n raw-key fix (5 dil productsPage namespace) + 2. .env recovery
+
+---
+
 ## 2026-05-11 ~22:30 CEST — Promotions migration 030 + handler enrich + happy-hour wired (code only — deploy QUEUED)
 
 **Servisler:** POS Go (88) — şema/binary GÜNCELLEME GEREKTİRİYOR; Backoffice
