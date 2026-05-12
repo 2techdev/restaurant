@@ -3,6 +3,65 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-12 ~21:55 CEST — POS cart footer'ına 3. TWINT quick-pay chip (BAR / KARTE / TWINT)
+
+**Kapsam:** POS Flutter app shell footer'ı. Sadece `pos_v2_shell.dart` dokunuldu. Backend ve diğer apps **etkilenmedi**.
+
+### Ne eklendi
+
+Operatör isteği: sepet altında BAR ve KARTE chip'lerine ek olarak **TWINT** chip'i — kart akışına alternatif tek-tap hızlı ödeme. Konum: KARTE'nin sağında, aynı `_PayChip` widget pattern'i.
+
+**Davranış:**
+- Toggle açıkken (Settings ▸ Payment ▸ MYPOS KART TERMİNALİ aktif):
+  TWINT chip → `showMyPosPaymentDialog(flow: MyPosFlow.twint, config: ...currency=CHF override)` → terminal TWINT QR gösterir → müşteri TWINT app'iyle okutur → onay → adisyon `_quickSettle(method: PaymentMethod.other, reference: 'MYPOS:TWINT:txId')` ile kapanır.
+- Toggle kapalı iken: manuel TWINT onay flow'u — operatör müşterinin telefonundaki ödeme onayını gözle teyit eder → `_quickSettle(method: PaymentMethod.other, reference: 'TWINT')`. Önceki manuel davranışla aynı.
+- Fallback: dialog failed/declined/connecting state'inde "MANUEL'E GEÇ" butonuyla manuel onay'a düşer.
+- TWINT her zaman CHF (SDK constraint). Settings'teki currency başka olsa bile `copyWith(currency: 'CHF')` ile override edilir.
+
+**Görsel:**
+- Icon: `Icons.qr_code_2_rounded` (TWINT QR çağrışımı, MyPosPaymentDialog'da da kullanılıyor — tutarlı).
+- Bg: `Color(0xFFD0006F)` (TWINT brand magenta'ya yaklaşık).
+- Fg: white. Label: "TWINT".
+
+### Değişen dosya
+
+```
+apps/pos/lib/features/orders/presentation/shells/pos_v2_shell.dart
+  + _CatsFooter Row'una üçüncü Expanded(_PayChip) — TWINT chip
+  + _onTwintTapped handler — _onKarteTapped pattern'inin TWINT eşdeğeri
+```
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                  (canlı slot — overwrite)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-twint-v2-20260512.apk          (versiyonlu kopya)
+size       : 89'496'282 bytes (≈85.4 MiB)
+sha256     : 7ccc7a99a85ccfa2fbb5ecd8dd5059460994ce657751672b45f1cde49dd0ee4f
+built from : claude/pilot-final (jolly-final worktree), pos_v2_shell.dart hunk uncommitted
+flavor     : pos (assembleRelease)
+```
+
+### Git notu
+
+Yine `pos_v2_shell.dart` üzerinde değişiklik — o dosyada büyük commit'lenmemiş user WIP olduğu için (önceki Cash Collector v2 ve MyPOS shell intercept'lerinde de aynı durumdu) bu hunk da APK'ya gömüldü ama commit edilmedi. Önceki shell intercept'leriyle (BAR `_onBarTapped` cash collector, KARTE `_onKarteTapped` MyPOS) aynı kategoride saklanıyor — ileride o dosya kendi WIP commit'i içinde kaydedilebilir.
+
+### Test sırası (sahada)
+
+1. APK kuruldu, Settings ▸ Payment ▸ MYPOS KART TERMİNALİ toggle **AÇIK** + IP doğru:
+   - POS sepet → ürün ekle → footer'da 3 chip görmek lazım: **BAR / KARTE / TWINT** yan yana.
+   - TWINT chip'e bas → MyPosPaymentDialog açılır → "TWINT TERMİNALİ" başlığı + qr_code_2 iconu + "BEKLENİYOR" badge → terminal QR gösterir → müşteri TWINT app'iyle okutur → "ONAYLANDI" → 600 ms sonra dialog kapanır → adisyon kapanır + receipt basılır.
+2. Toggle **KAPALI**:
+   - Aynı TWINT chip → dialog açılmamalı, anında `_quickSettle` tetiklenmeli (eski manuel onay).
+3. Fallback test (toggle açık, terminal kapalı):
+   - TWINT chip → dialog "BAĞLANIYOR" sonra "HATA" → "MANUEL'E GEÇ" butonu → manuel kayıt akışı.
+4. Regression: BAR ve KARTE chip'leri etkilenmeli — değişmedi, aynı davranış.
+
+### Rollback
+
+Settings'ten toggle kapatmak TWINT'i manuel'e geri çevirir. Chip'i tamamen kaldırmak için bir önceki APK (`63caa859d109...` veya `72e6c4ab318a...`) yeniden kurulur — kod farkı sadece üç-chip layout + `_onTwintTapped` handler.
+
+
 ## 2026-05-12 ~21:08 CEST — MyPOS Sigma (KART + TWINT) UI entegrasyonu + canlı dialog + numpad bypass
 
 **Kapsam:** POS Flutter app (jolly-final / `claude/pilot-final`). Backend ve diğer apps **dokunulmadı**.
