@@ -29,6 +29,7 @@ class CashCollectorResult {
     required this.refund,
     required this.transId,
     required this.orderId,
+    this.fallbackToManual = false,
   });
 
   /// Amount inserted by the customer (rappen). Equals or exceeds the bill.
@@ -43,6 +44,23 @@ class CashCollectorResult {
 
   final String transId;
   final String orderId;
+
+  /// True when the operator decided to bail out of the device flow and
+  /// enter cash manually instead — e.g. kiosk offline, jam they can't
+  /// clear, or just preference. Caller should open the manual cash
+  /// dialog (or unhide the numpad) when this is set.
+  final bool fallbackToManual;
+
+  /// Sentinel result used to indicate "abort device flow, switch to
+  /// manual cash for this transaction".
+  static const CashCollectorResult manualFallback = CashCollectorResult(
+    collected: 0,
+    dispensed: 0,
+    refund: 0,
+    transId: '',
+    orderId: '',
+    fallbackToManual: true,
+  );
 }
 
 /// Opens the dialog. Returns the result, or null if cancelled / no cash
@@ -268,37 +286,73 @@ class _CashCollectorDialogState extends State<_CashCollectorDialog> {
                 ),
               ],
               const SizedBox(height: AppTokens.space16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: state == CashCollectorState.completed
-                          ? null
-                          : _cancel,
-                      style: OutlinedButton.styleFrom(
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
-                        ),
-                        minimumSize:
-                            const Size.fromHeight(AppTokens.touchLarge),
-                      ),
-                      child: const Text(
-                        'İptal',
-                        style: TextStyle(
-                          fontFamily: 'WorkSans',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              _buildActions(state, collected),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  /// Action row. When the device flow is healthy → single "İptal".
+  /// When it has failed (or hasn't accepted any cash yet) → also offer
+  /// "Manuel girişe geç" so the cashier can recover without losing the
+  /// ticket. Once cash is in escrow we hide the manual switch — that
+  /// path would orphan the inserted money.
+  Widget _buildActions(CashCollectorState state, int collected) {
+    final canFallback =
+        collected == 0 && state != CashCollectorState.completed;
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed:
+                state == CashCollectorState.completed ? null : _cancel,
+            style: OutlinedButton.styleFrom(
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+              ),
+              minimumSize: const Size.fromHeight(AppTokens.touchLarge),
+            ),
+            child: const Text(
+              'İptal',
+              style: TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ),
+        ),
+        if (canFallback) ...[
+          const SizedBox(width: AppTokens.space8),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(context)
+                  .pop(CashCollectorResult.manualFallback),
+              style: FilledButton.styleFrom(
+                backgroundColor: GcColors.tertiary,
+                foregroundColor: GcColors.onPrimary,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.zero,
+                ),
+                minimumSize: const Size.fromHeight(AppTokens.touchLarge),
+              ),
+              icon: const Icon(Icons.keyboard_rounded, size: 18),
+              label: const Text(
+                'MANUEL GİRİŞE GEÇ',
+                style: TextStyle(
+                  fontFamily: 'WorkSans',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 

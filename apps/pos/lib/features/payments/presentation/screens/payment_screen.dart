@@ -84,6 +84,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   /// indicator and completion view show what the device actually dispensed.
   CashCollectorResult? _cashCollectorResult;
 
+  /// One-shot escape hatch: when the operator hit "Manuel girişe geç" in
+  /// the Cash Collector dialog, we unhide the numpad for *this* ticket so
+  /// they can finish manually. Doesn't touch the saved toggle — the next
+  /// ticket re-attempts the device.
+  bool _cashCollectorBypassed = false;
+
   TicketEntity? _ticket;
 
   // --- Derived totals ------------------------------------------------------
@@ -179,6 +185,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     return _enteredCents - target;
   }
 
+  /// True when the cash leg of this ticket should route through the
+  /// EcoCash kiosk: setting on, BAR selected, and the operator hasn't
+  /// punched the manual-bypass button for this ticket.
+  bool get _cashCollectorActive {
+    if (_method != _Method.bar) return false;
+    if (_cashCollectorBypassed) return false;
+    final collector =
+        ref.read(paymentSettingsProvider).valueOrNull?.cashCollector;
+    return collector?.enabled == true;
+  }
+
   bool get _canPay {
     if (_submitting || _grandTotal <= 0) return false;
     if (_calc.hasTenders && _liveCalc.isFullyPaid) return true;
@@ -187,11 +204,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       // When the Cash Collector is wired up, the operator doesn't have to
       // pre-enter the tendered amount on the numpad — the kiosk collects
       // it from the customer directly.
-      final collector = ref
-          .read(paymentSettingsProvider)
-          .valueOrNull
-          ?.cashCollector;
-      if (collector?.enabled == true) return true;
+      if (_cashCollectorActive) return true;
       return _enteredCents >= target;
     }
     return true; // Non-cash methods assume exact-outstanding tender.
@@ -359,11 +372,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     // returns the actual collected/dispensed amounts on success, or null if
     // the operator cancelled before any cash was accepted (in which case we
     // abort the whole _submit so they can pick another tender).
-    final paymentSettings = ref.read(paymentSettingsProvider).valueOrNull;
-    final collectorCfg = paymentSettings?.cashCollector;
-    if (_method == _Method.bar &&
-        collectorCfg != null &&
-        collectorCfg.enabled) {
+    if (_cashCollectorActive) {
+      final paymentSettings = ref.read(paymentSettingsProvider).valueOrNull;
+      final collectorCfg = paymentSettings!.cashCollector;
       final outstanding = _outstanding > 0 ? _outstanding : _grandTotal;
       final result = await showCashCollectorDialog(
         context,
@@ -372,6 +383,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       );
       if (!mounted) return;
       if (result == null) return; // cancelled
+      if (result.fallbackToManual) {
+        // Bypass the device for this ticket only — show the numpad and
+        // let the operator finish manually. The toggle in Settings stays
+        // on, so the next ticket retries the kiosk.
+        setState(() {
+          _cashCollectorBypassed = true;
+          _amountStr = '';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Manuel nakit girişine geçildi.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
       setState(() => _cashCollectorResult = result);
       if (result.refund > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -970,7 +997,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ? GcColors.primary
             : GcColors.surfaceContainerLowest,
         child: InkWell(
-          onTap: () => setState(() => _method = m),
+          onTap: () => setState(() {
+            _method = m;
+            // Switching methods clears the one-shot manual bypass so a
+            // KARTE→BAR roundtrip re-arms the Cash Collector flow.
+            if (m == _Method.bar) _cashCollectorBypassed = false;
+          }),
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: selected ? kPrimaryGradient : null,
@@ -1159,13 +1191,84 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     // represents an optional *partial* tender (e.g. CHF 30 on card).
     // Leaving the numpad empty means "pay the full outstanding via this
     // method", which keeps the single-tap UX for the common case.
-    if (_method == _Method.bar) return _buildNumpad();
+    if (_method == _Method.bar) {
+      // Cash Collector active: the kiosk handles the money — no need for
+      // the numpad. Show a banner that explains the flow and points at
+      // the ÖDE button.
+      if (_cashCollectorActive) return _buildCollectorBanner();
+      return _buildNumpad();
+    }
     return Column(
       children: [
         _buildTerminalBanner(),
         const SizedBox(height: AppTokens.space8),
         Expanded(child: _buildNumpad()),
       ],
+    );
+  }
+
+  /// Full-bleed placeholder shown in place of the cash numpad when the
+  /// EcoCash kiosk is wired up. Communicates "press ÖDE to start the
+  /// device" without any keyboard noise; ÖDE itself drives the dialog.
+  Widget _buildCollectorBanner() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: GcColors.surfaceContainerLowest,
+        border: Border.all(color: GcColors.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppTokens.space24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Icon(
+              Icons.savings_rounded,
+              size: 56,
+              color: GcColors.primary,
+            ),
+            const SizedBox(height: AppTokens.space12),
+            const Text(
+              'KASA OTOMATI HAZIR',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.4,
+                color: GcColors.onSurface,
+              ),
+            ),
+            const SizedBox(height: AppTokens.space8),
+            const Text(
+              'ÖDE tuşuna basın. Cihaz parayı müşteriden alıp '
+              'para üstünü otomatik verecek.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 13,
+                color: GcColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppTokens.space16),
+            OutlinedButton.icon(
+              onPressed: _submitting
+                  ? null
+                  : () => setState(() {
+                        _cashCollectorBypassed = true;
+                        _amountStr = '';
+                      }),
+              icon: const Icon(Icons.keyboard_rounded, size: 16),
+              label: const Text('MANUEL NAKİT GİRİŞİNE GEÇ'),
+              style: OutlinedButton.styleFrom(
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.zero,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
