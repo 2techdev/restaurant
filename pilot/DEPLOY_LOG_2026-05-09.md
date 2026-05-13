@@ -3,6 +3,118 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-13 ~14:52 CEST — MyPOS production-pattern rewrite: cancel-stuck + false-approval
+
+**Kapsam:** Sadece `MyPosPlugin.kt`. Dart, manifest, theme, build.gradle dokunulmadı.
+
+### Operatör 3 sorun raporladı (önceki APK üzerine)
+
+1. **İlk ödeme otomatik onaylıyor** — kart hiç yaklaştırmadan adisyon "ödendi"
+2. **Cihazdan iptal → POS hâlâ "ödeme bekleniyor"** — sonsuza kadar takılı
+3. **TWINT'e basınca app kapanıyor** — (sebep #1'in semptomu: false approval + dialog close → kapanmış görünüyor)
+
+### Kit'in production plugin'inden (reference/MyPosPlugin-production.kt, 3000+ satır) derinlemesine analiz
+
+Production plugin **iki katmanlı** handle ediyor. Bizim plugin tek katmanlıydı.
+
+**Production line 1250 pattern** — `handlePosInfo` USER_CANCEL/INTERNAL_ERROR/TERMINAL_BUSY/etc. case'lerinde **DIREKT `pendingResult?.error()` fire eder, `onTransactionComplete` beklemez**. Çünkü SDK 2.1.8 cancel sonrası `onTransactionComplete`'i çoğunlukla HİÇ fire etmiyor → bizim tek-katmanlı kod sonsuza kadar bekliyordu (3. sorun).
+
+**Production line 1637-1693** — `handleTransactionComplete` 4-way decision tree:
+- `failureStatus in terminalFailureStatuses()` → semantic errorCode override
+- `declinedReason` non-empty → DECLINED errorCode
+- `hasRealData` (rrn || authCode || approval=="00"/"approved") → success
+- Hiçbiri yok → `NO_DATA` — **success'e DÜŞMÜYOR**
+
+Bizim eski kod sadece `authCode.isNotEmpty() && declinedReason.isEmpty()` check'i yapıyordu. Boş ama non-null TransactionData event'inde false approval'a düşüyordu (1. sorun).
+
+### Uygulanan 3 fix
+
+| # | Fix | Yer | Production ref |
+|---|---|---|---|
+| **1** | `handlePosInfo` terminal failure DIREKT pendingResult.fire | MyPosPlugin.kt:onPOSInfoReceived | line 1250 |
+| **2** | `onTransactionComplete` 4-way decision tree (failureStatus / decline / hasRealData / NO_APPROVAL_DATA) | MyPosPlugin.kt:onTransactionComplete | line 1637-1693 |
+| **3** | Stale-data margin **5s → 60s** | MyPosPlugin.kt | line 1602-1635 |
+
+### Stale-data + hasRealData semantic gate kombinesi
+
+İki guard birlikte çalışıyor:
+1. **Time guard**: txData.transactionDateLocal < sessionStartedAt - 60s → reject + pendingResult intact
+2. **Semantic guard**: hasRealData = (rrn non-empty) OR (authCode non-empty) OR (approval == "00"/"0"/"approved"). Hiçbiri yoksa "no approval proof" → `NO_APPROVAL_DATA`, success'e DÜŞMEZ.
+
+Sonuç: hem zaman olarak hem semantically valid bir event olmadan adisyon **kapanmıyor**.
+
+### Cancel handling akışı (3. sorun fix)
+
+```
+Operatör cihazdan "Cancel" → SDK fires onPOSInfoReceived(USER_CANCEL)
+  ↓
+Yeni handlePosInfo:
+  - isFinancialCommand=true, status in terminalFailureStatuses()
+  - pendingResult.fire("CANCELLED", "Kullanıcı iptal etti")
+  - pendingResult = null, pendingOp = ""
+  ↓
+POS dialog hemen kapanır, "Kullanıcı iptal etti" göster
+  ↓
+SDK belki de onTransactionComplete fire eder (geç)
+  ↓
+Yeni handler: pendingResult == null → "⚠️ Orphan onTransactionComplete — ignoring"
+  ↓
+Adisyon kapanmadı, operator yeni ödeme denemesi yapabilir
+```
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                  (canlı slot)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-prodfix-20260513.apk           (versiyonlu)
+size       : 90'175'647 bytes (≈86.0 MiB)
+sha256     : 5367e8d0426b8b51a65995639c898c2a1e61f66212aec367c7be1131769a10f6
+built from : claude/pilot-final commit 55558b3
+flavor     : pos (assemblePosRelease, 28s)
+```
+
+### Sahada KRİTİK test sırası
+
+1. **Eski APK uninstall** (clean state şart).
+2. App aç → logcat: `🔗 SDK onConnected` + `✅ Terminal POS ready`.
+
+3. **🚨 BİRİNCİ ÖDEME TEST (false-approval gone?)**:
+   - Adisyon → KART → kart **YAKLAŞTIRMA**, 5 sn bekle.
+   - **Doğru**: Dialog "BEKLENİYOR"da kalmalı. Logcat'te `⚠️ Stale onTransactionComplete` veya `Tx complete with NO approval proof` görmen lazım.
+   - **YANLIŞ**: "ONAYLANDI" göstermesi/adisyon kapanması = fix tutmamış, derhal rapor et.
+
+4. **CANCEL TEST (stuck fix?)**:
+   - Adisyon → KART → terminale "Cancel" bas.
+   - **Doğru**: ~1 saniyede POS dialog kapanmalı, "Kullanıcı iptal etti" görmeli. Logcat: `🛑 Terminal failure: CANCELLED (status=2) — firing pendingResult NOW`.
+   - **YANLIŞ**: Dialog "ÖDEME BEKLENİYOR"da takılıyorsa → fix tutmamış.
+
+5. **TWINT TEST**:
+   - TWINT chip → MyPOS Activity ekranı açılmalı (crash olmamalı).
+   - QR göster → telefonla okut → onay → POS dialog kapanır.
+   - İptal: terminal'de X → POS dialog kapanır + "İptal edildi".
+
+6. **NORMAL HAPPY PATH**:
+   - KART + gerçek kart yaklaştırma + PIN → ONAYLANDI. Logcat: `✅ Transaction approved: RRN=... auth=...`
+
+### Logcat'te göreceğin yeni mesajlar
+
+```
+🛑 Terminal failure: CANCELLED (status=2) — firing pendingResult NOW    ← Cancel fix kanıtı
+⚠️ Orphan onTransactionComplete (no pendingResult) — ignoring           ← Geç gelen event reddi
+⚠️ Stale onTransactionComplete (txTime=X < startedAt=Y - 60s)            ← Stale-data fix
+Tx complete: hasCardData=true hasApprovalCode=false decline="" ...      ← Decision tree
+❌ Tx complete with NO approval proof ... refusing to mark paid          ← False-approval fix
+✅ Transaction approved: RRN=... auth=... (twint=false)                  ← Happy path
+```
+
+### Rollback
+
+False-approval ÇOK KRİTİK. Hâlâ olursa:
+- **Anında**: Settings ▸ Payment ▸ MYPOS toggle **kapat** — manuel akış.
+- Önceki APK: `c235b7dda78c...` (14:38 entry) — false-approval ilk fix denemesi, hâlâ buglı olabilir.
+- Daha eski güvenli: `246b6d509d24...` (12:14 entry) — yalnız manifest fix.
+
+
 ## 2026-05-13 ~14:38 CEST — 🚨 KRİTİK — false-approval + TWINT crash + AppCompat dep eksiği
 
 **Kapsam:** `build.gradle.kts` + `MyPosPlugin.kt`. **PARA KAYBI RİSKİ** içeren bug fix'i — operatör test'e başlamadan önce kuruyup doğrulamalı.
