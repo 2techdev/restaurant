@@ -15,6 +15,7 @@ package com.gastrocore.gastrocore_pos
 
 import android.app.Activity
 import android.bluetooth.BluetoothDevice
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -27,13 +28,18 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.PluginRegistry
 
 private const val TAG = "MyPosPlugin"
 private const val RECONNECT_DELAY_MS = 3000L
 private const val MAX_RECONNECT_ATTEMPTS = 10
 private const val HEARTBEAT_INTERVAL_MS = 60000L  // TCP/IP only
 
-class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
+class MyPosPlugin :
+    FlutterPlugin,
+    MethodChannel.MethodCallHandler,
+    ActivityAware,
+    PluginRegistry.ActivityResultListener {
 
     private lateinit var channel: MethodChannel
     private lateinit var logChannel: EventChannel
@@ -85,15 +91,34 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
         channel.setMethodCallHandler(null)
     }
 
+    private var activityBinding: ActivityPluginBinding? = null
+
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+        activityBinding = binding
+        // Required for TWINT: the SDK's `openPaymentActivity` returns via
+        // onActivityResult, which Flutter only forwards if the plugin is
+        // registered as an ActivityResultListener.
+        binding.addActivityResultListener(this)
     }
 
-    override fun onDetachedFromActivityForConfigChanges() { activity = null }
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) { activity = binding.activity }
+    override fun onDetachedFromActivityForConfigChanges() {
+        activityBinding?.removeActivityResultListener(this)
+        activityBinding = null
+        activity = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activity = binding.activity
+        activityBinding = binding
+        binding.addActivityResultListener(this)
+    }
+
     override fun onDetachedFromActivity() {
         stopHeartbeat()
         stopWatchdog()
+        activityBinding?.removeActivityResultListener(this)
+        activityBinding = null
         activity = null
     }
 
@@ -270,6 +295,17 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
         )
     }
 
+    /// TWINT flow per official MyPOS SDK doc (MYPOS_SDK_STANDALONE.md §5):
+    /// completely separate from card purchase. SDK's `openPaymentActivity`
+    /// launches its own Activity (terminal shows the QR), customer scans
+    /// with the TWINT app, and the result returns via `onActivityResult`
+    /// in the host Activity (forwarded here via ActivityResultListener).
+    ///
+    /// Pre-fix this method called `posHandler.twintPurchase(amount, currency)`
+    /// — that's the WRONG SDK entry point for TWINT; the doc explicitly
+    /// says PaymentParams isn't used for TWINT and the only correct path
+    /// is openPaymentActivity. That's why no QR ever appeared on the
+    /// terminal — the legacy call was a silent no-op.
     private fun handleTwint(call: MethodCall, result: MethodChannel.Result) {
         val amount = call.argument<Double>("amount") ?: run {
             result.success(mapOf("success" to false, "error" to "Missing amount"))
@@ -279,6 +315,17 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
             result.success(mapOf("success" to false, "error" to "Amount must be > 0"))
             return
         }
+        val act = activity
+        if (act == null) {
+            // TWINT *requires* an Activity context (doc §6). We can't
+            // launch openPaymentActivity from a Service or detached engine.
+            result.success(mapOf(
+                "success"   to false,
+                "errorCode" to "NO_ACTIVITY",
+                "error"     to "TWINT için Activity context şart — uygulama foreground'da değil"
+            ))
+            return
+        }
 
         ensureConnectionBeforePayment(
             onReady = {
@@ -286,9 +333,9 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
                 pendingOp = "twint"
                 isPaymentInProgress = true
                 lastTwintTransRef = UUID.randomUUID().toString()
-                val amountStr = String.format("%.2f", amount)
+                val amountStr = String.format(java.util.Locale.US, "%.2f", amount)
                 try {
-                    // TWINT is CHF-only at the SDK level — pin once.
+                    // TWINT is CHF-only at the SDK level.
                     if (lastSetCurrency != Currency.CHF) {
                         POSHandler.setCurrency(Currency.CHF)
                         lastSetCurrency = Currency.CHF
@@ -298,35 +345,26 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
                         sendLog("twint: busy flag set — force clearing")
                         forceCleanSdkState()
                     }
-                    if (lastReceiptConfig != POSHandler.RECEIPT_DO_NOT_PRINT) {
-                        POSHandler.setDefaultReceiptConfig(POSHandler.RECEIPT_DO_NOT_PRINT)
-                        lastReceiptConfig = POSHandler.RECEIPT_DO_NOT_PRINT
-                        sendLog("twint: setDefaultReceiptConfig(DO_NOT_PRINT)")
-                    }
-                    Log.i(TAG, "twintPurchase ENTRY amount=$amountStr transRef=$lastTwintTransRef")
-                    sendLog("➡️ twintPurchase($amountStr, CHF, transRef=$lastTwintTransRef)")
-                    // Try the newer QRPaymentParams builder API first — it's
-                    // what the May-2026 MyPOS bundle uses and our slavesdk-
-                    // 2.1.8.aar may also expose it (the wildcard import pulls
-                    // it in if present). If the class is missing at runtime
-                    // we catch NoClassDefFoundError and fall back to the
-                    // legacy (String, String) signature.
-                    val launched = tryTwintViaBuilder(amountStr, lastTwintTransRef)
-                    if (!launched) {
-                        sendLog("twint: builder API unavailable — falling back to legacy signature")
-                        posHandler?.twintPurchase(amountStr, "CHF")
-                    }
-                    Log.i(TAG, "twintPurchase RETURNED (waiting for onTransactionComplete)")
-                    schedulePaymentTimeout(result, "twintPurchase")
-                    startTwintBusyPoller(result)
+                    Log.i(TAG, "openPaymentActivity ENTRY amount=$amountStr transRef=$lastTwintTransRef")
+                    sendLog("➡️ openPaymentActivity($amountStr, CHF, transRef=$lastTwintTransRef)")
+                    posHandler?.openPaymentActivity(
+                        act,
+                        REQ_CODE_TWINT,
+                        amountStr,
+                        lastTwintTransRef
+                    )
+                    sendLog("twint: launched via openPaymentActivity — waiting for onActivityResult")
+                    // 180 s safety net — TWINT can legitimately take ~90 s
+                    // (doc §6); double that gives slow customers room. If
+                    // onActivityResult fires earlier the timer is cancelled.
+                    schedulePaymentTimeout(result, "twintActivity")
                 } catch (e: Throwable) {
-                    Log.e(TAG, "twintPurchase EXCEPTION", e)
-                    sendLog("❌ twintPurchase failed: ${e.javaClass.simpleName}: ${e.message}")
+                    Log.e(TAG, "openPaymentActivity EXCEPTION", e)
+                    sendLog("❌ openPaymentActivity failed: ${e.javaClass.simpleName}: ${e.message}")
                     isPaymentInProgress = false
                     pendingResult = null
                     pendingOp = ""
                     cancelPaymentTimeout()
-                    stopTwintBusyPoller()
                     result.success(mapOf(
                         "success"   to false,
                         "errorCode" to "TWINT_EXCEPTION",
@@ -340,42 +378,89 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
         )
     }
 
-    /// Try the newer `twintPurchase(QRPaymentParams)` builder API. Returns
-    /// true on success, false if the class isn't available at runtime (in
-    /// which case the caller falls back to the legacy 2-arg signature).
-    /// Reflection-based so the file still compiles on older AARs that
-    /// don't ship `QRPaymentParams`.
-    private fun tryTwintViaBuilder(amountStr: String, transRef: String): Boolean {
-        return try {
-            val cls = Class.forName("com.mypos.slavesdk.QRPaymentParams")
-            val builderMethod = cls.getMethod("builder")
-            val builder = builderMethod.invoke(null)
-            val builderCls = builder.javaClass
-            builderCls.getMethod("productAmount", String::class.java)
-                .invoke(builder, amountStr)
-            builderCls.getMethod("currency", String::class.java)
-                .invoke(builder, "756") // ISO 4217 numeric for CHF
-            builderCls.getMethod("transRef", String::class.java)
-                .invoke(builder, transRef)
-            val params = builderCls.getMethod("build").invoke(builder)
-            val twintMethod = POSHandler::class.java.getMethod(
-                "twintPurchase",
-                cls
-            )
-            twintMethod.invoke(posHandler, params)
-            sendLog("twint: launched via QRPaymentParams.builder()")
-            true
-        } catch (e: ClassNotFoundException) {
-            false
-        } catch (e: NoSuchMethodException) {
-            false
-        } catch (e: Throwable) {
-            // Builder exists but something else broke — log and let caller
-            // fall through to legacy.
-            Log.w(TAG, "twint builder path failed: ${e.javaClass.simpleName}: ${e.message}")
-            sendLog("twint: builder path threw ${e.javaClass.simpleName} — falling back")
-            false
+    /// SDK delivers the TWINT result here via ActivityResultListener.
+    /// Result Intent extras (per doc §5):
+    ///   - "pos_status": Int (POSHandler.POS_STATUS_*)
+    ///   - "transaction_data": Parcelable TransactionData
+    /// resultCode is RESULT_CANCELED on user cancel.
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ): Boolean {
+        if (requestCode != REQ_CODE_TWINT) return false
+        Log.i(TAG, "TWINT onActivityResult resultCode=$resultCode hasData=${data != null}")
+        sendLog("✉️ TWINT onActivityResult: resultCode=$resultCode")
+        cancelPaymentTimeout()
+        val result = pendingResult
+        pendingResult = null
+        val wasTwint = pendingOp == "twint"
+        pendingOp = ""
+        isPaymentInProgress = false
+        if (result == null || !wasTwint) {
+            sendLog("TWINT result arrived but pendingResult is stale — dropping")
+            return true
         }
+
+        val txData: TransactionData? = try {
+            @Suppress("DEPRECATION")
+            data?.getParcelableExtra("transaction_data")
+        } catch (e: Throwable) {
+            sendLog("TWINT result: parcelable read failed: ${e.message}")
+            null
+        }
+        val posStatus = data?.getIntExtra("pos_status", -1) ?: -1
+
+        when {
+            txData != null && !txData.rrn.isNullOrEmpty() -> {
+                val declined = txData.declinedReason1?.takeIf { it.isNotEmpty() }
+                    ?: txData.declineReason2?.takeIf { it.isNotEmpty() }
+                if (declined != null) {
+                    sendLog("❌ TWINT declined: $declined")
+                    result.success(mapOf(
+                        "success"   to false,
+                        "errorCode" to "DECLINED",
+                        "error"     to "TWINT reddedildi: $declined"
+                    ))
+                } else {
+                    sendLog("✅ TWINT approved rrn=${txData.rrn}")
+                    result.success(mapOf(
+                        "success"       to true,
+                        "transactionId" to (txData.rrn ?: ""),
+                        "authCode"      to (txData.authCode ?: ""),
+                        "amount"        to (txData.amount ?: "0.00"),
+                        "maskedPan"     to (txData.panMasked ?: ""),
+                        "cardType"      to "TWINT",
+                        "transRef"      to lastTwintTransRef
+                    ))
+                }
+            }
+            resultCode == Activity.RESULT_CANCELED -> {
+                sendLog("TWINT cancelled by user (RESULT_CANCELED)")
+                result.success(mapOf(
+                    "success"   to false,
+                    "errorCode" to "CANCELLED",
+                    "error"     to "Kullanıcı iptal etti"
+                ))
+            }
+            posStatus != -1 && posStatus != POSHandler.POS_STATUS_SUCCESS -> {
+                sendLog("TWINT failed: pos_status=$posStatus")
+                result.success(mapOf(
+                    "success"   to false,
+                    "errorCode" to "STATUS_$posStatus",
+                    "error"     to "TWINT başarısız: status=$posStatus"
+                ))
+            }
+            else -> {
+                sendLog("TWINT result: no data and no status — treating as failed")
+                result.success(mapOf(
+                    "success"   to false,
+                    "errorCode" to "NO_DATA",
+                    "error"     to "TWINT sonucu alınamadı (no transaction_data, status=-1)"
+                ))
+            }
+        }
+        return true
     }
 
     private fun handleRefund(call: MethodCall, result: MethodChannel.Result) {
@@ -484,7 +569,44 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
     /// as a "refresh" every single ÖDE. The 60 s heartbeat already runs and
     /// updates `lastSuccessfulPingTime`, so within 30 s of a heartbeat we
     /// have strong evidence the terminal is up — no need to pay another 2 s.
+    ///
+    /// Per the official doc (§3 + §10) there's a *second* gate: command-
+    /// layer readiness (`isPosReady`, fired by setPOSReadyListener). Without
+    /// it `purchase()` / `openPaymentActivity()` can silently no-op even on
+    /// a connected socket. We wait up to 2 s for that signal — long enough
+    /// for the post-connect handshake, short enough that a wedged terminal
+    /// still surfaces a clean error.
     private fun proceedWithPaymentChecks(
+        onReady: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        if (!isPosReady) {
+            sendLog("⏳ Pre-payment: waiting for POSReady (handshake in progress)")
+            val startWait = System.currentTimeMillis()
+            val deadlineMs = 2000L
+            val pollMs = 100L
+            val poller = object : Runnable {
+                override fun run() {
+                    if (isPosReady) {
+                        val waited = System.currentTimeMillis() - startWait
+                        sendLog("✅ Pre-payment: POSReady arrived after ${waited}ms")
+                        proceedWithPaymentChecksReady(onReady, onError)
+                        return
+                    }
+                    if (System.currentTimeMillis() - startWait >= deadlineMs) {
+                        onError("Terminal POSReady not signalled within ${deadlineMs}ms")
+                        return
+                    }
+                    mainHandler.postDelayed(this, pollMs)
+                }
+            }
+            mainHandler.post(poller)
+            return
+        }
+        proceedWithPaymentChecksReady(onReady, onError)
+    }
+
+    private fun proceedWithPaymentChecksReady(
         onReady: () -> Unit,
         onError: (String) -> Unit,
     ) {
@@ -541,6 +663,18 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
     /// `setCurrency` + (TWINT) `setDefaultReceiptConfig` firing each time.
     private var lastSetCurrency: Currency? = null
     private var lastReceiptConfig: Int = -1
+
+    /// SDK command-layer readiness — `setPOSReadyListener` fires this true
+    /// after the terminal completes its post-connect handshake. The plugin
+    /// already treated `connectionState=CONNECTED` as "go" but the official
+    /// doc (§3 + §10) says command-layer ready is a separate gate. Without
+    /// it `purchase()` and `openPaymentActivity()` can be silently no-op'd
+    /// by the SDK if it isn't yet ready.
+    private var isPosReady: Boolean = false
+
+    /// Request code for TWINT's openPaymentActivity flow. SDK returns the
+    /// result via onActivityResult with this code.
+    private val REQ_CODE_TWINT = 9001
 
     /// Currently in-flight operation, used by timeout / poller paths to
     /// know whether the pendingResult they hold is still theirs.
@@ -686,9 +820,10 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
         posHandler?.setConnectionListener(object : ConnectionListener {
             override fun onConnected(device: BluetoothDevice?) {
                 mainHandler.post {
-                    sendLog("🔗 SDK onConnected")
+                    sendLog("🔗 SDK onConnected (waiting for POSReady)")
                     reconnectAttempts = 0
                     isReconnecting = false
+                    isPosReady = false  // command-layer waits for POSReadyListener
                     lastSuccessfulPingTime = System.currentTimeMillis()
                     updateConnectionState(ConnectionState.CONNECTED, "SDK connected callback")
                     startHeartbeat()
@@ -698,6 +833,7 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
             override fun onDisconnected(device: BluetoothDevice?) {
                 mainHandler.post {
                     sendLog("🔌 SDK onDisconnected")
+                    isPosReady = false
                     updateConnectionState(ConnectionState.DISCONNECTED, "SDK disconnected callback")
                 }
             }
@@ -706,7 +842,8 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
         posHandler?.setPOSReadyListener(object : POSReadyListener {
             override fun onPOSReady() {
                 mainHandler.post {
-                    sendLog("✅ Terminal POS ready")
+                    sendLog("✅ Terminal POS ready — can dispatch commands")
+                    isPosReady = true
                     if (connectionState != ConnectionState.CONNECTED) {
                         updateConnectionState(ConnectionState.CONNECTED, "POS ready")
                     }
