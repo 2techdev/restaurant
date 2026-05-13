@@ -15,4 +15,12 @@
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+
+    <!-- Required by the MyPOS Slave SDK (see values/styles.xml). Dark-mode
+         variant defined here so the resource resolver finds it in either
+         qualifier. -->
+    <style name="MyPosOperationTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">false</item>
+    </style>
 </resources>

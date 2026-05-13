@@ -15,4 +15,17 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+
+    <!-- Required by the MyPOS Slave SDK. `OperationActivity` (which the SDK
+         launches for TWINT via `openPaymentActivity`) extends
+         AppCompatActivity and must therefore inherit from an AppCompat
+         theme — otherwise the activity crashes with
+         IllegalStateException("You need to use a Theme.AppCompat theme").
+         Pre-fix this style was missing AND OperationActivity wasn't
+         declared in AndroidManifest; the manifest fix won't help on its
+         own without this theme. -->
+    <style name="MyPosOperationTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">false</item>
+    </style>
 </resources>

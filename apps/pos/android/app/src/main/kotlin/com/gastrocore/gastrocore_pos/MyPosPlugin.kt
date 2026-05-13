@@ -15,6 +15,7 @@ package com.gastrocore.gastrocore_pos
 
 import android.app.Activity
 import android.bluetooth.BluetoothDevice
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -345,8 +346,15 @@ class MyPosPlugin :
                         sendLog("twint: busy flag set — force clearing")
                         forceCleanSdkState()
                     }
-                    Log.i(TAG, "openPaymentActivity ENTRY amount=$amountStr transRef=$lastTwintTransRef")
+                    Log.i(TAG, "openPaymentActivity ENTRY amount=$amountStr transRef=$lastTwintTransRef act=${act.javaClass.simpleName}")
                     sendLog("➡️ openPaymentActivity($amountStr, CHF, transRef=$lastTwintTransRef)")
+                    // ActivityNotFoundException is the specific symptom the
+                    // operator hit after the doc-spec rewrite: SDK fires an
+                    // Intent for `com.mypos.slavesdk.OperationActivity` which
+                    // must be declared in *our* AndroidManifest (the AAR's
+                    // own declaration uses a non-AppCompat theme that gets
+                    // stripped by the merger). We catch it explicitly so the
+                    // operator sees a clean error instead of an app crash.
                     posHandler?.openPaymentActivity(
                         act,
                         REQ_CODE_TWINT,
@@ -358,6 +366,18 @@ class MyPosPlugin :
                     // (doc §6); double that gives slow customers room. If
                     // onActivityResult fires earlier the timer is cancelled.
                     schedulePaymentTimeout(result, "twintActivity")
+                } catch (e: ActivityNotFoundException) {
+                    Log.e(TAG, "TWINT: OperationActivity not found", e)
+                    sendLog("❌ TWINT: OperationActivity not declared in manifest (or theme mismatch)")
+                    isPaymentInProgress = false
+                    pendingResult = null
+                    pendingOp = ""
+                    cancelPaymentTimeout()
+                    result.success(mapOf(
+                        "success"   to false,
+                        "errorCode" to "MANIFEST_MISSING",
+                        "error"     to "MyPOS OperationActivity manifest'te eksik / tema uyumsuz — APK build sorunu"
+                    ))
                 } catch (e: Throwable) {
                     Log.e(TAG, "openPaymentActivity EXCEPTION", e)
                     sendLog("❌ openPaymentActivity failed: ${e.javaClass.simpleName}: ${e.message}")

@@ -90,6 +90,21 @@
                 android:resource="@xml/usb_device_filter" />
         </activity>
 
+        <!-- MyPOS Slave SDK — TWINT flow launches `OperationActivity` via
+             `posHandler.openPaymentActivity(...)`. The activity extends
+             AppCompatActivity and lives inside the AAR, so we have to
+             re-declare it here with an AppCompat theme; without this entry
+             the SDK throws ActivityNotFoundException the moment the
+             operator taps the TWINT chip and the app crashes. `tools:
+             replace` lets us override the AAR's own manifest declaration
+             (which uses a non-AppCompat theme that's also missing here).
+             See MYPOS_SDK_STANDALONE.md §1 + reference bundle's manifest. -->
+        <activity
+            android:name="com.mypos.slavesdk.OperationActivity"
+            android:exported="false"
+            android:theme="@style/MyPosOperationTheme"
+            tools:replace="android:exported,android:theme" />
+
         <!-- Boot receiver — placeholder for future kiosk auto-start -->
         <receiver
             android:name=".BootReceiver"
