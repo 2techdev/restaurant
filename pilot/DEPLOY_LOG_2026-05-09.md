@@ -3,6 +3,61 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-13 ~10:21 CEST — MyPOS hardening: bundle spec'ine hizalama (6 fix tek commit)
+
+**Kapsam:** POS Flutter app `MyPosClient.dart` + Android `MyPosPlugin.kt`. Backend ve diğer apps **etkilenmedi**.
+
+### Bağlam
+
+Önceki deploy'da (race condition fix, 23:45) "Terminal not connected (state: CONNECTING)" düzeltildi. Sonra operatör "kanka mypos entegrasyonu olmamış emin misin" diye sorunca bundle vs mevcut implementation audit'i yapıldı — 6 fark tespit edildi (2 yüksek, 2 orta, 2 düşük). Operatör "yap" onayıyla hepsi tek commit'te uygulandı.
+
+### Düzeltmeler
+
+| # | Fix | Yer | Risk öncesi → sonrası |
+|---|---|---|---|
+| **1** | False-positive approval reject | `mypos_client.dart processPayment` | SDK `success=true` + tüm proof field'lar (txId/rrn/authCode) boş → eski kod APPROVED kabul ederdi → adisyon para tahsil edilmeden kapanırdı. Yeni: `NO_APPROVAL_DATA` ile reject. TWINT istisna (bundle gibi). |
+| **2** | 75 s payment timeout | `MyPosPlugin.kt schedulePaymentTimeout` | SDK callback hiç atmazsa POS dialog sonsuza kadar BEKLENİYOR. Yeni: 75 s'de `TIMEOUT` errorCode + `cancelTransaction` + `forceCleanSdkState`. |
+| **3** | TWINT busy poller | `MyPosPlugin.kt startTwintBusyPoller` | TWINT iptal callback unreliable; müşteri X'e basınca POS bilmezdi. Yeni: 3 s grace sonra her 2 s `isTerminalBusy()`, 3 ardışık idle (≈6 s) → `CANCELLED`. |
+| **4** | `RECEIPT_DO_NOT_PRINT` | `MyPosPlugin.kt handlePayment + handleTwint` | Terminal otomatik fiş + POS receipt = çift fiş. Tek fişe indirildi. |
+| **5** | TWINT client-side `transRef` UUID | `MyPosPlugin.kt` + `mypos_client.dart` | Terminal RRN bazen boş → reconciliation imkansız. UUID mint et, response'a `transRef` field koy, Dart `transactionId = "TWINT-{uuid}"` formatıyla audit'e işliyor. |
+| **6** | `POSHandler.setCurrency` + busy guard | `MyPosPlugin.kt handlePayment + handleTwint` | Önceki transaction state sızıntısı + stuck `mTransactionInProgress` flag. Yeni: her payment öncesi `setCurrency(enum)` + `forceCleanSdkState()` reflection workaround. |
+
+### Implementasyon notları
+
+- **KART payment API:** Builder API (`PaymentParams.builder()`)'ye geçilmedi. Legacy `purchase(String, String, Int)` zaten SDK 2.1.8'de stabil, swap gereksiz risk. Currency olarak da bundle'ın numeric ISO ("756")'sı yerine string ("CHF") tutuldu — legacy signature bunu kabul ediyor.
+- **TWINT API:** Aynı — legacy `twintPurchase(String, String)` korundu. `QRPaymentParams.builder().transRef(uuid)` newer AAR'da var, 2.1.8'de yok. transRef bu yüzden client-side correlation token olarak surface ediliyor (terminal almıyor, ama POS receipt + audit log için yeterli).
+- **Cleanup:** `pendingOp` field eklendi, timeout/poller pendingResult'ın hala kendilerine ait olduğunu validate edebilsin diye. `onTransactionComplete` ve `handleCancel` artık `cancelPaymentTimeout()` + `stopTwintBusyPoller()` çağırıyor — yoksa timer null pendingResult'a yazmaya çalışırdı.
+- **TWINT poller `startTwintBusyPoller`:** Bundle versiyonundan basitleştirilmiş — `queryLastTransaction` / `twintApprovedBySuccessStatus` machinery'si bizim plugin'de yok, o kısımları skip ettim.
+
+### Build
+
+`./gradlew :app:assemblePosRelease` (flavor-only fast path, 4m 22s). Flutter wrapper'ın multi-flavor uyumsuzluğu yine var, gradle direct invoke ile temiz build.
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                  (canlı slot — overwrite)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-hardened-20260513.apk          (versiyonlu kopya)
+size       : 90'143'842 bytes (≈86.0 MiB)
+sha256     : f56efc2fe6a99d2bcd2790b6b0d6da891b5672dcfc6d6f3201354170c8b08cdb
+built from : claude/pilot-final commit e2a42e9 (jolly-final worktree)
+flavor     : pos (assemblePosRelease)
+```
+
+### Sahada test sırası
+
+1. **KART happy path:** ürün ekle → KART → dialog → kart yaklaştır + PIN → ONAYLANDI → tek fiş bas (terminal fişi olmamalı, POS fişi olmalı).
+2. **KART false-positive simulasyon yok** (real device gerek), ama logcat'te `success=true` ama empty proof görürsen NO_APPROVAL_DATA döndürmeli.
+3. **TWINT happy path:** ürün ekle → TWINT → dialog → telefonla QR okut → ONAYLANDI. Audit'te reference: `MYPOS:TWINT:TWINT-<uuid>` formatında olmalı.
+4. **TWINT iptal:** dialog açık → müşteri telefonunu açma, terminal'de X'e bas → ~6 s içinde POS dialog `CANCELLED` ile kapanmalı (eski versiyonda sonsuza kadar bekliyordu).
+5. **TWINT timeout:** dialog açık → 75 s hiçbir şey yapma → `TIMEOUT` errorCode ile dialog kapanır.
+6. **Çift transaction:** KART success → hemen TWINT başlat → ikincisi busy bug'a düşmemeli (forceCleanSdkState devrede).
+
+### Rollback
+
+Önceki APK SHA `fff6d10d4b06...` (23:45 race fix entry). Settings'ten MYPOS toggle kapatmak da geçerli.
+
+
 ## 2026-05-12 ~23:45 CEST — MyPOS race koşulu düzeltildi (ödeme isteğinde "Terminal not connected (state: CONNECTING)")
 
 **Kapsam:** POS Flutter app dialog'u + Android plugin'i. Backend ve diğer apps **etkilenmedi**.
