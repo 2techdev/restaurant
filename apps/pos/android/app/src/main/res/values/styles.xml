@@ -24,8 +24,17 @@
          Pre-fix this style was missing AND OperationActivity wasn't
          declared in AndroidManifest; the manifest fix won't help on its
          own without this theme. -->
+    <!-- MyPOS OperationActivity extends AppCompatActivity, so it must run with
+         an AppCompat theme. Without this override the direct TWINT Activity
+         diagnostic can crash immediately on launch.
+         IMPORTANT: AppCompat themes look up BOTH the AppCompat-namespace
+         attribute (windowNoTitle) AND the android-namespace one
+         (android:windowNoTitle). Production sets both to be safe — copied
+         verbatim from 2tech Service App. -->
     <style name="MyPosOperationTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
-        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowActionBar">false</item>
     </style>
 </resources>
