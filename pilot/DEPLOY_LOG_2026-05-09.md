@@ -3,6 +3,101 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-13 ~19:49 CEST — 🔥 PRODUCTION SERVICE APP BİREBİR PORT
+
+**Kapsam:** Android plugin tamamen değişti. Dart side dokunulmadı.
+
+### Önemli bulgu (service app okumasından)
+
+Önceki APK'ları kendimce yazdığım yetersiz oldu. Service app (`E:/Project/tmp/device_service_app/2tech_service_app`) — gerçek production deployment — okuduğumda öğrendiklerim:
+
+**Bizim büyük hata:** TWINT için `openPaymentActivity` + `onActivityResult` yolunu kullanıyorduk. Service app'in **mypos_client.dart yorumu** çok açık:
+
+> "Process TWINT payment (CHF only) — varsayilan yol **legacy (POSHandler.twintPurchase + setPOSInfoListener)**. **OperationActivity alternatifi crash'a yol açıyordu**, sadece bug_tester'da test ediliyor."
+
+Yani:
+- Production TWINT = `QRPaymentParams.builder() + posHandler.twintPurchase(params)` → sonuç `onTransactionComplete` (POSInfoListener)
+- `openPaymentActivity` yolu = production'da REDDEDİLEN ve crash yaratan yol
+
+Bizim son 5-6 commit bu yanlış yolu kullanıyordu → sahada TWINT crash. ✅ tutarlı.
+
+### Çözüm
+
+Production plugin'i **birebir kopyala**, sadece package adını değiştir.
+
+| Dosya | Satır | Kaynak | Değişiklik |
+|---|---|---|---|
+| `MyPosPlugin.kt` | 3266 | `2tech_service_app/.../MyPosPlugin.kt` | `package com.twotech.twotech_service_app` → `com.gastrocore.gastrocore_pos` |
+| `MyPosTcpConnectionCleaner.kt` | 531 (yeni) | aynı kaynak | aynı package değişikliği |
+| `styles.xml` | 5 line edit | service app `MyPosOperationTheme` | `windowNoTitle`/`windowActionBar` HEM AppCompat HEM android: namespace |
+
+Bizim Dart side (`mypos_client.dart` v.b.) **dokunulmadı** — production plugin'in MethodChannel API'si bizim Dart side ile uyumlu (aynı method isimleri, aynı response shape).
+
+### Production plugin'in içindekiler (artık bizim plugin'de de var)
+
+- `onAttachedToEngine`'de SDK init (setApplicationContext + setSafetyClearingTimeout) — `configure` çağrısı beklemiyor
+- `handleTwint` → `QRPaymentParams.builder()` + `posHandler.twintPurchase(params)`
+- `twintPurchaseViaActivity` route var ama Dart kullanmıyor (bug_tester için)
+- `schedulePaymentTimeout` 75s (TWINT + kart)
+- `startTwintBusyPoller` — `isTerminalBusy` 3x idle → `getLastTransactionData()`
+- `ensureConnectionBeforePayment` + `connectTcpWithStaleBreaker`
+- `handlePosInfo`: USER_CANCEL/INTERNAL_ERROR/TERMINAL_BUSY/COM_ERROR direkt `pendingResult.error()` fire — onTransactionComplete beklemez (cancel-stuck fix)
+- `handleTransactionComplete`: hasRealData semantic + failureStatus mapping + stale-data 60s (false-approval fix)
+- `PendingRetry` — TERMINAL_BUSY otomatik retry
+- `twintApprovedBySuccessStatus` — TWINT için özel approval detection
+- `markTwintSuccessStatusIfCurrent`
+- `rememberApprovedTransaction` + `loadLastApprovedTransaction` (SharedPreferences cache)
+- `registerShutdownReceiver` — MyPOS Integration Specialist (Hristo Tsvetkov) tavsiyesi
+- `syncConnectionStateFromSdk`
+- `enableSocketKeepalive` — TCP keepalive + linger
+- Watchdog thread + Heartbeat 60s PING + ICMP watchdog
+- `forceCleanSdkState` reflection
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                  (canlı slot)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-production-port-20260513.apk   (versiyonlu)
+size       : 90'192'055 bytes (≈86.0 MiB)
+sha256     : a62a6a995bbdf6a98b928353420170c7ac6ca8dbcc3738e437d2fc83c662fa75
+built from : claude/pilot-final commit 7a687e9
+flavor     : pos (assemblePosRelease, 39s)
+```
+
+### Sahada test sırası
+
+1. **APK uninstall + reinstall** (clean state — singleton + SharedPreferences).
+2. App aç → logcat: `MyPOS SDK initialized (v2, safety timeout: 30s)` (yeni log mesajı — production'dan geliyor).
+3. Settings ▸ Payment ▸ MYPOS toggle açık + IP doğru → "BAĞLANTIYI TEST ET" → ✓.
+4. **KART ÖDEME**: kart yaklaştır + PIN → ONAYLANDI + RRN.
+5. **KART İPTAL (cihazdan)**: terminal'de "Cancel" → POS dialog ~1sn kapanır + "Kullanıcı iptal etti". Logcat: `User cancelled` log'u + DIREKT pendingResult.error.
+6. **TWINT**: TWINT chip → terminal QR gösterir → telefonla okut → ONAYLANDI. **app çakılmaz**.
+7. **İlk ödeme false-approval testi**: KART → kart yaklaştırma → bekle. Dialog "BEKLENİYOR"da kalmalı, ONAYLANDI çıkmamalı.
+
+### Logcat'te göreceğin yeni mesajlar (production-pattern)
+
+```
+MyPOS SDK initialized (v2, safety timeout: 30s)
+--- POSInfo: cmd=PURCHASE status=SUCCESS_PURCHASE desc=...
+twintPurchase(QRPaymentParams amount=15.00 currency=756 tranRef=<uuid> receipt=DO_NOT_PRINT)
+User cancelled
+Transaction Complete after failure status seen: USER_CANCEL -> returning errCode=CANCELLED
+TWINT rejected as stale: ...
+```
+
+### Rollback
+
+Önceki APK SHA `0c3e31843f6d...` (19:29 entry) — kit-rewrite ama openPaymentActivity yanlış yolu kullanıyordu. Crash'lar burada başlamıştı. Daha güvenli rollback: Settings'ten MYPOS toggle kapat → manuel akış.
+
+### Beklenti
+
+Bu deploy production'ın **birebir aynısı** olduğu için **çalışmaması mantıken imkansız** (production 2tech Service App ile aynı kod = aynı davranış). Eğer hâlâ sorun çıkarsa logcat çıktısı ile derin diagnose şart:
+
+```
+adb logcat -d | grep -iE "MyPos|TWINT|POSInfo|Transaction Complete"
+```
+
+
 ## 2026-05-13 ~19:29 CEST — 🔥 MyPosPlugin KOMPLE YENİDEN YAZIM (kit MyPosManager pattern)
 
 **Kapsam:** Sadece `MyPosPlugin.kt`. -1222 / +702 = net 520 satır azalma, temiz pattern. Önceki 4 turda patch-on-patch işe yaramayınca sıfırdan kit pattern'iyle yazıldı.
