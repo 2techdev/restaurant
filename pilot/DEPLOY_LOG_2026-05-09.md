@@ -3,6 +3,120 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-13 ~11:28 CEST — MyPOS TWINT resmi SDK spec'ine göre yeniden yazıldı (openPaymentActivity + onActivityResult)
+
+**Kapsam:** POS Flutter app `MyPosPlugin.kt`. Backend, diğer apps, ve POS Flutter Dart tarafı **dokunulmadı** (Dart `MyPosClient.twintPurchase` aynı MethodChannel adıyla çalışmaya devam ediyor — plugin tarafı değişti).
+
+### Kök neden
+
+Operatör "TWINT gitmiyor" raporu. Resmi MyPOS Slave SDK referans doc'u (`E:/Project/tmp/device_service_app/docs/api/MYPOS_SDK_STANDALONE.md` §5) açıkça diyor ki:
+
+> "TWINT, kart ödemesinden **farklı bir akış** kullanır. `openPaymentActivity` ile **MyPOS'un kendi Activity'sini** başlatır, sonuç `onActivityResult` ile döner. PaymentParams kullanılmaz."
+
+Bizim tüm önceki TWINT denemelerimiz yanlış API kullanıyordu:
+- v1: `posHandler.twintPurchase(String, String)` legacy 2-arg
+- v2: `posHandler.twintPurchase(QRPaymentParams)` reflective builder fallback
+
+İkisi de **doğru entry point değil**. SDK bunları sessizce no-op olarak işliyordu — terminale komut hiç ulaşmıyordu, QR ekranı hiç çıkmıyordu. Sadece `openPaymentActivity` doğru yol.
+
+### Düzeltmeler
+
+**1. Plugin artık `PluginRegistry.ActivityResultListener` implement ediyor.**
+- `onAttachedToActivity` → `binding.addActivityResultListener(this)`.
+- `onDetachedFromActivity` / config changes → temiz `remove`.
+- Bu olmadan `openPaymentActivity`'nin döndürdüğü `onActivityResult` Flutter plugin'ine ulaşmıyordu.
+
+**2. `handleTwint` baştan yazıldı:**
+```kotlin
+posHandler.openPaymentActivity(
+    activity,          // Activity context şart
+    REQ_CODE_TWINT,    // = 9001
+    amountStr,         // "32.78"
+    UUID.toString()    // transRef
+)
+```
+- Activity null ise erken `NO_ACTIVITY` hata.
+- `setCurrency(Currency.CHF)` cache'li.
+- `forceCleanSdkState` busy ise.
+- 180 s timeout (TWINT 90 s sürebilir, buffer'lı).
+
+**3. `onActivityResult` Intent extras parse:**
+
+| Şart | Sonuç |
+|---|---|
+| `txData.rrn` dolu + `declinedReason` boş | `success=true` + `transactionId/authCode/amount/transRef` |
+| `declinedReason` dolu | `DECLINED` + sebep |
+| `resultCode == RESULT_CANCELED` | `CANCELLED` ("Kullanıcı iptal etti") |
+| `pos_status != -1 && != SUCCESS` | `STATUS_<code>` |
+| Hiçbir veri yok | `NO_DATA` |
+
+**4. `isPosReady` gate (doc §3 + §10):**
+- `setPOSReadyListener` artık `isPosReady=true` set ediyor.
+- `setConnectionListener.onConnected` `isPosReady=false` (POSReady event'ini bekle).
+- `proceedWithPaymentChecks` artık ilk önce `isPosReady` kontrol ediyor; false ise 200 ms × 10 (= 2 s) poll, gelmezse net hata.
+- Bu olmadan SDK socket connected ama command-layer hazır değilken `purchase`/`openPaymentActivity` silent no-op olabiliyordu.
+
+**5. Eski TWINT-specific helper'lar kaldırıldı:**
+- `tryTwintViaBuilder` (QRPaymentParams reflection) artık kullanılmıyor.
+- `startTwintBusyPoller`/`stopTwintBusyPoller` TWINT için redundant (Activity result kendi cancel'ını yönetiyor) ama dosyada bırakıldı — başka bir senaryoda lazım olabilir.
+
+### Korunan önceki fix'ler (8bc20dd commit)
+
+- `main.dart _warmMyPosConnection` (startup auto-connect) ✓
+- `proceedWithPaymentChecks` heartbeat-fresh skip ✓
+- `lastSetCurrency`/`lastReceiptConfig` cache ✓
+
+Kart akışı (`handlePayment`) **dokunulmadı** — KART zaten çalışıyordu.
+
+### Sahada görmek istediğim log satırları
+
+App startup:
+```
+[BOOT] MyPOS auto-connect: 192.168.1.131:60180
+🔗 SDK onConnected (waiting for POSReady)
+✅ Terminal POS ready — can dispatch commands
+```
+
+TWINT request:
+```
+➡️ openPaymentActivity(32.78, CHF, transRef=<uuid>)
+twint: launched via openPaymentActivity — waiting for onActivityResult
+✉️ TWINT onActivityResult: resultCode=-1
+✅ TWINT approved rrn=<rrn>
+```
+
+Veya iptal:
+```
+TWINT cancelled by user (RESULT_CANCELED)
+```
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                   (canlı slot — overwrite)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-doc-spec-20260513.apk           (versiyonlu)
+size       : 90'143'842 bytes (≈86.0 MiB)
+sha256     : d5b6b4c9162c3d25241a3da18ffb1cc784ec97ee9d57a62d17a269946df18c1c
+built from : claude/pilot-final commit eb2b36b (jolly-final worktree)
+flavor     : pos (assemblePosRelease, --rerun-tasks)
+```
+
+Build notu: ilk `assemblePosRelease` deneme Kotlin daemon glitch yüzünden 16 s'de fail oldu; `--rerun-tasks` ile compile force edildi (44 s), sonraki assemble cleanly geçti.
+
+### Sahada test sırası
+
+1. Yeni APK kuruldu → Settings ▸ Payment ▸ MYPOS toggle açık ✓
+2. App aç → ~3 s sonra logcat'te `🔗 SDK onConnected` + `✅ Terminal POS ready`. **Her ikisi de gelmeli.** Sadece `🔗` gelirse POSReady event'i fire etmiyor demek (SDK sorunu, raporla).
+3. Sepet → ürün ekle → TWINT chip → **MyPOS Activity ekranı açılmalı** (POS dialog değil — SDK'nın kendi Activity'si). Terminal QR göstermeli.
+4. Müşteri TWINT app'iyle okutur → Activity kapanır → POS dialog "ONAYLANDI" → adisyon kapanır.
+5. **Eğer hâlâ TWINT gitmezse:** `adb logcat | grep -iE "mypos|openPaymentActivity|TWINT"` çıktısını gönder. Yeni log satırlarından biri kesin görünür ve gerçek hatayı söyler.
+6. KART ödemesi regresyon kontrolü — eski davranışla aynı, dokunulmadı.
+
+### Rollback
+
+Önceki APK SHA `ee4207c40883...` (11:19 entry). Settings'ten MYPOS toggle kapatmak da geçerli.
+
+
 ## 2026-05-13 ~11:19 CEST — MyPOS: auto-connect on startup + ping skip + TWINT builder fallback
 
 **Kapsam:** POS Flutter app `main.dart` bootstrap + Android `MyPosPlugin.kt`. 3 operatör şikayetinin hepsi tek commit'te çözüldü.
