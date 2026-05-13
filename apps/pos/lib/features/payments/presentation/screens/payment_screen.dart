@@ -37,9 +37,16 @@ import 'package:gastrocore_pos/features/payments/presentation/providers/refund_p
 import 'package:gastrocore_pos/features/payments/presentation/widgets/cash_collector_dialog.dart';
 import 'package:gastrocore_pos/features/payments/presentation/widgets/mypos_payment_dialog.dart';
 import 'package:gastrocore_pos/features/payments/presentation/widgets/voucher_dialog.dart';
-import 'package:gastrocore_pos/features/printing/data/receipt_print_facade.dart';
-import 'package:gastrocore_pos/features/printing/domain/ch_receipt_renderer.dart';
-import 'package:gastrocore_pos/features/printing/printing_providers.dart';
+// TODO(printing-merge): re-enable these three imports once the `features/
+// printing/*` files (currently untracked in the Cash Collector worktree)
+// land on claude/pilot-final. They are required by `_autoPrintIfEnabled`
+// and `_toReceiptItem` below, which are commented out in lockstep so this
+// payment-redesign branch builds standalone. The redesign APK will not
+// auto-print until that merge lands — manual print fallback on the
+// receipt screen still works.
+// import 'package:gastrocore_pos/features/printing/data/receipt_print_facade.dart';
+// import 'package:gastrocore_pos/features/printing/domain/ch_receipt_renderer.dart';
+// import 'package:gastrocore_pos/features/printing/printing_providers.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 
 /// Local tender selection.
@@ -554,10 +561,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       if (!mounted) return;
       setState(() => _paymentComplete = true);
 
-      // Auto-print on payment — fire-and-forget. The receipt screen still
-      // shows even if the printer is unreachable, so the cashier always has
-      // a fallback (manual print button on the receipt screen).
-      unawaited(_autoPrintIfEnabled(receivedBy: receivedBy));
+      // TODO(printing-merge): re-enable auto-print once the printing/
+      // feature lands on claude/pilot-final. The receipt screen still
+      // surfaces a manual print button so this regression is recoverable.
+      // unawaited(_autoPrintIfEnabled(receivedBy: receivedBy));
 
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) context.go(AppRoutes.receiptFor(widget.ticketId));
@@ -571,64 +578,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
-  /// Honours the `autoPrintOnPayment` printer setting: pulls the customer
-  /// receipt template from the local DAO and dispatches via the
-  /// [ReceiptPrintFacade]. Errors are swallowed (printer offline shouldn't
-  /// block UX) but the rendered text is still computed so the receipt
-  /// screen's manual fallback shows the same content.
-  Future<void> _autoPrintIfEnabled({required String receivedBy}) async {
-    final settings = ref.read(printerSettingsProvider).valueOrNull;
-    if (settings == null || !settings.autoPrintOnPayment) return;
-
-    final ticket = _ticket;
-    if (ticket == null) return;
-
-    final items = _items.map(_toReceiptItem).toList(growable: false);
-    final paymentLabel = switch (_method) {
-      _Method.bar => 'Bargeld',
-      _Method.karte => 'Karte',
-      _Method.twint => 'TWINT',
-      _Method.gutschein => 'Gutschein',
-    };
-
-    final req = ReceiptPrintRequest(
-      orderNo: ticket.orderNumber,
-      orderTime: ticket.openedAt,
-      tableOrTakeaway: ticket.tableId ?? 'Takeaway',
-      cashierName: receivedBy,
-      customerName: _linkedCustomer?.name ?? '',
-      items: items,
-      discount: ticket.discountAmount / 100.0,
-      tip: _tipAmount / 100.0,
-      paymentMethod: paymentLabel,
-      isCash: _method == _Method.bar,
-    );
-
-    final facade = ref.read(receiptPrintFacadeProvider);
-    try {
-      await facade.printReceipt(req);
-    } catch (_) {
-      // Auto-print is best-effort — the receipt screen has a manual button.
-    }
-  }
-
-  /// Maps an OrderItemEntity to the renderer's ReceiptItem. Computes the
-  /// effective VAT rate from the line's tax fraction so per-item rates are
-  /// honoured (food vs alcohol vs accommodation may differ on the same bill).
-  static ReceiptItem _toReceiptItem(OrderItemEntity it) {
-    final unit = it.unitPrice / 100.0;
-    final net = it.subtotal - it.taxAmount;
-    final rate = (net > 0 && it.taxAmount > 0)
-        ? (it.taxAmount / net) * 100.0
-        : (it.taxGroup == 'accommodation' ? 3.8 : 8.1);
-    final roundedRate = (rate * 10).round() / 10.0;
-    return ReceiptItem(
-      qty: it.quantity.round().clamp(1, 1 << 30),
-      name: it.productName,
-      unitPrice: unit,
-      vatRate: roundedRate,
-    );
-  }
+  // TODO(printing-merge): restore `_autoPrintIfEnabled` and `_toReceiptItem`
+  // once the printing/ feature lands on claude/pilot-final. They were
+  // commented out so this payment-redesign branch builds standalone — the
+  // imports they rely on (receipt_print_facade.dart, ch_receipt_renderer.
+  // dart, printing_providers.dart) only exist as untracked files in the
+  // Cash Collector worktree at the time this branch was cut.
+  //
+  // Full original implementations are preserved in git history at:
+  //   git log claude/pos-payment-redesign-20260513^ -- apps/pos/lib/features/
+  //   payments/presentation/screens/payment_screen.dart
+  // Restoration is a straight un-comment of both methods + the three
+  // imports above + the `unawaited(_autoPrintIfEnabled(...))` line in
+  // `_submit`. No signature changes.
 
   /// Resolve the tender list that will actually hit the repository.
   ///
@@ -1118,49 +1080,117 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Widget _tipRow() {
+    final hasTip = _tipAmount > 0;
     return Container(
       padding: const EdgeInsets.all(AppTokens.space8),
       decoration: BoxDecoration(
         color: GcColors.surfaceContainerLowest,
         border: Border.all(color: GcColors.outlineVariant),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: AppTokens.space8),
-            child: Text(
-              'TRINKGELD',
-              style: TextStyle(
-                fontFamily: 'WorkSans',
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-                color: GcColors.onSurfaceVariant,
+          Row(
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppTokens.space8),
+                child: Text(
+                  'TRINKGELD',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: GcColors.onSurfaceVariant,
+                  ),
+                ),
               ),
+              _tipChip('0%', _tipAmount == 0, _clearTip),
+              const SizedBox(width: AppTokens.space4),
+              _tipChip('5%', _selectedTipPercent == 5,
+                  () => _applyTipPercent(5)),
+              const SizedBox(width: AppTokens.space4),
+              _tipChip(
+                '10%',
+                _selectedTipPercent == 10,
+                () => _applyTipPercent(10),
+              ),
+              const SizedBox(width: AppTokens.space4),
+              _tipChip(
+                '15%',
+                _selectedTipPercent == 15,
+                () => _applyTipPercent(15),
+              ),
+              const SizedBox(width: AppTokens.space4),
+              _tipChip(
+                _tipAmount > 0 && _selectedTipPercent == null
+                    ? '${_fmt(_tipAmount).replaceFirst("CHF ", "")} CHF'
+                    : 'ÖZEL',
+                _selectedTipPercent == null && _tipAmount > 0,
+                _customTipDialog,
+              ),
+            ],
+          ),
+          // v2 live preview — binds the tip selection back to the grand
+          // total so operators don't have to reconcile it against the
+          // left-panel summary in their head. Even at 0% we show the
+          // grand total here for symmetry (the row becomes the right-
+          // panel's "running total" line).
+          const SizedBox(height: 6),
+          const Divider(color: GcColors.outlineVariant, height: 1),
+          const SizedBox(height: 6),
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: AppTokens.space8),
+            child: Row(
+              children: [
+                Icon(
+                  hasTip
+                      ? Icons.trending_up_rounded
+                      : Icons.horizontal_rule_rounded,
+                  size: 14,
+                  color: hasTip
+                      ? GcColors.secondary
+                      : GcColors.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  hasTip
+                      ? '+${_fmt(_tipAmount)} '
+                          '(${_selectedTipPercent != null ? "$_selectedTipPercent%" : "ÖZEL"})'
+                      : 'Trinkgeld yok',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: hasTip
+                        ? GcColors.secondary
+                        : GcColors.onSurfaceVariant,
+                  ),
+                ),
+                const Spacer(),
+                const Text(
+                  'TOPLAM',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                    color: GcColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _fmt(_grandTotal),
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: GcColors.primary,
+                  ),
+                ),
+              ],
             ),
-          ),
-          _tipChip('0%', _tipAmount == 0, _clearTip),
-          const SizedBox(width: AppTokens.space4),
-          _tipChip('5%', _selectedTipPercent == 5, () => _applyTipPercent(5)),
-          const SizedBox(width: AppTokens.space4),
-          _tipChip(
-            '10%',
-            _selectedTipPercent == 10,
-            () => _applyTipPercent(10),
-          ),
-          const SizedBox(width: AppTokens.space4),
-          _tipChip(
-            '15%',
-            _selectedTipPercent == 15,
-            () => _applyTipPercent(15),
-          ),
-          const SizedBox(width: AppTokens.space4),
-          _tipChip(
-            _tipAmount > 0 && _selectedTipPercent == null
-                ? '${_fmt(_tipAmount).replaceFirst("CHF ", "")} CHF'
-                : 'ÖZEL',
-            _selectedTipPercent == null && _tipAmount > 0,
-            _customTipDialog,
           ),
         ],
       ),
@@ -1194,28 +1224,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
+  /// v2: BÖL moved next to ÖDE in the CTA row; this row is now the
+  /// voucher affordance only so the GUTSCHEIN chip can span the width
+  /// and the voucher code stays readable.
   Widget _extraRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _extraButton(
-            icon: Icons.card_giftcard_rounded,
-            label: _voucher == null
-                ? 'GUTSCHEIN'
-                : 'GUTSCHEIN · ${_voucher!.code}',
-            onTap: _voucher == null ? _pickVoucher : _clearVoucher,
-            active: _voucher != null,
-          ),
-        ),
-        const SizedBox(width: AppTokens.space8),
-        Expanded(
-          child: _extraButton(
-            icon: Icons.call_split_rounded,
-            label: 'BÖL',
-            onTap: () => context.push(AppRoutes.splitBillFor(widget.ticketId)),
-          ),
-        ),
-      ],
+    return _extraButton(
+      icon: Icons.card_giftcard_rounded,
+      label: _voucher == null
+          ? 'GUTSCHEIN'
+          : 'GUTSCHEIN · ${_voucher!.code}',
+      onTap: _voucher == null ? _pickVoucher : _clearVoucher,
+      active: _voucher != null,
     );
   }
 
@@ -1291,136 +1310,52 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
-  /// Placeholder shown in place of the numpad when the MyPOS terminal is
-  /// wired up for the active method. ÖDE itself opens the live dialog.
+  /// Live-status card shown in place of the numpad when the MyPOS terminal
+  /// is wired up. Redesign v2: the amount due is the visual anchor (big
+  /// figure, centred), with a small status pill near the icon and the
+  /// manual fallback reduced to a one-line text link near the bottom so
+  /// it stops competing with the primary ÖDE button for attention.
   Widget _buildMyPosBanner() {
     final isTwint = _method == _Method.twint;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: GcColors.surfaceContainerLowest,
-        border: Border.all(color: GcColors.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.space24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Icon(
-              isTwint ? Icons.qr_code_2_rounded : Icons.credit_card_rounded,
-              size: 56,
-              color: GcColors.primary,
-            ),
-            const SizedBox(height: AppTokens.space12),
-            Text(
-              isTwint ? 'TWINT TERMİNALİ HAZIR' : 'KART TERMİNALİ HAZIR',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFamily: 'WorkSans',
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.4,
-                color: GcColors.onSurface,
-              ),
-            ),
-            const SizedBox(height: AppTokens.space8),
-            Text(
-              isTwint
-                  ? 'ÖDE tuşuna basın. Terminal TWINT QR’ı gösterecek; '
-                      'müşteri telefonuyla okutsun.'
-                  : 'ÖDE tuşuna basın. Terminal kart bekleyecek; '
-                      'müşteri yaklaştırsın / taksın + PIN.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 13,
-                color: GcColors.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppTokens.space16),
-            OutlinedButton.icon(
-              onPressed: _submitting
-                  ? null
-                  : () => setState(() {
-                        _myposBypassed = true;
-                        _amountStr = '';
-                      }),
-              icon: const Icon(Icons.keyboard_rounded, size: 16),
-              label: const Text('MANUEL’E GEÇ'),
-              style: OutlinedButton.styleFrom(
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.zero,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    final headline = isTwint ? 'TWINT TERMİNALİ HAZIR' : 'KART TERMİNALİ HAZIR';
+    final hint = isTwint
+        ? 'ÖDE’ye basın · terminal QR’ı gösterecek · müşteri okutsun.'
+        : 'ÖDE’ye basın · terminal kart bekleyecek · yaklaştır / tak + PIN.';
+    return _LiveStatusCard(
+      icon: isTwint ? Icons.qr_code_2_rounded : Icons.credit_card_rounded,
+      headline: headline,
+      statusLabel: 'TERMİNAL · HAZIR',
+      amountLabel: 'BEKLENEN',
+      amountFormatted: _fmt(_outstanding),
+      hint: hint,
+      manualLinkLabel: 'manuel’e geç',
+      onManual: _submitting
+          ? null
+          : () => setState(() {
+                _myposBypassed = true;
+                _amountStr = '';
+              }),
     );
   }
 
-  /// Full-bleed placeholder shown in place of the cash numpad when the
-  /// EcoCash kiosk is wired up. Communicates "press ÖDE to start the
-  /// device" without any keyboard noise; ÖDE itself drives the dialog.
+  /// Live-status card shown in place of the cash numpad when the EcoCash
+  /// kiosk is wired up. v2: same layout language as MyPOS banner so
+  /// operators learn one pattern. ÖDE remains the only primary action.
   Widget _buildCollectorBanner() {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: GcColors.surfaceContainerLowest,
-        border: Border.all(color: GcColors.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppTokens.space24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Icon(
-              Icons.savings_rounded,
-              size: 56,
-              color: GcColors.primary,
-            ),
-            const SizedBox(height: AppTokens.space12),
-            const Text(
-              'KASA OTOMATI HAZIR',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'WorkSans',
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.4,
-                color: GcColors.onSurface,
-              ),
-            ),
-            const SizedBox(height: AppTokens.space8),
-            const Text(
-              'ÖDE tuşuna basın. Cihaz parayı müşteriden alıp '
-              'para üstünü otomatik verecek.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 13,
-                color: GcColors.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppTokens.space16),
-            OutlinedButton.icon(
-              onPressed: _submitting
-                  ? null
-                  : () => setState(() {
-                        _cashCollectorBypassed = true;
-                        _amountStr = '';
-                      }),
-              icon: const Icon(Icons.keyboard_rounded, size: 16),
-              label: const Text('MANUEL NAKİT GİRİŞİNE GEÇ'),
-              style: OutlinedButton.styleFrom(
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.zero,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return _LiveStatusCard(
+      icon: Icons.savings_rounded,
+      headline: 'KASA OTOMATI HAZIR',
+      statusLabel: 'CİHAZ · HAZIR',
+      amountLabel: 'ALINACAK',
+      amountFormatted: _fmt(_outstanding),
+      hint: 'ÖDE’ye basın · cihaz parayı alacak · para üstünü otomatik verecek.',
+      manualLinkLabel: 'manuel girişe geç',
+      onManual: _submitting
+          ? null
+          : () => setState(() {
+                _cashCollectorBypassed = true;
+                _amountStr = '';
+              }),
     );
   }
 
@@ -1626,93 +1561,177 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget _buildTenderStrip() {
     if (!_calc.hasTenders) return const SizedBox.shrink();
     final live = _liveCalc;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTokens.space12,
-        vertical: AppTokens.space8,
-      ),
+    final paidCents = live.tenders.fold<int>(0, (s, t) => s + t.amountCents);
+    final goal = live.grandTotalCents;
+    final progress = goal <= 0 ? 0.0 : (paidCents / goal).clamp(0.0, 1.0);
+    final progressPct = (progress * 100).round();
+    final outstanding = live.outstandingCents;
+    final fullyPaid = outstanding <= 0;
+
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: GcColors.tertiary.withValues(alpha: 0.08),
+        color: GcColors.tertiary.withValues(alpha: 0.06),
         border: Border.all(color: GcColors.tertiary),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'KISMİ ÖDEMELER',
-                  style: TextStyle(
-                    fontFamily: 'WorkSans',
-                    fontSize: 11,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppTokens.space16,
+          AppTokens.space12,
+          AppTokens.space16,
+          AppTokens.space12,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header row: status label + progress percentage.
+            Row(
+              children: [
+                Icon(
+                  fullyPaid
+                      ? Icons.check_circle_rounded
+                      : Icons.timelapse_rounded,
+                  size: 16,
+                  color: GcColors.tertiary,
+                ),
+                const SizedBox(width: AppTokens.space8),
+                Expanded(
+                  child: Text(
+                    fullyPaid ? 'TÜMÜYLE ÖDENDİ' : 'TEILWEISE BEZAHLT',
+                    style: const TextStyle(
+                      fontFamily: 'WorkSans',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.4,
+                      color: GcColors.tertiary,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$progressPct%',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
                     color: GcColors.tertiary,
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            // Progress bar.
+            ClipRect(
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 6,
+                backgroundColor: GcColors.tertiary.withValues(alpha: 0.15),
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(GcColors.tertiary),
               ),
-              Text(
-                'Kalan: ${_fmt(live.outstandingCents)}',
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: GcColors.tertiary,
+            ),
+            const SizedBox(height: AppTokens.space12),
+            // Per-tender rows (vertical list, not Wrap — easier to scan
+            // when there are >2 partials).
+            for (int i = 0; i < _calc.tenders.length; i++) ...[
+              _tenderRow(i, _calc.tenders[i]),
+              if (i != _calc.tenders.length - 1)
+                const SizedBox(height: AppTokens.space4),
+            ],
+            const SizedBox(height: AppTokens.space12),
+            const Divider(color: GcColors.tertiary, height: 1),
+            const SizedBox(height: AppTokens.space8),
+            // KALAN — the visual anchor.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Expanded(
+                  child: Text(
+                    fullyPaid ? 'PARA ÜSTÜ' : 'KALAN',
+                    style: const TextStyle(
+                      fontFamily: 'WorkSans',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.4,
+                      color: GcColors.onSurface,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTokens.space4),
-          Wrap(
-            spacing: AppTokens.space8,
-            runSpacing: AppTokens.space4,
-            children: [
-              for (int i = 0; i < _calc.tenders.length; i++)
-                _tenderChip(i, _calc.tenders[i]),
-            ],
-          ),
-        ],
+                Text(
+                  _fmt(outstanding.abs()),
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    color:
+                        fullyPaid ? GcColors.secondary : GcColors.tertiary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _tenderChip(int index, TenderEntry t) {
+  /// One-line row for a staged tender — used in the v2 progress card.
+  /// Replaces the older `Wrap`-laid chips so multi-partial bills read top-
+  /// to-bottom like a receipt and the cashier can scan amounts vertically.
+  Widget _tenderRow(int index, TenderEntry t) {
     final uiMethod = _uiMethodFor(t);
-    final label = switch (uiMethod) {
-      _Method.bar => 'BAR',
-      _Method.karte => 'KARTE',
-      _Method.twint => 'TWINT',
-      _Method.gutschein => 'GUTSCHEIN',
+    final (icon, label) = switch (uiMethod) {
+      _Method.bar => (Icons.payments_rounded, 'BAR'),
+      _Method.karte => (Icons.credit_card_rounded, 'KARTE'),
+      _Method.twint => (Icons.phone_iphone_rounded, 'TWINT'),
+      _Method.gutschein => (Icons.confirmation_number_rounded, 'GUTSCHEIN'),
     };
-    return InkWell(
-      onTap: () => _removeTender(index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTokens.space8,
-          vertical: 4,
+    return Row(
+      children: [
+        Icon(
+          Icons.check_circle_rounded,
+          size: 14,
+          color: GcColors.tertiary,
         ),
-        decoration: BoxDecoration(
-          color: GcColors.surfaceContainerLowest,
-          border: Border.all(color: GcColors.tertiary),
+        const SizedBox(width: AppTokens.space8),
+        Icon(icon, size: 16, color: GcColors.onSurface),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+              color: GcColors.onSurface,
+            ),
+          ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$label · ${_fmt(t.amountCents)}',
-              style: const TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: GcColors.onSurface,
+        Text(
+          _fmt(t.amountCents),
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: GcColors.onSurface,
+          ),
+        ),
+        const SizedBox(width: AppTokens.space8),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _removeTender(index),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: GcColors.tertiary,
               ),
             ),
-            const SizedBox(width: 4),
-            const Icon(Icons.close_rounded, size: 14, color: GcColors.tertiary),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -1752,21 +1771,72 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   // --- Pay CTA -------------------------------------------------------------
 
+  /// v2 CTA row: [+ EKLE]  [✓ ÖDE · CHF X]  [⊟ BÖL]
+  ///  - EKLE only enabled when a partial tender is staged-able.
+  ///  - BÖL surfaced here so the seat-split flow doesn't get buried in
+  ///    the extras row anymore; cashiers report this is the action they
+  ///    reach for *during* a payment, not before it.
   Widget _buildPayCta() {
     return SizedBox(
       height: AppTokens.touchLarge + 8,
       child: Row(
         children: [
           Expanded(
-            flex: 2,
+            flex: 3,
             child: _stageButton(),
           ),
           const SizedBox(width: AppTokens.space8),
           Expanded(
-            flex: 5,
+            flex: 7,
             child: _payButton(),
           ),
+          const SizedBox(width: AppTokens.space8),
+          Expanded(
+            flex: 2,
+            child: _splitButton(),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _splitButton() {
+    return Material(
+      color: GcColors.surfaceContainerLow,
+      child: InkWell(
+        onTap: _submitting
+            ? null
+            : () => context.push(AppRoutes.splitBillFor(widget.ticketId)),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(color: GcColors.outline),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.call_split_rounded,
+                size: 20,
+                color: _submitting
+                    ? GcColors.outlineVariant
+                    : GcColors.onSurface,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'BÖL',
+                style: TextStyle(
+                  fontFamily: 'WorkSans',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0,
+                  color: _submitting
+                      ? GcColors.outlineVariant
+                      : GcColors.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2053,6 +2123,175 @@ class _LoyaltyRedeemDialogState extends State<_LoyaltyRedeemDialog> {
           child: const Text('Uygula'),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _LiveStatusCard — shared layout for Cash Collector + MyPOS banners.
+// ---------------------------------------------------------------------------
+
+/// Centred status card used by the hardware-driven payment methods.
+/// Visual anchor is the amount-due figure; the "go manual" affordance is
+/// reduced to a single text link in the bottom row so it stops competing
+/// with the primary ÖDE button. Pre-redesign these banners showed a large
+/// OutlinedButton for the fallback which read as a co-equal action — the
+/// operator hesitated which to tap.
+class _LiveStatusCard extends StatelessWidget {
+  const _LiveStatusCard({
+    required this.icon,
+    required this.headline,
+    required this.statusLabel,
+    required this.amountLabel,
+    required this.amountFormatted,
+    required this.hint,
+    required this.manualLinkLabel,
+    required this.onManual,
+  });
+
+  final IconData icon;
+  final String headline;
+  final String statusLabel;
+  final String amountLabel;
+  final String amountFormatted;
+  final String hint;
+  final String manualLinkLabel;
+  final VoidCallback? onManual;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: GcColors.surfaceContainerLowest,
+        border: Border.all(color: GcColors.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppTokens.space24,
+          AppTokens.space16,
+          AppTokens.space24,
+          AppTokens.space12,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top row — icon left, ready pill right.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 36, color: GcColors.primary),
+                const Spacer(),
+                _ReadyPill(label: statusLabel),
+              ],
+            ),
+            const SizedBox(height: AppTokens.space12),
+            Text(
+              headline,
+              style: const TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.4,
+                color: GcColors.onSurface,
+              ),
+            ),
+            const SizedBox(height: AppTokens.space24),
+            // Amount block — the visual anchor.
+            Text(
+              amountLabel,
+              style: const TextStyle(
+                fontFamily: 'WorkSans',
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.4,
+                color: GcColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              amountFormatted,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 44,
+                fontWeight: FontWeight.w900,
+                color: GcColors.primary,
+                height: 1.0,
+              ),
+            ),
+            const Spacer(),
+            // Helper line + small manual link.
+            Text(
+              hint,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                color: GcColors.onSurfaceVariant,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onManual,
+                icon: const Icon(Icons.keyboard_rounded, size: 14),
+                label: Text(manualLinkLabel),
+                style: TextButton.styleFrom(
+                  foregroundColor: GcColors.onSurfaceVariant,
+                  textStyle: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                  minimumSize: const Size(0, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadyPill extends StatelessWidget {
+  const _ReadyPill({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: GcColors.secondaryDim,
+        border: Border.all(color: GcColors.secondary),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: const BoxDecoration(
+              color: GcColors.secondary,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: GcColors.onSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
