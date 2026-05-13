@@ -3,6 +3,87 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-13 ~12:14 CEST — MyPOS TWINT app crash fix (OperationActivity manifest declarasyonu eksikti)
+
+**Kapsam:** `AndroidManifest.xml` + `styles.xml` (day/night) + `MyPosPlugin.kt` defensive catch. Backend ve diğer apps **etkilenmedi**.
+
+### Operatör raporu
+
+"app den atıyor twinti denedim" — TWINT chip'e basınca uygulama crash ediyor.
+
+### Kök neden
+
+Önceki commit (`eb2b36b`, 11:28) TWINT'i doc-spec'e göre `openPaymentActivity` ile yeniden yazdı ama temel bir Android gereksinimini atladım: **SDK'nın launch ettiği Activity bizim manifest'te declare edilmemişti**.
+
+SDK akışı:
+1. `posHandler.openPaymentActivity(...)` çağrılır.
+2. SDK içinde `Intent` ile `com.mypos.slavesdk.OperationActivity`'yi başlatmaya çalışır.
+3. O Activity AAR içinde tanımlı **ama bizim app'in merged manifest'inde yok** (AAR'ın kendi declarasyonu non-AppCompat tema kullandığı için Android merger tarafından strip'lendi veya hiç eklenmedi).
+4. `ActivityNotFoundException` → app crash.
+
+Doc (MYPOS_SDK_STANDALONE.md §1) ve referans bundle'ın manifest'i bu declarasyonu açıkça gösteriyordu, bizimkinde yoktu.
+
+### Düzeltmeler
+
+**1. AndroidManifest.xml — OperationActivity declare** (`apps/pos/android/app/src/main/AndroidManifest.xml`):
+```xml
+<activity
+    android:name="com.mypos.slavesdk.OperationActivity"
+    android:exported="false"
+    android:theme="@style/MyPosOperationTheme"
+    tools:replace="android:exported,android:theme" />
+```
+`tools:replace` AAR'ın kendi (yanlış-tema) declarasyonunu override eder.
+
+**2. styles.xml (day + night) — `MyPosOperationTheme`**:
+- day: parent=`Theme.AppCompat.Light.NoActionBar`
+- night: parent=`Theme.AppCompat.NoActionBar`
+
+OperationActivity `AppCompatActivity`'den extend ediyor. Yanlış parent tema → `IllegalStateException("You need to use a Theme.AppCompat theme")` → ayrı bir crash. İkisi de gerek.
+
+**3. MyPosPlugin.kt — explicit `ActivityNotFoundException` catch**:
+Generic `Throwable` catch'inin önüne spesifik `ActivityNotFoundException` catch eklendi. Tekrar olursa app çakılmaz, dialog `MANIFEST_MISSING` errorCode ile clean fail eder. Bonus: `Log.i ENTRY`'de activity referansı simpleName olarak log'lanır.
+
+### Korunan önceki fix'ler
+
+- `main.dart _warmMyPosConnection` startup auto-connect ✓
+- `proceedWithPaymentChecks` heartbeat-fresh skip ✓
+- `isPosReady` command-layer gate ✓
+- `onActivityResult` parser (rrn/status/cancel mapping) ✓
+- `lastSetCurrency`/`lastReceiptConfig` cache ✓
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                  (canlı slot — overwrite)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-doc-spec-20260513.apk          (versiyonlu — INTENTIONALLY OVERWRITTEN)
+size       : 90'153'119 bytes (≈86.0 MiB)
+sha256     : 246b6d509d2403070597b9b35c295488308f5ee5c3f9b44167b240974ccc537a
+built from : claude/pilot-final commit 14b52fe (jolly-final worktree)
+flavor     : pos (assemblePosRelease, 33s)
+```
+
+**Eski SHA** (`d5b6b4c9162c...`, 11:28 entry) artık geçersiz — aynı dosya adı üzerine yazıldı. Operatör eski APK'yı zaten yüklediyse yeni hash'i kontrol etsin: `sha256sum app-pos-release.apk` → `246b6d50...` olmalı.
+
+### Sahada test sırası
+
+1. Yeni APK yüklendi (eski APK üzerine, Settings korundu).
+2. App aç → logcat: `[BOOT] MyPOS auto-connect` + `🔗 SDK onConnected` + `✅ Terminal POS ready`.
+3. POS sepet → TWINT chip → **app crash ETMEMELI**. Üç senaryo:
+   - **Happy path:** MyPOS Activity ekranı açılır → terminal QR gösterir → müşteri telefonla okutur → Activity kapanır → POS "ONAYLANDI".
+   - **Manifest hâlâ eksikse** (build yanlış kopyalandı vs): dialog `MANIFEST_MISSING` errorCode + Türkçe mesaj gösterir, app çakılmaz.
+   - **Başka bir SDK hatası:** generic `TWINT_EXCEPTION` errorCode + exception class+message.
+4. Logcat'te `➡️ openPaymentActivity(... act=MainActivity)` satırı görünmeli (`act=` Activity referansının kimliğini doğrular).
+
+### Eğer hâlâ crash ederse
+
+`adb logcat -d | grep -iE "AndroidRuntime|mypos|fatal|OperationActivity"` çıktısı kritik — direct stack trace verir. Manifest fix olmasa bile defensive catch crash'i engellemiş olmalı; hâlâ crash varsa `act` referansı null geliyor olabilir veya başka bir gizli race var.
+
+### Rollback
+
+Önceki APK SHA (sağlıklı son sürüm) `ee4207c40883...` (11:19 entry). Settings'ten MYPOS toggle kapatmak da geçerli.
+
+
 ## 2026-05-13 ~11:28 CEST — MyPOS TWINT resmi SDK spec'ine göre yeniden yazıldı (openPaymentActivity + onActivityResult)
 
 **Kapsam:** POS Flutter app `MyPosPlugin.kt`. Backend, diğer apps, ve POS Flutter Dart tarafı **dokunulmadı** (Dart `MyPosClient.twintPurchase` aynı MethodChannel adıyla çalışmaya devam ediyor — plugin tarafı değişti).
