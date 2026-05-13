@@ -3,6 +3,84 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-13 ~11:19 CEST — MyPOS: auto-connect on startup + ping skip + TWINT builder fallback
+
+**Kapsam:** POS Flutter app `main.dart` bootstrap + Android `MyPosPlugin.kt`. 3 operatör şikayetinin hepsi tek commit'te çözüldü.
+
+### Operatör raporu (hardened APK `f56efc2fe6a9...` üzerine)
+
+1. App açılınca terminal otomatik bağlanmıyor — ilk ödemede bağlanıyor (gecikme).
+2. TWINT chip basılınca request terminale ulaşmıyor (QR gösterilmiyor).
+3. Her ödeme isteğinde bağlantı "refresh" ediyor — gereksiz.
+
+### Düzeltmeler
+
+| # | Fix | Yer | Önce → Sonra |
+|---|---|---|---|
+| **1** | App startup auto-connect | `lib/main.dart _warmMyPosConnection` | Hiç connect yok → SharedPrefs'ten `settings.v1.payment` oku, `mypos.enabled=true` ise fire-and-forget `MyPosClient(ip,port).connect()`. runApp'i bloklamaz. Heartbeat session'ı sıcak tutar. |
+| **2** | Skip pre-payment ping when heartbeat fresh | `MyPosPlugin.kt proceedWithPaymentChecks` | Her ödemede `runPingThenPayment` (PING + 2s wait) → `lastSuccessfulPingTime` < 30s ise skip + direkt `onReady()`. Heartbeat 60s'de çalıştığı için pratikte ping HER SEFER skip. |
+| **3** | Cache `setCurrency` + `setDefaultReceiptConfig` | `MyPosPlugin.kt` `lastSetCurrency`/`lastReceiptConfig` | Her ödemede 2-3 SDK roundtrip → sadece değer değiştiyse SDK call (ilk ödemeden sonra sıfır overhead). |
+| **4** | TWINT `QRPaymentParams.builder()` reflective fallback | `MyPosPlugin.kt tryTwintViaBuilder` | Legacy `twintPurchase(String, String)` AAR'da çalışmıyor olabilir. Reflection ile bundle'ın builder API'sini dene (currency="756", transRef=UUID, productAmount); başarısızsa legacy'ye düş. `ClassNotFoundException` veya `NoSuchMethodException` yakalanırsa fallback otomatik. |
+| **5** | TWINT explicit logging | `MyPosPlugin.kt handleTwint` | `Log.i ENTRY/RETURNED` markers + `sendLog` flow markers + `Throwable` catch'inde class+message. Pre-fix exception silent yutuluyordu; user logcat'te "twintPurchase" satırı görmüyordu. |
+
+### Yeni log satırları (sahada görmen lazım)
+
+App startup'ta:
+```
+[BOOT] MyPOS auto-connect: 192.168.1.131:60180
+🔗 SDK onConnected
+```
+
+İlk ödemede (cold):
+```
+🔍 Pre-payment PING verification...
+🏓 PING success
+```
+
+Sonraki ödemelerde (heartbeat fresh):
+```
+✅ Pre-payment: heartbeat fresh (5234ms ago) — skipping ping
+```
+
+TWINT request (builder yolu çalışıyorsa):
+```
+➡️ twintPurchase(32.78, CHF, transRef=...)
+twint: launched via QRPaymentParams.builder()
+twintPurchase RETURNED (waiting for onTransactionComplete)
+```
+
+TWINT builder yoksa (legacy fallback):
+```
+twint: builder API unavailable — falling back to legacy signature
+```
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                   (canlı slot — overwrite)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-autoconnect-20260513.apk        (versiyonlu)
+size       : 90'143'842 bytes (≈86.0 MiB)
+sha256     : ee4207c40883e07ce6422f3bd653735b42c610162993033d8546f8cfac3066df
+built from : claude/pilot-final commit 8bc20dd (jolly-final worktree)
+flavor     : pos (assemblePosRelease)
+```
+
+### Sahada test sırası
+
+1. **Auto-connect:** APK kuruldu, app aç → ~2-3 s içinde logcat'te `[BOOT] MyPOS auto-connect` + `🔗 SDK onConnected`. Bunlar yoksa Settings ▸ Payment ▸ MYPOS toggle gerçekten açık mı kontrol et.
+2. **Refresh azaldı:** ikinci ödemenden itibaren dialog "BAĞLANIYOR" göstermemeli, **direkt** "BEKLENİYOR"a geçmeli. Logcat'te `✅ Pre-payment: heartbeat fresh ... skipping ping` satırı.
+3. **TWINT debug:** TWINT chip → logcat'te şu satırlardan birini göreceksin:
+   - `twint: launched via QRPaymentParams.builder()` → terminal QR göstermeli, başarı.
+   - `twint: builder API unavailable — falling back to legacy signature` → eski yol kullanıldı; eğer hala QR çıkmıyorsa AAR ile SDK arasında daha derin uyumsuzluk var.
+   - `❌ twintPurchase failed: <exception>` → SDK throw'ladı; mesaj net hata raporlar.
+
+Logcat'i `adb logcat | grep -iE "mypos|payment|slave|sdk|🔗|➡️|✅|❌|BOOT.*MyPOS"` ile filtrele.
+
+### Rollback
+
+Önceki APK SHA `f56efc2fe6a9...` (10:21 entry). Settings'ten MYPOS toggle kapatmak da geçerli.
+
+
 ## 2026-05-13 ~10:21 CEST — MyPOS hardening: bundle spec'ine hizalama (6 fix tek commit)
 
 **Kapsam:** POS Flutter app `MyPosClient.dart` + Android `MyPosPlugin.kt`. Backend ve diğer apps **etkilenmedi**.
