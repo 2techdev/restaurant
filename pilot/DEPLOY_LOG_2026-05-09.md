@@ -3,6 +3,74 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-13 ~20:03 CEST — MyPosClient SINGLETON (Dart-side lifecycle fix)
+
+**Kapsam:** Sadece Dart side (4 dosya). Android plugin değişmedi.
+
+**APK:** `pilot/app-pos-release.apk` (85.4 MB)
+**Versiyonlu kopya:** `pilot/app-pos-release-2026-05-13-mypos-singleton.apk`
+**SHA256:** `57fe5b5eda7a6fb931ea4e63dbb34b03152cfa84ebaf505141178f5849afdfc6`
+**Commit:** `f17b404` (branch `claude/pilot-final`)
+
+### Neden hâlâ çalışmıyordu (service app birebir port'tan sonra)
+
+Önceki commit (`7a687e9`) Kotlin tarafını production'la birebir hizaladı —
+ama sahada hâlâ "TWINT çalışmıyor / kart çalışmıyor" raporu geldi. Service
+app'in Dart tarafını da inceleyince root cause çıktı:
+
+**Production app:** `PaymentEngine._activeProvider._client` → TEK bir
+`MyPosClient` instance, uygulama ömrü boyunca canlı.
+
+**Bizim app:** 4 ayrı call-site'ta `MyPosClient(...)` constructor çağrılıyordu:
+
+| Call-site | Ne yapıyor | Yan etki |
+|---|---|---|
+| `main.dart _warmMyPosConnection` | Boot warm-up | İlk instance — sağlıklı |
+| `settings_screen.dart _testMyPos` | Settings → Test butonu | Yeni instance + **`finally { client.disconnect() }`** warm session'ı öldürüyor |
+| `mypos_payment_dialog.dart _run` | Her ödeme dialog'u | Her show'da fresh instance, `_isConnected = false` reset |
+| `MyPosClient.fromConfig` | Provider construction | Yine fresh instance |
+
+Her `new MyPosClient(...)`:
+1. `_isConnected = false` resetliyor
+2. MethodChannel handler'ı yeniden install ediyor — son handler kazanır
+3. Settings Test butonuna basılırsa `finally` bloğu TCP socket'i kapatıyor
+
+Sonuç: Operator "Test" butonuna basınca warm session ölüyor, sonraki
+ödeme reconnect race'ine düşüyor. Plugin tarafı doğru ama Dart tarafı
+SDK'yı her seferinde sıfırdan kurmaya zorluyor.
+
+### Çözüm — singleton + Settings teardown drop
+
+| Dosya | Değişiklik |
+|---|---|
+| `mypos_client.dart` | Constructor private (`_internal`); `static _instance`; `factory MyPosClient.shared(...)` instance reuse; `terminalIp/terminalPort` mutable (re-target on-the-fly); `fromConfig` → `shared`'a delegate |
+| `main.dart` | `_warmMyPosConnection` → `MyPosClient.shared(...)` |
+| `settings_screen.dart` | `_testMyPos` → `MyPosClient.shared(...)` **+ `finally { disconnect() }` bloğunu sildim**. Settings Test artık production session'ı bozmaz. |
+| `mypos_payment_dialog.dart` | `_run` → `MyPosClient.shared(...)` — dialog her show'da fresh instance yaratmıyor |
+
+Yorum eklenen davranış (mypos_client.dart başında, top-level docstring):
+production 2tech Service App pattern'i = tek MyPosClient instance, uygulama
+ömrü boyunca canlı, boot'tan kapanışa kadar SDK socket warm.
+
+### Rollback
+
+```bash
+cd /e/Project/Restaurant/.claude/worktrees/jolly-final
+git revert f17b404
+flutter build apk --release --flavor pos
+cp apps/pos/build/app/outputs/flutter-apk/app-pos-release.apk /e/Project/Restaurant/pilot/
+```
+
+### Verification (next session @ pilot)
+
+1. App boot → MyPOS auto-connect (yeşil chip)
+2. Settings → MyPOS Test → "✓ terminal yanıt veriyor" (warm session korunuyor mu kontrol et: chip yeşil kalmalı)
+3. Sepete ürün → KARTE → kart yaklaştırma → onay → fiş bas
+4. Sepete ürün → TWINT → QR oku → onay → fiş bas
+5. Yeni ödeme tekrar Settings'e gidip Test'e basmadan da çalışmalı (singleton aynı warm socket'i kullanır)
+
+---
+
 ## 2026-05-13 ~19:49 CEST — 🔥 PRODUCTION SERVICE APP BİREBİR PORT
 
 **Kapsam:** Android plugin tamamen değişti. Dart side dokunulmadı.
