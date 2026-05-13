@@ -1,21 +1,45 @@
 /**
- * MyPOS Sigma Terminal Plugin — GastroCore POS
+ * MyPOS Sigma Flutter plugin — TOTAL REWRITE 2026-05-13
  *
- * WiFi (TCP/IP) connectivity only. USB and Bluetooth are not used.
+ * This file is a thin Flutter MethodChannel shim over a singleton
+ * `MyPosManager` whose code is the kit's production-tested
+ * `MyPosManager.kt` (RotaMyPosKit, 2026-05-13). All TWINT/card bug-
+ * fixes (cancel-stuck, false-approval, listener accumulation, stale
+ * data, busy poller fallback, 90 s safety timeout) live there, not
+ * here. The plugin's only job is to translate MethodChannel calls to
+ * Manager calls and pipe back results.
  *
- * Features:
- *  - TCP/IP WiFi connection via MyPOS SlaveSDK
- *  - Periodic heartbeat PING (60 s) to detect connection loss
- *  - 15 s ICMP watchdog thread for network-level monitoring
- *  - Automatic reconnect with linear back-off (max 10 attempts)
- *  - Pre-payment connection verification via real PING
- *  - Card purchase, TWINT purchase, refund, cancel, batch clear
+ * Previous incarnations of this file accumulated ~1300 lines of
+ * heuristics across many rounds of patches — most of those were
+ * working around bugs that the kit had already solved in its
+ * Manager. Wiping the slate clean and adopting the kit's pattern is
+ * less risky than incremental patching at this point.
+ *
+ * MethodChannel: 'mypos_payment'
+ *   configure(ip, port)             → { success: Boolean }
+ *   isConnected                     → { connected: Boolean }
+ *   checkRealConnection             → { connected: Boolean }
+ *   testConnection                  → { success: Boolean }
+ *   pingTerminal                    → { success: Boolean, connected: Boolean }
+ *   isTerminalBusy                  → { busy: Boolean }
+ *   processPayment(amount, currency)→ approval / failure map
+ *   twintPurchase(amount)           → approval / failure map
+ *   refund(amount, currency)        → approval / failure map
+ *   cancelPayment                   → { success: Boolean }
+ *   clearBatch                      → batch outcome
+ *   disconnect                      → { success: Boolean }
+ *
+ * Dart→Flutter callback (channel.invokeMethod):
+ *   onConnectionChanged({connected, state, reason})
+ *
+ * EventChannel: 'mypos_logs' — broadcast SDK + plugin log lines.
  */
 package com.gastrocore.gastrocore_pos
 
 import android.app.Activity
 import android.bluetooth.BluetoothDevice
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -23,6 +47,7 @@ import android.os.Looper
 import android.util.Log
 import com.mypos.slavesdk.*
 import java.util.UUID
+
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -32,9 +57,659 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
 
 private const val TAG = "MyPosPlugin"
-private const val RECONNECT_DELAY_MS = 3000L
-private const val MAX_RECONNECT_ATTEMPTS = 10
-private const val HEARTBEAT_INTERVAL_MS = 60000L  // TCP/IP only
+
+// =========================================================================
+// MyPosManager — kit's production-tested singleton (RotaMyPosKit 2026-05-13)
+// =========================================================================
+
+/**
+ * MyPos SDK Manager — singleton wrapper. Production-tested in 2tech
+ * Service App; behaviour is unchanged from the kit's reference
+ * `MyPosManager.kt`. The plugin below talks ONLY to this object.
+ */
+internal object MyPosManager {
+
+    private const val MTAG = "MyPosManager"
+    const val REQ_CODE_TWINT = 9001
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var posHandler: POSHandler? = null
+    private var initialized = false
+
+    @Volatile var isPosReady = false
+        private set
+    @Volatile var isPaymentInProgress = false
+        private set
+
+    private var cardCallback: ((PaymentResult) -> Unit)? = null
+    private var twintCallback: ((PaymentResult) -> Unit)? = null
+    private var twintStartedAt: Long = 0L
+    private var cardStartedAt: Long = 0L
+    private var lastTwintTransRef: String = ""
+    private var connectionListener: ((Boolean) -> Unit)? = null
+    private var logSink: ((String) -> Unit)? = null
+
+    private var lastFinancialFailureStatus: Int = -1
+
+    // ---- Public init / config ----
+
+    fun init(context: Context, tcpIp: String, tcpPort: Int) {
+        if (initialized) {
+            sendLog("MyPosManager: already initialized — skipping re-init (kit §1 listener-accumulation guard)")
+            return
+        }
+        initialized = true
+
+        // 1) SDK config (Application-equivalent setup).
+        POSHandler.setApplicationContext(context.applicationContext)
+        POSHandler.setSafetyClearingTimeout(30_000)
+        POSHandler.setConnectionType(ConnectionType.TCP_IP)
+        POSHandler.setTcpIpConnectivity(tcpIp, tcpPort)
+        POSHandler.setCurrency(Currency.CHF)
+        POSHandler.setLanguage(Language.GERMAN)
+
+        posHandler = POSHandler.getInstance()
+
+        // 2) Listeners — ONE TIME ONLY. Kit Troubleshooting §1: calling
+        // setConnectionListener twice accumulates callbacks and pushes
+        // the terminal into the "You are all set" loop.
+        setupListeners()
+
+        sendLog("MyPosManager initialized: $tcpIp:$tcpPort")
+    }
+
+    fun setConnectionListener(listener: ((Boolean) -> Unit)?) {
+        connectionListener = listener
+    }
+
+    fun setLogSink(sink: ((String) -> Unit)?) {
+        logSink = sink
+    }
+
+    fun isConnected(): Boolean = try {
+        posHandler?.isConnected ?: false
+    } catch (_: Exception) {
+        false
+    }
+
+    fun isTerminalBusy(): Boolean = try {
+        posHandler?.isTerminalBusy == true
+    } catch (_: Exception) {
+        false
+    }
+
+    // ---- Card payment ----
+
+    fun processCardPayment(amountInCHF: Double, callback: (PaymentResult) -> Unit) {
+        if (!initialized) {
+            callback(PaymentResult.Failed("MyPosManager.init() çağrılmadı"))
+            return
+        }
+        if (!isPosReady) {
+            callback(PaymentResult.Failed("Terminal hazır değil (POSReady bekleniyor)"))
+            return
+        }
+        if (isPaymentInProgress) {
+            callback(PaymentResult.Failed("Önceki ödeme devam ediyor"))
+            return
+        }
+
+        cardCallback = callback
+        isPaymentInProgress = true
+        cardStartedAt = System.currentTimeMillis()
+        lastFinancialFailureStatus = -1
+
+        forceCleanSdkState()
+
+        val amountStr = String.format(java.util.Locale.US, "%.2f", amountInCHF)
+        // SDK signature for .currency() is String (per javap inspection
+        // of slavesdk-release.aar). Use the ISO 4217 numeric code "756".
+        val params = PaymentParams.builder()
+            .productAmount(amountStr)
+            .currency("756")
+            .fixedPinpad(true)
+            .receiptConfiguration(POSHandler.RECEIPT_DO_NOT_PRINT)
+            .build()
+
+        POSHandler.setCurrency(Currency.CHF)
+        sendLog("➡️ purchase($amountStr CHF)")
+        try {
+            posHandler?.purchase(params)
+        } catch (e: Throwable) {
+            Log.e(MTAG, "purchase() exception", e)
+            sendLog("❌ purchase() exception: ${e.javaClass.simpleName}: ${e.message}")
+            isPaymentInProgress = false
+            cardCallback = null
+            callback(PaymentResult.Failed("purchase() exception: ${e.message}"))
+        }
+    }
+
+    // ---- TWINT payment ----
+
+    fun processTwintPayment(activity: Activity, amountInCHF: Double, callback: (PaymentResult) -> Unit) {
+        if (!initialized) {
+            callback(PaymentResult.Failed("MyPosManager.init() çağrılmadı"))
+            return
+        }
+        if (!isPosReady) {
+            callback(PaymentResult.Failed("Terminal hazır değil (POSReady bekleniyor)"))
+            return
+        }
+        if (isPaymentInProgress) {
+            callback(PaymentResult.Failed("Önceki ödeme devam ediyor"))
+            return
+        }
+
+        twintCallback = callback
+        isPaymentInProgress = true
+        twintStartedAt = System.currentTimeMillis()
+        lastTwintTransRef = UUID.randomUUID().toString()
+        lastFinancialFailureStatus = -1
+
+        forceCleanSdkState()
+        POSHandler.setCurrency(Currency.CHF) // TWINT only CHF
+
+        val amountStr = String.format(java.util.Locale.US, "%.2f", amountInCHF)
+        sendLog("➡️ openPaymentActivity(TWINT, $amountStr CHF, ref=$lastTwintTransRef)")
+
+        try {
+            posHandler?.openPaymentActivity(activity, REQ_CODE_TWINT, amountStr, lastTwintTransRef)
+            scheduleTwintSafetyTimeout()
+            scheduleTwintBusyPoller()
+        } catch (e: ActivityNotFoundException) {
+            Log.e(MTAG, "OperationActivity not declared", e)
+            sendLog("❌ TWINT crash: OperationActivity not in manifest")
+            isPaymentInProgress = false
+            cancelTwintSafetyNets()
+            twintCallback = null
+            callback(PaymentResult.Failed("MyPOS OperationActivity manifest'te eksik"))
+        } catch (e: Throwable) {
+            Log.e(MTAG, "openPaymentActivity() exception", e)
+            sendLog("❌ openPaymentActivity exception: ${e.javaClass.simpleName}: ${e.message}")
+            isPaymentInProgress = false
+            cancelTwintSafetyNets()
+            twintCallback = null
+            callback(PaymentResult.Failed("openPaymentActivity exception: ${e.message}"))
+        }
+    }
+
+    // ---- TWINT result (called from Activity.onActivityResult via plugin) ----
+
+    fun handleTwintResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode != REQ_CODE_TWINT) return
+        if (twintCallback == null) {
+            sendLog("TWINT result arrived but twintCallback null (already completed by safety net?)")
+            return
+        }
+        cancelTwintSafetyNets()
+        isPaymentInProgress = false
+
+        val posStatus = data?.getIntExtra("pos_status", -1) ?: -1
+        @Suppress("DEPRECATION")
+        val txData: TransactionData? = try {
+            data?.getParcelableExtra("transaction_data")
+        } catch (_: Throwable) { null }
+
+        sendLog("✉️ TWINT result: resultCode=$resultCode posStatus=$posStatus hasData=${txData != null}")
+
+        // Stale data — kit §5: getLastTransactionData can return the
+        // previous transaction. 60s window.
+        if (txData != null) {
+            val txTime = try { txData.transactionDateLocal?.time ?: 0L } catch (_: Throwable) { 0L }
+            if (txTime > 0 && txTime < twintStartedAt - 60_000) {
+                sendLog("⚠️ TWINT stale data (txTime=$txTime started=$twintStartedAt) — rejecting")
+                val cb = twintCallback
+                twintCallback = null
+                cb?.invoke(PaymentResult.Failed("Stale TWINT data — eski işlem verisi"))
+                return
+            }
+        }
+
+        val result: PaymentResult = when {
+            txData != null && !txData.rrn.isNullOrEmpty() -> {
+                val declined = txData.declinedReason1?.takeIf { it.isNotEmpty() }
+                    ?: txData.declineReason2?.takeIf { it.isNotEmpty() }
+                if (declined != null) {
+                    sendLog("❌ TWINT declined: $declined")
+                    PaymentResult.Declined(declined)
+                } else {
+                    sendLog("✅ TWINT approved rrn=${txData.rrn}")
+                    PaymentResult.Approved(
+                        transactionId = txData.rrn ?: "",
+                        authCode = txData.authCode ?: "",
+                        amount = txData.amount ?: "",
+                        maskedPan = txData.panMasked ?: "",
+                        cardType = "TWINT",
+                        terminalId = txData.terminalID ?: "",
+                        merchantId = txData.merchantID ?: "",
+                        stan = txData.stan ?: "",
+                        transRef = lastTwintTransRef,
+                    )
+                }
+            }
+            resultCode == Activity.RESULT_CANCELED -> {
+                sendLog("TWINT cancelled by user")
+                PaymentResult.Cancelled
+            }
+            posStatus != -1 && posStatus != POSHandler.POS_STATUS_SUCCESS -> {
+                sendLog("TWINT failed: pos_status=$posStatus")
+                PaymentResult.Failed("status=$posStatus")
+            }
+            else -> {
+                sendLog("TWINT no data, treating as failed")
+                PaymentResult.Failed("No transaction data")
+            }
+        }
+
+        val cb = twintCallback
+        twintCallback = null
+        cb?.invoke(result)
+    }
+
+    // ---- TWINT safety nets (kit production fallbacks) ----
+
+    private var twintSafetyTimeout: Runnable? = null
+    private var twintBusyPoller: Runnable? = null
+    private var twintIdleCount: Int = 0
+
+    /** 90 s timeout — terminal never responded. */
+    private fun scheduleTwintSafetyTimeout() {
+        cancelTwintSafetyTimeout()
+        twintSafetyTimeout = Runnable {
+            if (!isPaymentInProgress) return@Runnable
+            sendLog("⏱ TWINT safety timeout (90s) — no response from terminal")
+            try { posHandler?.cancelTransaction() } catch (_: Exception) {}
+            isPaymentInProgress = false
+            cancelTwintSafetyNets()
+            val cb = twintCallback
+            twintCallback = null
+            cb?.invoke(PaymentResult.Failed("TWINT timeout (90s) — terminal cevap vermedi"))
+        }
+        mainHandler.postDelayed(twintSafetyTimeout!!, 90_000)
+    }
+
+    private fun cancelTwintSafetyTimeout() {
+        twintSafetyTimeout?.let { mainHandler.removeCallbacks(it) }
+        twintSafetyTimeout = null
+    }
+
+    /**
+     * Busy poller — SDK 2.1.8/2.1.9 sometimes never fires
+     * onActivityResult for TWINT. After 3 consecutive idle ticks
+     * (~6 s) ask the SDK for the last transaction data and pretend
+     * it's our onActivityResult.
+     */
+    private fun scheduleTwintBusyPoller() {
+        cancelTwintBusyPoller()
+        twintIdleCount = 0
+        twintBusyPoller = object : Runnable {
+            override fun run() {
+                if (!isPaymentInProgress) return
+                val busy = try { posHandler?.isTerminalBusy == true } catch (_: Exception) { true }
+                if (!busy) {
+                    twintIdleCount++
+                    sendLog("TWINT poller: idle ($twintIdleCount/3)")
+                    if (twintIdleCount >= 3) {
+                        sendLog("TWINT poller: 3x idle — querying lastTransactionData (async)")
+                        // SDK 2.1.9 signature: void getLastTransactionData() —
+                        // it does NOT return the data, it triggers a fresh
+                        // onTransactionComplete callback. Our listener will
+                        // forward that to handleTwintResult via the
+                        // twintCallback path below.
+                        try {
+                            posHandler?.getLastTransactionData()
+                        } catch (e: Exception) {
+                            sendLog("getLastTransactionData error: ${e.message}")
+                            // If the SDK call itself fails, fall back to
+                            // cancelling so the operator isn't stuck.
+                            if (twintCallback != null) {
+                                handleTwintResult(
+                                    REQ_CODE_TWINT,
+                                    Activity.RESULT_CANCELED,
+                                    buildSyntheticIntentFromData(null),
+                                )
+                            }
+                        }
+                        return
+                    }
+                } else {
+                    twintIdleCount = 0
+                }
+                mainHandler.postDelayed(this, 2000)
+            }
+        }
+        mainHandler.postDelayed(twintBusyPoller!!, 2000)
+    }
+
+    private fun cancelTwintBusyPoller() {
+        twintBusyPoller?.let { mainHandler.removeCallbacks(it) }
+        twintBusyPoller = null
+        twintIdleCount = 0
+    }
+
+    private fun cancelTwintSafetyNets() {
+        cancelTwintSafetyTimeout()
+        cancelTwintBusyPoller()
+    }
+
+    private fun buildSyntheticIntentFromData(data: TransactionData?): Intent {
+        val intent = Intent()
+        if (data != null) {
+            intent.putExtra("transaction_data", data)
+            intent.putExtra("pos_status", POSHandler.POS_STATUS_SUCCESS)
+        } else {
+            intent.putExtra("pos_status", -1)
+        }
+        return intent
+    }
+
+    // ---- Cancel / EOD ----
+
+    fun cancelCurrentTransaction(): Boolean = try {
+        cancelTwintSafetyNets()
+        posHandler?.cancelTransaction()
+        true
+    } catch (e: Exception) {
+        Log.e(MTAG, "cancelTransaction error: ${e.message}", e)
+        false
+    }
+
+    fun clearBatch(callback: (success: Boolean, errorMsg: String?) -> Unit) {
+        if (!initialized || posHandler == null) {
+            callback(false, "not initialized")
+            return
+        }
+        try {
+            posHandler?.setTransactionClearedListener { status ->
+                mainHandler.post {
+                    callback(
+                        status == POSHandler.POS_STATUS_SUCCESS,
+                        if (status == 0) null else "status=$status"
+                    )
+                }
+            }
+            posHandler?.clearBatch()
+        } catch (e: Exception) {
+            callback(false, "exception: ${e.message}")
+        }
+    }
+
+    // ---- Refund ----
+
+    fun processRefund(amountInCHF: Double, currency: String, callback: (PaymentResult) -> Unit) {
+        if (!initialized) {
+            callback(PaymentResult.Failed("MyPosManager.init() çağrılmadı"))
+            return
+        }
+        if (!isPosReady) {
+            callback(PaymentResult.Failed("Terminal hazır değil"))
+            return
+        }
+        if (isPaymentInProgress) {
+            callback(PaymentResult.Failed("Önceki işlem devam ediyor"))
+            return
+        }
+        cardCallback = callback // refund uses same complete callback
+        isPaymentInProgress = true
+        cardStartedAt = System.currentTimeMillis()
+        lastFinancialFailureStatus = -1
+        forceCleanSdkState()
+
+        val amountStr = String.format(java.util.Locale.US, "%.2f", amountInCHF)
+        // SDK has two refund signatures (per javap):
+        //   void refund(RefundParams)
+        //   void refund(String amount, String currency, int receipt)
+        // The legacy 3-arg form is simpler and we don't need the
+        // referenceNumber + referenceNumberType the builder API exposes
+        // (POS-side cash software already tracks the original RRN).
+        try {
+            posHandler?.refund(amountStr, currency, POSHandler.RECEIPT_DO_NOT_PRINT)
+            sendLog("➡️ refund($amountStr $currency)")
+        } catch (e: Throwable) {
+            isPaymentInProgress = false
+            cardCallback = null
+            callback(PaymentResult.Failed("refund() exception: ${e.message}"))
+        }
+    }
+
+    // ---- Listener setup ----
+
+    private fun setupListeners() {
+        val ph = posHandler ?: return
+
+        ph.setConnectionListener(object : ConnectionListener {
+            override fun onConnected(device: BluetoothDevice?) {
+                mainHandler.post {
+                    sendLog("🔗 SDK CONNECTED (waiting for POSReady)")
+                    isPosReady = false
+                    connectionListener?.invoke(false) // not READY yet
+                }
+            }
+
+            override fun onDisconnected(device: BluetoothDevice?) {
+                mainHandler.post {
+                    sendLog("🔌 SDK DISCONNECTED")
+                    isPosReady = false
+                    connectionListener?.invoke(false)
+                    // Kit §2: don't manually reconnect on TCP/IP — SDK
+                    // 2.1.9+ runs its own 2.5 s sleep+retry loop.
+                }
+            }
+        })
+
+        ph.setPOSReadyListener {
+            mainHandler.post {
+                sendLog("✅ POS READY — terminal command-layer ready")
+                isPosReady = true
+                connectionListener?.invoke(true)
+            }
+        }
+
+        ph.setPOSInfoListener(object : POSInfoListener {
+            override fun onPOSInfoReceived(command: Int, status: Int, description: String?, bundle: Bundle?) {
+                mainHandler.post { handlePosInfo(command, status, description) }
+            }
+
+            override fun onTransactionComplete(data: TransactionData?) {
+                mainHandler.post { handleTransactionComplete(data) }
+            }
+        })
+    }
+
+    private fun handlePosInfo(command: Int, status: Int, description: String?) {
+        sendLog("ℹ️ PosInfo cmd=$command status=$status (${getStatusName(status)}) desc=${description ?: "-"}")
+
+        // Stash financial-command failure status for handleTransactionComplete.
+        if (command == POSHandler.COMMAND_PURCHASE ||
+            command == POSHandler.COMMAND_REFUND ||
+            command == POSHandler.COMMAND_TWINT_PURCHASE
+        ) {
+            if (status in terminalFailureStatuses()) {
+                lastFinancialFailureStatus = status
+            }
+        }
+
+        // Card direct-fire: definite terminal failure → callback NOW.
+        // SDK does not always follow these with onTransactionComplete,
+        // so waiting for it was the 2026-05-13 cancel-stuck bug.
+        // (TWINT result path is onActivityResult; only fire here for
+        // card/refund.)
+        if (cardCallback != null && command != POSHandler.COMMAND_TWINT_PURCHASE) {
+            when (status) {
+                POSHandler.POS_STATUS_USER_CANCEL -> finishCard(PaymentResult.Cancelled)
+                POSHandler.POS_STATUS_INTERNAL_ERROR -> finishCard(PaymentResult.Failed("Terminal internal error"))
+                POSHandler.POS_STATUS_TERMINAL_BUSY -> finishCard(PaymentResult.Failed("Terminal busy"))
+                POSHandler.POS_STATUS_WRONG_AMOUNT -> finishCard(PaymentResult.Failed("Wrong amount"))
+                POSHandler.POS_STATUS_COM_ERROR -> finishCard(PaymentResult.Failed("Communication error"))
+                POSHandler.POS_STATUS_NO_CARD_FOUND -> finishCard(PaymentResult.Failed("Card not found"))
+                POSHandler.POS_STATUS_NOT_SUPPORTED_CARD -> finishCard(PaymentResult.Failed("Card not supported"))
+                POSHandler.POS_STATUS_CARD_CHIP_ERROR -> finishCard(PaymentResult.Failed("Card chip read error"))
+                POSHandler.POS_STATUS_INVALID_PIN -> finishCard(PaymentResult.Failed("Wrong PIN"))
+                POSHandler.POS_STATUS_MAX_PIN_COUNT_EXCEEDED -> finishCard(PaymentResult.Failed("PIN locked"))
+                POSHandler.POS_STATUS_TRANSACTION_NOT_FOUND -> finishCard(PaymentResult.Failed("Transaction not found"))
+                else -> { /* progress — wait */ }
+            }
+        }
+    }
+
+    private fun handleTransactionComplete(data: TransactionData?) {
+        sendLog("--- onTransactionComplete data=${data?.rrn ?: "null"} failureStatus=$lastFinancialFailureStatus")
+
+        // TWINT bypass: if a TWINT callback is pending, this event is
+        // almost certainly the SDK's response to a `getLastTransactionData()`
+        // call from the busy poller (SDK 2.1.9 sometimes never fires
+        // onActivityResult for TWINT). Forward to handleTwintResult as
+        // if it had come through onActivityResult.
+        if (twintCallback != null) {
+            sendLog("onTransactionComplete forwarded to TWINT result handler")
+            handleTwintResult(
+                REQ_CODE_TWINT,
+                if (data != null && !data.rrn.isNullOrEmpty()) Activity.RESULT_OK
+                    else Activity.RESULT_CANCELED,
+                buildSyntheticIntentFromData(data),
+            )
+            return
+        }
+
+        if (cardCallback == null) {
+            // handlePosInfo already finished it (or it's an orphan).
+            lastFinancialFailureStatus = -1
+            return
+        }
+
+        // Stale data — 60s window (production aligned).
+        if (data != null && cardStartedAt > 0) {
+            val txTime = try { data.transactionDateLocal?.time ?: 0L } catch (_: Throwable) { 0L }
+            if (txTime > 0 && txTime < cardStartedAt - 60_000) {
+                sendLog("⚠️ Stale onTransactionComplete (card, txTime=$txTime started=$cardStartedAt) — rejecting")
+                return
+            }
+        }
+
+        val rrn = data?.rrn?.trim().orEmpty()
+        val authCode = data?.authCode?.trim().orEmpty()
+        val approval = try { data?.approval?.trim().orEmpty() } catch (_: Throwable) { "" }
+        val declinedReason = data?.declinedReason1?.takeIf { it.isNotEmpty() }
+            ?: data?.declineReason2?.takeIf { it.isNotEmpty() }
+            ?: ""
+
+        val hasCardData = rrn.isNotEmpty() || authCode.isNotEmpty()
+        val hasApprovalCode = approval == "00" || approval == "0" ||
+            approval.equals("approved", ignoreCase = true)
+        val hasRealData = hasCardData || hasApprovalCode
+        val failureOrDefinite = lastFinancialFailureStatus in terminalFailureStatuses()
+        val hasExplicitDecline = declinedReason.isNotEmpty()
+
+        val result: PaymentResult = when {
+            failureOrDefinite -> when (lastFinancialFailureStatus) {
+                POSHandler.POS_STATUS_USER_CANCEL -> PaymentResult.Cancelled
+                else -> PaymentResult.Failed("status=${getStatusName(lastFinancialFailureStatus)}")
+            }
+            hasExplicitDecline -> PaymentResult.Declined(declinedReason)
+            hasRealData -> PaymentResult.Approved(
+                transactionId = if (rrn.isNotEmpty()) rrn else authCode,
+                authCode = authCode,
+                amount = data?.amount ?: "",
+                maskedPan = data?.panMasked ?: "",
+                cardType = data?.aidName ?: "",
+                terminalId = data?.terminalID ?: "",
+                merchantId = data?.merchantID ?: "",
+                stan = data?.stan ?: "",
+            )
+            else -> PaymentResult.Failed("No approval proof (rrn/authCode/approval all empty)")
+        }
+        finishCard(result)
+    }
+
+    private fun finishCard(result: PaymentResult) {
+        val cb = cardCallback
+        cardCallback = null
+        isPaymentInProgress = false
+        cardStartedAt = 0L
+        lastFinancialFailureStatus = -1
+        cb?.invoke(result)
+    }
+
+    private fun terminalFailureStatuses(): Set<Int> = setOf(
+        POSHandler.POS_STATUS_USER_CANCEL,
+        POSHandler.POS_STATUS_INTERNAL_ERROR,
+        POSHandler.POS_STATUS_TERMINAL_BUSY,
+        POSHandler.POS_STATUS_WRONG_AMOUNT,
+        POSHandler.POS_STATUS_COM_ERROR,
+        POSHandler.POS_STATUS_NO_CARD_FOUND,
+        POSHandler.POS_STATUS_NOT_SUPPORTED_CARD,
+        POSHandler.POS_STATUS_CARD_CHIP_ERROR,
+        POSHandler.POS_STATUS_INVALID_PIN,
+        POSHandler.POS_STATUS_MAX_PIN_COUNT_EXCEEDED,
+        POSHandler.POS_STATUS_TRANSACTION_NOT_FOUND,
+    )
+
+    private fun forceCleanSdkState() {
+        try {
+            val utilsClass = Class.forName("com.mypos.slavesdk.Utils")
+            val field = utilsClass.getDeclaredField("mTransactionInProgress")
+            field.isAccessible = true
+            if (field.getBoolean(null)) {
+                field.setBoolean(null, false)
+                sendLog("SDK busy flag was stuck — cleared")
+            }
+        } catch (e: Exception) {
+            // Non-fatal — only matters if the field was actually stuck.
+        }
+    }
+
+    private fun getCurrencyIsoNumeric(code: String): Int = when (code.uppercase()) {
+        "CHF" -> 756
+        "EUR" -> 978
+        "USD" -> 840
+        "GBP" -> 826
+        else -> 756
+    }
+
+    private fun getStatusName(status: Int): String = when (status) {
+        0 -> "SUCCESS"
+        1 -> "PENDING_USER_INTERACTION"
+        2 -> "USER_CANCEL"
+        3 -> "INTERNAL_ERROR"
+        4 -> "TERMINAL_BUSY"
+        11 -> "PROCESSING"
+        23 -> "WRONG_AMOUNT"
+        34 -> "SUCCESS_PURCHASE"
+        35 -> "SUCCESS_REFUND"
+        74 -> "PRESENT_CARD"
+        76 -> "ENTER_PIN"
+        79 -> "COM_ERROR"
+        else -> "STATUS_$status"
+    }
+
+    private fun sendLog(msg: String) {
+        Log.d(MTAG, msg)
+        try { logSink?.invoke(msg) } catch (_: Throwable) {}
+    }
+
+    // ---- Result type (Flutter conversion happens in plugin) ----
+
+    sealed class PaymentResult {
+        object Cancelled : PaymentResult()
+        data class Approved(
+            val transactionId: String,
+            val authCode: String,
+            val amount: String,
+            val maskedPan: String,
+            val cardType: String,
+            val terminalId: String,
+            val merchantId: String,
+            val stan: String,
+            val transRef: String = "",
+        ) : PaymentResult()
+        data class Declined(val reason: String) : PaymentResult()
+        data class Failed(val reason: String) : PaymentResult()
+    }
+}
+
+// =========================================================================
+// MyPosPlugin — thin Flutter shim that delegates to MyPosManager.
+// =========================================================================
 
 class MyPosPlugin :
     FlutterPlugin,
@@ -46,60 +721,45 @@ class MyPosPlugin :
     private lateinit var logChannel: EventChannel
     private var logSink: EventChannel.EventSink? = null
     private var activity: Activity? = null
+    private var activityBinding: ActivityPluginBinding? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var posHandler: POSHandler? = null
-    private var pendingResult: MethodChannel.Result? = null
-    private var pingResult: MethodChannel.Result? = null
-    private var tcpIp: String = "192.168.1.131"
-    private var tcpPort: Int = 60180
-
-    // Connection state
-    private var connectionState: ConnectionState = ConnectionState.DISCONNECTED
-    private var isConfigured: Boolean = false
-    private var reconnectAttempts: Int = 0
-    private var isReconnecting: Boolean = false
-    private var lastSuccessfulPingTime: Long = 0
-    private var heartbeatRunnable: Runnable? = null
-    private var isPaymentInProgress: Boolean = false
-
-    // Watchdog (ICMP ping in background thread)
-    @Volatile private var watchdogActive = false
-    private var watchdogThread: Thread? = null
-
-    enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED, RECONNECTING }
-
-    // =========================================================================
-    // Plugin lifecycle
-    // =========================================================================
+    private var appContext: Context? = null
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        appContext = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, "mypos_payment")
         channel.setMethodCallHandler(this)
-
         logChannel = EventChannel(binding.binaryMessenger, "mypos_logs")
         logChannel.setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink?) { logSink = events }
             override fun onCancel(arguments: Any?) { logSink = null }
         })
 
-        POSHandler.setApplicationContext(binding.applicationContext)
-        sendLog("✅ MyPOS plugin attached (TCP/IP mode)")
+        // Pipe MyPosManager logs to the Dart EventChannel + the connection
+        // listener to the Flutter MethodChannel callback.
+        MyPosManager.setLogSink { msg ->
+            mainHandler.post { logSink?.success(msg) }
+        }
+        MyPosManager.setConnectionListener { ready ->
+            mainHandler.post {
+                channel.invokeMethod("onConnectionChanged", mapOf(
+                    "connected" to ready,
+                    "state" to if (ready) "READY" else "NOT_READY",
+                    "reason" to "MyPosManager state change",
+                ))
+            }
+        }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        stopHeartbeat()
-        stopWatchdog()
         channel.setMethodCallHandler(null)
+        MyPosManager.setLogSink(null)
+        MyPosManager.setConnectionListener(null)
     }
-
-    private var activityBinding: ActivityPluginBinding? = null
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
         activityBinding = binding
-        // Required for TWINT: the SDK's `openPaymentActivity` returns via
-        // onActivityResult, which Flutter only forwards if the plugin is
-        // registered as an ActivityResultListener.
         binding.addActivityResultListener(this)
     }
 
@@ -116,1297 +776,117 @@ class MyPosPlugin :
     }
 
     override fun onDetachedFromActivity() {
-        stopHeartbeat()
-        stopWatchdog()
         activityBinding?.removeActivityResultListener(this)
         activityBinding = null
         activity = null
     }
 
-    // =========================================================================
-    // Method channel dispatch
-    // =========================================================================
-
-    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        when (call.method) {
-            "configure"          -> handleConfigure(call, result)
-            "disconnect"         -> handleDisconnect(result)
-            "isConnected"        -> result.success(mapOf("connected" to (connectionState == ConnectionState.CONNECTED)))
-            "checkRealConnection"-> handleCheckRealConnection(result)
-            "pingTerminal"       -> handlePingTerminal(result)
-            "testConnection"     -> result.success(mapOf("success" to (connectionState == ConnectionState.CONNECTED)))
-            "processPayment"     -> handlePayment(call, result)
-            "twintPurchase"      -> handleTwint(call, result)
-            "refund"             -> handleRefund(call, result)
-            "cancelPayment"      -> handleCancel(result)
-            "clearBatch"         -> handleClearBatch(result)
-            "isTerminalBusy"     -> result.success(mapOf("busy" to (posHandler?.isTerminalBusy() ?: false)))
-            else                 -> result.notImplemented()
-        }
-    }
-
-    // =========================================================================
-    // Configure (TCP/IP)
-    // =========================================================================
-
-    private fun handleConfigure(call: MethodCall, result: MethodChannel.Result) {
-        val type = call.argument<String>("type") ?: "tcp"
-        if (type != "tcp") {
-            sendLog("❌ Only TCP/IP is supported in GastroCore POS")
-            result.success(mapOf("success" to false, "error" to "Only TCP/IP supported"))
-            return
-        }
-
-        tcpIp = call.argument<String>("ip") ?: tcpIp
-        tcpPort = call.argument<Int>("port") ?: tcpPort
-
-        sendLog("⚙️ Configuring TCP/IP: $tcpIp:$tcpPort")
-        updateConnectionState(ConnectionState.CONNECTING, "configure called")
-
-        try {
-            if (posHandler == null) {
-                posHandler = POSHandler.getInstance()
-                setupListeners()
-            }
-
-            // SDK 2.1.8: setConnectionType and setTcpIpConnectivity are static
-            POSHandler.setConnectionType(ConnectionType.TCP_IP)
-            POSHandler.setTcpIpConnectivity(tcpIp, tcpPort)
-
-            activity?.let { ctx ->
-                posHandler?.connectDevice(ctx)
-                isConfigured = true
-                sendLog("📡 TCP connect initiated to $tcpIp:$tcpPort")
-                // Report success optimistically; real state comes via listener
-                result.success(mapOf("success" to true))
-                startWatchdog()
-                startHeartbeat()
-            } ?: run {
-                sendLog("❌ Activity not available")
-                result.success(mapOf("success" to false, "error" to "Activity not available"))
-            }
-        } catch (e: Exception) {
-            sendLog("❌ Configure error: ${e.message}")
-            updateConnectionState(ConnectionState.DISCONNECTED, "configure exception")
-            result.success(mapOf("success" to false, "error" to e.message))
-        }
-    }
-
-    private fun handleDisconnect(result: MethodChannel.Result) {
-        stopHeartbeat()
-        stopWatchdog()
-        try {
-            posHandler?.resetTcpConnection()
-        } catch (_: Exception) {}
-        isConfigured = false
-        reconnectAttempts = 0
-        updateConnectionState(ConnectionState.DISCONNECTED, "explicit disconnect")
-        result.success(mapOf("success" to true))
-    }
-
-    private fun handleCheckRealConnection(result: MethodChannel.Result) {
-        // Kit Troubleshooting §7: SDK 2.1.8's `isConnected()` is NOT a pure
-        // state check — it sends an OOB byte over the socket; if the byte
-        // fails to deliver, the SDK fires `onDisconnected` immediately.
-        // Calling it on every payment was actively destroying the very
-        // connection it was trying to verify. Trust our own state machine
-        // (driven by the ConnectionListener) instead — it tracks the
-        // SDK's view without the side effect.
-        val connected = connectionState == ConnectionState.CONNECTED && isPosReady
-        sendLog("🔍 checkRealConnection: state=$connectionState ready=$isPosReady → $connected")
-        result.success(mapOf("connected" to connected))
-    }
-
-    private fun handlePingTerminal(result: MethodChannel.Result) {
-        if (pingResult != null) {
-            result.success(mapOf("success" to false, "connected" to false, "error" to "Ping already in progress"))
-            return
-        }
-        pingResult = result
-        try {
-            posHandler?.checkConnection()
-            // Response handled in POSInfoListener
-            mainHandler.postDelayed({
-                if (pingResult != null) {
-                    sendLog("⏰ Ping timeout")
-                    pingResult?.success(mapOf("success" to false, "connected" to false))
-                    pingResult = null
-                    if (connectionState == ConnectionState.CONNECTED) {
-                        updateConnectionState(ConnectionState.DISCONNECTED, "ping timeout")
-                    }
-                }
-            }, 5000)
-        } catch (e: Exception) {
-            pingResult = null
-            result.success(mapOf("success" to false, "connected" to false))
-        }
-    }
-
-    // =========================================================================
-    // Payment operations
-    // =========================================================================
-
-    private fun handlePayment(call: MethodCall, result: MethodChannel.Result) {
-        val amount = call.argument<Double>("amount") ?: run {
-            result.success(mapOf("success" to false, "error" to "Missing amount"))
-            return
-        }
-        val currency = call.argument<String>("currency") ?: "CHF"
-
-        // 🚨 CRITICAL — operator reported "first payment auto-approves
-        // without card tap, second works". Symptom of a queued/stale
-        // `onTransactionComplete` event from a previous session firing
-        // *after* we set pendingResult on the new payment. Hard-reset
-        // any lingering session state here so the only outcome that can
-        // close this ticket is a fresh SDK callback we triggered
-        // ourselves.
-        resetPaymentSessionState("handlePayment entry")
-
-        ensureConnectionBeforePayment(
-            onReady = {
-                pendingResult = result
-                pendingOp = "purchase"
-                isPaymentInProgress = true
-                // Stamp the start time *immediately before* we tell the SDK
-                // to begin — used by onTransactionComplete to filter out
-                // any stale event with an older transactionDateLocal.
-                cardStartedAt = System.currentTimeMillis()
-                try {
-                    // Bundle alignment (2026-05-13):
-                    //  1) Pin the SDK's currency only when it differs from
-                    //     the last call. Pre-cache patch the SDK call fired
-                    //     on every payment and operators saw a perceptible
-                    //     "refresh" — pure SDK overhead with no benefit.
-                    val wantCurrency = getCurrencyEnum(currency)
-                    if (lastSetCurrency != wantCurrency) {
-                        POSHandler.setCurrency(wantCurrency)
-                        lastSetCurrency = wantCurrency
-                        sendLog("purchase: setCurrency($wantCurrency)")
-                    }
-                    //  2) Clear a stuck busy flag from a previous timeout/
-                    //     cancel — already conditional on isTerminalBusy.
-                    if (posHandler?.isTerminalBusy() == true) {
-                        sendLog("purchase: busy flag set — force clearing")
-                        forceCleanSdkState()
-                    }
-                    sendLog("purchase(${String.format("%.2f", amount)}, $currency, DO_NOT_PRINT)")
-                    // SDK 2.1.8 legacy signature: purchase(amount, currency, receiptConfig).
-                    // RECEIPT_DO_NOT_PRINT: POS prints its own receipt; don't
-                    // make the operator deal with a duplicate from the terminal.
-                    posHandler?.purchase(
-                        String.format("%.2f", amount),
-                        currency,
-                        POSHandler.RECEIPT_DO_NOT_PRINT
-                    )
-                    //  3) 75 s safety net so the POS dialog doesn't hang if
-                    //     the SDK never calls onTransactionComplete.
-                    schedulePaymentTimeout(result, "purchase")
-                } catch (e: Exception) {
-                    isPaymentInProgress = false
-                    pendingResult = null
-                    pendingOp = ""
-                    result.success(mapOf("success" to false, "error" to e.message))
-                }
-            },
-            onError = { err ->
-                result.success(mapOf("success" to false, "error" to err))
-            }
-        )
-    }
-
-    /// TWINT flow per official MyPOS SDK doc (MYPOS_SDK_STANDALONE.md §5):
-    /// completely separate from card purchase. SDK's `openPaymentActivity`
-    /// launches its own Activity (terminal shows the QR), customer scans
-    /// with the TWINT app, and the result returns via `onActivityResult`
-    /// in the host Activity (forwarded here via ActivityResultListener).
-    ///
-    /// Pre-fix this method called `posHandler.twintPurchase(amount, currency)`
-    /// — that's the WRONG SDK entry point for TWINT; the doc explicitly
-    /// says PaymentParams isn't used for TWINT and the only correct path
-    /// is openPaymentActivity. That's why no QR ever appeared on the
-    /// terminal — the legacy call was a silent no-op.
-    private fun handleTwint(call: MethodCall, result: MethodChannel.Result) {
-        val amount = call.argument<Double>("amount") ?: run {
-            result.success(mapOf("success" to false, "error" to "Missing amount"))
-            return
-        }
-        if (amount <= 0) {
-            result.success(mapOf("success" to false, "error" to "Amount must be > 0"))
-            return
-        }
-        val act = activity
-        if (act == null) {
-            // TWINT *requires* an Activity context (doc §6). We can't
-            // launch openPaymentActivity from a Service or detached engine.
-            result.success(mapOf(
-                "success"   to false,
-                "errorCode" to "NO_ACTIVITY",
-                "error"     to "TWINT için Activity context şart — uygulama foreground'da değil"
-            ))
-            return
-        }
-
-        // Same hard-reset as handlePayment: clear any queued stale event
-        // before we set pendingResult so the first SDK callback we get
-        // is the one for *this* transaction.
-        resetPaymentSessionState("handleTwint entry")
-
-        ensureConnectionBeforePayment(
-            onReady = {
-                pendingResult = result
-                pendingOp = "twint"
-                isPaymentInProgress = true
-                lastTwintTransRef = UUID.randomUUID().toString()
-                twintStartedAt = System.currentTimeMillis()
-                val amountStr = String.format(java.util.Locale.US, "%.2f", amount)
-                try {
-                    // TWINT is CHF-only at the SDK level.
-                    if (lastSetCurrency != Currency.CHF) {
-                        POSHandler.setCurrency(Currency.CHF)
-                        lastSetCurrency = Currency.CHF
-                        sendLog("twint: setCurrency(CHF)")
-                    }
-                    if (posHandler?.isTerminalBusy() == true) {
-                        sendLog("twint: busy flag set — force clearing")
-                        forceCleanSdkState()
-                    }
-                    Log.i(TAG, "openPaymentActivity ENTRY amount=$amountStr transRef=$lastTwintTransRef act=${act.javaClass.simpleName}")
-                    sendLog("➡️ openPaymentActivity($amountStr, CHF, transRef=$lastTwintTransRef)")
-                    // ActivityNotFoundException is the specific symptom the
-                    // operator hit after the doc-spec rewrite: SDK fires an
-                    // Intent for `com.mypos.slavesdk.OperationActivity` which
-                    // must be declared in *our* AndroidManifest (the AAR's
-                    // own declaration uses a non-AppCompat theme that gets
-                    // stripped by the merger). We catch it explicitly so the
-                    // operator sees a clean error instead of an app crash.
-                    posHandler?.openPaymentActivity(
-                        act,
-                        REQ_CODE_TWINT,
-                        amountStr,
-                        lastTwintTransRef
-                    )
-                    sendLog("twint: launched via openPaymentActivity — waiting for onActivityResult")
-                    // 180 s safety net — TWINT can legitimately take ~90 s
-                    // (doc §6); double that gives slow customers room. If
-                    // onActivityResult fires earlier the timer is cancelled.
-                    schedulePaymentTimeout(result, "twintActivity")
-                } catch (e: ActivityNotFoundException) {
-                    Log.e(TAG, "TWINT: OperationActivity not found", e)
-                    sendLog("❌ TWINT: OperationActivity not declared in manifest (or theme mismatch)")
-                    isPaymentInProgress = false
-                    pendingResult = null
-                    pendingOp = ""
-                    cancelPaymentTimeout()
-                    result.success(mapOf(
-                        "success"   to false,
-                        "errorCode" to "MANIFEST_MISSING",
-                        "error"     to "MyPOS OperationActivity manifest'te eksik / tema uyumsuz — APK build sorunu"
-                    ))
-                } catch (e: Throwable) {
-                    Log.e(TAG, "openPaymentActivity EXCEPTION", e)
-                    sendLog("❌ openPaymentActivity failed: ${e.javaClass.simpleName}: ${e.message}")
-                    isPaymentInProgress = false
-                    pendingResult = null
-                    pendingOp = ""
-                    cancelPaymentTimeout()
-                    result.success(mapOf(
-                        "success"   to false,
-                        "errorCode" to "TWINT_EXCEPTION",
-                        "error"     to "${e.javaClass.simpleName}: ${e.message ?: "unknown"}"
-                    ))
-                }
-            },
-            onError = { err ->
-                result.success(mapOf("success" to false, "error" to err))
-            }
-        )
-    }
-
-    /// SDK delivers the TWINT result here via ActivityResultListener.
-    /// Result Intent extras (per doc §5):
-    ///   - "pos_status": Int (POSHandler.POS_STATUS_*)
-    ///   - "transaction_data": Parcelable TransactionData
-    /// resultCode is RESULT_CANCELED on user cancel.
-    override fun onActivityResult(
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?
-    ): Boolean {
-        if (requestCode != REQ_CODE_TWINT) return false
-        Log.i(TAG, "TWINT onActivityResult resultCode=$resultCode hasData=${data != null}")
-        sendLog("✉️ TWINT onActivityResult: resultCode=$resultCode")
-        cancelPaymentTimeout()
-        val result = pendingResult
-        pendingResult = null
-        val wasTwint = pendingOp == "twint"
-        pendingOp = ""
-        isPaymentInProgress = false
-        if (result == null || !wasTwint) {
-            sendLog("TWINT result arrived but pendingResult is stale — dropping")
-            return true
-        }
-
-        val txData: TransactionData? = try {
-            @Suppress("DEPRECATION")
-            data?.getParcelableExtra("transaction_data")
-        } catch (e: Throwable) {
-            sendLog("TWINT result: parcelable read failed: ${e.message}")
-            null
-        }
-        val posStatus = data?.getIntExtra("pos_status", -1) ?: -1
-
-        // Kit Troubleshooting §5: occasionally the SDK hands back the
-        // PREVIOUS transaction's data when a second TWINT starts quickly.
-        // If the txn timestamp predates our `twintStartedAt - 60s` window
-        // it can't be ours; refuse it so the POS doesn't accidentally
-        // mark a completely different sale as paid.
-        if (txData != null) {
-            val txTime = try { txData.transactionDateLocal?.time ?: 0L }
-                catch (_: Throwable) { 0L }
-            if (txTime > 0 && txTime < twintStartedAt - 60_000) {
-                sendLog("⚠️ TWINT stale data (txTime=$txTime started=$twintStartedAt) — rejecting")
-                result.success(mapOf(
-                    "success"   to false,
-                    "errorCode" to "STALE_DATA",
-                    "error"     to "TWINT eski işlem verisi döndü (SDK bug) — manuel kontrol"
-                ))
-                return true
-            }
-        }
-
-        when {
-            txData != null && !txData.rrn.isNullOrEmpty() -> {
-                val declined = txData.declinedReason1?.takeIf { it.isNotEmpty() }
-                    ?: txData.declineReason2?.takeIf { it.isNotEmpty() }
-                if (declined != null) {
-                    sendLog("❌ TWINT declined: $declined")
-                    result.success(mapOf(
-                        "success"   to false,
-                        "errorCode" to "DECLINED",
-                        "error"     to "TWINT reddedildi: $declined"
-                    ))
-                } else {
-                    sendLog("✅ TWINT approved rrn=${txData.rrn}")
-                    result.success(mapOf(
-                        "success"       to true,
-                        "transactionId" to (txData.rrn ?: ""),
-                        "authCode"      to (txData.authCode ?: ""),
-                        "amount"        to (txData.amount ?: "0.00"),
-                        "maskedPan"     to (txData.panMasked ?: ""),
-                        "cardType"      to "TWINT",
-                        "transRef"      to lastTwintTransRef
-                    ))
-                }
-            }
-            resultCode == Activity.RESULT_CANCELED -> {
-                sendLog("TWINT cancelled by user (RESULT_CANCELED)")
-                result.success(mapOf(
-                    "success"   to false,
-                    "errorCode" to "CANCELLED",
-                    "error"     to "Kullanıcı iptal etti"
-                ))
-            }
-            posStatus != -1 && posStatus != POSHandler.POS_STATUS_SUCCESS -> {
-                sendLog("TWINT failed: pos_status=$posStatus")
-                result.success(mapOf(
-                    "success"   to false,
-                    "errorCode" to "STATUS_$posStatus",
-                    "error"     to "TWINT başarısız: status=$posStatus"
-                ))
-            }
-            else -> {
-                sendLog("TWINT result: no data and no status — treating as failed")
-                result.success(mapOf(
-                    "success"   to false,
-                    "errorCode" to "NO_DATA",
-                    "error"     to "TWINT sonucu alınamadı (no transaction_data, status=-1)"
-                ))
-            }
-        }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != MyPosManager.REQ_CODE_TWINT) return false
+        MyPosManager.handleTwintResult(requestCode, resultCode, data)
         return true
     }
 
-    private fun handleRefund(call: MethodCall, result: MethodChannel.Result) {
-        val amount = call.argument<Double>("amount") ?: 0.0
-        val currency = call.argument<String>("currency") ?: "CHF"
-
-        ensureConnectionBeforePayment(
-            onReady = {
-                pendingResult = result
-                isPaymentInProgress = true
-                try {
-                    // SDK 2.1.8: refund(String amount, String currency, int receiptConfig)
-                    posHandler?.refund(
-                        String.format("%.2f", amount),
-                        currency,
-                        POSHandler.RECEIPT_PRINT_AUTOMATICALLY
-                    )
-                } catch (e: Exception) {
-                    isPaymentInProgress = false
-                    pendingResult = null
-                    result.success(mapOf("success" to false, "error" to e.message))
-                }
-            },
-            onError = { err ->
-                result.success(mapOf("success" to false, "error" to err))
+    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        when (call.method) {
+            "configure" -> handleConfigure(call, result)
+            "disconnect" -> {
+                // Manager doesn't expose explicit disconnect; treat as cancel-only.
+                MyPosManager.cancelCurrentTransaction()
+                result.success(mapOf("success" to true))
             }
-        )
+            "isConnected" -> result.success(mapOf("connected" to MyPosManager.isConnected()))
+            "checkRealConnection" -> result.success(mapOf("connected" to (MyPosManager.isConnected() && MyPosManager.isPosReady)))
+            "testConnection" -> result.success(mapOf("success" to MyPosManager.isPosReady))
+            "pingTerminal" -> {
+                // Heartbeat-equivalent: trust state flag (kit §7).
+                val ok = MyPosManager.isConnected() && MyPosManager.isPosReady
+                result.success(mapOf("success" to ok, "connected" to ok))
+            }
+            "isTerminalBusy" -> result.success(mapOf("busy" to MyPosManager.isTerminalBusy()))
+            "processPayment" -> handlePayment(call, result)
+            "twintPurchase" -> handleTwint(call, result)
+            "refund" -> handleRefund(call, result)
+            "cancelPayment" -> result.success(mapOf("success" to MyPosManager.cancelCurrentTransaction()))
+            "clearBatch" -> MyPosManager.clearBatch { success, err ->
+                result.success(mapOf(
+                    "success" to success,
+                    "status" to (if (success) "batch_cleared" else "failed"),
+                    "error" to (err ?: ""),
+                ))
+            }
+            else -> result.notImplemented()
+        }
     }
 
-    private fun handleCancel(result: MethodChannel.Result) {
-        // Cashier-initiated cancel: kill the in-flight timer + poller too,
-        // otherwise they'd fire 75 s / 6 s later and try to push a second
-        // result through a now-null pendingResult.
-        cancelPaymentTimeout()
-        stopTwintBusyPoller()
+    private fun handleConfigure(call: MethodCall, result: MethodChannel.Result) {
+        val ip = call.argument<String>("ip") ?: "192.168.1.131"
+        val port = call.argument<Int>("port") ?: 60180
         try {
-            // SDK 2.1.8: cancel() → cancelTransaction()
-            posHandler?.cancelTransaction()
+            val ctx = activity ?: appContext
+                ?: return result.success(mapOf("success" to false, "error" to "No context available"))
+            MyPosManager.init(ctx, ip, port)
             result.success(mapOf("success" to true))
-        } catch (e: Exception) {
-            result.success(mapOf("success" to false, "error" to e.message))
+        } catch (e: Throwable) {
+            Log.e(TAG, "configure() failed", e)
+            result.success(mapOf("success" to false, "error" to (e.message ?: "configure failed")))
         }
     }
 
-    private fun handleClearBatch(result: MethodChannel.Result) {
-        ensureConnectionBeforePayment(
-            onReady = {
-                pendingResult = result
-                try {
-                    posHandler?.clearBatch()
-                } catch (e: Exception) {
-                    pendingResult = null
-                    result.success(mapOf("success" to false, "error" to e.message))
-                }
-            },
-            onError = { err ->
-                result.success(mapOf("success" to false, "error" to err))
-            }
-        )
+    private fun handlePayment(call: MethodCall, result: MethodChannel.Result) {
+        val amount = call.argument<Double>("amount")
+            ?: return result.success(mapOf("success" to false, "error" to "Missing amount"))
+        MyPosManager.processCardPayment(amount) { r -> result.success(toMap(r)) }
     }
 
-    // =========================================================================
-    // Pre-payment connection verification
-    // =========================================================================
-
-    private fun ensureConnectionBeforePayment(
-        onReady: () -> Unit,
-        onError: (String) -> Unit,
-    ) {
-        // Pre-v3 (2026-05-12 fix): the dialog could race the SDK — a fresh
-        // configure() leaves state=CONNECTING for ~1-3 s before onConnected
-        // fires, and the payment request that came in right after was
-        // hard-rejected here with "Terminal not connected (state: CONNECTING)".
-        // Now we tolerate a brief CONNECTING window: poll up to 3 s at 200 ms
-        // intervals, only fail if the state hasn't settled by then.
-        if (connectionState != ConnectionState.CONNECTED) {
-            sendLog("⏳ Pre-payment: state=$connectionState, waiting up to 3 s for handshake")
-            val startWait = System.currentTimeMillis()
-            val deadlineMs = 3000L
-            val pollMs = 200L
-            val poller = object : Runnable {
-                override fun run() {
-                    if (connectionState == ConnectionState.CONNECTED) {
-                        val waited = System.currentTimeMillis() - startWait
-                        sendLog("✅ Pre-payment: settled after ${waited}ms — proceeding")
-                        proceedWithPaymentChecks(onReady, onError)
-                        return
-                    }
-                    if (System.currentTimeMillis() - startWait >= deadlineMs) {
-                        onError("Terminal not connected (state: $connectionState) — handshake timed out")
-                        return
-                    }
-                    mainHandler.postDelayed(this, pollMs)
-                }
-            }
-            mainHandler.post(poller)
-            return
-        }
-
-        proceedWithPaymentChecks(onReady, onError)
-    }
-
-    /// Skip the pre-payment PING round-trip when the heartbeat has confirmed
-    /// the terminal recently. Pre-fix this method (then `runPingThenPayment`)
-    /// always pinged + waited 2 s per payment, which the operator perceived
-    /// as a "refresh" every single ÖDE. The 60 s heartbeat already runs and
-    /// updates `lastSuccessfulPingTime`, so within 30 s of a heartbeat we
-    /// have strong evidence the terminal is up — no need to pay another 2 s.
-    ///
-    /// Per the official doc (§3 + §10) there's a *second* gate: command-
-    /// layer readiness (`isPosReady`, fired by setPOSReadyListener). Without
-    /// it `purchase()` / `openPaymentActivity()` can silently no-op even on
-    /// a connected socket. We wait up to 2 s for that signal — long enough
-    /// for the post-connect handshake, short enough that a wedged terminal
-    /// still surfaces a clean error.
-    private fun proceedWithPaymentChecks(
-        onReady: () -> Unit,
-        onError: (String) -> Unit,
-    ) {
-        if (!isPosReady) {
-            sendLog("⏳ Pre-payment: waiting for POSReady (handshake in progress)")
-            val startWait = System.currentTimeMillis()
-            val deadlineMs = 2000L
-            val pollMs = 100L
-            val poller = object : Runnable {
-                override fun run() {
-                    if (isPosReady) {
-                        val waited = System.currentTimeMillis() - startWait
-                        sendLog("✅ Pre-payment: POSReady arrived after ${waited}ms")
-                        proceedWithPaymentChecksReady(onReady, onError)
-                        return
-                    }
-                    if (System.currentTimeMillis() - startWait >= deadlineMs) {
-                        onError("Terminal POSReady not signalled within ${deadlineMs}ms")
-                        return
-                    }
-                    mainHandler.postDelayed(this, pollMs)
-                }
-            }
-            mainHandler.post(poller)
-            return
-        }
-        proceedWithPaymentChecksReady(onReady, onError)
-    }
-
-    private fun proceedWithPaymentChecksReady(
-        onReady: () -> Unit,
-        onError: (String) -> Unit,
-    ) {
-        val sinceLastPing = System.currentTimeMillis() - lastSuccessfulPingTime
-        if (sinceLastPing in 0..30_000) {
-            sendLog("✅ Pre-payment: heartbeat fresh (${sinceLastPing}ms ago) — skipping ping")
-            onReady()
-            return
-        }
-        runPingThenPayment(onReady, onError)
-    }
-
-    private fun runPingThenPayment(
-        onReady: () -> Unit,
-        onError: (String) -> Unit,
-    ) {
-        // Send real PING and wait for response before proceeding
-        sendLog("🔍 Pre-payment PING verification...")
-        val startTime = System.currentTimeMillis()
-
-        try {
-            posHandler?.checkConnection()
-        } catch (e: Exception) {
-            onError("Pre-payment ping failed: ${e.message}")
-            return
-        }
-
-        // Wait up to 2 s for ping response
-        mainHandler.postDelayed({
-            val elapsed = System.currentTimeMillis() - startTime
-            if (connectionState == ConnectionState.CONNECTED) {
-                sendLog("✅ Pre-payment PING OK (${elapsed}ms)")
-                onReady()
-            } else {
-                onError("Terminal disconnected during pre-payment check")
-            }
-        }, 2000)
-    }
-
-    // =========================================================================
-    // Payment safety helpers — ported from MyPOS-only bundle (2026-05-13)
-    // =========================================================================
-
-    /// Last UUID we minted for a TWINT request. SDK 2.1.8 doesn't accept
-    /// a transRef on `twintPurchase(String, String)`, so this is a
-    /// client-side correlation token surfaced in the response payload so
-    /// the POS receipt + audit log can reference *something* unique even
-    /// when the terminal RRN is missing.
-    private var lastTwintTransRef: String = ""
-
-    /// Wall-clock at which the current TWINT was launched. Kit
-    /// Troubleshooting §5: `getLastTransactionData()` (and even the SDK's
-    /// own onActivityResult) can occasionally return the **previous**
-    /// transaction's data, e.g. when the operator quickly fires a second
-    /// TWINT before SDK state has fully reset. We compare the result's
-    /// transaction date against this — anything older than 60 s before
-    /// launch is treated as stale.
-    private var twintStartedAt: Long = 0L
-
-    /// Same guard, extended to CARD payments. RotaKit's troubleshooting
-    /// only documents §5 for TWINT, but operators reported a "first
-    /// payment auto-approves without touching the card, second works" —
-    /// classic stale `onTransactionComplete` from a previous app run or
-    /// reconnect cycle still queued in `mainHandler`. We capture the
-    /// wall-clock the moment `purchase()` is called and reject any
-    /// onTransactionComplete with a `transactionDateLocal` predating
-    /// that minus a 5 s margin.
-    private var cardStartedAt: Long = 0L
-
-    /// Cache the last SDK-level currency / receipt-config we set so we
-    /// don't re-issue identical calls on every payment. Pre-fix the
-    /// operator saw a perceptible "refresh" before every ÖDE; that was
-    /// `setCurrency` + (TWINT) `setDefaultReceiptConfig` firing each time.
-    private var lastSetCurrency: Currency? = null
-    private var lastReceiptConfig: Int = -1
-
-    /// SDK command-layer readiness — `setPOSReadyListener` fires this true
-    /// after the terminal completes its post-connect handshake. The plugin
-    /// already treated `connectionState=CONNECTED` as "go" but the official
-    /// doc (§3 + §10) says command-layer ready is a separate gate. Without
-    /// it `purchase()` and `openPaymentActivity()` can be silently no-op'd
-    /// by the SDK if it isn't yet ready.
-    private var isPosReady: Boolean = false
-
-    /// One-time guard for `setupListeners()`. Kit Troubleshooting §1: SDK's
-    /// `setConnectionListener` *appends* (doesn't replace) — re-calling
-    /// would accumulate listeners and re-handshake the terminal into the
-    /// "You are all set" loop. Defensively double-check even though our
-    /// posHandler-null gate already prevents this in the common path.
-    private var listenersAttached: Boolean = false
-
-    /// Request code for TWINT's openPaymentActivity flow. SDK returns the
-    /// result via onActivityResult with this code.
-    private val REQ_CODE_TWINT = 9001
-
-    /// Kit Troubleshooting §3: SDK fires the failure status (USER_CANCEL,
-    /// COM_ERROR, TERMINAL_BUSY...) via `onPOSInfoReceived` first, then
-    /// follows up with `onTransactionComplete(null)`. If we hand back a
-    /// generic "no transaction data" error on the second callback the POS
-    /// layer reports a failed sale even though the operator just hit
-    /// cancel. We stash the most-recent financial-command failure status
-    /// here so onTransactionComplete can map it back to the right errorCode.
-    private var lastFinancialFailureStatus: Int = -1
-
-    /// Failure status codes worth surfacing as semantic errors (rather
-    /// than the generic NO_DATA). Copied from the kit's MyPosManager.
-    private fun terminalFailureStatuses(): Set<Int> = setOf(
-        POSHandler.POS_STATUS_USER_CANCEL,
-        POSHandler.POS_STATUS_INTERNAL_ERROR,
-        POSHandler.POS_STATUS_TERMINAL_BUSY,
-        POSHandler.POS_STATUS_WRONG_AMOUNT,
-        POSHandler.POS_STATUS_COM_ERROR,
-        POSHandler.POS_STATUS_NO_CARD_FOUND,
-        POSHandler.POS_STATUS_NOT_SUPPORTED_CARD,
-        POSHandler.POS_STATUS_CARD_CHIP_ERROR,
-        POSHandler.POS_STATUS_INVALID_PIN,
-        POSHandler.POS_STATUS_MAX_PIN_COUNT_EXCEEDED,
-        POSHandler.POS_STATUS_TRANSACTION_NOT_FOUND,
-    )
-
-    /// Map a POSHandler status int to a stable string error code surfaced
-    /// to Dart. CANCELLED is the cleanest signal for the cash-software side
-    /// (Cash Collector / payment_screen) so it knows to leave the ticket
-    /// open rather than mark a refund.
-    private fun statusToErrorCode(status: Int): String = when (status) {
-        POSHandler.POS_STATUS_USER_CANCEL          -> "CANCELLED"
-        POSHandler.POS_STATUS_TERMINAL_BUSY        -> "TERMINAL_BUSY"
-        POSHandler.POS_STATUS_WRONG_AMOUNT         -> "WRONG_AMOUNT"
-        POSHandler.POS_STATUS_COM_ERROR            -> "COM_ERROR"
-        POSHandler.POS_STATUS_NO_CARD_FOUND        -> "NO_CARD"
-        POSHandler.POS_STATUS_NOT_SUPPORTED_CARD   -> "CARD_NOT_SUPPORTED"
-        POSHandler.POS_STATUS_CARD_CHIP_ERROR      -> "CARD_CHIP_ERROR"
-        POSHandler.POS_STATUS_INVALID_PIN          -> "INVALID_PIN"
-        POSHandler.POS_STATUS_MAX_PIN_COUNT_EXCEEDED -> "PIN_LOCKED"
-        POSHandler.POS_STATUS_TRANSACTION_NOT_FOUND -> "TX_NOT_FOUND"
-        else                                        -> "STATUS_$status"
-    }
-
-    /// Currently in-flight operation, used by timeout / poller paths to
-    /// know whether the pendingResult they hold is still theirs.
-    private var pendingOp: String = ""
-
-    /// Wipe every piece of "current transaction" state before starting a
-    /// new payment. Without this the operator's first payment can be
-    /// auto-approved by a stale `onTransactionComplete` event left over
-    /// from the previous app launch / reconnect — the very symptom
-    /// reported on 2026-05-13 ("ilk ödemede otomatik onaylıyor, kart hiç
-    /// yaklaştırmadan adisyon ödendi"). Called at the top of every
-    /// handlePayment / handleTwint entry.
-    private fun resetPaymentSessionState(reason: String) {
-        if (pendingResult != null || isPaymentInProgress) {
-            sendLog("🧹 resetPaymentSessionState ($reason): clearing stale pending state " +
-                "[pendingOp=$pendingOp, isPaymentInProgress=$isPaymentInProgress]")
-        }
-        cancelPaymentTimeout()
-        stopTwintBusyPoller()
-        pendingResult = null
-        pendingOp = ""
-        isPaymentInProgress = false
-        lastFinancialFailureStatus = -1
-        cardStartedAt = 0L
-        twintStartedAt = 0L
-        lastTwintTransRef = ""
-    }
-
-    /// Reflection-based unstick for the SDK's `mTransactionInProgress`
-    /// flag. The SDK occasionally leaves it true after a cancel/timeout,
-    /// which then makes the next purchase silently fail with TERMINAL_BUSY.
-    /// Copied from MyPOS-only bundle's `forceCleanSdkState`.
-    private fun forceCleanSdkState() {
-        try {
-            val utilsClass = Class.forName("com.mypos.slavesdk.Utils")
-            val field = utilsClass.getDeclaredField("mTransactionInProgress")
-            field.isAccessible = true
-            val wasBusy = field.getBoolean(null)
-            if (wasBusy) {
-                field.setBoolean(null, false)
-                sendLog("SDK busy flag cleared (was stuck)")
-            }
-        } catch (e: Exception) {
-            sendLog("forceCleanSdkState: ${e.message}")
-        }
-    }
-
-    /// Map an ISO 4217 alpha code to the SDK's Currency enum. Used for
-    /// `POSHandler.setCurrency(...)` ahead of every purchase so a previous
-    /// transaction's currency doesn't leak in.
-    private fun getCurrencyEnum(code: String): Currency = when (code.uppercase()) {
-        "EUR" -> Currency.EUR
-        "USD" -> Currency.USD
-        "GBP" -> Currency.GBP
-        else  -> Currency.CHF
-    }
-
-    // ---------- Payment timeout (75 s) ----------
-
-    private var paymentTimeoutRunnable: Runnable? = null
-
-    /// Posts a 75 s safety net: if the SDK never fires
-    /// `onTransactionComplete` we cancel the pending payment with a TIMEOUT
-    /// error so the POS dialog doesn't hang forever. Called right after
-    /// firing `purchase()` / `twintPurchase()`; cancelled on
-    /// `onTransactionComplete`, `handleCancel`, and on each subsequent
-    /// payment start.
-    private fun schedulePaymentTimeout(result: MethodChannel.Result, op: String) {
-        cancelPaymentTimeout()
-        val timeoutMs = 75_000L
-        paymentTimeoutRunnable = Runnable {
-            if (pendingResult != result) return@Runnable
-            sendLog("⏱ $op timeout after ${timeoutMs / 1000}s — no SDK callback, cancelling")
-            try { posHandler?.cancelTransaction() } catch (_: Exception) {}
-            forceCleanSdkState()
-            isPaymentInProgress = false
-            val r = pendingResult
-            pendingResult = null
-            pendingOp = ""
-            stopTwintBusyPoller()
-            r?.success(mapOf(
-                "success"   to false,
-                "errorCode" to "TIMEOUT",
-                "error"     to "$op timeout — no response from terminal"
+    private fun handleTwint(call: MethodCall, result: MethodChannel.Result) {
+        val amount = call.argument<Double>("amount")
+            ?: return result.success(mapOf("success" to false, "error" to "Missing amount"))
+        val act = activity
+            ?: return result.success(mapOf(
+                "success" to false,
+                "errorCode" to "NO_ACTIVITY",
+                "error" to "TWINT için Activity context şart — uygulama foreground'da değil"
             ))
-        }
-        mainHandler.postDelayed(paymentTimeoutRunnable!!, timeoutMs)
+        MyPosManager.processTwintPayment(act, amount) { r -> result.success(toMap(r)) }
     }
 
-    private fun cancelPaymentTimeout() {
-        paymentTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
-        paymentTimeoutRunnable = null
+    private fun handleRefund(call: MethodCall, result: MethodChannel.Result) {
+        val amount = call.argument<Double>("amount")
+            ?: return result.success(mapOf("success" to false, "error" to "Missing amount"))
+        val currency = call.argument<String>("currency") ?: "CHF"
+        MyPosManager.processRefund(amount, currency) { r -> result.success(toMap(r)) }
     }
 
-    // ---------- TWINT busy poller ----------
-    //
-    // The SDK is unreliable about firing `onTransactionComplete` for TWINT
-    // when the customer dismisses the QR screen or the terminal times out
-    // internally — it just goes idle. We poll `isTerminalBusy` and, after
-    // 3 consecutive idle ticks past a 3 s grace window, declare the
-    // transaction CANCELLED so the dialog can close instead of hanging.
-    // Simpler than the bundle's variant (no `queryLastTransaction`
-    // dependency) — adequate for our use.
-
-    private var twintBusyPollRunnable: Runnable? = null
-    private var twintNotBusyStreak: Int = 0
-    private var twintPollStartedAt: Long = 0L
-
-    private fun startTwintBusyPoller(result: MethodChannel.Result) {
-        stopTwintBusyPoller()
-        twintNotBusyStreak = 0
-        twintPollStartedAt = System.currentTimeMillis()
-        twintBusyPollRunnable = object : Runnable {
-            override fun run() {
-                if (pendingResult != result || pendingOp != "twint") {
-                    sendLog("TWINT poller: pendingResult changed, stopping")
-                    return
-                }
-                val elapsed = System.currentTimeMillis() - twintPollStartedAt
-                // Grace window: SDK takes ~1-2 s to set busy=true.
-                if (elapsed < 3000) {
-                    mainHandler.postDelayed(this, 1500)
-                    return
-                }
-                val busy = try {
-                    posHandler?.isTerminalBusy() ?: false
-                } catch (_: Exception) { false }
-                if (busy) {
-                    twintNotBusyStreak = 0
-                } else {
-                    twintNotBusyStreak++
-                    sendLog("TWINT poller: idle (streak=$twintNotBusyStreak)")
-                    // 3 idle checks × 2 s = 6 s without callback → treat as cancel.
-                    if (twintNotBusyStreak >= 3) {
-                        sendLog("TWINT poller: 6 s idle without callback — declaring CANCELLED")
-                        cancelPaymentTimeout()
-                        isPaymentInProgress = false
-                        val r = pendingResult
-                        pendingResult = null
-                        pendingOp = ""
-                        r?.success(mapOf(
-                            "success"   to false,
-                            "errorCode" to "CANCELLED",
-                            "error"     to "TWINT cancelled (terminal idle without callback)"
-                        ))
-                        return
-                    }
-                }
-                mainHandler.postDelayed(this, 2000)
-            }
-        }
-        mainHandler.postDelayed(twintBusyPollRunnable!!, 1500)
-    }
-
-    private fun stopTwintBusyPoller() {
-        twintBusyPollRunnable?.let { mainHandler.removeCallbacks(it) }
-        twintBusyPollRunnable = null
-    }
-
-    // =========================================================================
-    // SDK listeners
-    // =========================================================================
-
-    private fun setupListeners() {
-        if (listenersAttached) {
-            // Kit §1 — accidentally calling setConnectionListener twice
-            // accumulates callbacks; the terminal then enters its "You
-            // are all set" loop and refuses commands. Guard belt-and-
-            // suspenders even though handleConfigure's posHandler-null
-            // gate already prevents re-entry on the happy path.
-            sendLog("setupListeners: already attached — skipping (kit §1 guard)")
-            return
-        }
-        listenersAttached = true
-        // SDK 2.1.8: ConnectionListener callbacks take BluetoothDevice param (ignored for TCP)
-        posHandler?.setConnectionListener(object : ConnectionListener {
-            override fun onConnected(device: BluetoothDevice?) {
-                mainHandler.post {
-                    sendLog("🔗 SDK onConnected (waiting for POSReady)")
-                    reconnectAttempts = 0
-                    isReconnecting = false
-                    isPosReady = false  // command-layer waits for POSReadyListener
-                    lastSuccessfulPingTime = System.currentTimeMillis()
-                    updateConnectionState(ConnectionState.CONNECTED, "SDK connected callback")
-                    startHeartbeat()
-                }
-            }
-
-            override fun onDisconnected(device: BluetoothDevice?) {
-                mainHandler.post {
-                    sendLog("🔌 SDK onDisconnected")
-                    isPosReady = false
-                    updateConnectionState(ConnectionState.DISCONNECTED, "SDK disconnected callback")
-                }
-            }
-        })
-
-        posHandler?.setPOSReadyListener(object : POSReadyListener {
-            override fun onPOSReady() {
-                mainHandler.post {
-                    sendLog("✅ Terminal POS ready — can dispatch commands")
-                    isPosReady = true
-                    if (connectionState != ConnectionState.CONNECTED) {
-                        updateConnectionState(ConnectionState.CONNECTED, "POS ready")
-                    }
-                }
-            }
-        })
-
-        // SDK 2.1.8: POSInfoListener.onPOSInfoReceived(command, status, message, bundle)
-        posHandler?.setPOSInfoListener(object : POSInfoListener {
-            override fun onPOSInfoReceived(command: Int, status: Int, message: String?, bundle: Bundle?) {
-                mainHandler.post {
-                    sendLog("ℹ️ POSInfo cmd=$command status=$status: $message")
-
-                    // Kit Troubleshooting §3 stash AND the production
-                    // pattern (MyPosPlugin-production.kt line 1250+):
-                    // for terminal-side failures on a financial command,
-                    // FIRE THE PENDING RESULT DIRECTLY HERE. SDK 2.1.8
-                    // does NOT reliably follow USER_CANCEL with an
-                    // onTransactionComplete — operator hit "Cancel" on
-                    // terminal, expected POS dialog to close, dialog
-                    // hung forever. That was the 2026-05-13 cancel-stuck
-                    // bug. Fire+forget approach: complete the Flutter
-                    // call now, mark the late onTransactionComplete as
-                    // orphan (pendingResult==null → ignored).
-                    val isFinancialCommand =
-                        command == POSHandler.COMMAND_PURCHASE ||
-                        command == POSHandler.COMMAND_REFUND ||
-                        command == POSHandler.COMMAND_TWINT_PURCHASE
-                    if (isFinancialCommand && status in terminalFailureStatuses()) {
-                        lastFinancialFailureStatus = status
-                        val r = pendingResult
-                        if (r != null) {
-                            val errCode = statusToErrorCode(status)
-                            sendLog("🛑 Terminal failure: $errCode (status=$status) — firing pendingResult NOW")
-                            cancelPaymentTimeout()
-                            stopTwintBusyPoller()
-                            isPaymentInProgress = false
-                            pendingResult = null
-                            pendingOp = ""
-                            cardStartedAt = 0L
-                            twintStartedAt = 0L
-                            // Reset failureStatus only AFTER we used it
-                            // — late onTransactionComplete (if any) will
-                            // see pendingResult==null and ignore itself.
-                            lastFinancialFailureStatus = -1
-                            r.success(mapOf(
-                                "success"   to false,
-                                "errorCode" to errCode,
-                                "error"     to (if (errCode == "CANCELLED") "Kullanıcı iptal etti"
-                                                else message ?: "Terminal error: $errCode"),
-                            ))
-                            return@post  // do NOT process other status branches
-                        }
-                    }
-
-                    when (status) {
-                        POSHandler.POS_STATUS_SUCCESS_PING -> {
-                            lastSuccessfulPingTime = System.currentTimeMillis()
-                            sendLog("🏓 PING success")
-                            pingResult?.let {
-                                it.success(mapOf("success" to true, "connected" to true))
-                                pingResult = null
-                            }
-                        }
-                        POSHandler.POS_STATUS_PING_FAILED -> {
-                            sendLog("❌ PING failed")
-                            pingResult?.let {
-                                it.success(mapOf("success" to false, "connected" to false))
-                                pingResult = null
-                            }
-                            if (connectionState == ConnectionState.CONNECTED) {
-                                updateConnectionState(ConnectionState.DISCONNECTED, "PING failed")
-                            }
-                        }
-                        POSHandler.POS_STATUS_COM_ERROR -> {
-                            sendLog("❌ Communication error")
-                            if (connectionState == ConnectionState.CONNECTED) {
-                                updateConnectionState(ConnectionState.DISCONNECTED, "COM error")
-                            }
-                        }
-                        else -> {}
-                    }
-                }
-            }
-
-            override fun onTransactionComplete(transactionData: TransactionData?) {
-                mainHandler.post {
-                    val result = pendingResult ?: run {
-                        sendLog("⚠️ Orphan onTransactionComplete (no pendingResult) — ignoring")
-                        return@post
-                    }
-                    val wasTwint = pendingOp == "twint"
-
-                    // 🚨 CRITICAL stale-event filter (extended kit §5 to
-                    // card path). If the SDK hands us transaction data
-                    // whose `transactionDateLocal` predates the moment
-                    // we kicked off the request, it can't be ours —
-                    // it's a leftover event from before the user even
-                    // tapped ÖDE. Treating it as success was the
-                    // "first payment auto-approves" symptom reported
-                    // 2026-05-13.
-                    // Stale-event filter — production plugin §5 pattern,
-                    // 60s margin (kit-aligned, was 5s before).
-                    val sessionStartedAt = if (wasTwint) twintStartedAt else cardStartedAt
-                    if (sessionStartedAt > 0 && transactionData != null) {
-                        val txTime = try {
-                            transactionData.transactionDateLocal?.time ?: 0L
-                        } catch (_: Throwable) { 0L }
-                        if (txTime > 0 && txTime < sessionStartedAt - 60_000) {
-                            sendLog("⚠️ Stale onTransactionComplete (txTime=$txTime " +
-                                "< startedAt=$sessionStartedAt - 60s) — rejecting, NOT closing ticket")
-                            return@post
-                        }
-                    }
-
-                    cancelPaymentTimeout()
-                    stopTwintBusyPoller()
-                    isPaymentInProgress = false
-                    pendingResult = null
-                    pendingOp = ""
-                    cardStartedAt = 0L
-                    twintStartedAt = 0L
-                    val failureStatus = lastFinancialFailureStatus
-                    lastFinancialFailureStatus = -1
-
-                    // 🚨 hasRealData semantic guard (production line 1637-1648):
-                    // a "successful" onTransactionComplete must carry at
-                    // least ONE strong proof — non-empty rrn, non-empty
-                    // authCode, OR approval=="00"/"approved". Without
-                    // this gate an empty TransactionData closes the
-                    // ticket as paid → the false-approval Bug reported
-                    // 2026-05-13. Plus failureStatus seen → override
-                    // any "looks successful" data because operator
-                    // already cancelled / decline path won.
-                    val rrn = transactionData?.getRRN()?.trim().orEmpty()
-                    val authCode = transactionData?.getAuthCode()?.trim().orEmpty()
-                    val approval = try {
-                        transactionData?.approval?.trim().orEmpty()
-                    } catch (_: Throwable) { "" }
-                    val declinedReason = transactionData?.getDeclinedReason1()?.trim().orEmpty()
-                    val hasCardData = rrn.isNotEmpty() || authCode.isNotEmpty()
-                    val hasApprovalCode = approval == "00" || approval == "0" ||
-                        approval.equals("approved", ignoreCase = true)
-                    val hasRealData = hasCardData || hasApprovalCode
-                    val hasExplicitDecline = declinedReason.isNotEmpty()
-                    val failureOrDefinite = failureStatus in terminalFailureStatuses()
-
-                    sendLog("Tx complete: hasCardData=$hasCardData hasApprovalCode=$hasApprovalCode " +
-                        "decline=\"$declinedReason\" failureStatus=$failureStatus rrn=\"$rrn\" auth=\"$authCode\" approval=\"$approval\"")
-
-                    if (failureOrDefinite) {
-                        // Operator hit cancel / SDK reported a definite
-                        // failure earlier. Refuse to honour any
-                        // apparent-success payload that arrives now.
-                        val errCode = statusToErrorCode(failureStatus)
-                        sendLog("❌ Tx complete after failure status: $errCode (status=$failureStatus)")
-                        result.success(mapOf(
-                            "success"   to false,
-                            "errorCode" to errCode,
-                            "error"     to (if (errCode == "CANCELLED") "Kullanıcı iptal etti"
-                                            else "Transaction failed: $errCode"),
-                        ))
-                    } else if (hasExplicitDecline) {
-                        sendLog("❌ Tx declined by bank: $declinedReason")
-                        result.success(mapOf(
-                            "success"   to false,
-                            "errorCode" to "DECLINED",
-                            "error"     to declinedReason,
-                        ))
-                    } else if (hasRealData) {
-                        sendLog("✅ Transaction approved: RRN=$rrn auth=$authCode (twint=$wasTwint)")
-                        val payload = mutableMapOf<String, Any?>(
-                            "success"       to true,
-                            "transactionId" to (if (rrn.isNotEmpty()) rrn else authCode),
-                            "authCode"      to authCode,
-                            "cardType"      to (transactionData?.getAIDName() ?: ""),
-                            "maskedPan"     to (transactionData?.getPANMasked() ?: ""),
-                            "amount"        to (transactionData?.getAmount() ?: "0.00"),
-                        )
-                        if (wasTwint && lastTwintTransRef.isNotEmpty()) {
-                            payload["transRef"] = lastTwintTransRef
-                        }
-                        result.success(payload)
-                        return@post
-                    } else {
-                        // No proof, no decline, no failure — refuse to
-                        // close the ticket. Cash software treats this
-                        // as a failed payment and the operator can retry.
-                        sendLog("❌ Tx complete with NO approval proof " +
-                            "(rrn/authCode/approval all empty, no decline, no failure) — refusing to mark paid")
-                        result.success(mapOf(
-                            "success"   to false,
-                            "errorCode" to "NO_APPROVAL_DATA",
-                            "error"     to "Terminal complete event but no approval proof — treating as failed",
-                        ))
-                    }
-                }
-            }
-        })
-
-        // SDK 2.1.8: PosTransactionClearedListener.onComplete(status)
-        posHandler?.setTransactionClearedListener(object : PosTransactionClearedListener {
-            override fun onComplete(status: Int) {
-                mainHandler.post {
-                    sendLog("✅ Batch cleared (end of day), status=$status")
-                    val result = pendingResult ?: return@post
-                    pendingResult = null
-                    result.success(mapOf("success" to true, "status" to "batch_cleared"))
-                }
-            }
-        })
-    }
-
-    // =========================================================================
-    // Connection state manager
-    // =========================================================================
-
-    private fun updateConnectionState(newState: ConnectionState, reason: String = "") {
-        val old = connectionState
-        connectionState = newState
-        sendLog("🔄 State: $old → $newState${if (reason.isNotEmpty()) " ($reason)" else ""}")
-
-        channel.invokeMethod("onConnectionChanged", mapOf(
-            "connected" to (newState == ConnectionState.CONNECTED),
-            "state"     to newState.name,
-            "reason"    to reason
-        ))
-
-        // Kit Troubleshooting §2: on TCP/IP we must NOT manually trigger
-        // reconnect — the slave SDK runs its own 2.5 s sleep + retry loop
-        // and our scheduleReconnect raced it, producing the ~1 s connect/
-        // disconnect flap (you'd see "SDK CONNECTED → SDK DISCONNECTED →
-        // SDK CONNECTED" cycling in logs). Operator-visible symptom: the
-        // dialog hung in "BAĞLANIYOR" forever.
-        //
-        // We only set the TCP/IP connection type today, so simply
-        // surrender here. The heartbeat code below still pings every 60 s
-        // and will surface a real outage; the user can always hit
-        // "BAĞLANTIYI TEST ET" from Settings to force a reconfigure if
-        // the SDK gets wedged.
-    }
-
-    // =========================================================================
-    // Heartbeat (TCP/IP only)
-    // =========================================================================
-
-    private fun startHeartbeat() {
-        stopHeartbeat()
-        sendLog("💓 Heartbeat started (${HEARTBEAT_INTERVAL_MS / 1000}s)")
-        heartbeatRunnable = object : Runnable {
-            override fun run() {
-                if (connectionState == ConnectionState.CONNECTED) {
-                    sendHeartbeatPing()
-                }
-                mainHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
-            }
-        }
-        mainHandler.postDelayed(heartbeatRunnable!!, HEARTBEAT_INTERVAL_MS)
-    }
-
-    private fun stopHeartbeat() {
-        heartbeatRunnable?.let { mainHandler.removeCallbacks(it) }
-        heartbeatRunnable = null
-    }
-
-    private fun sendHeartbeatPing() {
-        if (isPaymentInProgress) {
-            lastSuccessfulPingTime = System.currentTimeMillis()
-            return
-        }
-        if (posHandler?.isTerminalBusy() == true) {
-            lastSuccessfulPingTime = System.currentTimeMillis()
-            return
-        }
-        try {
-            posHandler?.checkConnection()
-            mainHandler.postDelayed({
-                val timeSinceLastPing = System.currentTimeMillis() - lastSuccessfulPingTime
-                if (timeSinceLastPing > HEARTBEAT_INTERVAL_MS && connectionState == ConnectionState.CONNECTED) {
-                    sendLog("💔 Heartbeat: no PING response — connection lost")
-                    updateConnectionState(ConnectionState.DISCONNECTED, "heartbeat timeout")
-                }
-            }, 5000)
-        } catch (e: Exception) {
-            sendLog("💔 Heartbeat error: ${e.message}")
-            if (connectionState == ConnectionState.CONNECTED) {
-                updateConnectionState(ConnectionState.DISCONNECTED, "heartbeat exception")
-            }
-        }
-    }
-
-    // =========================================================================
-    // Watchdog (ICMP ping background thread)
-    // =========================================================================
-
-    private fun startWatchdog() {
-        stopWatchdog()
-        watchdogActive = true
-        watchdogThread = Thread {
-            var lastReachable = false
-            while (watchdogActive) {
-                try { Thread.sleep(15000) } catch (_: InterruptedException) { break }
-                if (!watchdogActive) break
-
-                val reachable = icmpPing(tcpIp, 3000)
-
-                if (reachable != lastReachable) {
-                    mainHandler.post {
-                        if (reachable) {
-                            sendLog("📡 Watchdog: terminal reachable")
-                            if (connectionState != ConnectionState.CONNECTED && !isReconnecting) {
-                                try {
-                                    posHandler?.resetTcpConnection()
-                                    activity?.let { posHandler?.connectDevice(it) }
-                                } catch (_: Exception) {}
-                            }
-                        } else {
-                            sendLog("📡 Watchdog: terminal unreachable")
-                            if (connectionState == ConnectionState.CONNECTED) {
-                                updateConnectionState(ConnectionState.DISCONNECTED, "watchdog ICMP unreachable")
-                            }
-                        }
-                    }
-                }
-                lastReachable = reachable
-            }
-        }.also {
-            it.isDaemon = true
-            it.name = "mypos-watchdog"
-            it.start()
-        }
-        sendLog("📡 Watchdog started (15 s ICMP)")
-    }
-
-    private fun stopWatchdog() {
-        watchdogActive = false
-        watchdogThread?.interrupt()
-        watchdogThread = null
-    }
-
-    private fun icmpPing(ip: String, timeoutMs: Int): Boolean =
-        try { java.net.InetAddress.getByName(ip).isReachable(timeoutMs) } catch (_: Exception) { false }
-
-    // =========================================================================
-    // Auto-reconnect
-    // =========================================================================
-
-    private fun scheduleReconnect() {
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            sendLog("❌ Max reconnect attempts ($MAX_RECONNECT_ATTEMPTS) reached")
-            isReconnecting = false
-            reconnectAttempts = 0
-            return
-        }
-        isReconnecting = true
-        updateConnectionState(ConnectionState.RECONNECTING, "attempt ${reconnectAttempts + 1}")
-        val delay = RECONNECT_DELAY_MS * (reconnectAttempts + 1)
-        mainHandler.postDelayed({ attemptReconnect() }, delay)
-    }
-
-    private fun attemptReconnect() {
-        if (!isConfigured) { isReconnecting = false; return }
-
-        if (posHandler?.isConnected() == true) {
-            reconnectAttempts = 0
-            isReconnecting = false
-            lastSuccessfulPingTime = System.currentTimeMillis()
-            updateConnectionState(ConnectionState.CONNECTED, "SDK already connected")
-            startHeartbeat()
-            return
-        }
-
-        reconnectAttempts++
-        sendLog("🔄 Reconnect attempt $reconnectAttempts/$MAX_RECONNECT_ATTEMPTS")
-
-        try {
-            activity?.let { ctx ->
-                try { posHandler?.resetTcpConnection() } catch (_: Exception) {}
-                Thread.sleep(300)
-                posHandler?.connectDevice(ctx)
-                isReconnecting = false
-            } ?: run {
-                sendLog("⚠️ No activity for reconnect")
-                isReconnecting = false
-            }
-        } catch (e: Exception) {
-            sendLog("❌ Reconnect error: ${e.message}")
-            isReconnecting = false
-            scheduleReconnect()
-        }
-    }
-
-    // =========================================================================
-    // Logging
-    // =========================================================================
-
-    private fun sendLog(message: String) {
-        Log.d(TAG, message)
-        mainHandler.post { logSink?.success(message) }
+    /** Convert manager PaymentResult to the response shape Dart expects. */
+    private fun toMap(r: MyPosManager.PaymentResult): Map<String, Any?> = when (r) {
+        is MyPosManager.PaymentResult.Approved -> mapOf(
+            "success" to true,
+            "transactionId" to r.transactionId,
+            "authCode" to r.authCode,
+            "amount" to r.amount,
+            "maskedPan" to r.maskedPan,
+            "cardType" to r.cardType,
+            "terminalId" to r.terminalId,
+            "merchantId" to r.merchantId,
+            "stan" to r.stan,
+            "transRef" to r.transRef,
+            "rrn" to r.transactionId,
+        )
+        is MyPosManager.PaymentResult.Declined -> mapOf(
+            "success" to false,
+            "errorCode" to "DECLINED",
+            "error" to r.reason,
+        )
+        is MyPosManager.PaymentResult.Cancelled -> mapOf(
+            "success" to false,
+            "errorCode" to "CANCELLED",
+            "error" to "Kullanıcı iptal etti",
+        )
+        is MyPosManager.PaymentResult.Failed -> mapOf(
+            "success" to false,
+            "errorCode" to "FAILED",
+            "error" to r.reason,
+        )
     }
 }
