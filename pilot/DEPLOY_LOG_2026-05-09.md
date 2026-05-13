@@ -3,6 +3,105 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-13 ~19:29 CEST — 🔥 MyPosPlugin KOMPLE YENİDEN YAZIM (kit MyPosManager pattern)
+
+**Kapsam:** Sadece `MyPosPlugin.kt`. -1222 / +702 = net 520 satır azalma, temiz pattern. Önceki 4 turda patch-on-patch işe yaramayınca sıfırdan kit pattern'iyle yazıldı.
+
+### Yapı
+
+| Eski (1300+ satır) | Yeni (~620 satır) |
+|---|---|
+| Tek dev `MyPosPlugin` class — state + logic + Flutter channel iç içe | Ayrı `object MyPosManager` + `class MyPosPlugin` (thin Flutter shim) |
+| Kit pattern'i parça parça uygulanmış | Kit `MyPosManager.kt` birebir adaptasyon |
+| `getLastTransactionData()` Unit return — yanlış kullanılıyordu | Doğru kullanım — async fire, listener forward |
+| 90 sn safety timeout yoktu | `scheduleTwintSafetyTimeout` + `cancelTransaction` |
+| Busy poller "CANCELLED" diyordu | Busy poller → `getLastTransactionData()` async tetikler → handleTransactionComplete'e gelir → twintCallback forward |
+| handlePosInfo failure status sadece stash ediyordu | DIREKT cardCallback fire (cancel-stuck fix) |
+| handleTransactionComplete `authCode.isNotEmpty()` tek check | 4-way decision tree: failure/decline/hasRealData/fallback |
+
+### SDK API uyumsuzlukları (javap inspection)
+
+`slavesdk-release.aar` (AppCompat + AAR install + reflect) içinden `javap com.mypos.slavesdk.POSHandler` ile çıkarıldı:
+
+| Eski (yanlış) | Doğru (javap) |
+|---|---|
+| `PaymentParams.builder().currency(756)` (Int) | `.currency("756")` (String) |
+| `posHandler.lastTransactionData` (property) | `posHandler.getLastTransactionData()` (Unit return, async fire) |
+| `posHandler.refund(PaymentParams)` | `posHandler.refund(String, String, Int)` legacy veya `RefundParams` |
+
+Kit'in örneği bile yanlış API kullanıyordu (`lastTransactionData` property erişim). Doğru kullanım: çağrı tetikleyici, sonuç `onTransactionComplete` event'inde geliyor.
+
+### 3 sorun nasıl çözüldü
+
+**1. False-approval (ilk ödeme):**
+```kotlin
+val hasRealData = (rrn.isNotEmpty() || authCode.isNotEmpty()) ||
+    approval == "00" || approval == "0" ||
+    approval.equals("approved", ignoreCase = true)
+```
+hasRealData=false → `PaymentResult.Failed("No approval proof")`. Boş data success'e DÜŞMEZ.
+
+**2. Cancel-stuck (cihazdan iptal):**
+`handlePosInfo` cardCallback != null + COMMAND_PURCHASE/REFUND + failure status:
+```kotlin
+when (status) {
+    POSHandler.POS_STATUS_USER_CANCEL -> finishCard(PaymentResult.Cancelled)
+    POSHandler.POS_STATUS_INTERNAL_ERROR -> finishCard(...)
+    // ... 10 farklı failure status
+}
+```
+onTransactionComplete beklemez, anında fire eder. Dialog ~100ms'de kapanır.
+
+**3. TWINT akışı (3 katmanlı safety):**
+- A) Normal: `openPaymentActivity` → MyPOS Activity → `onActivityResult` → `handleTwintResult` → success/cancel.
+- B) onActivityResult fire etmezse: 2s aralıklarla `isTerminalBusy()` poll, 3x ardışık idle (6s) → `getLastTransactionData()` async fire → `onTransactionComplete` event → `handleTransactionComplete` başında TWINT forward → `handleTwintResult` synthetic intent ile.
+- C) Hiçbiri gelmezse: 90s `scheduleTwintSafetyTimeout` → `cancelTransaction()` + Failed callback.
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                  (canlı slot)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-kitrewrite-20260513.apk        (versiyonlu)
+size       : 90'175'647 bytes (≈86.0 MiB)
+sha256     : 0c3e31843f6dc826a8ac558339489ea7831d32a3fce74ace8b0c77f4c45ce82c
+built from : claude/pilot-final commit ffeeb9f
+flavor     : pos (assemblePosRelease, 1m 3s)
+```
+
+### Sahada test sırası
+
+1. **APK uninstall + reinstall** (Manager singleton'u clean start için).
+2. App aç → logcat: `🔗 SDK CONNECTED (waiting for POSReady)` + `✅ POS READY`. **İkisi de gelmeli.**
+3. **KART ÖDEME**: kart yaklaştır + PIN → "Onaylandı" + RRN. Logcat'te `--- onTransactionComplete data=<rrn>`.
+4. **KART İPTAL (cancel-stuck testi)**: KART → terminalde "Cancel" → ~1sn'de POS dialog kapanır + "Kullanıcı iptal etti". Logcat: `ℹ️ PosInfo cmd=1 status=2 (USER_CANCEL)` + `finishCard(Cancelled)`.
+5. **TWINT (crash testi)**: TWINT chip → MyPOS Activity açılır, **app çakılmaz**, QR göster.
+6. **TWINT BAŞARILI**: telefondan okut → terminal onay → POS dialog kapanır + "Onaylandı: TWINT-{rrn}".
+7. **TWINT İPTAL**: Activity'de X → POS dialog kapanır + "Kullanıcı iptal etti".
+8. **TWINT POLLER FALLBACK** (eğer SDK onActivityResult fire etmezse): Logcat'te 6sn sonra `TWINT poller: 3x idle — querying lastTransactionData (async)` görmeli. Sonra `onTransactionComplete forwarded to TWINT result handler` + sonuç.
+
+### Logcat'te yeni satırlar
+
+```
+🔗 SDK CONNECTED (waiting for POSReady)              ← bağlantı kuruldu
+✅ POS READY — terminal command-layer ready          ← komut hazır
+➡️ purchase(15.00 CHF)                                ← kart başlatıldı
+ℹ️ PosInfo cmd=1 status=74 (PRESENT_CARD)            ← progress
+ℹ️ PosInfo cmd=1 status=34 (SUCCESS_PURCHASE)        ← onay
+--- onTransactionComplete data=12345 failureStatus=-1 ← data geldi
+➡️ openPaymentActivity(TWINT, 15.00 CHF, ref=<uuid>) ← TWINT başlatıldı
+TWINT poller: idle (1/3)                             ← busy poller
+⏱ TWINT safety timeout (90s)                         ← 90s timeout
+```
+
+### Rollback
+
+False approval ÇOK CIDDI. Anında:
+- Settings ▸ Payment ▸ MYPOS toggle **kapat** → manuel akış.
+- Önceki APK SHA `5367e8d0426b...` (14:52 entry, production-pattern fix v3).
+
+Bu komple yeniden yazım son şanstır — eğer hâlâ sorun varsa **logcat çıktısı şart** (`adb logcat | grep -iE "mypos|🔗|✅|⚠️|❌|🛑|⏱"`). Hangi log satırı görünüp görünmediği teşhisi tamamen değiştirir.
+
+
 ## 2026-05-13 ~14:52 CEST — MyPOS production-pattern rewrite: cancel-stuck + false-approval
 
 **Kapsam:** Sadece `MyPosPlugin.kt`. Dart, manifest, theme, build.gradle dokunulmadı.
