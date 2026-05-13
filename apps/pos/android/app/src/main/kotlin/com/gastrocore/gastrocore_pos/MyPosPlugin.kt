@@ -1022,14 +1022,46 @@ class MyPosPlugin :
                 mainHandler.post {
                     sendLog("ℹ️ POSInfo cmd=$command status=$status: $message")
 
-                    // Kit Troubleshooting §3: stash the financial-command
-                    // failure status here so onTransactionComplete(null) —
-                    // which fires *after* this for cancel/decline — can
-                    // surface the right errorCode instead of NO_DATA.
-                    if ((command == POSHandler.COMMAND_PURCHASE ||
-                            command == POSHandler.COMMAND_REFUND) &&
-                        status in terminalFailureStatuses()) {
+                    // Kit Troubleshooting §3 stash AND the production
+                    // pattern (MyPosPlugin-production.kt line 1250+):
+                    // for terminal-side failures on a financial command,
+                    // FIRE THE PENDING RESULT DIRECTLY HERE. SDK 2.1.8
+                    // does NOT reliably follow USER_CANCEL with an
+                    // onTransactionComplete — operator hit "Cancel" on
+                    // terminal, expected POS dialog to close, dialog
+                    // hung forever. That was the 2026-05-13 cancel-stuck
+                    // bug. Fire+forget approach: complete the Flutter
+                    // call now, mark the late onTransactionComplete as
+                    // orphan (pendingResult==null → ignored).
+                    val isFinancialCommand =
+                        command == POSHandler.COMMAND_PURCHASE ||
+                        command == POSHandler.COMMAND_REFUND ||
+                        command == POSHandler.COMMAND_TWINT_PURCHASE
+                    if (isFinancialCommand && status in terminalFailureStatuses()) {
                         lastFinancialFailureStatus = status
+                        val r = pendingResult
+                        if (r != null) {
+                            val errCode = statusToErrorCode(status)
+                            sendLog("🛑 Terminal failure: $errCode (status=$status) — firing pendingResult NOW")
+                            cancelPaymentTimeout()
+                            stopTwintBusyPoller()
+                            isPaymentInProgress = false
+                            pendingResult = null
+                            pendingOp = ""
+                            cardStartedAt = 0L
+                            twintStartedAt = 0L
+                            // Reset failureStatus only AFTER we used it
+                            // — late onTransactionComplete (if any) will
+                            // see pendingResult==null and ignore itself.
+                            lastFinancialFailureStatus = -1
+                            r.success(mapOf(
+                                "success"   to false,
+                                "errorCode" to errCode,
+                                "error"     to (if (errCode == "CANCELLED") "Kullanıcı iptal etti"
+                                                else message ?: "Terminal error: $errCode"),
+                            ))
+                            return@post  // do NOT process other status branches
+                        }
                     }
 
                     when (status) {
@@ -1078,17 +1110,16 @@ class MyPosPlugin :
                     // tapped ÖDE. Treating it as success was the
                     // "first payment auto-approves" symptom reported
                     // 2026-05-13.
+                    // Stale-event filter — production plugin §5 pattern,
+                    // 60s margin (kit-aligned, was 5s before).
                     val sessionStartedAt = if (wasTwint) twintStartedAt else cardStartedAt
                     if (sessionStartedAt > 0 && transactionData != null) {
                         val txTime = try {
                             transactionData.transactionDateLocal?.time ?: 0L
                         } catch (_: Throwable) { 0L }
-                        if (txTime > 0 && txTime < sessionStartedAt - 5_000) {
+                        if (txTime > 0 && txTime < sessionStartedAt - 60_000) {
                             sendLog("⚠️ Stale onTransactionComplete (txTime=$txTime " +
-                                "< startedAt=$sessionStartedAt) — rejecting, NOT closing ticket")
-                            // Leave pendingResult intact — the real
-                            // callback for *this* transaction should
-                            // still arrive (or the timeout will fire).
+                                "< startedAt=$sessionStartedAt - 60s) — rejecting, NOT closing ticket")
                             return@post
                         }
                     }
@@ -1100,73 +1131,78 @@ class MyPosPlugin :
                     pendingOp = ""
                     cardStartedAt = 0L
                     twintStartedAt = 0L
-                    // Snapshot the failure status before resetting it so
-                    // the post-data path below can map it. Pre-fix this
-                    // wasn't tracked and a cancelled card always came back
-                    // as NO_DATA → POS layer marked it as failed.
                     val failureStatus = lastFinancialFailureStatus
                     lastFinancialFailureStatus = -1
 
-                    if (transactionData != null) {
-                        // SDK 2.1.8: success if authCode is non-empty and no declined reason
-                        val authCode = transactionData.getAuthCode() ?: ""
-                        val declinedReason = transactionData.getDeclinedReason1() ?: ""
-                        val isSuccess = authCode.isNotEmpty() && declinedReason.isEmpty()
+                    // 🚨 hasRealData semantic guard (production line 1637-1648):
+                    // a "successful" onTransactionComplete must carry at
+                    // least ONE strong proof — non-empty rrn, non-empty
+                    // authCode, OR approval=="00"/"approved". Without
+                    // this gate an empty TransactionData closes the
+                    // ticket as paid → the false-approval Bug reported
+                    // 2026-05-13. Plus failureStatus seen → override
+                    // any "looks successful" data because operator
+                    // already cancelled / decline path won.
+                    val rrn = transactionData?.getRRN()?.trim().orEmpty()
+                    val authCode = transactionData?.getAuthCode()?.trim().orEmpty()
+                    val approval = try {
+                        transactionData?.approval?.trim().orEmpty()
+                    } catch (_: Throwable) { "" }
+                    val declinedReason = transactionData?.getDeclinedReason1()?.trim().orEmpty()
+                    val hasCardData = rrn.isNotEmpty() || authCode.isNotEmpty()
+                    val hasApprovalCode = approval == "00" || approval == "0" ||
+                        approval.equals("approved", ignoreCase = true)
+                    val hasRealData = hasCardData || hasApprovalCode
+                    val hasExplicitDecline = declinedReason.isNotEmpty()
+                    val failureOrDefinite = failureStatus in terminalFailureStatuses()
 
-                        if (isSuccess) {
-                            val rrn = transactionData.getRRN() ?: ""
-                            sendLog("✅ Transaction complete: RRN=$rrn (twint=$wasTwint)")
-                            val payload = mutableMapOf<String, Any?>(
-                                "success"       to true,
-                                "transactionId" to rrn,
-                                "authCode"      to authCode,
-                                "cardType"      to (transactionData.getAIDName() ?: ""),
-                                "maskedPan"     to (transactionData.getPANMasked() ?: ""),
-                                "amount"        to (transactionData.getAmount() ?: "0.00"),
-                            )
-                            // Surface the client-side correlation token to the
-                            // POS so the receipt + audit log have a stable ref
-                            // even when the terminal RRN comes back empty for
-                            // TWINT (SDK 2.1.8 occasionally does).
-                            if (wasTwint && lastTwintTransRef.isNotEmpty()) {
-                                payload["transRef"] = lastTwintTransRef
-                            }
-                            result.success(payload)
-                        } else {
-                            // Kit §3 honour: prefer the financial status
-                            // we already captured (USER_CANCEL etc) over
-                            // the generic declinedReason text — operator
-                            // wants a "iptal edildi" pop, not "DECLINED".
-                            val errCode = when {
-                                failureStatus in terminalFailureStatuses() ->
-                                    statusToErrorCode(failureStatus)
-                                declinedReason.isNotEmpty() -> declinedReason
-                                else -> "DECLINED"
-                            }
-                            sendLog("❌ Transaction failed: $errCode (failureStatus=$failureStatus)")
-                            result.success(mapOf(
-                                "success"   to false,
-                                "errorCode" to errCode,
-                                "error"     to (if (errCode == "CANCELLED") "Kullanıcı iptal etti"
-                                                else "Transaction declined or failed: $errCode"),
-                            ))
-                        }
-                    } else {
-                        sendLog("❌ Transaction failed: null data")
-                        // null data + captured failure status = the cancel /
-                        // decline path operator hit on the terminal. Surface
-                        // the specific code rather than a generic UNKNOWN so
-                        // the POS dialog can render "Kullanıcı iptal etti"
-                        // instead of "no data received".
-                        val errCode = if (failureStatus in terminalFailureStatuses()) {
-                            statusToErrorCode(failureStatus)
-                        } else "UNKNOWN"
-                        sendLog("❌ Transaction failed: null data, failureStatus=$failureStatus → $errCode")
+                    sendLog("Tx complete: hasCardData=$hasCardData hasApprovalCode=$hasApprovalCode " +
+                        "decline=\"$declinedReason\" failureStatus=$failureStatus rrn=\"$rrn\" auth=\"$authCode\" approval=\"$approval\"")
+
+                    if (failureOrDefinite) {
+                        // Operator hit cancel / SDK reported a definite
+                        // failure earlier. Refuse to honour any
+                        // apparent-success payload that arrives now.
+                        val errCode = statusToErrorCode(failureStatus)
+                        sendLog("❌ Tx complete after failure status: $errCode (status=$failureStatus)")
                         result.success(mapOf(
                             "success"   to false,
                             "errorCode" to errCode,
                             "error"     to (if (errCode == "CANCELLED") "Kullanıcı iptal etti"
-                                            else "Transaction failed: no data received"),
+                                            else "Transaction failed: $errCode"),
+                        ))
+                    } else if (hasExplicitDecline) {
+                        sendLog("❌ Tx declined by bank: $declinedReason")
+                        result.success(mapOf(
+                            "success"   to false,
+                            "errorCode" to "DECLINED",
+                            "error"     to declinedReason,
+                        ))
+                    } else if (hasRealData) {
+                        sendLog("✅ Transaction approved: RRN=$rrn auth=$authCode (twint=$wasTwint)")
+                        val payload = mutableMapOf<String, Any?>(
+                            "success"       to true,
+                            "transactionId" to (if (rrn.isNotEmpty()) rrn else authCode),
+                            "authCode"      to authCode,
+                            "cardType"      to (transactionData?.getAIDName() ?: ""),
+                            "maskedPan"     to (transactionData?.getPANMasked() ?: ""),
+                            "amount"        to (transactionData?.getAmount() ?: "0.00"),
+                        )
+                        if (wasTwint && lastTwintTransRef.isNotEmpty()) {
+                            payload["transRef"] = lastTwintTransRef
+                        }
+                        result.success(payload)
+                        return@post
+                    } else {
+                        // No proof, no decline, no failure — refuse to
+                        // close the ticket. Cash software treats this
+                        // as a failed payment and the operator can retry.
+                        sendLog("❌ Tx complete with NO approval proof " +
+                            "(rrn/authCode/approval all empty, no decline, no failure) — refusing to mark paid")
+                        result.success(mapOf(
+                            "success"   to false,
+                            "errorCode" to "NO_APPROVAL_DATA",
+                            "error"     to "Terminal complete event but no approval proof — treating as failed",
                         ))
                     }
                 }
