@@ -3,6 +3,106 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-13 ~12:44 CEST — RotaMyPosKit hizalama: 5 production fix + AAR upgrade
+
+**Kapsam:** AAR replace + `MyPosPlugin.kt` 5 sürgün fix. Manifest + theme + Dart side dokunulmadı (önceki commit'lerden korunuyor).
+
+### Bağlam
+
+Kullanıcı production-tested kit (`RotaMyPosKit-2026-05-13.zip` ~1.2MB) gönderdi: 2tech Service App'in canlı deployment'ından çıkarılmış. İçinde 11 production bug listesi + `MyPosManager.kt` 450-satır wrapper + yeni AAR. Doc'taki 11 maddenin **5'i bizim koddaki gerçek bug'lara birebir karşılık geliyordu**.
+
+### 11 troubleshooting maddesinden bize uygulananlar
+
+| § | Konu | Risk | Bizde var mıydı? | Fix |
+|---|---|---|---|---|
+| **§1** | "You are all set" loop (listener accumulation) | KRİTİK | ❌ Hayır — `if (posHandler == null) {...}` pattern'ı zaten koruyor | Sadece kontrol |
+| **§2** | TCP/IP onDisconnected reconnect race | KRİTİK | ✅ Evet — `updateConnectionState` `scheduleReconnect()` tetikliyordu | Kaldırıldı, SDK kendi reconnect'ine bırakıldı |
+| **§3** | Kart iptal "NO_DATA" raporu | YÜKSEK | ✅ Evet — USER_CANCEL ikinci callback'te kayboluyordu | `lastFinancialFailureStatus` tracking + `statusToErrorCode()` mapping |
+| **§4** | TWINT cevap vermiyor (SDK 2.1.8 bug) | ORTA | ✅ Önceki commit'te `startTwintBusyPoller` eklemiştik (TWINT için yine etkin tutulabilir) | Korundu |
+| **§5** | TWINT stale data | ORTA | ✅ Evet — `twintStartedAt` track edilmiyordu | wall-clock + 60s window check |
+| §6 | "Terminal busy" stuck flag | DÜŞÜK | ✅ Var, `forceCleanSdkState()` zaten eklemiştik | Korundu |
+| **§7** | `isConnected()` yan etkisi (HER ÖDEMEDE FLAP) | KRİTİK | ✅ Evet — `handleCheckRealConnection` çağırıyordu | Kaldırıldı, state flag kullanılıyor |
+| §8 | USB+TWINT instability | N/A | ❌ TCP/IP-only kullanıyoruz | — |
+| §9 | EBUSY reconnect | DÜŞÜK | ❌ Manual reconnect'i kaldırdık (§2 fix) | — |
+| **§10** | OperationActivity theme crash | KRİTİK | ✅ Önceki commit'te (`14b52fe`) eklemiştik | Korundu |
+| §11 | Log şampiyonu / test stratejisi | — | Devam ediyor | Sahada test sırası aşağıda |
+
+### Bizim eski impl vs RotaKit production wrapper — kritik farklar
+
+| Aspect | Bizim eski | RotaKit pattern |
+|---|---|---|
+| `isConnected()` çağrısı | Her ödemede + checkRealConnection | Pure state flag, çağrı **yok** |
+| `onDisconnected` davranışı | scheduleReconnect tetikliyor | TCP/IP'de **hiçbir şey yapma** |
+| `onTransactionComplete(null)` | "NO_DATA" döndür | Önce `lastFinancialFailureStatus` map et |
+| TWINT result | `transactionDateLocal` check yok | Stale-data guard 60s window |
+| Listener kurulumu | configure içinde, posHandler==null guard'lı | Singleton init, tek seferlik |
+| SDK busy flag | force clean if busy | Aynı (zaten yapıyorduk) |
+| AAR | slavesdk-2.1.8.aar (April 19, eski) | slavesdk-release.aar (May 13, production) |
+
+### Değişen dosyalar
+
+```
+apps/pos/android/app/libs/slavesdk-2.1.8.aar         DELETED
+apps/pos/android/app/libs/slavesdk2.1.8.aar          DELETED
+apps/pos/android/app/libs/slavesdk-release.aar       ADDED (kit production AAR, 549.5 KB)
+apps/pos/android/app/build.gradle.kts                MODIFIED (dependency reference güncellendi)
+apps/pos/android/.../MyPosPlugin.kt                  MODIFIED (5 fix, +140/-13 satır)
+```
+
+Toplam: 5 dosya, +140 / −13 satır.
+
+### AppCompat manifest fix — kanıt
+
+Önceki commit `14b52fe`'de eklendi, hâlâ aktif:
+
+```xml
+<activity
+    android:name="com.mypos.slavesdk.OperationActivity"
+    android:exported="false"
+    android:theme="@style/MyPosOperationTheme"
+    tools:replace="android:exported,android:theme" />
+```
+
+styles.xml'de `MyPosOperationTheme parent="Theme.AppCompat.Light.NoActionBar"` (day) + `parent="Theme.AppCompat.NoActionBar"` (night). Yeni AAR'la birlikte bu tema şart — kit doc'u §10'da net.
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                  (canlı slot — overwrite)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-rotakit-20260513.apk           (versiyonlu)
+size       : 90'153'619 bytes (≈86.0 MiB)
+sha256     : f106d5f1bc40907504929bb0bea7ee7998dce4d511e1fd7aeb69130c55a5fd05
+built from : claude/pilot-final commit 97d1fb6 (jolly-final worktree)
+flavor     : pos (assemblePosRelease, 31s)
+```
+
+### Sahada test sırası
+
+Kit doc'unun §11 test stratejisi listesini birebir uygula:
+
+1. **Happy path KART:** Kart yaklaştır → ONAYLANDI → tek fiş + receipt.
+2. **USER_CANCEL KART:** Terminal'de cancel'a bas → POS dialog **"Kullanıcı iptal etti"** göstermeli (eski "NO_DATA" / "DECLINED" değil).
+3. **TWINT happy path:** TWINT chip → MyPOS Activity açılır → QR göster → müşteri okutur → onay.
+4. **TWINT user cancel:** Activity'de X'e bas → POS dialog **CANCELLED**.
+5. **TWINT stale data simulasyonu:** İki TWINT'i hızlı arda başlat → ikincisi STALE_DATA hatası verirse fix çalışıyor.
+6. **Connection loss + recovery:** Wi-Fi kapat → onDisconnected log'u → **scheduleReconnect log'u GELMEMELI** (kit §2 fix kanıtı) → Wi-Fi geri aç → SDK kendi reconnect'ini yapmalı → onConnected + POSReady.
+7. **Refresh azaldı:** Ardışık 2 ödeme yap, ikincisinin pre-payment ping atlanmalı (heartbeat-fresh skip log'u).
+8. **clearBatch (gün sonu):** End-of-day → batch cleared status callback.
+
+### Logcat'te yeni mesajlar
+
+```
+🔍 checkRealConnection: state=CONNECTED ready=true → true   (eski "sdk=..." satırı YOK)
+🔄 State: ... → DISCONNECTED (...)                          (SCHEDULE_RECONNECT satırı YOK)
+❌ Transaction failed: CANCELLED (failureStatus=2)          (yeni map'leme)
+⚠️ TWINT stale data (txTime=... started=...) — rejecting   (kit §5 fix kanıtı)
+```
+
+### Rollback
+
+Önceki APK SHA `246b6d509d24...` (12:14 entry, OperationActivity manifest fix). Settings'ten MYPOS toggle kapatmak da geçerli.
+
+
 ## 2026-05-13 ~12:14 CEST — MyPOS TWINT app crash fix (OperationActivity manifest declarasyonu eksikti)
 
 **Kapsam:** `AndroidManifest.xml` + `styles.xml` (day/night) + `MyPosPlugin.kt` defensive catch. Backend ve diğer apps **etkilenmedi**.
