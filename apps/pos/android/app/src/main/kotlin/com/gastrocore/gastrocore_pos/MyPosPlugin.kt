@@ -229,11 +229,18 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
                 isPaymentInProgress = true
                 try {
                     // Bundle alignment (2026-05-13):
-                    //  1) Pin the SDK's currency to this transaction so a prior
-                    //     EUR sale can't bleed into a CHF one.
-                    POSHandler.setCurrency(getCurrencyEnum(currency))
+                    //  1) Pin the SDK's currency only when it differs from
+                    //     the last call. Pre-cache patch the SDK call fired
+                    //     on every payment and operators saw a perceptible
+                    //     "refresh" — pure SDK overhead with no benefit.
+                    val wantCurrency = getCurrencyEnum(currency)
+                    if (lastSetCurrency != wantCurrency) {
+                        POSHandler.setCurrency(wantCurrency)
+                        lastSetCurrency = wantCurrency
+                        sendLog("purchase: setCurrency($wantCurrency)")
+                    }
                     //  2) Clear a stuck busy flag from a previous timeout/
-                    //     cancel — otherwise the SDK silently no-ops here.
+                    //     cancel — already conditional on isTerminalBusy.
                     if (posHandler?.isTerminalBusy() == true) {
                         sendLog("purchase: busy flag set — force clearing")
                         forceCleanSdkState()
@@ -278,38 +285,97 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
                 pendingResult = result
                 pendingOp = "twint"
                 isPaymentInProgress = true
-                // Mint a client-side correlation token. SDK 2.1.8's
-                // `twintPurchase(String, String)` can't pass this to the
-                // terminal (newer AAR's QRPaymentParams API does), but it's
-                // surfaced in the response so the POS audit log / receipt
-                // can reference *something* unique even when the terminal
-                // RRN comes back blank.
                 lastTwintTransRef = UUID.randomUUID().toString()
+                val amountStr = String.format("%.2f", amount)
                 try {
-                    // TWINT is CHF-only at the SDK level.
-                    POSHandler.setCurrency(Currency.CHF)
+                    // TWINT is CHF-only at the SDK level — pin once.
+                    if (lastSetCurrency != Currency.CHF) {
+                        POSHandler.setCurrency(Currency.CHF)
+                        lastSetCurrency = Currency.CHF
+                        sendLog("twint: setCurrency(CHF)")
+                    }
                     if (posHandler?.isTerminalBusy() == true) {
                         sendLog("twint: busy flag set — force clearing")
                         forceCleanSdkState()
                     }
-                    sendLog("twintPurchase(${String.format("%.2f", amount)}, CHF, transRef=$lastTwintTransRef, DO_NOT_PRINT)")
-                    POSHandler.setDefaultReceiptConfig(POSHandler.RECEIPT_DO_NOT_PRINT)
-                    posHandler?.twintPurchase(String.format("%.2f", amount), "CHF")
+                    if (lastReceiptConfig != POSHandler.RECEIPT_DO_NOT_PRINT) {
+                        POSHandler.setDefaultReceiptConfig(POSHandler.RECEIPT_DO_NOT_PRINT)
+                        lastReceiptConfig = POSHandler.RECEIPT_DO_NOT_PRINT
+                        sendLog("twint: setDefaultReceiptConfig(DO_NOT_PRINT)")
+                    }
+                    Log.i(TAG, "twintPurchase ENTRY amount=$amountStr transRef=$lastTwintTransRef")
+                    sendLog("➡️ twintPurchase($amountStr, CHF, transRef=$lastTwintTransRef)")
+                    // Try the newer QRPaymentParams builder API first — it's
+                    // what the May-2026 MyPOS bundle uses and our slavesdk-
+                    // 2.1.8.aar may also expose it (the wildcard import pulls
+                    // it in if present). If the class is missing at runtime
+                    // we catch NoClassDefFoundError and fall back to the
+                    // legacy (String, String) signature.
+                    val launched = tryTwintViaBuilder(amountStr, lastTwintTransRef)
+                    if (!launched) {
+                        sendLog("twint: builder API unavailable — falling back to legacy signature")
+                        posHandler?.twintPurchase(amountStr, "CHF")
+                    }
+                    Log.i(TAG, "twintPurchase RETURNED (waiting for onTransactionComplete)")
                     schedulePaymentTimeout(result, "twintPurchase")
-                    // SDK can fail to fire onTransactionComplete on cancel/
-                    // dismiss — poll for terminal idle as a fallback.
                     startTwintBusyPoller(result)
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
+                    Log.e(TAG, "twintPurchase EXCEPTION", e)
+                    sendLog("❌ twintPurchase failed: ${e.javaClass.simpleName}: ${e.message}")
                     isPaymentInProgress = false
                     pendingResult = null
                     pendingOp = ""
-                    result.success(mapOf("success" to false, "error" to e.message))
+                    cancelPaymentTimeout()
+                    stopTwintBusyPoller()
+                    result.success(mapOf(
+                        "success"   to false,
+                        "errorCode" to "TWINT_EXCEPTION",
+                        "error"     to "${e.javaClass.simpleName}: ${e.message ?: "unknown"}"
+                    ))
                 }
             },
             onError = { err ->
                 result.success(mapOf("success" to false, "error" to err))
             }
         )
+    }
+
+    /// Try the newer `twintPurchase(QRPaymentParams)` builder API. Returns
+    /// true on success, false if the class isn't available at runtime (in
+    /// which case the caller falls back to the legacy 2-arg signature).
+    /// Reflection-based so the file still compiles on older AARs that
+    /// don't ship `QRPaymentParams`.
+    private fun tryTwintViaBuilder(amountStr: String, transRef: String): Boolean {
+        return try {
+            val cls = Class.forName("com.mypos.slavesdk.QRPaymentParams")
+            val builderMethod = cls.getMethod("builder")
+            val builder = builderMethod.invoke(null)
+            val builderCls = builder.javaClass
+            builderCls.getMethod("productAmount", String::class.java)
+                .invoke(builder, amountStr)
+            builderCls.getMethod("currency", String::class.java)
+                .invoke(builder, "756") // ISO 4217 numeric for CHF
+            builderCls.getMethod("transRef", String::class.java)
+                .invoke(builder, transRef)
+            val params = builderCls.getMethod("build").invoke(builder)
+            val twintMethod = POSHandler::class.java.getMethod(
+                "twintPurchase",
+                cls
+            )
+            twintMethod.invoke(posHandler, params)
+            sendLog("twint: launched via QRPaymentParams.builder()")
+            true
+        } catch (e: ClassNotFoundException) {
+            false
+        } catch (e: NoSuchMethodException) {
+            false
+        } catch (e: Throwable) {
+            // Builder exists but something else broke — log and let caller
+            // fall through to legacy.
+            Log.w(TAG, "twint builder path failed: ${e.javaClass.simpleName}: ${e.message}")
+            sendLog("twint: builder path threw ${e.javaClass.simpleName} — falling back")
+            false
+        }
     }
 
     private fun handleRefund(call: MethodCall, result: MethodChannel.Result) {
@@ -395,7 +461,7 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
                     if (connectionState == ConnectionState.CONNECTED) {
                         val waited = System.currentTimeMillis() - startWait
                         sendLog("✅ Pre-payment: settled after ${waited}ms — proceeding")
-                        runPingThenPayment(onReady, onError)
+                        proceedWithPaymentChecks(onReady, onError)
                         return
                     }
                     if (System.currentTimeMillis() - startWait >= deadlineMs) {
@@ -409,6 +475,25 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
             return
         }
 
+        proceedWithPaymentChecks(onReady, onError)
+    }
+
+    /// Skip the pre-payment PING round-trip when the heartbeat has confirmed
+    /// the terminal recently. Pre-fix this method (then `runPingThenPayment`)
+    /// always pinged + waited 2 s per payment, which the operator perceived
+    /// as a "refresh" every single ÖDE. The 60 s heartbeat already runs and
+    /// updates `lastSuccessfulPingTime`, so within 30 s of a heartbeat we
+    /// have strong evidence the terminal is up — no need to pay another 2 s.
+    private fun proceedWithPaymentChecks(
+        onReady: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        val sinceLastPing = System.currentTimeMillis() - lastSuccessfulPingTime
+        if (sinceLastPing in 0..30_000) {
+            sendLog("✅ Pre-payment: heartbeat fresh (${sinceLastPing}ms ago) — skipping ping")
+            onReady()
+            return
+        }
         runPingThenPayment(onReady, onError)
     }
 
@@ -449,6 +534,13 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
     /// the POS receipt + audit log can reference *something* unique even
     /// when the terminal RRN is missing.
     private var lastTwintTransRef: String = ""
+
+    /// Cache the last SDK-level currency / receipt-config we set so we
+    /// don't re-issue identical calls on every payment. Pre-fix the
+    /// operator saw a perceptible "refresh" before every ÖDE; that was
+    /// `setCurrency` + (TWINT) `setDefaultReceiptConfig` firing each time.
+    private var lastSetCurrency: Currency? = null
+    private var lastReceiptConfig: Int = -1
 
     /// Currently in-flight operation, used by timeout / poller paths to
     /// know whether the pendingResult they hold is still theirs.

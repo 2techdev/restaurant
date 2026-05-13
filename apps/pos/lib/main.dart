@@ -10,6 +10,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:gastrocore_pos/app.dart';
+import 'package:gastrocore_pos/features/payments/data/hardware/mypos/mypos_client.dart';
 import 'package:gastrocore_pos/core/config/app_endpoints.dart';
 import 'package:gastrocore_pos/core/data/app_initializer.dart';
 import 'package:gastrocore_pos/core/data/seed_data.dart';
@@ -155,12 +157,45 @@ Future<void> _bootstrap() async {
   // initial route correctly on the very first frame.
   await container.read(brandAuthProvider.notifier).restoreSession();
 
+  // Auto-warm the MyPOS terminal connection so the operator doesn't pay
+  // the 1-3 s SDK handshake on their first ÖDE of the day. Fire-and-forget
+  // — we never block startup on payment hardware, the heartbeat takes over
+  // from there. Only runs when the operator actually has the MyPOS toggle
+  // enabled in Settings; otherwise the call is skipped silently.
+  unawaited(_warmMyPosConnection(prefs));
+
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const GastroCoreApp(),
     ),
   );
+}
+
+/// Reads `settings.v1.payment` straight from SharedPreferences (same key
+/// the SettingsRepository uses) so we don't drag in the full Riverpod
+/// graph just for a startup probe. If MyPOS is enabled, opens a one-shot
+/// MyPosClient, calls `connect()` (fire-and-forget) and lets the plugin's
+/// heartbeat + reconnect machinery keep the session warm from there.
+Future<void> _warmMyPosConnection(SharedPreferences prefs) async {
+  try {
+    final raw = prefs.getString('settings.v1.payment');
+    if (raw == null) return;
+    final json = jsonDecode(raw);
+    if (json is! Map<String, dynamic>) return;
+    final mypos = json['mypos'];
+    if (mypos is! Map<String, dynamic>) return;
+    if (mypos['enabled'] != true) return;
+    final ip = (mypos['ip'] as String?)?.trim() ?? '';
+    final port = (mypos['port'] as int?) ?? 60180;
+    if (ip.isEmpty) return;
+    debugPrint('[BOOT] MyPOS auto-connect: $ip:$port');
+    final client = MyPosClient(terminalIp: ip, terminalPort: port);
+    // Don't await — connection is async and the SDK heartbeat takes over.
+    unawaited(client.connect());
+  } catch (e) {
+    debugPrint('[BOOT] MyPOS auto-connect skipped: $e');
+  }
 }
 
 /// Minimal fallback UI shown when [_bootstrap] throws.
