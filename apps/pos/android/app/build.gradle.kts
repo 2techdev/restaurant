@@ -125,6 +125,12 @@ dependencies {
     // POSHandler, PaymentParams, OperationActivity, etc., plus the
     // TCP/IP auto-reconnect fix the kit's troubleshooting doc references.
     implementation(files("libs/slavesdk-release.aar"))
+    // REQUIRED for the SDK's `OperationActivity` (TWINT flow). Without
+    // AppCompat at runtime the activity fails to inflate even though the
+    // manifest references a Theme.AppCompat parent — symptom is an
+    // instant app crash the moment the operator taps TWINT. The kit's
+    // own build.gradle calls this out as ZORUNLU.
+    implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.gridlayout:gridlayout:1.0.0")
     // integration_test is a dev dependency but GeneratedPluginRegistrant.java references it
     // in all build modes due to a Flutter tool bug. Add it for release compilation only;

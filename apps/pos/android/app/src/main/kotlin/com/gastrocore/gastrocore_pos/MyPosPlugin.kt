@@ -253,11 +253,24 @@ class MyPosPlugin :
         }
         val currency = call.argument<String>("currency") ?: "CHF"
 
+        // 🚨 CRITICAL — operator reported "first payment auto-approves
+        // without card tap, second works". Symptom of a queued/stale
+        // `onTransactionComplete` event from a previous session firing
+        // *after* we set pendingResult on the new payment. Hard-reset
+        // any lingering session state here so the only outcome that can
+        // close this ticket is a fresh SDK callback we triggered
+        // ourselves.
+        resetPaymentSessionState("handlePayment entry")
+
         ensureConnectionBeforePayment(
             onReady = {
                 pendingResult = result
                 pendingOp = "purchase"
                 isPaymentInProgress = true
+                // Stamp the start time *immediately before* we tell the SDK
+                // to begin — used by onTransactionComplete to filter out
+                // any stale event with an older transactionDateLocal.
+                cardStartedAt = System.currentTimeMillis()
                 try {
                     // Bundle alignment (2026-05-13):
                     //  1) Pin the SDK's currency only when it differs from
@@ -332,6 +345,11 @@ class MyPosPlugin :
             ))
             return
         }
+
+        // Same hard-reset as handlePayment: clear any queued stale event
+        // before we set pendingResult so the first SDK callback we get
+        // is the one for *this* transaction.
+        resetPaymentSessionState("handleTwint entry")
 
         ensureConnectionBeforePayment(
             onReady = {
@@ -711,6 +729,16 @@ class MyPosPlugin :
     /// launch is treated as stale.
     private var twintStartedAt: Long = 0L
 
+    /// Same guard, extended to CARD payments. RotaKit's troubleshooting
+    /// only documents §5 for TWINT, but operators reported a "first
+    /// payment auto-approves without touching the card, second works" —
+    /// classic stale `onTransactionComplete` from a previous app run or
+    /// reconnect cycle still queued in `mainHandler`. We capture the
+    /// wall-clock the moment `purchase()` is called and reject any
+    /// onTransactionComplete with a `transactionDateLocal` predating
+    /// that minus a 5 s margin.
+    private var cardStartedAt: Long = 0L
+
     /// Cache the last SDK-level currency / receipt-config we set so we
     /// don't re-issue identical calls on every payment. Pre-fix the
     /// operator saw a perceptible "refresh" before every ÖDE; that was
@@ -725,6 +753,13 @@ class MyPosPlugin :
     /// it `purchase()` and `openPaymentActivity()` can be silently no-op'd
     /// by the SDK if it isn't yet ready.
     private var isPosReady: Boolean = false
+
+    /// One-time guard for `setupListeners()`. Kit Troubleshooting §1: SDK's
+    /// `setConnectionListener` *appends* (doesn't replace) — re-calling
+    /// would accumulate listeners and re-handshake the terminal into the
+    /// "You are all set" loop. Defensively double-check even though our
+    /// posHandler-null gate already prevents this in the common path.
+    private var listenersAttached: Boolean = false
 
     /// Request code for TWINT's openPaymentActivity flow. SDK returns the
     /// result via onActivityResult with this code.
@@ -776,6 +811,29 @@ class MyPosPlugin :
     /// Currently in-flight operation, used by timeout / poller paths to
     /// know whether the pendingResult they hold is still theirs.
     private var pendingOp: String = ""
+
+    /// Wipe every piece of "current transaction" state before starting a
+    /// new payment. Without this the operator's first payment can be
+    /// auto-approved by a stale `onTransactionComplete` event left over
+    /// from the previous app launch / reconnect — the very symptom
+    /// reported on 2026-05-13 ("ilk ödemede otomatik onaylıyor, kart hiç
+    /// yaklaştırmadan adisyon ödendi"). Called at the top of every
+    /// handlePayment / handleTwint entry.
+    private fun resetPaymentSessionState(reason: String) {
+        if (pendingResult != null || isPaymentInProgress) {
+            sendLog("🧹 resetPaymentSessionState ($reason): clearing stale pending state " +
+                "[pendingOp=$pendingOp, isPaymentInProgress=$isPaymentInProgress]")
+        }
+        cancelPaymentTimeout()
+        stopTwintBusyPoller()
+        pendingResult = null
+        pendingOp = ""
+        isPaymentInProgress = false
+        lastFinancialFailureStatus = -1
+        cardStartedAt = 0L
+        twintStartedAt = 0L
+        lastTwintTransRef = ""
+    }
 
     /// Reflection-based unstick for the SDK's `mTransactionInProgress`
     /// flag. The SDK occasionally leaves it true after a cancel/timeout,
@@ -913,6 +971,16 @@ class MyPosPlugin :
     // =========================================================================
 
     private fun setupListeners() {
+        if (listenersAttached) {
+            // Kit §1 — accidentally calling setConnectionListener twice
+            // accumulates callbacks; the terminal then enters its "You
+            // are all set" loop and refuses commands. Guard belt-and-
+            // suspenders even though handleConfigure's posHandler-null
+            // gate already prevents re-entry on the happy path.
+            sendLog("setupListeners: already attached — skipping (kit §1 guard)")
+            return
+        }
+        listenersAttached = true
         // SDK 2.1.8: ConnectionListener callbacks take BluetoothDevice param (ignored for TCP)
         posHandler?.setConnectionListener(object : ConnectionListener {
             override fun onConnected(device: BluetoothDevice?) {
@@ -996,13 +1064,42 @@ class MyPosPlugin :
 
             override fun onTransactionComplete(transactionData: TransactionData?) {
                 mainHandler.post {
+                    val result = pendingResult ?: run {
+                        sendLog("⚠️ Orphan onTransactionComplete (no pendingResult) — ignoring")
+                        return@post
+                    }
+                    val wasTwint = pendingOp == "twint"
+
+                    // 🚨 CRITICAL stale-event filter (extended kit §5 to
+                    // card path). If the SDK hands us transaction data
+                    // whose `transactionDateLocal` predates the moment
+                    // we kicked off the request, it can't be ours —
+                    // it's a leftover event from before the user even
+                    // tapped ÖDE. Treating it as success was the
+                    // "first payment auto-approves" symptom reported
+                    // 2026-05-13.
+                    val sessionStartedAt = if (wasTwint) twintStartedAt else cardStartedAt
+                    if (sessionStartedAt > 0 && transactionData != null) {
+                        val txTime = try {
+                            transactionData.transactionDateLocal?.time ?: 0L
+                        } catch (_: Throwable) { 0L }
+                        if (txTime > 0 && txTime < sessionStartedAt - 5_000) {
+                            sendLog("⚠️ Stale onTransactionComplete (txTime=$txTime " +
+                                "< startedAt=$sessionStartedAt) — rejecting, NOT closing ticket")
+                            // Leave pendingResult intact — the real
+                            // callback for *this* transaction should
+                            // still arrive (or the timeout will fire).
+                            return@post
+                        }
+                    }
+
                     cancelPaymentTimeout()
                     stopTwintBusyPoller()
                     isPaymentInProgress = false
-                    val result = pendingResult ?: return@post
-                    val wasTwint = pendingOp == "twint"
                     pendingResult = null
                     pendingOp = ""
+                    cardStartedAt = 0L
+                    twintStartedAt = 0L
                     // Snapshot the failure status before resetting it so
                     // the post-data path below can map it. Pre-fix this
                     // wasn't tracked and a cancelled card always came back
