@@ -20,6 +20,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.mypos.slavesdk.*
+import java.util.UUID
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -224,17 +225,35 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
         ensureConnectionBeforePayment(
             onReady = {
                 pendingResult = result
+                pendingOp = "purchase"
                 isPaymentInProgress = true
                 try {
-                    // SDK 2.1.8: purchase(String amount, String currency, int receiptConfig)
+                    // Bundle alignment (2026-05-13):
+                    //  1) Pin the SDK's currency to this transaction so a prior
+                    //     EUR sale can't bleed into a CHF one.
+                    POSHandler.setCurrency(getCurrencyEnum(currency))
+                    //  2) Clear a stuck busy flag from a previous timeout/
+                    //     cancel — otherwise the SDK silently no-ops here.
+                    if (posHandler?.isTerminalBusy() == true) {
+                        sendLog("purchase: busy flag set — force clearing")
+                        forceCleanSdkState()
+                    }
+                    sendLog("purchase(${String.format("%.2f", amount)}, $currency, DO_NOT_PRINT)")
+                    // SDK 2.1.8 legacy signature: purchase(amount, currency, receiptConfig).
+                    // RECEIPT_DO_NOT_PRINT: POS prints its own receipt; don't
+                    // make the operator deal with a duplicate from the terminal.
                     posHandler?.purchase(
                         String.format("%.2f", amount),
                         currency,
-                        POSHandler.RECEIPT_PRINT_AUTOMATICALLY
+                        POSHandler.RECEIPT_DO_NOT_PRINT
                     )
+                    //  3) 75 s safety net so the POS dialog doesn't hang if
+                    //     the SDK never calls onTransactionComplete.
+                    schedulePaymentTimeout(result, "purchase")
                 } catch (e: Exception) {
                     isPaymentInProgress = false
                     pendingResult = null
+                    pendingOp = ""
                     result.success(mapOf("success" to false, "error" to e.message))
                 }
             },
@@ -249,18 +268,41 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
             result.success(mapOf("success" to false, "error" to "Missing amount"))
             return
         }
-        val currency = call.argument<String>("currency") ?: "CHF"
+        if (amount <= 0) {
+            result.success(mapOf("success" to false, "error" to "Amount must be > 0"))
+            return
+        }
 
         ensureConnectionBeforePayment(
             onReady = {
                 pendingResult = result
+                pendingOp = "twint"
                 isPaymentInProgress = true
+                // Mint a client-side correlation token. SDK 2.1.8's
+                // `twintPurchase(String, String)` can't pass this to the
+                // terminal (newer AAR's QRPaymentParams API does), but it's
+                // surfaced in the response so the POS audit log / receipt
+                // can reference *something* unique even when the terminal
+                // RRN comes back blank.
+                lastTwintTransRef = UUID.randomUUID().toString()
                 try {
-                    // SDK 2.1.8: twintPurchase(String amount, String currency)
-                    posHandler?.twintPurchase(String.format("%.2f", amount), currency)
+                    // TWINT is CHF-only at the SDK level.
+                    POSHandler.setCurrency(Currency.CHF)
+                    if (posHandler?.isTerminalBusy() == true) {
+                        sendLog("twint: busy flag set — force clearing")
+                        forceCleanSdkState()
+                    }
+                    sendLog("twintPurchase(${String.format("%.2f", amount)}, CHF, transRef=$lastTwintTransRef, DO_NOT_PRINT)")
+                    POSHandler.setDefaultReceiptConfig(POSHandler.RECEIPT_DO_NOT_PRINT)
+                    posHandler?.twintPurchase(String.format("%.2f", amount), "CHF")
+                    schedulePaymentTimeout(result, "twintPurchase")
+                    // SDK can fail to fire onTransactionComplete on cancel/
+                    // dismiss — poll for terminal idle as a fallback.
+                    startTwintBusyPoller(result)
                 } catch (e: Exception) {
                     isPaymentInProgress = false
                     pendingResult = null
+                    pendingOp = ""
                     result.success(mapOf("success" to false, "error" to e.message))
                 }
             },
@@ -298,6 +340,11 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
     }
 
     private fun handleCancel(result: MethodChannel.Result) {
+        // Cashier-initiated cancel: kill the in-flight timer + poller too,
+        // otherwise they'd fire 75 s / 6 s later and try to push a second
+        // result through a now-null pendingResult.
+        cancelPaymentTimeout()
+        stopTwintBusyPoller()
         try {
             // SDK 2.1.8: cancel() → cancelTransaction()
             posHandler?.cancelTransaction()
@@ -393,6 +440,152 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
     }
 
     // =========================================================================
+    // Payment safety helpers — ported from MyPOS-only bundle (2026-05-13)
+    // =========================================================================
+
+    /// Last UUID we minted for a TWINT request. SDK 2.1.8 doesn't accept
+    /// a transRef on `twintPurchase(String, String)`, so this is a
+    /// client-side correlation token surfaced in the response payload so
+    /// the POS receipt + audit log can reference *something* unique even
+    /// when the terminal RRN is missing.
+    private var lastTwintTransRef: String = ""
+
+    /// Currently in-flight operation, used by timeout / poller paths to
+    /// know whether the pendingResult they hold is still theirs.
+    private var pendingOp: String = ""
+
+    /// Reflection-based unstick for the SDK's `mTransactionInProgress`
+    /// flag. The SDK occasionally leaves it true after a cancel/timeout,
+    /// which then makes the next purchase silently fail with TERMINAL_BUSY.
+    /// Copied from MyPOS-only bundle's `forceCleanSdkState`.
+    private fun forceCleanSdkState() {
+        try {
+            val utilsClass = Class.forName("com.mypos.slavesdk.Utils")
+            val field = utilsClass.getDeclaredField("mTransactionInProgress")
+            field.isAccessible = true
+            val wasBusy = field.getBoolean(null)
+            if (wasBusy) {
+                field.setBoolean(null, false)
+                sendLog("SDK busy flag cleared (was stuck)")
+            }
+        } catch (e: Exception) {
+            sendLog("forceCleanSdkState: ${e.message}")
+        }
+    }
+
+    /// Map an ISO 4217 alpha code to the SDK's Currency enum. Used for
+    /// `POSHandler.setCurrency(...)` ahead of every purchase so a previous
+    /// transaction's currency doesn't leak in.
+    private fun getCurrencyEnum(code: String): Currency = when (code.uppercase()) {
+        "EUR" -> Currency.EUR
+        "USD" -> Currency.USD
+        "GBP" -> Currency.GBP
+        else  -> Currency.CHF
+    }
+
+    // ---------- Payment timeout (75 s) ----------
+
+    private var paymentTimeoutRunnable: Runnable? = null
+
+    /// Posts a 75 s safety net: if the SDK never fires
+    /// `onTransactionComplete` we cancel the pending payment with a TIMEOUT
+    /// error so the POS dialog doesn't hang forever. Called right after
+    /// firing `purchase()` / `twintPurchase()`; cancelled on
+    /// `onTransactionComplete`, `handleCancel`, and on each subsequent
+    /// payment start.
+    private fun schedulePaymentTimeout(result: MethodChannel.Result, op: String) {
+        cancelPaymentTimeout()
+        val timeoutMs = 75_000L
+        paymentTimeoutRunnable = Runnable {
+            if (pendingResult != result) return@Runnable
+            sendLog("⏱ $op timeout after ${timeoutMs / 1000}s — no SDK callback, cancelling")
+            try { posHandler?.cancelTransaction() } catch (_: Exception) {}
+            forceCleanSdkState()
+            isPaymentInProgress = false
+            val r = pendingResult
+            pendingResult = null
+            pendingOp = ""
+            stopTwintBusyPoller()
+            r?.success(mapOf(
+                "success"   to false,
+                "errorCode" to "TIMEOUT",
+                "error"     to "$op timeout — no response from terminal"
+            ))
+        }
+        mainHandler.postDelayed(paymentTimeoutRunnable!!, timeoutMs)
+    }
+
+    private fun cancelPaymentTimeout() {
+        paymentTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        paymentTimeoutRunnable = null
+    }
+
+    // ---------- TWINT busy poller ----------
+    //
+    // The SDK is unreliable about firing `onTransactionComplete` for TWINT
+    // when the customer dismisses the QR screen or the terminal times out
+    // internally — it just goes idle. We poll `isTerminalBusy` and, after
+    // 3 consecutive idle ticks past a 3 s grace window, declare the
+    // transaction CANCELLED so the dialog can close instead of hanging.
+    // Simpler than the bundle's variant (no `queryLastTransaction`
+    // dependency) — adequate for our use.
+
+    private var twintBusyPollRunnable: Runnable? = null
+    private var twintNotBusyStreak: Int = 0
+    private var twintPollStartedAt: Long = 0L
+
+    private fun startTwintBusyPoller(result: MethodChannel.Result) {
+        stopTwintBusyPoller()
+        twintNotBusyStreak = 0
+        twintPollStartedAt = System.currentTimeMillis()
+        twintBusyPollRunnable = object : Runnable {
+            override fun run() {
+                if (pendingResult != result || pendingOp != "twint") {
+                    sendLog("TWINT poller: pendingResult changed, stopping")
+                    return
+                }
+                val elapsed = System.currentTimeMillis() - twintPollStartedAt
+                // Grace window: SDK takes ~1-2 s to set busy=true.
+                if (elapsed < 3000) {
+                    mainHandler.postDelayed(this, 1500)
+                    return
+                }
+                val busy = try {
+                    posHandler?.isTerminalBusy() ?: false
+                } catch (_: Exception) { false }
+                if (busy) {
+                    twintNotBusyStreak = 0
+                } else {
+                    twintNotBusyStreak++
+                    sendLog("TWINT poller: idle (streak=$twintNotBusyStreak)")
+                    // 3 idle checks × 2 s = 6 s without callback → treat as cancel.
+                    if (twintNotBusyStreak >= 3) {
+                        sendLog("TWINT poller: 6 s idle without callback — declaring CANCELLED")
+                        cancelPaymentTimeout()
+                        isPaymentInProgress = false
+                        val r = pendingResult
+                        pendingResult = null
+                        pendingOp = ""
+                        r?.success(mapOf(
+                            "success"   to false,
+                            "errorCode" to "CANCELLED",
+                            "error"     to "TWINT cancelled (terminal idle without callback)"
+                        ))
+                        return
+                    }
+                }
+                mainHandler.postDelayed(this, 2000)
+            }
+        }
+        mainHandler.postDelayed(twintBusyPollRunnable!!, 1500)
+    }
+
+    private fun stopTwintBusyPoller() {
+        twintBusyPollRunnable?.let { mainHandler.removeCallbacks(it) }
+        twintBusyPollRunnable = null
+    }
+
+    // =========================================================================
     // SDK listeners
     // =========================================================================
 
@@ -466,9 +659,13 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
 
             override fun onTransactionComplete(transactionData: TransactionData?) {
                 mainHandler.post {
+                    cancelPaymentTimeout()
+                    stopTwintBusyPoller()
                     isPaymentInProgress = false
                     val result = pendingResult ?: return@post
+                    val wasTwint = pendingOp == "twint"
                     pendingResult = null
+                    pendingOp = ""
 
                     if (transactionData != null) {
                         // SDK 2.1.8: success if authCode is non-empty and no declined reason
@@ -477,15 +674,24 @@ class MyPosPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAwar
                         val isSuccess = authCode.isNotEmpty() && declinedReason.isEmpty()
 
                         if (isSuccess) {
-                            sendLog("✅ Transaction complete: RRN=${transactionData.getRRN()}")
-                            result.success(mapOf(
+                            val rrn = transactionData.getRRN() ?: ""
+                            sendLog("✅ Transaction complete: RRN=$rrn (twint=$wasTwint)")
+                            val payload = mutableMapOf<String, Any?>(
                                 "success"       to true,
-                                "transactionId" to (transactionData.getRRN() ?: ""),
+                                "transactionId" to rrn,
                                 "authCode"      to authCode,
                                 "cardType"      to (transactionData.getAIDName() ?: ""),
                                 "maskedPan"     to (transactionData.getPANMasked() ?: ""),
                                 "amount"        to (transactionData.getAmount() ?: "0.00"),
-                            ))
+                            )
+                            // Surface the client-side correlation token to the
+                            // POS so the receipt + audit log have a stable ref
+                            // even when the terminal RRN comes back empty for
+                            // TWINT (SDK 2.1.8 occasionally does).
+                            if (wasTwint && lastTwintTransRef.isNotEmpty()) {
+                                payload["transRef"] = lastTwintTransRef
+                            }
+                            result.success(payload)
                         } else {
                             val errCode = declinedReason.ifEmpty { "DECLINED" }
                             sendLog("❌ Transaction failed: $errCode")

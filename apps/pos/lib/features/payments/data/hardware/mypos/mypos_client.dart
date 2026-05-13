@@ -151,12 +151,27 @@ class MyPosClient {
         'currency': currency,
       });
       if (result?['success'] == true) {
+        // Bundle alignment (2026-05-13): the SDK occasionally returns
+        // success=true with every transaction-proof field empty — we'd
+        // close the ticket as paid even though no money moved. Reject
+        // that case explicitly. (TWINT is handled separately and is
+        // allowed to approve without an RRN.)
+        final txId = result!['transactionId']?.toString().trim() ?? '';
+        final rrn = result['rrn']?.toString().trim() ?? '';
+        final auth = result['authCode']?.toString().trim() ?? '';
+        if (txId.isEmpty && rrn.isEmpty && auth.isEmpty) {
+          return MyPosPaymentResult(
+            success: false,
+            errorCode: 'NO_APPROVAL_DATA',
+            errorMessage:
+                'Terminal success=true ama transaction proof yok '
+                '(transactionId/rrn/authCode hepsi boş) — false-positive reddi.',
+          );
+        }
         return MyPosPaymentResult(
           success: true,
-          transactionId: result!['transactionId']?.toString() ??
-              result['rrn']?.toString() ??
-              '',
-          authCode: result['authCode']?.toString(),
+          transactionId: txId.isNotEmpty ? txId : rrn,
+          authCode: auth.isEmpty ? null : auth,
           cardType: result['cardType']?.toString(),
           maskedPan: result['maskedPan']?.toString(),
           amountCents: amountCents,
@@ -188,11 +203,21 @@ class MyPosClient {
         'amount': amountCents / 100.0,
       });
       if (result?['success'] == true) {
+        // For TWINT we intentionally do NOT require an RRN — SDK 2.1.8
+        // sometimes approves without one. The plugin mints a client-side
+        // `transRef` UUID and surfaces it here so the audit log + receipt
+        // still have a stable correlation token.
+        final txId = result!['transactionId']?.toString().trim() ?? '';
+        final rrn = result['rrn']?.toString().trim() ?? '';
+        final transRef = result['transRef']?.toString().trim() ?? '';
+        final fallbackId = transRef.isNotEmpty
+            ? 'TWINT-$transRef'
+            : 'TWINT-${DateTime.now().millisecondsSinceEpoch}';
         return MyPosPaymentResult(
           success: true,
-          transactionId: result!['transactionId']?.toString() ??
-              result['rrn']?.toString() ??
-              '',
+          transactionId: txId.isNotEmpty
+              ? txId
+              : (rrn.isNotEmpty ? rrn : fallbackId),
           authCode: result['authCode']?.toString(),
           cardType: 'TWINT',
           amountCents: amountCents,
