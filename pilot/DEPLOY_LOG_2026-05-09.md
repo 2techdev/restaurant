@@ -3,6 +3,108 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-13 ~14:38 CEST — 🚨 KRİTİK — false-approval + TWINT crash + AppCompat dep eksiği
+
+**Kapsam:** `build.gradle.kts` + `MyPosPlugin.kt`. **PARA KAYBI RİSKİ** içeren bug fix'i — operatör test'e başlamadan önce kuruyup doğrulamalı.
+
+### 3 raporlanan sorun
+
+1. **🚨 İlk ödeme otomatik onaylıyor** — kart hiç yaklaştırmadan adisyon "ödendi". Para tahsil edilmemiş.
+2. İkinci ödeme normal çalışıyor — sadece ilkinde sorun.
+3. TWINT'e basınca app kapanıyor — önceki manifest fix + yeni AAR'a rağmen.
+
+### Kök neden #1 + #2: stale onTransactionComplete event
+
+SDK önceki app launch'ından / reconnect cycle'ından kalmış bir başarılı `onTransactionComplete` eventi `mainHandler` queue'sunda kalıyor. Akış:
+
+1. App açılır, SDK reconnect olur, stale event queue'da bekler
+2. Operatör ÖDE'ye basar → `handlePayment` → `pendingResult` set edilir
+3. Queued stale event fire eder → handler "`pendingResult != null`" check'inden geçer
+4. Eski (başarılı) transaction data CONSUME edilir → adisyon false-approve
+5. İkinci ödeme: queue temiz → normal akış
+
+Kit Troubleshooting **§5** TWINT için bu pattern'i çözüyor: `transactionDateLocal < sessionStartedAt - 60s` ise stale say. Önceki commit'te TWINT'e ekledim ama CARD'a uygulamadım. Kit'te de CARD için yazılmamış ama mantık aynı.
+
+### Kök neden #3: AppCompat library yoktu
+
+Bizim `build.gradle.kts`'de `androidx.appcompat:appcompat` **bağımlılığı yoktu**, sadece `gridlayout` vardı. Önceki commit manifest'e `Theme.AppCompat.*` parent'ı ekledi + styles.xml'e `MyPosOperationTheme` koydu — ama **AppCompat library runtime'da yüklü değildi**. SDK'nın OperationActivity'si inflate olurken AppCompat class'larını arıyor → `ClassNotFoundException` → crash.
+
+Kit'in `example-app/build.gradle` net diyor: `// ZORUNLU — TWINT'in OperationActivity'si için AppCompat`.
+
+### Düzeltmeler
+
+| # | Fix | Yer |
+|---|---|---|
+| **1** | `androidx.appcompat:appcompat:1.6.1` bağımlılığı eklendi | `build.gradle.kts` |
+| **2** | `cardStartedAt: Long` field eklendi, `handlePayment` içinde `purchase()` çağrısının hemen ÖNCESİNDE set ediliyor | `MyPosPlugin.kt` |
+| **3** | `onTransactionComplete` stale-event filter — `txData.transactionDateLocal < sessionStartedAt - 5s` ise reject + pendingResult intact bırak (gerçek callback bekleniyor) | `MyPosPlugin.kt` |
+| **4** | `resetPaymentSessionState(reason)` helper — `handlePayment` ve `handleTwint` başında çağrılıyor, tüm pending state'i bir-vuruşta sıfırlıyor | `MyPosPlugin.kt` |
+| **5** | `listenersAttached: Boolean` idempotency flag — setupListeners() tek-seferlik garantili | `MyPosPlugin.kt` |
+
+### Stale event guard mekanizması
+
+```kotlin
+val sessionStartedAt = if (wasTwint) twintStartedAt else cardStartedAt
+if (sessionStartedAt > 0 && transactionData != null) {
+    val txTime = transactionData.transactionDateLocal?.time ?: 0L
+    if (txTime > 0 && txTime < sessionStartedAt - 5_000) {
+        sendLog("⚠️ Stale onTransactionComplete (txTime=$txTime < startedAt=$sessionStartedAt) — rejecting, NOT closing ticket")
+        return@post  // pendingResult intact
+    }
+}
+```
+
+5 sn margin: bizim Kotlin clock ile SDK'nın transactionDateLocal'i arasında küçük drift olabilir, ama 5 sn buffer'ı yeterince gevşek. Stale event genelde dakikalar/saatler önce olur.
+
+### APK
+
+```
+E:/Project/Restaurant/pilot/app-pos-release.apk                                  (canlı slot — overwrite)
+E:/Project/Restaurant/pilot/app-pos-release-mypos-rotakit-v2-20260513.apk        (versiyonlu)
+size       : 90'175'647 bytes (≈86.0 MiB)
+sha256     : c235b7dda78ccc3ac57cb13821c4907cd11e01fd6481c4fd4c41c0c963da3932
+built from : claude/pilot-final commit fa65395 (jolly-final worktree)
+flavor     : pos (assemblePosRelease, 30s)
+```
+
+**Boyut artışı: 22 KB** — AppCompat library bundle'a eklendi (R8/ProGuard minify edilse 50KB+ tasarruf olurdu ama ihtiyaç yok).
+
+### Sahada KRİTİK test akışı (sırayla)
+
+1. **Eski APK'yı tamamen kaldır** — uninstall edip yeniden install et (clean state).
+2. App aç → logcat:
+   ```
+   [BOOT] MyPOS auto-connect: ...
+   🔗 SDK onConnected (waiting for POSReady)
+   ✅ Terminal POS ready — can dispatch commands
+   ```
+3. **🚨 BİRİNCİ ÖDEME TEST**: ürün ekle → ÖDE → KART. Kart YAKLAŞTIRMADAN logcat'i izle:
+   - **Doğru davranış**: Dialog "BEKLENİYOR" göstermeli. Hiçbir şey yapma 5-10 sn.
+   - Logcat'te `⚠️ Stale onTransactionComplete — rejecting, NOT closing ticket` görmen lazım (varsa). Bu fix çalıştığının kanıtı.
+   - Adisyon **kapanmamalı**. İptal et veya kart yaklaştır.
+   - **Yanlış davranış**: "ONAYLANDI" gösterirse ve adisyon kapanırsa → fix tutmamış, hemen rapor et.
+4. Kart yaklaştır → PIN gir → gerçek onay → şimdi normal kapanmalı.
+5. **TWINT TEST**: TWINT chip → **app crash etmemeli**. AAR'ın Activity'si açılıp QR göstermeli.
+6. İkinci ödeme: TWINT veya KART normal devam.
+
+### Logcat'te yeni satırlar
+
+```
+🧹 resetPaymentSessionState (handlePayment entry): clearing stale pending state [...]
+⚠️ Stale onTransactionComplete (txTime=X < startedAt=Y) — rejecting, NOT closing ticket
+⚠️ Orphan onTransactionComplete (no pendingResult) — ignoring
+setupListeners: already attached — skipping (kit §1 guard)
+```
+
+### Rollback
+
+False-approval ÇOK CIDDI bir risk. Eğer bu APK ile **hâlâ** false-approval olursa **derhal** MYPOS toggle'ı Settings'ten kapat ve önceki APK'ya geç:
+
+- En son sağlıklı bilinen APK: `f106d5f1bc40907504929bb0bea7ee7998dce4d511e1fd7aeb69130c55a5fd05` (12:44 entry, RotaKit alignment) — false-approval bug bu sürümde başlamış olabilir, dikkatli ol.
+- Daha güvenli rollback: `246b6d509d2403070597b9b35c295488308f5ee5c3f9b44167b240974ccc537a` (12:14 entry, ilk OperationActivity manifest fix) — AAR upgrade'i ve toplu kit fix'leri öncesi.
+- En güvenli: toggle kapatmak — manuel KART/TWINT moduna dön.
+
+
 ## 2026-05-13 ~12:44 CEST — RotaMyPosKit hizalama: 5 production fix + AAR upgrade
 
 **Kapsam:** AAR replace + `MyPosPlugin.kt` 5 sürgün fix. Manifest + theme + Dart side dokunulmadı (önceki commit'lerden korunuyor).
