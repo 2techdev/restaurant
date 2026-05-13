@@ -1369,15 +1369,19 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
     if (mounted) _showSnack('Payment settings saved.');
   }
 
-  /// Probes the MyPOS Sigma terminal: opens a fresh client with the
-  /// fields currently in the form, runs configure+connect, and ping
-  /// the terminal. Cleans up afterwards (best-effort disconnect).
+  /// Probes the MyPOS Sigma terminal: reuses the shared client with the
+  /// fields currently in the form, runs configure+connect, and ping the
+  /// terminal. Does NOT disconnect afterwards — the same singleton is
+  /// used for real payments, and tearing down the socket here forces a
+  /// cold reconnect on the next charge (which in turn races the SDK
+  /// heartbeat and produces false-positive approvals). Matches the
+  /// 2tech Service App pattern: one warm session for the app lifetime.
   Future<void> _testMyPos() async {
     setState(() {
       _myposTesting = true;
       _myposTestResult = null;
     });
-    final client = MyPosClient(
+    final client = MyPosClient.shared(
       terminalIp: _myposIpCtrl.text.trim(),
       terminalPort: int.tryParse(_myposPortCtrl.text.trim()) ?? 60180,
     );
@@ -1401,9 +1405,6 @@ class _PaymentSectionState extends ConsumerState<_PaymentSection> {
       if (!mounted) return;
       setState(() => _myposTestResult = '✗ $e');
     } finally {
-      try {
-        await client.disconnect();
-      } catch (_) {}
       if (mounted) setState(() => _myposTesting = false);
     }
   }

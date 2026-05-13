@@ -136,7 +136,7 @@ class _MyPosPaymentDialogState extends State<_MyPosPaymentDialog> {
   }
 
   Future<void> _run() async {
-    final client = MyPosClient(
+    final client = MyPosClient.shared(
       terminalIp: widget.config.ip,
       terminalPort: widget.config.port,
       onConnectionStateChanged: (connected, state, reason) {

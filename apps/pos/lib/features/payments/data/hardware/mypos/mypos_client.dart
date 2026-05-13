@@ -14,33 +14,80 @@ typedef MyPosConnectionCallback =
 /// Communicates with the native [MyPosPlugin] via MethodChannel.
 /// Only TCP/IP connectivity is supported — USB and Bluetooth are excluded.
 ///
+/// **SINGLETON.** Same approach as the production 2tech Service App
+/// (PaymentEngine holds a single MyPosPaymentProvider with a single
+/// MyPosClient). Previously this codebase had 5 separate constructor
+/// call-sites (boot warm-up, Settings test, both with their own
+/// `disconnect()` in finally blocks; the payment dialog freshly built
+/// one for each show; etc.). Each new instance reset the
+/// `_isConnected` flag, re-installed the channel handler, and (worst)
+/// the Settings test's finally always tore down the TCP socket —
+/// leaving the next payment attempt to race a reconnect. With
+/// `MyPosClient.shared(...)` every call-site reuses the same instance;
+/// the underlying SDK socket stays warm.
+///
 /// Channel names:
 ///   'mypos_payment'  — MethodChannel for commands
 ///   'mypos_logs'     — EventChannel for native log stream (debug only)
 class MyPosClient {
-  MyPosClient({
-    required this.terminalIp,
-    required this.terminalPort,
+  MyPosClient._internal({
+    required String terminalIp,
+    required int terminalPort,
     this.onConnectionStateChanged,
-  }) {
+  })  : _terminalIp = terminalIp,
+        _terminalPort = terminalPort {
     _setupMethodCallHandler();
     if (kDebugMode) _startNativeLogListener();
+  }
+
+  /// Singleton accessor. The first call creates the instance with the
+  /// given IP/port; subsequent calls return that same instance regardless
+  /// of arguments. To re-target a different terminal, call [reconfigure]
+  /// (or just let the next [connect] call configure the plugin again —
+  /// the native side accepts a new IP/port at any time).
+  static MyPosClient? _instance;
+  factory MyPosClient.shared({
+    required String terminalIp,
+    required int terminalPort,
+    MyPosConnectionCallback? onConnectionStateChanged,
+  }) {
+    final existing = _instance;
+    if (existing != null) {
+      // Keep the IP/port the caller wanted; the native plugin's
+      // handleConfigure can re-target on the next connect() call.
+      existing._terminalIp = terminalIp;
+      existing._terminalPort = terminalPort;
+      if (onConnectionStateChanged != null) {
+        existing.onConnectionStateChanged = onConnectionStateChanged;
+      }
+      return existing;
+    }
+    final created = MyPosClient._internal(
+      terminalIp: terminalIp,
+      terminalPort: terminalPort,
+      onConnectionStateChanged: onConnectionStateChanged,
+    );
+    _instance = created;
+    return created;
   }
 
   factory MyPosClient.fromConfig(
     MyPosConfig config, {
     MyPosConnectionCallback? onConnectionStateChanged,
   }) {
-    return MyPosClient(
+    return MyPosClient.shared(
       terminalIp: config.terminalIp,
       terminalPort: config.terminalPort,
       onConnectionStateChanged: onConnectionStateChanged,
     );
   }
 
-  final String terminalIp;
-  final int terminalPort;
-  final MyPosConnectionCallback? onConnectionStateChanged;
+  String _terminalIp;
+  int _terminalPort;
+  MyPosConnectionCallback? onConnectionStateChanged;
+
+  String get terminalIp => _terminalIp;
+  int get terminalPort => _terminalPort;
 
   static const _channel = MethodChannel('mypos_payment');
   static const _logChannel = EventChannel('mypos_logs');

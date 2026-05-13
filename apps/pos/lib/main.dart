@@ -190,7 +190,7 @@ Future<void> _warmMyPosConnection(SharedPreferences prefs) async {
     final port = (mypos['port'] as int?) ?? 60180;
     if (ip.isEmpty) return;
     debugPrint('[BOOT] MyPOS auto-connect: $ip:$port');
-    final client = MyPosClient(terminalIp: ip, terminalPort: port);
+    final client = MyPosClient.shared(terminalIp: ip, terminalPort: port);
     // Don't await — connection is async and the SDK heartbeat takes over.
     unawaited(client.connect());
   } catch (e) {
