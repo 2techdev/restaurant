@@ -120,7 +120,11 @@ repositories {
 }
 
 dependencies {
-    implementation(files("libs/slavesdk2.1.8.aar"))
+    // MyPOS Slave SDK — Rota production kit (2026-05-13), supersedes the
+    // previous local 2.1.8 AAR. Same SDK family but newer patches; ships
+    // POSHandler, PaymentParams, OperationActivity, etc., plus the
+    // TCP/IP auto-reconnect fix the kit's troubleshooting doc references.
+    implementation(files("libs/slavesdk-release.aar"))
     implementation("androidx.gridlayout:gridlayout:1.0.0")
     // integration_test is a dev dependency but GeneratedPluginRegistrant.java references it
     // in all build modes due to a Flutter tool bug. Add it for release compilation only;

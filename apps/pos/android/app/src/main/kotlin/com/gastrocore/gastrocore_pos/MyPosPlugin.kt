@@ -205,10 +205,15 @@ class MyPosPlugin :
     }
 
     private fun handleCheckRealConnection(result: MethodChannel.Result) {
-        val sdkConnected = posHandler?.isConnected() ?: false
-        val stateConnected = connectionState == ConnectionState.CONNECTED
-        val connected = sdkConnected && stateConnected
-        sendLog("🔍 checkRealConnection: sdk=$sdkConnected, state=$connectionState → $connected")
+        // Kit Troubleshooting §7: SDK 2.1.8's `isConnected()` is NOT a pure
+        // state check — it sends an OOB byte over the socket; if the byte
+        // fails to deliver, the SDK fires `onDisconnected` immediately.
+        // Calling it on every payment was actively destroying the very
+        // connection it was trying to verify. Trust our own state machine
+        // (driven by the ConnectionListener) instead — it tracks the
+        // SDK's view without the side effect.
+        val connected = connectionState == ConnectionState.CONNECTED && isPosReady
+        sendLog("🔍 checkRealConnection: state=$connectionState ready=$isPosReady → $connected")
         result.success(mapOf("connected" to connected))
     }
 
@@ -334,6 +339,7 @@ class MyPosPlugin :
                 pendingOp = "twint"
                 isPaymentInProgress = true
                 lastTwintTransRef = UUID.randomUUID().toString()
+                twintStartedAt = System.currentTimeMillis()
                 val amountStr = String.format(java.util.Locale.US, "%.2f", amount)
                 try {
                     // TWINT is CHF-only at the SDK level.
@@ -430,6 +436,25 @@ class MyPosPlugin :
             null
         }
         val posStatus = data?.getIntExtra("pos_status", -1) ?: -1
+
+        // Kit Troubleshooting §5: occasionally the SDK hands back the
+        // PREVIOUS transaction's data when a second TWINT starts quickly.
+        // If the txn timestamp predates our `twintStartedAt - 60s` window
+        // it can't be ours; refuse it so the POS doesn't accidentally
+        // mark a completely different sale as paid.
+        if (txData != null) {
+            val txTime = try { txData.transactionDateLocal?.time ?: 0L }
+                catch (_: Throwable) { 0L }
+            if (txTime > 0 && txTime < twintStartedAt - 60_000) {
+                sendLog("⚠️ TWINT stale data (txTime=$txTime started=$twintStartedAt) — rejecting")
+                result.success(mapOf(
+                    "success"   to false,
+                    "errorCode" to "STALE_DATA",
+                    "error"     to "TWINT eski işlem verisi döndü (SDK bug) — manuel kontrol"
+                ))
+                return true
+            }
+        }
 
         when {
             txData != null && !txData.rrn.isNullOrEmpty() -> {
@@ -677,6 +702,15 @@ class MyPosPlugin :
     /// when the terminal RRN is missing.
     private var lastTwintTransRef: String = ""
 
+    /// Wall-clock at which the current TWINT was launched. Kit
+    /// Troubleshooting §5: `getLastTransactionData()` (and even the SDK's
+    /// own onActivityResult) can occasionally return the **previous**
+    /// transaction's data, e.g. when the operator quickly fires a second
+    /// TWINT before SDK state has fully reset. We compare the result's
+    /// transaction date against this — anything older than 60 s before
+    /// launch is treated as stale.
+    private var twintStartedAt: Long = 0L
+
     /// Cache the last SDK-level currency / receipt-config we set so we
     /// don't re-issue identical calls on every payment. Pre-fix the
     /// operator saw a perceptible "refresh" before every ÖDE; that was
@@ -695,6 +729,49 @@ class MyPosPlugin :
     /// Request code for TWINT's openPaymentActivity flow. SDK returns the
     /// result via onActivityResult with this code.
     private val REQ_CODE_TWINT = 9001
+
+    /// Kit Troubleshooting §3: SDK fires the failure status (USER_CANCEL,
+    /// COM_ERROR, TERMINAL_BUSY...) via `onPOSInfoReceived` first, then
+    /// follows up with `onTransactionComplete(null)`. If we hand back a
+    /// generic "no transaction data" error on the second callback the POS
+    /// layer reports a failed sale even though the operator just hit
+    /// cancel. We stash the most-recent financial-command failure status
+    /// here so onTransactionComplete can map it back to the right errorCode.
+    private var lastFinancialFailureStatus: Int = -1
+
+    /// Failure status codes worth surfacing as semantic errors (rather
+    /// than the generic NO_DATA). Copied from the kit's MyPosManager.
+    private fun terminalFailureStatuses(): Set<Int> = setOf(
+        POSHandler.POS_STATUS_USER_CANCEL,
+        POSHandler.POS_STATUS_INTERNAL_ERROR,
+        POSHandler.POS_STATUS_TERMINAL_BUSY,
+        POSHandler.POS_STATUS_WRONG_AMOUNT,
+        POSHandler.POS_STATUS_COM_ERROR,
+        POSHandler.POS_STATUS_NO_CARD_FOUND,
+        POSHandler.POS_STATUS_NOT_SUPPORTED_CARD,
+        POSHandler.POS_STATUS_CARD_CHIP_ERROR,
+        POSHandler.POS_STATUS_INVALID_PIN,
+        POSHandler.POS_STATUS_MAX_PIN_COUNT_EXCEEDED,
+        POSHandler.POS_STATUS_TRANSACTION_NOT_FOUND,
+    )
+
+    /// Map a POSHandler status int to a stable string error code surfaced
+    /// to Dart. CANCELLED is the cleanest signal for the cash-software side
+    /// (Cash Collector / payment_screen) so it knows to leave the ticket
+    /// open rather than mark a refund.
+    private fun statusToErrorCode(status: Int): String = when (status) {
+        POSHandler.POS_STATUS_USER_CANCEL          -> "CANCELLED"
+        POSHandler.POS_STATUS_TERMINAL_BUSY        -> "TERMINAL_BUSY"
+        POSHandler.POS_STATUS_WRONG_AMOUNT         -> "WRONG_AMOUNT"
+        POSHandler.POS_STATUS_COM_ERROR            -> "COM_ERROR"
+        POSHandler.POS_STATUS_NO_CARD_FOUND        -> "NO_CARD"
+        POSHandler.POS_STATUS_NOT_SUPPORTED_CARD   -> "CARD_NOT_SUPPORTED"
+        POSHandler.POS_STATUS_CARD_CHIP_ERROR      -> "CARD_CHIP_ERROR"
+        POSHandler.POS_STATUS_INVALID_PIN          -> "INVALID_PIN"
+        POSHandler.POS_STATUS_MAX_PIN_COUNT_EXCEEDED -> "PIN_LOCKED"
+        POSHandler.POS_STATUS_TRANSACTION_NOT_FOUND -> "TX_NOT_FOUND"
+        else                                        -> "STATUS_$status"
+    }
 
     /// Currently in-flight operation, used by timeout / poller paths to
     /// know whether the pendingResult they hold is still theirs.
@@ -876,6 +953,17 @@ class MyPosPlugin :
             override fun onPOSInfoReceived(command: Int, status: Int, message: String?, bundle: Bundle?) {
                 mainHandler.post {
                     sendLog("ℹ️ POSInfo cmd=$command status=$status: $message")
+
+                    // Kit Troubleshooting §3: stash the financial-command
+                    // failure status here so onTransactionComplete(null) —
+                    // which fires *after* this for cancel/decline — can
+                    // surface the right errorCode instead of NO_DATA.
+                    if ((command == POSHandler.COMMAND_PURCHASE ||
+                            command == POSHandler.COMMAND_REFUND) &&
+                        status in terminalFailureStatuses()) {
+                        lastFinancialFailureStatus = status
+                    }
+
                     when (status) {
                         POSHandler.POS_STATUS_SUCCESS_PING -> {
                             lastSuccessfulPingTime = System.currentTimeMillis()
@@ -915,6 +1003,12 @@ class MyPosPlugin :
                     val wasTwint = pendingOp == "twint"
                     pendingResult = null
                     pendingOp = ""
+                    // Snapshot the failure status before resetting it so
+                    // the post-data path below can map it. Pre-fix this
+                    // wasn't tracked and a cancelled card always came back
+                    // as NO_DATA → POS layer marked it as failed.
+                    val failureStatus = lastFinancialFailureStatus
+                    lastFinancialFailureStatus = -1
 
                     if (transactionData != null) {
                         // SDK 2.1.8: success if authCode is non-empty and no declined reason
@@ -942,20 +1036,40 @@ class MyPosPlugin :
                             }
                             result.success(payload)
                         } else {
-                            val errCode = declinedReason.ifEmpty { "DECLINED" }
-                            sendLog("❌ Transaction failed: $errCode")
+                            // Kit §3 honour: prefer the financial status
+                            // we already captured (USER_CANCEL etc) over
+                            // the generic declinedReason text — operator
+                            // wants a "iptal edildi" pop, not "DECLINED".
+                            val errCode = when {
+                                failureStatus in terminalFailureStatuses() ->
+                                    statusToErrorCode(failureStatus)
+                                declinedReason.isNotEmpty() -> declinedReason
+                                else -> "DECLINED"
+                            }
+                            sendLog("❌ Transaction failed: $errCode (failureStatus=$failureStatus)")
                             result.success(mapOf(
                                 "success"   to false,
                                 "errorCode" to errCode,
-                                "error"     to "Transaction declined or failed: $errCode",
+                                "error"     to (if (errCode == "CANCELLED") "Kullanıcı iptal etti"
+                                                else "Transaction declined or failed: $errCode"),
                             ))
                         }
                     } else {
                         sendLog("❌ Transaction failed: null data")
+                        // null data + captured failure status = the cancel /
+                        // decline path operator hit on the terminal. Surface
+                        // the specific code rather than a generic UNKNOWN so
+                        // the POS dialog can render "Kullanıcı iptal etti"
+                        // instead of "no data received".
+                        val errCode = if (failureStatus in terminalFailureStatuses()) {
+                            statusToErrorCode(failureStatus)
+                        } else "UNKNOWN"
+                        sendLog("❌ Transaction failed: null data, failureStatus=$failureStatus → $errCode")
                         result.success(mapOf(
                             "success"   to false,
-                            "errorCode" to "UNKNOWN",
-                            "error"     to "Transaction failed: no data received",
+                            "errorCode" to errCode,
+                            "error"     to (if (errCode == "CANCELLED") "Kullanıcı iptal etti"
+                                            else "Transaction failed: no data received"),
                         ))
                     }
                 }
@@ -990,9 +1104,18 @@ class MyPosPlugin :
             "reason"    to reason
         ))
 
-        if (newState == ConnectionState.DISCONNECTED && isConfigured && !isReconnecting) {
-            scheduleReconnect()
-        }
+        // Kit Troubleshooting §2: on TCP/IP we must NOT manually trigger
+        // reconnect — the slave SDK runs its own 2.5 s sleep + retry loop
+        // and our scheduleReconnect raced it, producing the ~1 s connect/
+        // disconnect flap (you'd see "SDK CONNECTED → SDK DISCONNECTED →
+        // SDK CONNECTED" cycling in logs). Operator-visible symptom: the
+        // dialog hung in "BAĞLANIYOR" forever.
+        //
+        // We only set the TCP/IP connection type today, so simply
+        // surrender here. The heartbeat code below still pings every 60 s
+        // and will surface a real outage; the user can always hit
+        // "BAĞLANTIYI TEST ET" from Settings to force a reconfigure if
+        // the SDK gets wedged.
     }
 
     // =========================================================================
