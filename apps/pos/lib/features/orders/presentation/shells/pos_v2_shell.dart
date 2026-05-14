@@ -3202,13 +3202,11 @@ class _LineActions extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // v3 redesign: thumb-friendly stepper + clearly tinted RABATT/LÖSCHEN
-    // outlines (orange / red). Stepper is now one unit with the qty value
-    // baked in so the cashier reads "current qty" without looking at the
-    // line title. RABATT is a placeholder for the line-discount feature
-    // (`OrderItemEntity.discountAmount` is plumbed in the entity but no
-    // notifier mutation exists yet) — surfaces a snackbar so the affor-
-    // dance lands without claiming behaviour we haven't built.
+    // v3 redesign: thumb-friendly stepper + icon-only RABATT/LÖSCHEN
+    // square buttons. Round-13 fix (2026-05-14): the labelled outline
+    // chips were wrapping on narrow line widths ("sıkışık"), so we
+    // dropped the text and bumped the glyph to 20dp. Tooltips preserve
+    // discoverability for the long-press / a11y path.
     return Row(
       children: [
         _Stepper(
@@ -3230,33 +3228,29 @@ class _LineActions extends ConsumerWidget {
                 .updateItemQuantity(item.id, item.quantity + 1);
           },
         ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: _OutlineAction(
-            label: 'RABATT',
-            icon: Icons.percent_rounded,
-            tone: _OutlineTone.warning,
-            onTap: () {
-              ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                const SnackBar(
-                  content: Text('Bald verfügbar.'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-          ),
+        const SizedBox(width: 8),
+        _IconAction(
+          tooltip: 'Rabatt',
+          icon: Icons.percent_rounded,
+          tone: _OutlineTone.warning,
+          onTap: () {
+            ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+              const SnackBar(
+                content: Text('Bald verfügbar.'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
         ),
         const SizedBox(width: 6),
-        Expanded(
-          child: _OutlineAction(
-            label: 'LÖSCHEN',
-            icon: Icons.close_rounded,
-            tone: _OutlineTone.danger,
-            onTap: () {
-              ref.read(currentTicketProvider.notifier).removeItem(item.id);
-              ref.read(v2SelectedLineIdProvider.notifier).state = null;
-            },
-          ),
+        _IconAction(
+          tooltip: 'Löschen',
+          icon: Icons.close_rounded,
+          tone: _OutlineTone.danger,
+          onTap: () {
+            ref.read(currentTicketProvider.notifier).removeItem(item.id);
+            ref.read(v2SelectedLineIdProvider.notifier).state = null;
+          },
         ),
       ],
     );
@@ -3265,14 +3259,17 @@ class _LineActions extends ConsumerWidget {
 
 enum _OutlineTone { warning, danger }
 
-class _OutlineAction extends StatelessWidget {
-  const _OutlineAction({
-    required this.label,
+/// Square icon-only outline button — replaces the previous `_OutlineAction`
+/// labelled variant. Fixed 48×40 footprint so the row never reflows when
+/// the line title is long; Tooltip + Semantics carry the label.
+class _IconAction extends StatelessWidget {
+  const _IconAction({
+    required this.tooltip,
     required this.icon,
     required this.tone,
     required this.onTap,
   });
-  final String label;
+  final String tooltip;
   final IconData icon;
   final _OutlineTone tone;
   final VoidCallback onTap;
@@ -3286,34 +3283,29 @@ class _OutlineAction extends StatelessWidget {
     final border = tone == _OutlineTone.danger
         ? const Color(0xFFFCA5A5)
         : const Color(0xFFFCD34D);
-    return Material(
-      color: v2.surface,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          height: 40,
-          decoration: BoxDecoration(
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: v2.surface,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: border),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: fg),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
-                  color: fg,
-                ),
+            child: Container(
+              height: 40,
+              width: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: border),
               ),
-            ],
+              child: ExcludeSemantics(
+                child: Icon(icon, size: 20, color: fg),
+              ),
+            ),
           ),
         ),
       ),
