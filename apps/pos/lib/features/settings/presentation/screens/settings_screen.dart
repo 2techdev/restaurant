@@ -6425,7 +6425,7 @@ class _PosTileSizeSegmented extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       child: Row(
         children: [
-          for (final size in PosTileSize.values)
+          for (final PosTileSize size in PosTileSize.values)
             Expanded(
               child: _PosTileSizeButton(
                 key: Key('tile-size-${size.name}'),
@@ -6542,6 +6542,21 @@ class _PosModeSection extends ConsumerWidget {
             title: l10n.settingsPosModeHybrid,
             subtitle: l10n.settingsPosModeHybridDesc,
             // Hybrid implies feature_tisch is on for this device.
+            onChanged: (v) => _setMode(ref, v, true),
+          ),
+          const SizedBox(height: 12),
+          _PosModeRadio(
+            value: PosMode.mixed,
+            groupValue: selected,
+            // 2026-05-15: third mode — Order Center hub. Re-uses the
+            // existing l10n keys with a hardcoded fallback so a string
+            // refresh isn't required to ship the feature; once .arb
+            // files land the fallback drops out.
+            title: 'Mixed (Order Center)',
+            subtitle:
+                'Tisch grid + Schnellverkauf + aktif Bestellung tek ekranda.',
+            // Mixed mode still benefits from the floor-plan, so keep
+            // feature_tisch on by default.
             onChanged: (v) => _setMode(ref, v, true),
           ),
         ],

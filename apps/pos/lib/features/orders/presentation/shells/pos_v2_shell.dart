@@ -35,7 +35,9 @@ import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_l
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/customers/domain/entities/customer_entity.dart';
 import 'package:gastrocore_pos/features/customers/presentation/providers/customer_provider.dart';
+import 'package:gastrocore_pos/features/fast_sale/domain/restaurant_config.dart';
 import 'package:gastrocore_pos/features/fast_sale/presentation/providers/restaurant_config_provider.dart';
+import 'package:gastrocore_pos/features/online_orders/presentation/providers/online_order_provider.dart';
 import 'package:gastrocore_pos/features/fast_sale/presentation/widgets/delivery_customer_form.dart';
 import 'package:gastrocore_pos/features/fast_sale/presentation/widgets/order_type_selector.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
@@ -345,20 +347,40 @@ class _Rail extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final active = ref.watch(v2RailActiveProvider);
     final ticket = ref.watch(currentTicketProvider);
-    final hasItems = ticket != null && ticket.items.isNotEmpty;
     final fastSale = FastSaleModeScope.of(context);
     final user = ref.watch(currentUserProvider);
     final funktionButtons = ref.watch(visibleActionButtonsByPositionProvider(
         ActionButtonPosition.ticketScreen));
     // Round-9 operator request: "kafama gore aktif pasif yapabileyim".
     // Each rail entry now consults the operator's hide-list (negative
-    // encoding so future additions default to visible). The fnGroup
-    // toggle hides the whole dynamic FUNKTION block in one tap rather
-    // than forcing per-button settings dance.
+    // encoding so future additions default to visible).
     final disabled =
         ref.watch(appSettingsProvider).valueOrNull?.disabledRailIds ??
             const <String>{};
     bool isOn(String id) => !disabled.contains(id);
+
+    // 2026-05-15 redesign: mode-aware rail entries. The cloud-driven
+    // RestaurantConfig.PosMode drives which entries are visible and
+    // which route the "Home" button lands on. Three modes:
+    //   - fastSale  → home is /fast-sale (cart-first counter flow)
+    //   - hybrid    → home is /tables   (fine-dining floor plan)
+    //   - mixed     → home is /order-center (hub w/ cart preview +
+    //                 floor grid + quick-sale CTA, full layout in Faz 4)
+    final posMode = ref.watch(effectiveRestaurantConfigProvider).posMode;
+    final isFineDining = posMode == PosMode.hybrid;
+    final isMixed = posMode == PosMode.mixed;
+    final isFastFood = posMode == PosMode.fastSale;
+    final homeRoute = switch (posMode) {
+      PosMode.fastSale => AppRoutes.fastSale,
+      PosMode.hybrid => AppRoutes.tables,
+      PosMode.mixed => AppRoutes.orderCenter,
+    };
+    // Online order badge — drives a turuncu sayaç on the ONLINE rail
+    // entry. Hidden entirely when the toggle in Settings is off (the
+    // online order Settings section lands in Faz 3 alongside the WS
+    // boot wire; the provider already exists and stays at length 0
+    // until the WS pump is mounted).
+    final onlinePending = ref.watch(pendingOnlineOrdersProvider);
 
     return Container(
       color: context.v2.chrome,
@@ -366,33 +388,21 @@ class _Rail extends ConsumerWidget {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            // Round-11: avatar + Settings + Tweaks are the rail head in
-            // BOTH modes (round-10 only fast-sale; topbar now also gone
-            // in table-service). The 4-element top stack covers what the
-            // old topbar exposed.
             _RailUserAvatar(name: user?.name ?? 'Admin'),
-            const SizedBox(height: 6),
-            _RailIconBtn(
-              icon: Icons.tune,
-              label: 'Tweaks',
-              onTap: () => showDialog<void>(
-                context: context,
-                barrierColor: Colors.transparent,
-                builder: (_) => const _TweaksOverlay(),
-              ),
-            ),
-            _RailIconBtn(
-              icon: Icons.settings_outlined,
-              label: 'Settings',
-              onTap: () => context.push(AppRoutes.settings),
-            ),
             const SizedBox(height: 8),
             const _RailDivider(),
             const SizedBox(height: 6),
-            // Tische rail entry — only relevant for table-service mode.
-            // Fast-sale runs counter / takeaway / delivery and never needs
-            // a floor plan, so hide it there.
-            if (!fastSale && isOn('tables'))
+
+            // ── Mode-primary group: Home + mode-specific ───────────
+            if (isOn('home'))
+              _RailBtn(
+                id: 'home',
+                label: 'Home',
+                icon: Icons.home_rounded,
+                active: false,
+                onTap: () => context.go(homeRoute),
+              ),
+            if ((isFineDining || isMixed) && isOn('tables'))
               _RailBtn(
                 id: 'tables',
                 label: 'Tische',
@@ -403,14 +413,10 @@ class _Rail extends ConsumerWidget {
                   context.push(AppRoutes.tables);
                 },
               ),
-            // Round-12 operator request: "schnell verkaufa nasil
-            // gecegim, solda bir yere hizli verkaufa gecme ayari
-            // ekle". Topbar is gone — without this rail entry the
-            // table-service operator cannot reach fast-sale anymore.
-            // Symmetric to the `Tische` entry above (only renders in
-            // the OPPOSITE shell so the rail never duplicates the
-            // shell the operator is already in).
-            if (!fastSale && isOn('fastSaleSwitch'))
+            // Schnell entry: jump to fast-sale shell. Visible in fine-
+            // dining + mixed (operator can flip into counter flow);
+            // hidden when already in fast-sale to avoid self-link.
+            if (!isFastFood && !fastSale && isOn('fastSaleSwitch'))
               _RailBtn(
                 id: 'fastSaleSwitch',
                 label: 'Schnell',
@@ -418,20 +424,94 @@ class _Rail extends ConsumerWidget {
                 active: false,
                 onTap: () => context.go(AppRoutes.fastSale),
               ),
-            if (isOn('bill'))
+
+            // ── Order group ─────────────────────────────────────────
+            const SizedBox(height: 6),
+            const _RailDivider(),
+            const SizedBox(height: 4),
+            if (isOn('order'))
               _RailBtn(
-                id: 'bill',
-                label: 'Bons',
+                id: 'order',
+                label: 'Order',
                 icon: Icons.receipt_long_outlined,
-                active: active == 'bill',
+                active: active == 'order',
                 onTap: () {
-                  ref.read(v2RailActiveProvider.notifier).state = 'bill';
+                  ref.read(v2RailActiveProvider.notifier).state = 'order';
+                  // Order entry returns to whichever shell renders the
+                  // current ticket — fast-sale or table-service.
+                  context.go(homeRoute);
+                },
+              ),
+            if (isOn('online'))
+              _RailBtnBadge(
+                id: 'online',
+                label: 'Online',
+                icon: Icons.cloud_download_outlined,
+                badgeCount: onlinePending.length,
+                active: active == 'online',
+                onTap: () {
+                  ref.read(v2RailActiveProvider.notifier).state = 'online';
+                  context.push(AppRoutes.onlineOrders);
+                },
+              ),
+            if (isOn('kunden'))
+              _RailBtn(
+                id: 'kunden',
+                label: 'Kunden',
+                icon: Icons.people_alt_outlined,
+                active: false,
+                onTap: () async {
+                  final t = ticket;
+                  if (t == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Aktiver Bon erforderlich — wähle zuerst einen Tisch.',
+                        ),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    return;
+                  }
+                  await _openSearchDialog(context, ref, t);
+                },
+              ),
+
+            // ── Admin group ─────────────────────────────────────────
+            const SizedBox(height: 6),
+            const _RailDivider(),
+            const SizedBox(height: 4),
+            if (isOn('settings'))
+              _RailBtn(
+                id: 'settings',
+                label: 'Settings',
+                icon: Icons.settings_outlined,
+                active: false,
+                onTap: () => context.push(AppRoutes.settings),
+              ),
+            if (isOn('reports'))
+              _RailBtn(
+                id: 'reports',
+                label: 'Reports',
+                icon: Icons.assessment_outlined,
+                active: false,
+                onTap: () => context.push(AppRoutes.analytics),
+              ),
+            if (isOn('verlauf'))
+              _RailBtn(
+                id: 'verlauf',
+                label: 'Verlauf',
+                icon: Icons.history_rounded,
+                active: active == 'verlauf',
+                onTap: () {
+                  ref.read(v2RailActiveProvider.notifier).state = 'verlauf';
                   context.push(AppRoutes.orderHistory);
                 },
               ),
+
             // FUNKTION group — dynamic action buttons (operator-defined).
-            // Hidden when no ticket-screen actions are configured OR when
-            // the operator switches the whole group off in Tweaks → Rail.
+            // Kept in rail with low visual weight; can be hidden via the
+            // Tweaks → Rail panel.
             if (isOn('fnGroup') && funktionButtons.isNotEmpty) ...[
               const SizedBox(height: 6),
               const _RailDivider(),
@@ -449,6 +529,11 @@ class _Rail extends ConsumerWidget {
                   ),
                 ),
             ],
+
+            // ── Destructive ─────────────────────────────────────────
+            // Storno + Sperren retained until the admin-sheet refactor
+            // lands (TODO follow-up). Visually lower priority but
+            // operator-critical.
             const SizedBox(height: 6),
             const _RailDivider(),
             const SizedBox(height: 4),
@@ -461,18 +546,6 @@ class _Rail extends ConsumerWidget {
                 active: false,
                 onTap: () => _onStorno(context, ref, ticket),
               ),
-            if (isOn('print'))
-              _RailBtn(
-                id: 'print',
-                label: 'Drucken',
-                icon: Icons.print_outlined,
-                active: false,
-                onTap: hasItems
-                    ? () => ref
-                        .read(currentTicketProvider.notifier)
-                        .sendToKitchen()
-                    : null,
-              ),
             if (isOn('lock'))
               _RailBtn(
                 id: 'lock',
@@ -481,13 +554,10 @@ class _Rail extends ConsumerWidget {
                 active: false,
                 onTap: () => context.go(AppRoutes.login),
               ),
-            // Round-11: build marker — bumps every round so the cashier
-            // can verify which APK is on the tablet without taking a
-            // screenshot. Visible in BOTH modes now (round-10 only in
-            // fast-sale; topbar's gone in table-service too).
+
             const SizedBox(height: 8),
             const Text(
-              'v20',
+              'v21',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Inter',
@@ -616,6 +686,12 @@ class _RailUserAvatar extends StatelessWidget {
 /// Compact icon-only rail entry — used for Settings / Tweaks at the
 /// rail head. Smaller than [_RailBtn] (no large vertical padding) so
 /// the avatar + 2 utilities + divider fit in ~140dp at the top.
+///
+/// 2026-05-15: no longer wired in the rail (the v3 rail uses full-size
+/// [_RailBtn] for every entry incl. Settings + Reports), kept around
+/// in case a future shell wants the smaller variant. Quiet the
+/// analyzer until either it gets re-mounted or removed for good.
+// ignore: unused_element
 class _RailIconBtn extends StatelessWidget {
   const _RailIconBtn({
     required this.icon,
@@ -766,6 +842,70 @@ class _RailBtn extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Rail entry with an overlay badge (e.g. Online sayaç).
+///
+/// Renders the same look as [_RailBtn] but adds a small orange pill in
+/// the top-right showing [badgeCount] when > 0. Hidden when zero so
+/// the rail stays calm during idle hours.
+class _RailBtnBadge extends StatelessWidget {
+  const _RailBtnBadge({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.badgeCount,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String id;
+  final String label;
+  final IconData icon;
+  final int badgeCount;
+  final bool active;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _RailBtn(
+          id: id,
+          label: label,
+          icon: icon,
+          active: active,
+          onTap: onTap,
+        ),
+        if (badgeCount > 0)
+          Positioned(
+            right: 14,
+            top: 6,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEA580C),
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                badgeCount > 99 ? '99+' : '$badgeCount',
+                style: const TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

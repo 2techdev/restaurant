@@ -17,12 +17,12 @@ import 'package:gastrocore_pos/features/brand_auth/presentation/screens/register
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_open_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/z_report_screen.dart';
 import 'package:gastrocore_pos/features/home/presentation/screens/home_screen.dart';
-import 'package:gastrocore_pos/features/orders/presentation/shells/pos_shell_router.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/screens/kitchen_display_screen.dart';
 import 'package:gastrocore_pos/features/payments/presentation/screens/payment_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_close_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/day_close_screen.dart';
 import 'package:gastrocore_pos/features/orders/presentation/screens/receipt_preview_screen.dart';
+import 'package:gastrocore_pos/features/orders/presentation/shells/pos_shell_router.dart';
 import 'package:gastrocore_pos/features/payments/presentation/screens/split_bill_screen.dart';
 import 'package:gastrocore_pos/features/orders/presentation/screens/refund_screen.dart';
 import 'package:gastrocore_pos/features/settings/presentation/screens/settings_screen.dart';
@@ -40,17 +40,25 @@ import 'package:gastrocore_pos/features/reservations/presentation/screens/reserv
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_detail_screen.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_form_screen.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_list_screen.dart';
+import 'package:gastrocore_pos/features/online_orders/presentation/screens/online_orders_list_screen.dart';
 import 'package:gastrocore_pos/features/tables/presentation/screens/floor_plan_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_list_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_detail_screen.dart';
 import 'package:gastrocore_pos/features/dashboard/presentation/screens/analytics_screen.dart';
 import 'package:gastrocore_pos/features/reports/presentation/screens/reports_center_screen.dart';
+import 'package:gastrocore_pos/features/device_pairing/presentation/pair_screen.dart';
+import 'package:gastrocore_pos/features/fast_sale/presentation/screens/fast_sale_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:gastrocore_pos/features/menu_sync/domain/menu_sync_settings.dart';
 
 // ---------------------------------------------------------------------------
 // Route path constants
 // ---------------------------------------------------------------------------
 
 abstract final class AppRoutes {
+  // ── Device pairing (must run before brand auth on first launch) ───────────
+  static const String pair = '/pair';
+
   // ── Brand auth (new) ──────────────────────────────────────────────────────
   static const String brandLogin = '/brand-login';
   static const String register = '/register';
@@ -62,6 +70,7 @@ abstract final class AppRoutes {
   // ── Core POS screens ─────────────────────────────────────────────────────
   static const String shiftOpen = '/shift-open';
   static const String home = '/home';
+  static const String fastSale = '/fast-sale';
   static const String orderCenter = '/order-center';
   static const String kitchen = '/kitchen';
   static const String payment = '/payment/:ticketId';
@@ -92,6 +101,7 @@ abstract final class AppRoutes {
   static const String customerDetail = '/customers/:customerId';
   static const String analytics = '/analytics';
   static const String reportsCenter = '/reports-center';
+  static const String onlineOrders = '/online-orders';
 
   /// Build a void route for a specific ticket.
   static String voidFor(String ticketId) => '/void/$ticketId';
@@ -121,11 +131,33 @@ abstract final class AppRoutes {
   // ---------------------------------------------------------------------------
 
   /// Routes accessible without brand JWT authentication.
-  static const _publicRoutes = {brandLogin, register, forgotPassword};
+  static const _publicRoutes = {pair, brandLogin, register, forgotPassword};
 
   /// Returns `true` when [path] requires brand authentication.
   static bool requiresBrandAuth(String path) =>
       !_publicRoutes.contains(path);
+}
+
+// ---------------------------------------------------------------------------
+// Pair-state synchronous probe
+// ---------------------------------------------------------------------------
+
+/// Synchronous read of `MenuSyncSettings.cloudApiKey` from the same
+/// SharedPreferences key the repository uses.
+///
+/// We need a sync read here because GoRouter's `redirect` callback is
+/// synchronous; the Riverpod-provider path is async. The sync API requires
+/// a SharedPreferences instance that's already been awaited at app boot,
+/// which `main.dart` does before runApp().
+bool _isDevicePaired(SharedPreferences prefs) {
+  final raw = prefs.getString('menu_sync.v1');
+  if (raw == null) return false;
+  try {
+    final s = MenuSyncSettings.fromJsonString(raw);
+    return s.cloudApiKey.isNotEmpty && s.cloudTenantId.isNotEmpty;
+  } catch (_) {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +182,7 @@ typedef BrandAuthReader = ({bool isInitialized, bool isAuthenticated});
 GoRouter createAppRouter({
   BrandAuthReader Function()? authReader,
   Listenable? authListenable,
+  SharedPreferences? prefs,
 }) =>
     GoRouter(
       initialLocation: '/',
@@ -165,12 +198,22 @@ GoRouter createAppRouter({
         final path = state.matchedLocation;
         final isPublic = !AppRoutes.requiresBrandAuth(path);
 
+        // Device-pairing gate: a tablet without a stored API key cannot
+        // talk to the cloud, so all flows route through /pair first. Skip
+        // when we're already on /pair (otherwise we'd loop) and when the
+        // SharedPreferences instance wasn't passed (test harness path).
+        if (prefs != null && path != AppRoutes.pair && !_isDevicePaired(prefs)) {
+          return AppRoutes.pair;
+        }
+
         if (!auth.isAuthenticated && !isPublic) {
           return AppRoutes.brandLogin;
         }
 
         if (auth.isAuthenticated && isPublic) {
           // Already logged in — bounce away from auth screens.
+          // /pair is treated as "auth screen" so paired+authed users
+          // don't get stuck there if they navigate manually.
           return AppRoutes.login;
         }
 
@@ -180,6 +223,12 @@ GoRouter createAppRouter({
         GoRoute(
           path: '/',
           redirect: (_, __) => AppRoutes.login,
+        ),
+
+        // ── Device pairing (one-shot, before brand auth) ──────────────────
+        GoRoute(
+          path: AppRoutes.pair,
+          builder: (context, state) => const PairScreen(),
         ),
 
         // ── Brand auth ─────────────────────────────────────────────────────
@@ -212,12 +261,23 @@ GoRouter createAppRouter({
           builder: (context, state) => const HomeScreen(),
         ),
         GoRoute(
+          path: AppRoutes.fastSale,
+          builder: (context, state) => const FastSaleScreen(),
+        ),
+        GoRoute(
           path: AppRoutes.orderCenter,
+          // Round-5 hotfix 2026-05-07: previously redirected to /fast-sale
+          // to keep the cafe pilot from drifting back to the table-service
+          // shell. That made the in-shell "Tische" pill (which bounces to
+          // /order-center to flip into mix mode) one-way — operator could
+          // enter fast-sale but never return to mix. Restore the route to
+          // its actual builder so mode-switching works in both directions.
+          // Default landing is still fast-sale (home Verkauf → /fast-sale).
           builder: (context, state) => const PosShellRouter(),
         ),
         GoRoute(
           path: AppRoutes.pos,
-          redirect: (_, __) => AppRoutes.orderCenter,
+          redirect: (_, __) => AppRoutes.fastSale,
         ),
         GoRoute(
           path: AppRoutes.tables,
@@ -305,6 +365,15 @@ GoRouter createAppRouter({
         GoRoute(
           path: AppRoutes.auditLog,
           builder: (context, state) => const AuditLogScreen(),
+        ),
+        // 2026-05-15 — Online Bestellungen list view. Live implementation
+        // in Faz 3 (sidebar badge + WS pump + sound + accept/reject
+        // wiring); for Faz 1 this surfaces the existing
+        // `pendingOnlineOrdersProvider` queue so the sidebar entry
+        // doesn't bounce into a 404.
+        GoRoute(
+          path: AppRoutes.onlineOrders,
+          builder: (context, state) => const OnlineOrdersListScreen(),
         ),
         GoRoute(
           path: AppRoutes.qrBill,
