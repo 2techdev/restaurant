@@ -38,6 +38,8 @@ import 'package:gastrocore_pos/features/customers/presentation/providers/custome
 import 'package:gastrocore_pos/features/fast_sale/domain/restaurant_config.dart';
 import 'package:gastrocore_pos/features/fast_sale/presentation/providers/restaurant_config_provider.dart';
 import 'package:gastrocore_pos/features/online_orders/presentation/providers/online_order_provider.dart';
+import 'package:gastrocore_pos/features/online_orders/presentation/providers/online_orders_settings_provider.dart';
+import 'package:gastrocore_pos/features/online_orders/presentation/widgets/online_order_overlay.dart';
 import 'package:gastrocore_pos/features/fast_sale/presentation/widgets/delivery_customer_form.dart';
 import 'package:gastrocore_pos/features/fast_sale/presentation/widgets/order_type_selector.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
@@ -277,14 +279,47 @@ class _V2Layout extends ConsumerWidget {
           ),
         );
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: leftHanded
-              ? <Widget>[mainColumn, railSlot]
-              : <Widget>[railSlot, mainColumn],
+        return Stack(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: leftHanded
+                  ? <Widget>[mainColumn, railSlot]
+                  : <Widget>[railSlot, mainColumn],
+            ),
+            // Faz 3 (2026-05-15) — online order side-effects.
+            // Both children are no-ops unless Settings → Online
+            // Bestellungen is enabled; the listener also gates the
+            // PosWsClient lifecycle so the WS connection is only
+            // established when the operator opted in.
+            const _OnlineOrdersBootstrap(),
+            const OnlineOrderOverlay(),
+          ],
         );
       },
     );
+  }
+}
+
+/// Mount-only widget that subscribes to the online-orders providers so
+/// the WebSocket connection is alive while the shell is on screen. The
+/// `posWsClientProvider` is auto-dispose — watching it from a stable
+/// shell-level widget keeps it instantiated for as long as the operator
+/// stays in the POS flow. When the operator hasn't enabled Online
+/// Bestellungen in Settings the watch is a no-op so unwanted egress
+/// traffic is avoided.
+class _OnlineOrdersBootstrap extends ConsumerWidget {
+  const _OnlineOrdersBootstrap();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(onlineOrdersEnabledProvider);
+    if (enabled) {
+      // Side effect: watching instantiates the autoDispose provider
+      // and triggers `client.connect()`. Result intentionally unused.
+      ref.watch(posWsClientProvider);
+    }
+    return const SizedBox.shrink();
   }
 }
 

@@ -35,6 +35,7 @@ import 'package:gastrocore_pos/features/settings/domain/entities/printer_setting
 import 'package:gastrocore_pos/features/settings/domain/entities/receipt_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/tax_settings.dart';
+import 'package:gastrocore_pos/features/online_orders/presentation/providers/online_orders_settings_provider.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
@@ -75,6 +76,7 @@ import 'package:intl/intl.dart';
 enum _Section {
   restaurant('Restaurant', Icons.storefront_rounded),
   posMode('POS Modu', Icons.flash_on_rounded),
+  onlineOrders('Online Bestellungen', Icons.cloud_download_rounded),
   printer('Printer', Icons.print_rounded),
   payment('Payment', Icons.payment_rounded),
   receipt('Receipt', Icons.receipt_long_rounded),
@@ -158,6 +160,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return switch (_selected) {
       _Section.restaurant => const _RestaurantSection(),
       _Section.posMode => const _PosModeSection(),
+      _Section.onlineOrders => const _OnlineOrdersSection(),
       _Section.printer => const _PrinterSection(),
       _Section.payment => const _PaymentSection(),
       _Section.receipt => const _ReceiptSection(),
@@ -6640,6 +6643,270 @@ class _PosModeRadio extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _OnlineOrdersSection — gastro.2hub.ch online order intake (Faz 3).
+// Toggle + sound + auto-print + lead-time + tenant override + token +
+// pop-up style + Connection test placeholder.
+// ---------------------------------------------------------------------------
+
+class _OnlineOrdersSection extends ConsumerWidget {
+  const _OnlineOrdersSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cfg = ref.watch(onlineOrdersConfigProvider);
+    final notifier = ref.read(onlineOrdersConfigProvider.notifier);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Online Bestellungen',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'gastro.2hub.ch web sitenizden gelen siparişleri POS\'a düşürür. '
+            'Bağlantı aktifken yeni sipariş geldiğinde ekranın sağ alt '
+            'köşesinde slide-in toast belirir, sidebar\'da "Online" '
+            'rozeti yanar. Ses + otomatik mutfak çıktısı isteğe bağlı.',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _OnlineToggleRow(
+            label: 'Online sipariş kabulü',
+            sub: cfg.enabled ? 'Aktif' : 'Kapalı',
+            value: cfg.enabled,
+            onChanged: notifier.setEnabled,
+          ),
+          if (cfg.enabled) ...[
+            const SizedBox(height: 14),
+            _OnlineLabel('gastro.2hub.ch bağlantı'),
+            const SizedBox(height: 8),
+            _OnlineTextField(
+              label: 'Tenant ID (boş = brand tenant)',
+              initial: cfg.tenantOverride,
+              onSubmitted: notifier.setTenantOverride,
+            ),
+            const SizedBox(height: 10),
+            _OnlineTextField(
+              label: 'API Token / HMAC secret',
+              initial: cfg.apiToken,
+              obscure: true,
+              onSubmitted: notifier.setApiToken,
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Bağlantı testi: WS pump app shell ile birlikte '
+                      'aktif. Pending kuyruğu canlı izleniyor.',
+                    ),
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.wifi_tethering_rounded, size: 16),
+              label: const Text('Bağlantıyı Test Et'),
+            ),
+            const SizedBox(height: 18),
+            _OnlineLabel('Bildirim ve davranış'),
+            const SizedBox(height: 8),
+            _OnlineToggleRow(
+              label: 'Ses uyarısı',
+              sub: 'Yeni sipariş geldiğinde ding çal',
+              value: cfg.soundOn,
+              onChanged: notifier.setSoundOn,
+            ),
+            const SizedBox(height: 8),
+            _OnlineToggleRow(
+              label: 'Otomatik mutfak çıktısı',
+              sub: 'Onaylanan sipariş mutfak printer\'ına otomatik gitsin',
+              value: cfg.autoPrintOnAccept,
+              onChanged: notifier.setAutoPrint,
+            ),
+            const SizedBox(height: 14),
+            _OnlineLabel('Hazırlama süresi'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Slider(
+                    min: 5,
+                    max: 90,
+                    divisions: 17,
+                    value: cfg.leadTimeMinutes.toDouble(),
+                    label: '${cfg.leadTimeMinutes} dk',
+                    onChanged: (v) => notifier.setLeadTime(v.round()),
+                  ),
+                ),
+                SizedBox(
+                  width: 64,
+                  child: Text(
+                    '${cfg.leadTimeMinutes} dk',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _OnlineLabel('Pop-up tipi'),
+            const SizedBox(height: 8),
+            SegmentedButton<OnlinePopupStyle>(
+              segments: const [
+                ButtonSegment(
+                  value: OnlinePopupStyle.toast,
+                  label: Text('Slide-in toast'),
+                  icon: Icon(Icons.notifications_rounded, size: 14),
+                ),
+                ButtonSegment(
+                  value: OnlinePopupStyle.modal,
+                  label: Text('Modal'),
+                  icon: Icon(Icons.fullscreen_rounded, size: 14),
+                ),
+              ],
+              selected: {cfg.popupStyle},
+              onSelectionChanged: (s) => notifier.setPopupStyle(s.first),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _OnlineLabel extends StatelessWidget {
+  const _OnlineLabel(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: const TextStyle(
+        fontFamily: 'WorkSans',
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.2,
+        color: AppColors.textSecondary,
+      ),
+    );
+  }
+}
+
+class _OnlineTextField extends StatefulWidget {
+  const _OnlineTextField({
+    required this.label,
+    required this.initial,
+    required this.onSubmitted,
+    this.obscure = false,
+  });
+  final String label;
+  final String initial;
+  final bool obscure;
+  final ValueChanged<String> onSubmitted;
+
+  @override
+  State<_OnlineTextField> createState() => _OnlineTextFieldState();
+}
+
+class _OnlineTextFieldState extends State<_OnlineTextField> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      obscureText: widget.obscure,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        border: const OutlineInputBorder(),
+      ),
+      onSubmitted: widget.onSubmitted,
+      onEditingComplete: () => widget.onSubmitted(_controller.text),
+    );
+  }
+}
+
+class _OnlineToggleRow extends StatelessWidget {
+  const _OnlineToggleRow({
+    required this.label,
+    required this.sub,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String sub;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: value ? const Color(0xFFEFF6FF) : Colors.white,
+          border: Border.all(
+            color: value
+                ? const Color(0xFF1D4ED8)
+                : const Color(0xFFE5E7EB),
+            width: value ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontFamily: 'WorkSans',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    sub,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(value: value, onChanged: onChanged),
           ],
         ),
       ),
