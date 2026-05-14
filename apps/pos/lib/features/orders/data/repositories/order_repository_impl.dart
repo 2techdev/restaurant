@@ -466,7 +466,17 @@ class OrderRepositoryImpl {
       discountAmount = (subtotal * ticket.discountValue! / 100).round();
     }
 
-    final total = subtotal + taxAmount - discountAmount;
+    // 2026-05-14 KDV fix: Swiss pilot prices are gross (Verkaufspreise,
+    // MwSt-inkl.). `item.subtotal` is the gross line total; `item.taxAmount`
+    // is the INFORMATIONAL portion extracted from the gross via
+    // `_extractItemTax(grossPrice * rate / (100 + rate))`. Adding it back
+    // here double-counted the VAT (operator screenshot: 178.50 gross sum
+    // → 191.88 display, exactly +13.38 = the embedded 8.1% MwSt). The
+    // entity-layer calculator (`TicketEntity._withRecalculatedTotals`)
+    // already computes `total = subtotal − discount`; this repo path was
+    // the only place that re-added the tax. Receipt rendering still uses
+    // `taxAmount` for the MwSt breakdown line — fiscal info is preserved.
+    final total = subtotal - discountAmount;
 
     await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId))).write(
       TicketsCompanion(

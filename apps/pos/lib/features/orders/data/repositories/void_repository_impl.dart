@@ -294,7 +294,12 @@ class VoidRepositoryImpl {
       discountAmount = (subtotal * ticketRow.discountValue! / 100).round();
     }
 
-    final total = subtotal + taxAmount - discountAmount;
+    // 2026-05-14 KDV fix (same as `OrderRepositoryImpl.calculateTicketTotals`):
+    // gross-inclusive prices — `taxAmount` is informational and must not
+    // be re-added to the total. The void flow shares this pre-existing
+    // bug; without the matching fix, voiding a line on a saved ticket
+    // would recompute and re-inflate the total.
+    final total = subtotal - discountAmount;
 
     await (_db.update(_db.tickets)..where((t) => t.id.equals(ticketId)))
         .write(

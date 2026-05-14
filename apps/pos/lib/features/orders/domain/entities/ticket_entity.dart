@@ -136,7 +136,10 @@ class TicketEntity {
   /// The raw discount value (cents for fixed, percentage for percentage).
   final int discountValue;
 
-  /// Grand total in cents (subtotal + tax - discount).
+  /// Grand total in cents — Swiss gross-inclusive: `subtotal − discount`.
+  /// `taxAmount` is the informational MwSt extracted from the gross and
+  /// must NOT be re-added here; the repo layer was double-counting it
+  /// pre-2026-05-14.
   final int total;
 
   // -------------------------------------------------------------------------
