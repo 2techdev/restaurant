@@ -241,6 +241,14 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
           ),
           const SizedBox(width: 8),
 
+          // Filter dropdown — Faz 2 (2026-05-15). Only meaningful in
+          // grid view outside edit mode (the canvas isn't filterable;
+          // edit mode targets physical positioning, not state).
+          if (!editMode && _isGridView) ...[
+            _buildFilterDropdown(),
+            const SizedBox(width: 8),
+          ],
+
           // View toggle (Grid / Canvas) – only visible outside edit mode
           if (!editMode)
             Container(
@@ -257,6 +265,99 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Filter chip that pops a 4-option menu (All / Active / Pending /
+  /// Free) and writes the choice through [floorPlanFilterProvider].
+  Widget _buildFilterDropdown() {
+    final filter = ref.watch(floorPlanFilterProvider);
+    final (icon, label) = switch (filter) {
+      FloorPlanFilter.all => (Icons.apps_rounded, 'Tümü'),
+      FloorPlanFilter.active => (Icons.local_fire_department_rounded, 'Açık'),
+      FloorPlanFilter.pending => (Icons.payments_outlined, 'Bekleyen'),
+      FloorPlanFilter.free => (Icons.event_seat_outlined, 'Boş'),
+    };
+    return PopupMenuButton<FloorPlanFilter>(
+      tooltip: 'Filtre',
+      offset: const Offset(0, 36),
+      position: PopupMenuPosition.under,
+      onSelected: (v) =>
+          ref.read(floorPlanFilterProvider.notifier).state = v,
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: FloorPlanFilter.all,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.apps_rounded, size: 16),
+              SizedBox(width: 8),
+              Text('Tümü'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: FloorPlanFilter.active,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.local_fire_department_rounded, size: 16),
+              SizedBox(width: 8),
+              Text('Açık'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: FloorPlanFilter.pending,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.payments_outlined, size: 16),
+              SizedBox(width: 8),
+              Text('Bekleyen'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: FloorPlanFilter.free,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.event_seat_outlined, size: 16),
+              SizedBox(width: 8),
+              Text('Boş'),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: AppColors.textSecondary),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.expand_more_rounded,
+              size: 14,
+              color: AppColors.textDim,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -656,26 +757,80 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
   // -------------------------------------------------------------------------
 
   Widget _buildFloorGrid(List<RestaurantTableEntity> tables) {
+    // Faz 2 (2026-05-15): pull the joined view so each tile can render
+    // guest count + sitting duration + gross total + waiter initials.
+    // The provider drops to AsyncLoading only on first paint; subsequent
+    // table / ticket updates push through without flicker.
+    final enrichedAsync = ref.watch(enrichedTablesProvider);
+    final filter = ref.watch(floorPlanFilterProvider);
+    final enrichedAll = enrichedAsync.value ?? const <EnrichedTable>[];
+    // Cross-reference with the zone-filtered `tables` list (the caller
+    // already applied the Hepsi/İç/Teras/Bar filter, so we honour that).
+    final tableIds = tables.map((t) => t.id).toSet();
+    final enriched = enrichedAll
+        .where((e) => tableIds.contains(e.table.id))
+        .where((e) => _matchesFilter(e, filter))
+        .toList(growable: false);
+
+    if (enriched.isEmpty && filter != FloorPlanFilter.all) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Text(
+            'Bu filtreye uyan masa yok.',
+            style: const TextStyle(
+              color: AppColors.textDim,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    }
+
     return LayoutBuilder(builder: (context, constraints) {
-      // Aim for ~180dp-wide square-ish tiles. On 1280-class landscape
-      // tablets this gives 6 cols; on a narrow phone it still returns 3.
-      final cols = (constraints.maxWidth / 180).floor().clamp(3, 6);
+      // Tiles got more content in v3 — slightly bigger target (~200dp)
+      // and shorter aspect ratio so guest / duration / total / waiter
+      // fit without squishing.
+      final cols = (constraints.maxWidth / 200).floor().clamp(3, 6);
       return GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          // Near-square, slightly landscape — content fits without squish
-          // and tiles never render as tall vertical strips.
-          childAspectRatio: 1.1,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          // 0.85 = slightly taller than wide → leaves vertical room for
+          // the 4-line occupied-state body.
+          childAspectRatio: 0.85,
         ),
-        itemCount: tables.length,
-        itemBuilder: (_, i) => _buildTableTile(tables[i]),
+        itemCount: enriched.length,
+        itemBuilder: (_, i) => _buildTableTile(enriched[i]),
       );
     });
   }
 
-  Widget _buildTableTile(RestaurantTableEntity table) {
+  /// Map a [FloorPlanFilter] to a predicate against the enriched row.
+  bool _matchesFilter(EnrichedTable e, FloorPlanFilter f) {
+    return switch (f) {
+      FloorPlanFilter.all => true,
+      FloorPlanFilter.active =>
+        e.isOccupied || e.table.status == TableStatus.occupied,
+      FloorPlanFilter.pending =>
+        e.table.flags.contains(TableFlag.billRequested),
+      FloorPlanFilter.free =>
+        !e.isOccupied &&
+            (e.table.status == TableStatus.available ||
+                e.table.status == TableStatus.dirty),
+    };
+  }
+
+  /// v3 tile — card layout with left-border status colour and an enriched
+  /// body that adapts to the table state (occupied / free / dirty /
+  /// reserved). Long-press still surfaces the detail sheet so power-user
+  /// flows (transfer / merge / split) remain reachable.
+  Widget _buildTableTile(EnrichedTable enriched) {
+    final table = enriched.table;
+    final ticket = enriched.ticket;
+    final occupied = enriched.isOccupied;
     final statusColor = _statusColor(table.status);
     final isRound = table.shape == TableShape.circle;
 
@@ -686,61 +841,66 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
         clipBehavior: Clip.none,
         children: [
           Container(
-            // Stitch: bg surfaceContainerHigh (#1C2028), no border
             decoration: BoxDecoration(
               color: AppColors.surfaceContainerHigh,
               borderRadius: isRound
                   ? BorderRadius.circular(100)
-                  : BorderRadius.circular(4),
+                  : BorderRadius.circular(8),
+              border: Border(
+                left: BorderSide(color: statusColor, width: 4),
+              ),
             ),
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Table number — huge, font-black
-                Text(
-                  table.name,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Status badge
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    _statusLabel(table.status),
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w800,
-                      color: statusColor,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Guest / seat count
+                // Header row — name + status badge
                 Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.person_rounded,
-                        size: 11, color: AppColors.textDim),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${table.capacity}',
-                      style: const TextStyle(
-                          fontSize: 10, color: AppColors.textDim),
+                    Expanded(
+                      child: Text(
+                        table.name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -0.5,
+                          height: 1.0,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        _statusLabel(table.status),
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w800,
+                          color: statusColor,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 1,
+                  color: AppColors.textDim.withValues(alpha: 0.15),
+                ),
+                const SizedBox(height: 6),
+                // Body — adapts to state
+                Expanded(
+                  child: occupied
+                      ? _OccupiedBody(table: table, ticket: ticket!)
+                      : _FreeBody(table: table),
                 ),
               ],
             ),
@@ -1264,6 +1424,173 @@ class _BottomStat extends StatelessWidget {
             style: TextStyle(
                 fontSize: 11,
                 color: color ?? AppColors.textSecondary)),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Faz 2 grid-tile bodies — occupied / free states.
+// Kept as separate widgets so the tile builder stays small and each
+// state's content can evolve independently (e.g. reserved-state body
+// will likely add the booking time + guest name next sprint).
+// ---------------------------------------------------------------------------
+
+class _OccupiedBody extends StatelessWidget {
+  const _OccupiedBody({required this.table, required this.ticket});
+  final RestaurantTableEntity table;
+  final TicketEntity ticket;
+
+  String _waiterInitials() {
+    final id = ticket.waiterId ?? '';
+    if (id.isEmpty) return '—';
+    // Display first two ASCII letters of the id as a stable initial
+    // for the pilot. Faz 3+ will swap to a real `waiterId → name`
+    // lookup once the users provider is wired through this widget.
+    final clean = id.replaceAll(RegExp(r'[^A-Za-z]'), '');
+    if (clean.isEmpty) return id.substring(0, id.length.clamp(0, 2)).toUpperCase();
+    return clean.substring(0, clean.length.clamp(0, 2)).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final guests = ticket.guestCount;
+    final capacity = table.capacity;
+    final delta = DateTime.now().difference(ticket.openedAt);
+    final durationLabel = delta.inHours > 0
+        ? '${delta.inHours}h${(delta.inMinutes % 60).toString().padLeft(2, '0')}'
+        : "${delta.inMinutes}'";
+    final totalLabel = 'CHF ${(ticket.total / 100).toStringAsFixed(2)}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.person_rounded, size: 12, color: AppColors.textDim),
+            const SizedBox(width: 4),
+            Text(
+              '$guests/$capacity',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const Spacer(),
+            const Icon(Icons.timer_outlined, size: 12, color: AppColors.textDim),
+            const SizedBox(width: 3),
+            Text(
+              durationLabel,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          totalLabel,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            color: AppColors.textPrimary,
+            fontFeatures: [FontFeature.tabularFigures()],
+            letterSpacing: -0.3,
+          ),
+        ),
+        const Spacer(),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: AppColors.accentDim,
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                '↳ ${_waiterInitials()}',
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.accent,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _FreeBody extends StatelessWidget {
+  const _FreeBody({required this.table});
+  final RestaurantTableEntity table;
+
+  @override
+  Widget build(BuildContext context) {
+    final dirty = table.status == TableStatus.dirty;
+    final reserved = table.status == TableStatus.reserved;
+    final label = dirty
+        ? 'CHECK'
+        : reserved
+            ? 'RESERVE'
+            : 'FREE';
+    final caption = dirty
+        ? 'needs clean'
+        : reserved
+            ? null
+            : 'tippen → öffnen';
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Spacer(),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            color: dirty
+                ? AppColors.yellow
+                : reserved
+                    ? AppColors.orange
+                    : AppColors.green,
+            letterSpacing: 1.4,
+          ),
+        ),
+        if (caption != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            caption,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.textDim,
+            ),
+          ),
+        ],
+        const Spacer(),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.person_outline_rounded,
+                size: 12, color: AppColors.textDim),
+            const SizedBox(width: 4),
+            Text(
+              'kap. ${table.capacity}',
+              style: const TextStyle(
+                fontSize: 10,
+                color: AppColors.textDim,
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
