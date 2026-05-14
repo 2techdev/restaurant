@@ -408,7 +408,7 @@ class _Rail extends ConsumerWidget {
     final homeRoute = switch (posMode) {
       PosMode.fastSale => AppRoutes.fastSale,
       PosMode.hybrid => AppRoutes.tables,
-      PosMode.mixed => AppRoutes.orderCenter,
+      PosMode.mixed => AppRoutes.mixedHub,
     };
     // Online order badge — drives a turuncu sayaç on the ONLINE rail
     // entry. Hidden entirely when the toggle in Settings is off (the

@@ -41,6 +41,7 @@ import 'package:gastrocore_pos/features/reservations/presentation/screens/reserv
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_form_screen.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_list_screen.dart';
 import 'package:gastrocore_pos/features/online_orders/presentation/screens/online_orders_list_screen.dart';
+import 'package:gastrocore_pos/features/orders/presentation/screens/mixed_hub_screen.dart';
 import 'package:gastrocore_pos/features/tables/presentation/screens/floor_plan_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_list_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_detail_screen.dart';
@@ -102,6 +103,7 @@ abstract final class AppRoutes {
   static const String analytics = '/analytics';
   static const String reportsCenter = '/reports-center';
   static const String onlineOrders = '/online-orders';
+  static const String mixedHub = '/mixed-hub';
 
   /// Build a void route for a specific ticket.
   static String voidFor(String ticketId) => '/void/$ticketId';
@@ -374,6 +376,12 @@ GoRouter createAppRouter({
         GoRoute(
           path: AppRoutes.onlineOrders,
           builder: (context, state) => const OnlineOrdersListScreen(),
+        ),
+        // 2026-05-15 — Mixed mode Order Center hub. Lands here when
+        // sidebar Home is tapped under RestaurantConfig.PosMode.mixed.
+        GoRoute(
+          path: AppRoutes.mixedHub,
+          builder: (context, state) => const MixedHubScreen(),
         ),
         GoRoute(
           path: AppRoutes.qrBill,
