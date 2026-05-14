@@ -200,15 +200,21 @@ class _MyPosPaymentDialogState extends State<_MyPosPaymentDialog> {
 
     try {
       final MyPosPaymentResult result;
+      final String? rawErrorCode;
+      final String? rawErrorMessage;
       if (widget.flow == MyPosFlow.twint) {
         final r = await client.processTwintPayment(amountCents: widget.amountCents);
         result = _resultFromClient(r, MyPosFlow.twint);
+        rawErrorCode = r.errorCode;
+        rawErrorMessage = r.errorMessage;
       } else {
         final r = await client.processPayment(
           amountCents: widget.amountCents,
           currency: widget.config.currency,
         );
         result = _resultFromClient(r, MyPosFlow.card);
+        rawErrorCode = r.errorCode;
+        rawErrorMessage = r.errorMessage;
       }
 
       if (!mounted || _disposed) return;
@@ -226,15 +232,57 @@ class _MyPosPaymentDialogState extends State<_MyPosPaymentDialog> {
         if (!mounted || _disposed) return;
         Navigator.of(context).pop(result);
       } else {
+        // Show operator a friendly Turkish message — NOT the raw SDK
+        // technobabble ("TWINT terminated [SDK status=79 (COM_ERROR)]
+        // desc=..."). Operators reported the verbose text as confusing.
+        final friendly = _friendlyMyPosError(rawErrorCode, rawErrorMessage);
         setState(() {
           _state = _DialogState.declined;
-          _statusText = result.errorMessage ?? 'Reddedildi';
-          _errorMessage = result.errorMessage;
+          _statusText = friendly;
+          _errorMessage = friendly;
         });
       }
     } catch (e) {
       if (!mounted || _disposed) return;
-      _fail('Terminal hatası: $e');
+      _fail('Ödeme başarısız');
+    }
+  }
+
+  /// Maps native plugin error codes to short, operator-friendly Turkish.
+  /// Codes are emitted by `MyPosPlugin.kt` via `Result.error(code, msg)` —
+  /// raw `msg` includes SDK technobabble ("TWINT terminated [SDK status=79
+  /// (COM_ERROR)] desc=..."), which we hide from the operator on purpose.
+  String _friendlyMyPosError(String? code, String? raw) {
+    switch (code) {
+      case 'CANCELLED':
+      case 'USER_CANCEL':
+        return 'Ödeme iptal edildi';
+      case 'BUSY':
+      case 'TERMINAL_BUSY':
+        return 'Terminal meşgul, lütfen birkaç saniye sonra tekrar dene';
+      case 'TIMEOUT':
+        return 'Terminal zaman aşımı';
+      case 'WRONG_AMOUNT':
+        return 'Hatalı tutar';
+      case 'NO_CARD':
+        return 'Kart okunamadı';
+      case 'CARD_NOT_SUPPORTED':
+        return 'Kart desteklenmiyor';
+      case 'CARD_CHIP_ERROR':
+        return 'Kart chip hatası';
+      case 'INVALID_PIN':
+        return 'Yanlış PIN';
+      case 'PIN_LOCKED':
+        return 'PIN deneme hakkı aşıldı';
+      case 'TX_NOT_FOUND':
+        return 'İşlem bulunamadı';
+      case 'NO_APPROVAL_DATA':
+        return 'Terminal onay bilgisi göndermedi';
+      case 'COM_ERROR':
+      case 'DISCONNECTED':
+      case 'INTERNAL_ERROR':
+      default:
+        return 'Ödeme başarısız';
     }
   }
 
