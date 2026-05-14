@@ -3,6 +3,66 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-14 ~02:42 CEST — MyPOS dialog: kullanıcı dostu hata metni
+
+**Kapsam:** Sadece `mypos_payment_dialog.dart` (51+/3-).
+
+**APK:** `pilot/app-pos-release.apk` (85.4 MB)
+**Versiyonlu kopya:** `pilot/app-pos-release-2026-05-14-friendly-errors.apk`
+**SHA256:** `4328e45f2d797b463c343fd0995ab9f2c7c218afd8c9bcbdd8c49078fd34caf9`
+**Commit:** `5a277de` (branch `claude/pilot-final`)
+
+### Sorun
+
+Operatör screenshot ekledi: TWINT iptal/decline ekranında
+
+> `TWINT terminated [SDK status=79 (COM_ERROR)] desc="Connection to terminal was lost, please try again."`
+
+Hem üst status text'inde hem de kırmızı hata kutusunda aynı raw SDK
+metni görünüyordu. Operatör için anlamsız.
+
+### Çözüm — `_friendlyMyPosError(code, raw)` mapper
+
+Plugin zaten stable error code'ları üretiyor (`Result.error(code, msg)`).
+Onları kısa Türkçe metne mapliyoruz:
+
+| Plugin code | Operator metni |
+|---|---|
+| `CANCELLED` / `USER_CANCEL` | Ödeme iptal edildi |
+| `BUSY` / `TERMINAL_BUSY` | Terminal meşgul, lütfen birkaç saniye sonra tekrar dene |
+| `TIMEOUT` | Terminal zaman aşımı |
+| `WRONG_AMOUNT` | Hatalı tutar |
+| `NO_CARD` | Kart okunamadı |
+| `CARD_NOT_SUPPORTED` | Kart desteklenmiyor |
+| `CARD_CHIP_ERROR` | Kart chip hatası |
+| `INVALID_PIN` | Yanlış PIN |
+| `PIN_LOCKED` | PIN deneme hakkı aşıldı |
+| `TX_NOT_FOUND` | İşlem bulunamadı |
+| `NO_APPROVAL_DATA` | Terminal onay bilgisi göndermedi |
+| `COM_ERROR` / `DISCONNECTED` / `INTERNAL_ERROR` / default | Ödeme başarısız |
+
+Catch bloğu da artık raw `PlatformException` toString'i basmıyor; sadece
+"Ödeme başarısız" diyor. Connect-phase mesajları operatöre yön gösterdiği
+için aynen bırakıldı (IP/port kontrol et, vb.).
+
+### Rollback
+
+```bash
+cd /e/Project/Restaurant/.claude/worktrees/jolly-final
+git revert 5a277de
+flutter build apk --release --flavor pos
+cp apps/pos/build/app/outputs/flutter-apk/app-pos-release.apk /e/Project/Restaurant/pilot/
+```
+
+### Verification (next session @ pilot)
+
+1. TWINT başlat → terminal'den iptal et → ekranda "Ödeme iptal edildi"
+2. TWINT başlat → terminali kapat / kablo çek → ekranda "Ödeme başarısız"
+3. KARTE başlat → terminal'den iptal et → ekranda "Ödeme iptal edildi"
+4. KARTE başlat → yanlış PIN 3x → "Yanlış PIN" sonra "PIN deneme hakkı aşıldı"
+
+---
+
 ## 2026-05-13 ~20:03 CEST — MyPosClient SINGLETON (Dart-side lifecycle fix)
 
 **Kapsam:** Sadece Dart side (4 dosya). Android plugin değişmedi.
