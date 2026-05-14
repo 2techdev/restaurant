@@ -2696,6 +2696,25 @@ class _HeaderHamburger extends ConsumerWidget {
             ],
           ),
         ),
+        PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'clearBon',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.delete_sweep_outlined,
+                size: 16,
+                color: Color(0xFFDC2626),
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Bon stornieren',
+                style: TextStyle(color: Color(0xFFDC2626)),
+              ),
+            ],
+          ),
+        ),
       ],
       onSelected: (action) async {
         switch (action) {
@@ -2703,6 +2722,9 @@ class _HeaderHamburger extends ConsumerWidget {
             final t = ticket;
             if (t == null) return;
             await _openSearchDialog(context, ref, t);
+            break;
+          case 'clearBon':
+            await _onClearBon(context, ref);
             break;
           case 'remark':
           case 'note':
@@ -2727,6 +2749,60 @@ class _HeaderHamburger extends ConsumerWidget {
         ),
         alignment: Alignment.center,
         child: Icon(Icons.menu_rounded, size: 16, color: v2.ink2),
+      ),
+    );
+  }
+
+  /// Confirm-and-clear handler for the destructive hamburger entry.
+  /// Refuses if any line has been sent to the kitchen — those must go
+  /// through the void flow so the KDS ticket stays consistent.
+  Future<void> _onClearBon(BuildContext context, WidgetRef ref) async {
+    final t = ticket;
+    if (t == null || t.items.isEmpty) return;
+    final hasSent = t.items.any((i) => i.sentToKitchen);
+    if (hasSent) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Mutfağa gönderilmiş kalemler var — Storno akışından geçin.',
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Fişi temizle?'),
+        content: const Text(
+          'Bu fişteki tüm kalemler silinecek. Fiş numarası açık kalır, '
+          'yeni satış aynı bonda devam edebilir.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final ok = await ref
+        .read(currentTicketProvider.notifier)
+        .clearAllItems();
+    if (!context.mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Fiş temizlendi.' : 'Mutfağa gönderilmiş kalem var.'),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

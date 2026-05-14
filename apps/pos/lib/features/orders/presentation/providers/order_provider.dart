@@ -315,13 +315,33 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
   }
 
   /// Remove an item from the current ticket by [itemId].
-  void removeItem(String itemId) {
+  ///
+  /// Hotfix 2026-05-15 (re-applied — was on jolly-final WIP and missed
+  /// the rebase): used to be in-memory only — never wrote to the DB.
+  /// When the ticket was non-draft (already persisted via `addItem` or
+  /// `saveCurrentTicket`), the next `addItem` re-read the ticket from
+  /// the DB via `getTicketById` and the supposedly-deleted items came
+  /// back. Operator-visible bug: "löschen dedikten sonra ürün
+  /// eklediğimde sildiğim ürünler geri geliyor". Now we also fire a
+  /// DB soft-delete for non-draft tickets so the next refresh stays
+  /// consistent.
+  Future<void> removeItem(String itemId) async {
     if (state == null) return;
     state = state!.removeItem(itemId);
+
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.removeItemFromTicket(itemId);
+    }
   }
 
   /// Update the quantity of an existing item and recalculate totals.
-  void updateItemQuantity(String itemId, double newQty) {
+  ///
+  /// Hotfix 2026-05-15: same bug class as `removeItem` above — used to
+  /// be in-memory only. Once the ticket was non-draft, any subsequent
+  /// `addItem` re-read the DB and reverted the qty change. Now we also
+  /// persist via the repo so the next refresh stays consistent.
+  Future<void> updateItemQuantity(String itemId, double newQty) async {
     if (state == null) return;
 
     final updatedItems = state!.items.map((item) {
@@ -333,6 +353,38 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     }).toList();
 
     state = state!.copyWith(items: updatedItems).calculateTotals();
+
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.updateItemQuantity(itemId, newQty.round());
+    }
+  }
+
+  /// Clear every line on the current ticket without voiding the bon.
+  ///
+  /// Bug 1 (2026-05-15): operators asked for a "Fiş İptal" / clear-cart
+  /// affordance that wipes the items but keeps the ticket number around
+  /// so the next sale lands on the same row. Unlike [voidTicket] this
+  /// preserves the ticket (open status) and does not write to the
+  /// storno audit log — it's a UX shortcut, not a fiscal cancellation.
+  ///
+  /// Refuses when ANY line has already been sent to the kitchen
+  /// ([OrderItemStatus.sent]+): those lines must go through the void
+  /// flow so the kitchen ticket is updated in lock-step. Returns true
+  /// on success, false when blocked (UI shows a snackbar in that case).
+  Future<bool> clearAllItems() async {
+    if (state == null) return true;
+    final hasSent = state!.items.any((i) => i.sentToKitchen);
+    if (hasSent) return false;
+
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      for (final item in state!.items) {
+        await repo.removeItemFromTicket(item.id);
+      }
+    }
+    state = state!.copyWith(items: const []).calculateTotals();
+    return true;
   }
 
   /// Persist the current ticket to the database. Called when the user
