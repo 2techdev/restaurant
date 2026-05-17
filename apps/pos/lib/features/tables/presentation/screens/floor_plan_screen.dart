@@ -50,13 +50,42 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
   // Shows a brief "Saved" indicator after a position is persisted to SQLite.
   String? _savedLabel;
 
-  // Stitch status colors
+  // Floor plan v4 (2026-05-17 UX overhaul) — premium tinted palette.
+  // Saturated borders + soft fills so each state reads at a glance from
+  // across the bar. BILL flag overrides occupied tint with orange.
+  static const _v4Available = Color(0xFF22C55E);
+  static const _v4AvailableBg = Color(0xFFFFFFFF);
+  static const _v4Busy = Color(0xFFFB7185);
+  static const _v4BusyBg = Color(0xFFFFF1F2);
+  static const _v4Bill = Color(0xFFEA580C);
+  static const _v4BillBg = Color(0xFFFFEDD5);
+  static const _v4Clean = Color(0xFFEAB308);
+  static const _v4CleanBg = Color(0xFFFEF9C3);
+  static const _v4Reserved = Color(0xFF8B5CF6);
+  static const _v4ReservedBg = Color(0xFFF3E8FF);
+
   Color _statusColor(TableStatus status) => switch (status) {
-        TableStatus.available => AppColors.green,     // #69F6B8
-        TableStatus.occupied => AppColors.coral,      // #FF6F7E (BUSY)
-        TableStatus.reserved => AppColors.orange,     // #FFAB4E
-        TableStatus.dirty => AppColors.yellow,        // #FFD166
+        TableStatus.available => _v4Available,
+        TableStatus.occupied => _v4Busy,
+        TableStatus.reserved => _v4Reserved,
+        TableStatus.dirty => _v4Clean,
       };
+
+  /// (border, fill) for the v4 tile shell, honouring the BILL flag.
+  ({Color border, Color fill}) _statusPalette(
+    TableStatus status,
+    Set<TableFlag> flags,
+  ) {
+    if (flags.contains(TableFlag.billRequested)) {
+      return (border: _v4Bill, fill: _v4BillBg);
+    }
+    return switch (status) {
+      TableStatus.available => (border: _v4Available, fill: _v4AvailableBg),
+      TableStatus.occupied => (border: _v4Busy, fill: _v4BusyBg),
+      TableStatus.reserved => (border: _v4Reserved, fill: _v4ReservedBg),
+      TableStatus.dirty => (border: _v4Clean, fill: _v4CleanBg),
+    };
+  }
 
   String _statusLabel(TableStatus status) => switch (status) {
         TableStatus.available => 'AVAILABLE',
@@ -247,13 +276,9 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
           ),
           const SizedBox(width: 8),
 
-          // Filter dropdown — Faz 2 (2026-05-15). Only meaningful in
-          // grid view outside edit mode (the canvas isn't filterable;
-          // edit mode targets physical positioning, not state).
-          if (!editMode && _isGridView) ...[
-            _buildFilterDropdown(),
-            const SizedBox(width: 8),
-          ],
+          // 2026-05-17: dropdown promoted to inline chip row below
+          // the top-nav. Single chip in the nav is dead weight when
+          // the count rail is right under it.
 
           // View toggle (Grid / Canvas) – only visible outside edit mode
           if (!editMode)
@@ -275,95 +300,100 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
     );
   }
 
-  /// Filter chip that pops a 4-option menu (All / Active / Pending /
-  /// Free) and writes the choice through [floorPlanFilterProvider].
-  Widget _buildFilterDropdown() {
-    final filter = ref.watch(floorPlanFilterProvider);
-    final (icon, label) = switch (filter) {
-      FloorPlanFilter.all => (Icons.apps_rounded, 'Tümü'),
-      FloorPlanFilter.active => (Icons.local_fire_department_rounded, 'Açık'),
-      FloorPlanFilter.pending => (Icons.payments_outlined, 'Bekleyen'),
-      FloorPlanFilter.free => (Icons.event_seat_outlined, 'Boş'),
-    };
-    return PopupMenuButton<FloorPlanFilter>(
-      tooltip: 'Filtre',
-      offset: const Offset(0, 36),
-      position: PopupMenuPosition.under,
-      onSelected: (v) =>
-          ref.read(floorPlanFilterProvider.notifier).state = v,
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: FloorPlanFilter.all,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.apps_rounded, size: 16),
-              SizedBox(width: 8),
-              Text('Tümü'),
-            ],
+  /// v4 inline filter chip row — replaces the v3 dropdown. Chips show
+  /// per-state counts so the operator can see how many tables match
+  /// each filter without opening a popup. Counts are computed from
+  /// `enrichedTablesProvider` so they stay live as tickets open/close.
+  Widget _buildFilterChipRow() {
+    final selected = ref.watch(floorPlanFilterProvider);
+    final enriched =
+        ref.watch(enrichedTablesProvider).value ?? const <EnrichedTable>[];
+    final activeCount = enriched
+        .where((e) =>
+            e.isOccupied || e.table.status == TableStatus.occupied)
+        .length;
+    final pendingCount = enriched
+        .where((e) => e.table.flags.contains(TableFlag.billRequested))
+        .length;
+    final freeCount = enriched
+        .where((e) =>
+            !e.isOccupied &&
+            (e.table.status == TableStatus.available ||
+                e.table.status == TableStatus.dirty))
+        .length;
+    final reservedCount = enriched
+        .where((e) => e.table.status == TableStatus.reserved)
+        .length;
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _FloorFilterChip(
+            label: 'Tümü',
+            icon: Icons.apps_rounded,
+            count: enriched.length,
+            tint: AppColors.textPrimary,
+            tintBg: AppColors.surfaceContainerHigh,
+            selected: selected == FloorPlanFilter.all,
+            onTap: () => ref.read(floorPlanFilterProvider.notifier).state =
+                FloorPlanFilter.all,
           ),
-        ),
-        PopupMenuItem(
-          value: FloorPlanFilter.active,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.local_fire_department_rounded, size: 16),
-              SizedBox(width: 8),
-              Text('Açık'),
-            ],
+          const SizedBox(width: 8),
+          _FloorFilterChip(
+            label: 'Açık',
+            icon: Icons.local_fire_department_rounded,
+            count: activeCount,
+            tint: _v4Busy,
+            tintBg: _v4BusyBg,
+            selected: selected == FloorPlanFilter.active,
+            onTap: () => ref.read(floorPlanFilterProvider.notifier).state =
+                FloorPlanFilter.active,
           ),
-        ),
-        PopupMenuItem(
-          value: FloorPlanFilter.pending,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.payments_outlined, size: 16),
-              SizedBox(width: 8),
-              Text('Bekleyen'),
-            ],
+          const SizedBox(width: 8),
+          _FloorFilterChip(
+            label: 'Ödeme',
+            icon: Icons.payments_outlined,
+            count: pendingCount,
+            tint: _v4Bill,
+            tintBg: _v4BillBg,
+            selected: selected == FloorPlanFilter.pending,
+            onTap: () => ref.read(floorPlanFilterProvider.notifier).state =
+                FloorPlanFilter.pending,
           ),
-        ),
-        PopupMenuItem(
-          value: FloorPlanFilter.free,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.event_seat_outlined, size: 16),
-              SizedBox(width: 8),
-              Text('Boş'),
-            ],
+          const SizedBox(width: 8),
+          _FloorFilterChip(
+            label: 'Boş',
+            icon: Icons.event_seat_outlined,
+            count: freeCount,
+            tint: _v4Available,
+            tintBg: const Color(0xFFDCFCE7),
+            selected: selected == FloorPlanFilter.free,
+            onTap: () => ref.read(floorPlanFilterProvider.notifier).state =
+                FloorPlanFilter.free,
           ),
-        ),
-      ],
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: AppColors.textSecondary),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.expand_more_rounded,
-              size: 14,
-              color: AppColors.textDim,
+          if (reservedCount > 0) ...[
+            const SizedBox(width: 8),
+            _FloorFilterChip(
+              label: 'Rezerve',
+              icon: Icons.event_available_outlined,
+              count: reservedCount,
+              tint: _v4Reserved,
+              tintBg: _v4ReservedBg,
+              // Reserved doesn't have its own filter enum yet; tapping
+              // surfaces a soft hint until that lands.
+              selected: false,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Rezerve filtre — yakında.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
             ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -646,6 +676,15 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
             // because drag positions are scoped to a floor, not a zone.
             if (!editMode) _buildZoneFilterBar(selectedZone),
 
+            // v4 (2026-05-17) — state-filter chip row with live counts.
+            // Sits under the zone filter so the two filter dimensions
+            // (zone × state) read top-to-bottom.
+            if (!editMode && _isGridView)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: _buildFilterChipRow(),
+              ),
+
             // Table area
             Expanded(
               child: Padding(
@@ -829,84 +868,131 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
     };
   }
 
-  /// v3 tile — card layout with left-border status colour and an enriched
-  /// body that adapts to the table state (occupied / free / dirty /
-  /// reserved). Long-press still surfaces the detail sheet so power-user
-  /// flows (transfer / merge / split) remain reachable.
+  /// v4 tile — premium card. Tinted background + saturated border per
+  /// status (BILL flag overrides to orange). InkWell ripple + scale
+  /// feedback on press. Long-press still surfaces the detail sheet so
+  /// power-user flows (transfer / merge / split) remain reachable.
   Widget _buildTableTile(EnrichedTable enriched) {
     final table = enriched.table;
     final ticket = enriched.ticket;
     final occupied = enriched.isOccupied;
-    final statusColor = _statusColor(table.status);
+    final palette = _statusPalette(table.status, table.flags.toSet());
     final isRound = table.shape == TableShape.circle;
+    final billRequested = table.flags.contains(TableFlag.billRequested);
 
-    return GestureDetector(
+    return _TilePressable(
       onTap: () => _onTableTap(table),
       onLongPress: () => showTableDetailSheet(context, table),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Container(
+          DecoratedBox(
             decoration: BoxDecoration(
-              color: AppColors.surfaceContainerHigh,
+              color: palette.fill,
               borderRadius: isRound
                   ? BorderRadius.circular(100)
-                  : BorderRadius.circular(8),
-              border: Border(
-                left: BorderSide(color: statusColor, width: 4),
-              ),
+                  : BorderRadius.circular(10),
+              border: Border.all(color: palette.border, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: palette.border.withValues(alpha: 0.10),
+                  blurRadius: 6,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
               children: [
-                // Header row — name + status badge
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        table.name,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textPrimary,
-                          letterSpacing: -0.5,
-                          height: 1.0,
-                        ),
+                // 4dp left bar — kept as a secondary cue (helps tile
+                // scanning at a glance when the fill tint is subtle on
+                // white backgrounds like Available).
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 4,
+                    decoration: BoxDecoration(
+                      color: palette.border,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(10),
+                        bottomLeft: Radius.circular(10),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                      child: Text(
-                        _statusLabel(table.status),
-                        style: TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.w800,
-                          color: statusColor,
-                          letterSpacing: 0.6,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  height: 1,
-                  color: AppColors.textDim.withValues(alpha: 0.15),
-                ),
-                const SizedBox(height: 6),
-                // Body — adapts to state
-                Expanded(
-                  child: occupied
-                      ? _OccupiedBody(table: table, ticket: ticket!)
-                      : _FreeBody(table: table),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              table.name,
+                              style: const TextStyle(
+                                fontFamily: 'WorkSans',
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.8,
+                                height: 1.0,
+                              ),
+                            ),
+                          ),
+                          if (billRequested)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: palette.border,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'BILL',
+                                style: TextStyle(
+                                  fontFamily: 'WorkSans',
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: palette.border.withValues(alpha: 0.20),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _statusLabel(table.status),
+                                style: TextStyle(
+                                  fontFamily: 'WorkSans',
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  color: palette.border,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: occupied
+                            ? _OccupiedBody(table: table, ticket: ticket!)
+                            : _FreeBody(table: table),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1531,6 +1617,127 @@ class _OccupiedBody extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Press-feedback wrapper for the v4 tile — adds a Material ripple +
+/// a 0.97 scale on press. Keeps the tap target square so tablet thumb
+/// hits land cleanly.
+class _TilePressable extends StatefulWidget {
+  const _TilePressable({
+    required this.child,
+    required this.onTap,
+    required this.onLongPress,
+  });
+  final Widget child;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  @override
+  State<_TilePressable> createState() => _TilePressableState();
+}
+
+class _TilePressableState extends State<_TilePressable> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      scale: _pressed ? 0.97 : 1.0,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          onLongPress: widget.onLongPress,
+          onHighlightChanged: (v) => setState(() => _pressed = v),
+          borderRadius: BorderRadius.circular(10),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Floor-plan v4 filter chip with live count badge.
+class _FloorFilterChip extends StatelessWidget {
+  const _FloorFilterChip({
+    required this.label,
+    required this.icon,
+    required this.count,
+    required this.tint,
+    required this.tintBg,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final IconData icon;
+  final int count;
+  final Color tint;
+  final Color tintBg;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? Colors.white : tint;
+    return Material(
+      color: selected ? tint : tintBg,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? tint : tint.withValues(alpha: 0.30),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: fg),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: fg,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(width: 7),
+              Container(
+                constraints: const BoxConstraints(minWidth: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.22)
+                      : tint.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    color: fg,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
