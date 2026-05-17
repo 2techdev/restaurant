@@ -42,6 +42,18 @@ type Config struct {
 	StripeSecretKey       string
 	StripeWebhookSecret   string
 	StripeSuccessURLBase  string // e.g. "https://order.gastrocore.ch"
+
+	// SMTP (reporting automation + threshold alerts). Optional — if SMTPHost
+	// is empty the scheduler logs the rendered body and records `skipped`
+	// instead of sending. This keeps dev environments noise-free.
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUser     string
+	SMTPPassword string
+	SMTPFrom     string // "GastroCore Reports <reports@gastrocore.ch>"
+
+	// Backoffice URL used in email bodies to link to the full report page.
+	BackofficeURLBase string // e.g. "https://backoffice.gastrocore.ch"
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -75,6 +87,12 @@ func Load() *Config {
 		StripeSecretKey:       getEnv("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:   getEnv("STRIPE_WEBHOOK_SECRET", ""),
 		StripeSuccessURLBase:  getEnv("STRIPE_SUCCESS_URL_BASE", "http://localhost:3000"),
+		SMTPHost:              getEnv("SMTP_HOST", ""),
+		SMTPPort:              getEnvInt("SMTP_PORT", 587),
+		SMTPUser:              getEnv("SMTP_USER", ""),
+		SMTPPassword:          getEnv("SMTP_PASSWORD", ""),
+		SMTPFrom:              getEnv("SMTP_FROM", "GastroCore Reports <reports@gastrocore.ch>"),
+		BackofficeURLBase:     getEnv("BACKOFFICE_URL_BASE", "https://backoffice.gastrocore.ch"),
 	}
 	return cfg
 }

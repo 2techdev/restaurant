@@ -34,6 +34,7 @@ import (
 	"github.com/gastrocore/server/internal/promotions"
 	"github.com/gastrocore/server/internal/qrbill"
 	"github.com/gastrocore/server/internal/receipt_templates"
+	"github.com/gastrocore/server/internal/reporting"
 	"github.com/gastrocore/server/internal/reports"
 	"github.com/gastrocore/server/internal/reservations"
 	"github.com/gastrocore/server/internal/shared/config"
@@ -130,6 +131,9 @@ func main() {
 	// Swiss-compliant receipt templates (020)
 	receiptTemplatesModule := receipt_templates.NewModule(db)
 
+	// Reporting automation (041) — scheduled email reports + threshold alerts.
+	reportingModule := reporting.NewModule(db, cfg)
+
 	// ---------------------------------------------------------------------------
 	// Build router
 	// ---------------------------------------------------------------------------
@@ -205,6 +209,9 @@ func main() {
 
 	// Receipt templates (020) — Swiss MWST-compliant printable layouts
 	receiptTemplatesModule.RegisterRoutes(mux)
+
+	// Reporting automation (041)
+	reportingModule.RegisterRoutes(mux)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain
@@ -287,6 +294,12 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+
+	// Reporting scheduler (041) — cron tick + alert evaluation. Lives for the
+	// process lifetime; ctx cancellation on shutdown stops the goroutine.
+	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
+	defer schedulerCancel()
+	reportingModule.StartScheduler(schedulerCtx)
 
 	// Graceful shutdown
 	go func() {

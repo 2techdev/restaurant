@@ -123,6 +123,8 @@ export const NAV_CONFIG: NavEntry[] = [
       { href: (l) => `/${l}/reports/hourly`, labelKey: "reportsHourly" },
       { href: (l) => `/${l}/reports/mwst`, labelKey: "reportsMwst" },
       { href: (l) => `/${l}/reports/export`, labelKey: "reportsExport" },
+      { href: (l) => `/${l}/reports/automation`, labelKey: "reportsAutomation" },
+      { href: (l) => `/${l}/reports/alerts`, labelKey: "reportsAlerts" },
     ],
   },
   {
