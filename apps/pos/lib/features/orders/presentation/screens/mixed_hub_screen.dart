@@ -21,6 +21,7 @@ import 'package:gastrocore_pos/core/router/app_router.dart';
 import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/mode_switcher_pill.dart';
 import 'package:gastrocore_pos/features/tables/presentation/providers/table_provider.dart';
 
 class MixedHubScreen extends ConsumerWidget {
@@ -56,15 +57,23 @@ class _LeftPanel extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Order Center',
-            style: TextStyle(
-              fontFamily: 'WorkSans',
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textPrimary,
-              letterSpacing: -0.5,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Expanded(
+                child: Text(
+                  'Order Center',
+                  style: TextStyle(
+                    fontFamily: 'WorkSans',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ),
+              const ModeSwitcherPill(),
+            ],
           ),
           const SizedBox(height: 4),
           const Text(

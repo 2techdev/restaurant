@@ -18,6 +18,7 @@ import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/mode_switcher_pill.dart';
 import 'package:gastrocore_pos/features/tables/domain/entities/table_entity.dart';
 import 'package:gastrocore_pos/features/tables/presentation/providers/table_provider.dart';
 import 'package:gastrocore_pos/features/tables/presentation/widgets/floor_form_dialog.dart';
@@ -148,6 +149,11 @@ class _FloorPlanScreenState extends ConsumerState<FloorPlanScreen> {
       color: AppColors.surfaceContainerLow,
       child: Row(
         children: [
+          // Mode-switcher pill — one-tap mode change from anywhere.
+          // 2026-05-17 UX overhaul: replaces the Settings → POS Modu
+          // round-trip with an inline header affordance.
+          const ModeSwitcherPill(),
+          const SizedBox(width: 14),
           ...navItems.asMap().entries.map((entry) {
             final i = entry.key;
             final (label, icon) = entry.value;

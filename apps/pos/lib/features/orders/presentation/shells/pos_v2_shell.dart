@@ -49,6 +49,7 @@ import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/theme/pos_v2_theme.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/mode_switcher_pill.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/modifier_dialog.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/favorites_bar.dart'
     show allActiveProductsProvider;
@@ -424,6 +425,13 @@ class _Rail extends ConsumerWidget {
         child: Column(
           children: [
             _RailUserAvatar(name: user?.name ?? 'Admin'),
+            const SizedBox(height: 8),
+            // Mode-switcher pill — one-tap mode change from the rail head.
+            // Rendered compact (icon-only) to fit the 64-80dp rail width.
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: ModeSwitcherPill(style: ModeSwitcherStyle.compact),
+            ),
             const SizedBox(height: 8),
             const _RailDivider(),
             const SizedBox(height: 6),
