@@ -179,6 +179,7 @@ type adminUserInfo struct {
 	Role           string   `json:"role"`
 	OrgRole        string   `json:"org_role,omitempty"` // HQ chain role — derived from admin_users.role
 	StoreIDs       []string `json:"store_ids,omitempty"`
+	IsSuperAdmin   bool     `json:"is_super_admin,omitempty"` // F1 — Wallee-style ghost login (migration 024)
 }
 
 // mapAdminRoleToOrgRole maps the legacy admin_users.role values onto the HQ
@@ -225,14 +226,16 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		status       string
 		passwordHash string
 		storeIDs     pq.StringArray
+		isSuperAdmin bool
 	)
 
 	err := m.db.QueryRowContext(r.Context(), `
 		SELECT id, organization_id, name, role, status, password_hash,
-		       COALESCE(store_ids, '{}')
+		       COALESCE(store_ids, '{}'),
+		       COALESCE(is_super_admin, FALSE)
 		FROM admin_users
 		WHERE email = $1
-	`, req.Email).Scan(&userID, &orgID, &name, &role, &status, &passwordHash, &storeIDs)
+	`, req.Email).Scan(&userID, &orgID, &name, &role, &status, &passwordHash, &storeIDs, &isSuperAdmin)
 
 	if err == sql.ErrNoRows {
 		// Use constant-time response to prevent user enumeration.
@@ -268,6 +271,7 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		Role:           role,
 		OrganizationID: orgID,
 		OrgRole:        orgRole,
+		IsSuperAdmin:   isSuperAdmin,
 	})
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "TOKEN_ERROR", "Failed to generate token")
@@ -282,6 +286,7 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		Role:           role + "_refresh",
 		OrganizationID: orgID,
 		OrgRole:        orgRole,
+		IsSuperAdmin:   isSuperAdmin,
 	})
 
 	ids := []string(storeIDs)
@@ -302,6 +307,7 @@ func (m *Module) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 			Role:           role,
 			OrgRole:        orgRole,
 			StoreIDs:       ids,
+			IsSuperAdmin:   isSuperAdmin,
 		},
 	})
 }

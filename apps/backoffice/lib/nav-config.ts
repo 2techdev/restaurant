@@ -24,6 +24,8 @@ export type NavLeaf = {
   labelKey: string; // i18n key under namespace `nav`
   icon: string;
   hqOnly?: boolean;
+  /** Only renders when the session has admin_users.is_super_admin=TRUE (F1, migration 024). */
+  superAdminOnly?: boolean;
   /** Optional count badge (mono, muted) on the right side. */
   badge?: number | string;
   /** Optional dot indicator color. */
@@ -121,6 +123,8 @@ export const NAV_CONFIG: NavEntry[] = [
       { href: (l) => `/${l}/reports/hourly`, labelKey: "reportsHourly" },
       { href: (l) => `/${l}/reports/mwst`, labelKey: "reportsMwst" },
       { href: (l) => `/${l}/reports/export`, labelKey: "reportsExport" },
+      { href: (l) => `/${l}/reports/automation`, labelKey: "reportsAutomation" },
+      { href: (l) => `/${l}/reports/alerts`, labelKey: "reportsAlerts" },
     ],
   },
   {
@@ -233,6 +237,16 @@ export const NAV_CONFIG: NavEntry[] = [
       { href: (l) => `/${l}/settings/integrations`, labelKey: "settingsIntegrations" },
       { href: (l) => `/${l}/settings?tab=audit`, labelKey: "settingsAudit" },
     ],
+  },
+  // F1 — Super admin only (admin_users.is_super_admin=TRUE, migration 024).
+  // Renders below settings as a leaf row; sidebar renderer filters out unless
+  // the prop `isSuperAdmin` on Sidebar is true.
+  {
+    kind: "leaf",
+    href: (l) => `/${l}/admin/tenants`,
+    labelKey: "tenants",
+    icon: "ShieldCheck",
+    superAdminOnly: true,
   },
 ];
 

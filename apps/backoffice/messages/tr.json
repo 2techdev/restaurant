@@ -79,6 +79,8 @@
     "reportsHourly": "Saatlik Dağılım",
     "reportsMwst": "MWST Raporu",
     "reportsExport": "Export (CSV)",
+    "reportsAutomation": "Otomatik Raporlar",
+    "reportsAlerts": "Uyarılar",
     "customersList": "Müşteri Listesi",
     "customersLoyalty": "Sadakat",
     "customersFeedback": "Geri Bildirim",
@@ -110,9 +112,12 @@
     "settingsNotifications": "Bildirimler",
     "settingsApiKeys": "API Anahtarları",
     "settingsIntegrations": "Entegrasyonlar",
+    "settingsMenuSource": "Menü Yönetimi",
     "settingsAudit": "Audit Log",
     "comingSoon": "Yakında",
-    "comingSoonHint": "Bu özellik geliştirilme aşamasında. Pilot kapsamı dışındadır."
+    "comingSoonHint": "Bu özellik geliştirilme aşamasında. Pilot kapsamı dışındadır.",
+    "tenants": "Tenants",
+    "superAdmin": "Süper Admin"
   },
   "dashboard": {
     "todayRevenue": "Günlük ciro",
@@ -171,11 +176,80 @@
     "lockedBadge": "HQ Kilitli",
     "localBadge": "Yerel",
     "lockedTooltip": "Bu ürün merkez (HQ) tarafından kilitlendi",
+    "import": {
+      "headerButton": "Gastro Hub'dan İçe Aktar",
+      "title": "Gastro Hub'dan menüyü içe aktar",
+      "codePlaceholder": "XXX-XXX",
+      "steps": {
+        "input": "Kod",
+        "preview": "Önizleme",
+        "result": "Sonuç"
+      },
+      "step1": {
+        "heading": "Bağlantı kodunu girin",
+        "description": "Daha önce gastro.2hub.ch'de menünüzü kurduysanız, oradan bir bağlantı kodu üretip buraya yapıştırın. Mevcut menünüz POS sistemine kopyalanacak.",
+        "codeLabel": "Bağlantı kodu",
+        "codeHint": "Biçim: XXX-XXX (örn. M7K-9PQ). Kodlar 15 dakika geçerlidir.",
+        "previewButton": "Önizleme Al"
+      },
+      "step2": {
+        "heading": "Önizleme",
+        "description": "Devam etmeden önce nelerin içe aktarılacağını kontrol edin.",
+        "applyButton": "İçe Aktar"
+      },
+      "step3": {
+        "heading": "Menünüz başarıyla içe aktarıldı",
+        "description": "Gastro Hub'dan menü başarıyla alındı.",
+        "categories": "Kategoriler",
+        "products": "Ürünler",
+        "modifiers": "Modifier grupları",
+        "updated": "güncellendi",
+        "linkedAt": "Bağlantı zamanı",
+        "syncEventId": "Sync olay ID",
+        "viewMenuButton": "Menüyü Görüntüle"
+      },
+      "preview": {
+        "categories": "Kategoriler",
+        "products": "Ürünler",
+        "modifiers": "Modifier grupları",
+        "new": "yeni",
+        "update": "güncelleme",
+        "unchanged": "aynı",
+        "skip": "atlandı",
+        "error": "hata",
+        "warnings": "Uyarılar",
+        "rowReport": "Detaylı rapor ({count} satır)",
+        "recordCol": "Kayıt",
+        "statusCol": "Durum",
+        "moreRows": "satır daha"
+      }
+    },
+    "productDetail": {
+      "backToList": "Ürün listesine dön",
+      "notFound": "Ürün bulunamadı.",
+      "overlay": {
+        "title": "Online Overlay",
+        "subtitle": "Bu alanlar Gastro Hub admin panelinden yönetilir. POS yalnızca yansıtır.",
+        "readOnly": "Salt-okunur",
+        "image": "Yüksek-çözünürlüklü görsel",
+        "noImage": "Görsel yok — Gastro Hub'dan ekleyin.",
+        "popularOnline": "Online Popüler rozeti",
+        "yes": "Evet",
+        "no": "Hayır",
+        "allergens": "Alerjen bilgisi",
+        "noAllergens": "Alerjen bilgisi belirtilmemiş.",
+        "descriptionLong": "Uzun açıklama (vitrin)",
+        "noDescription": "Açıklama belirtilmemiş.",
+        "editHint": "Bu alanları düzenlemek için Gastro Hub admin paneline gidin.",
+        "openGastroHub": "Gastro Hub'da Aç"
+      }
+    },
     "productsPage": {
       "title": "Ürünler",
       "subtitle": "Menü ürünlerinizi yönetin, fiyatlandırın ve POS'a yayınlayın.",
       "newProduct": "Yeni Ürün",
       "editProduct": "Ürünü Düzenle",
+      "viewOverlay": "Online overlay",
       "listHeader": "{count, plural, =0 {Ürün yok} =1 {1 ürün} other {# ürün}}",
       "emptyState": "Bu filtreye uygun ürün yok — Yeni Ürün ekleyin.",
       "createdToast": "Ürün oluşturuldu",
@@ -200,11 +274,24 @@
         "prices": "Fiyat (Std / Paket / Teslim)",
         "tax": "KDV",
         "status": "Aktif",
+        "toggles": "Durum",
         "description": "Açıklama",
         "allergens": "Alerjenler",
         "image": "Görsel URL",
         "displayOrder": "Sıra",
         "active": "Aktif"
+      },
+      "toggles": {
+        "active": "Aktif",
+        "available": "Stokta",
+        "onlineVisible": "Online'da"
+      },
+      "bulkActions": {
+        "label": "Toplu",
+        "markAllAvailable": "Tümünü stoğa al",
+        "markAllUnavailable": "Tümünü stoktan çıkar",
+        "markedAllAvailable": "Tümü stoğa alındı",
+        "markedAllUnavailable": "Tümü stoktan çıkarıldı"
       },
       "price": {
         "standard": "Standart",
@@ -817,6 +904,9 @@
       "emptyState": "Henüz happy hour kuralı yok.",
       "createdToast": "Kural oluşturuldu",
       "updatedToast": "Kural güncellendi",
+      "deletedToast": "Kural silindi",
+      "saveError": "Kaydedilemedi",
+      "deleteError": "Silinemedi",
       "formHint": "Saat aralığı + günler + indirim. Birden çok kural eşleşirse sıralı uygulanır.",
       "namePlaceholder": "Aperitivo Saati",
       "col": {
@@ -884,6 +974,124 @@
         "footer": "Alt Yazı"
       }
     }
+  }
+,
+  "automation": {
+    "title": "Otomatik Raporlar",
+    "subtitle": "E-posta ile zamanlı sevkiyat — günlük özet, haftalık satış, aylık P&L. Cron ile çalışır, alıcı listesi tenant başına.",
+    "tabList": "Tanımlar",
+    "tabLogs": "Gönderim Geçmişi",
+    "addReport": "Yeni Rapor",
+    "editReport": "Raporu Düzenle",
+    "addSubtitle": "Yeni zamanlı rapor tanımla",
+    "editSubtitle": "Mevcut tanımı güncelle",
+    "defaultName": "Günlük Satış Özeti",
+    "emptyState": "Henüz zamanlı rapor yok. Yukarıdan ekleyin.",
+    "colName": "Ad",
+    "colType": "Rapor Tipi",
+    "colSchedule": "Zamanlama (cron)",
+    "colRecipients": "Alıcılar",
+    "colFormat": "Format",
+    "colLocale": "Dil",
+    "colNextRun": "Sonraki çalıştırma",
+    "colLastStatus": "Son durum",
+    "colActive": "Aktif",
+    "colActions": "İşlemler",
+    "edit": "Düzenle",
+    "delete": "Sil",
+    "sendNow": "Şimdi gönder",
+    "preview": "Önizleme",
+    "scheduleHint": "5 alanlı cron: dakika saat ay-günü ay hafta-günü. Örnek: 59 23 * * * her gün 23:59.",
+    "recipientsHint": "E-postaları virgülle ayırın.",
+    "presetDaily": "Her gün 23:59",
+    "presetDailyMorning": "Her gün 08:00",
+    "presetWeeklyMon": "Pazartesi 09:00",
+    "presetMonthly1st": "Ayın 1'i 09:00",
+    "formatHtml": "HTML (e-posta gövdesi)",
+    "formatPdf": "PDF (ek)",
+    "formatCsv": "CSV (ek)",
+    "typeDailyDigest": "Günlük Özet",
+    "typeSalesSummary": "Satış Özeti",
+    "typeHourlySales": "Saatlik Satış",
+    "typeStaffPerformance": "Personel Performansı",
+    "typeInventoryHealth": "Stok Durumu",
+    "typeCustomerActivity": "Müşteri Aktivitesi",
+    "statusSuccess": "Başarılı",
+    "statusFailed": "Başarısız",
+    "sendNowDispatched": "Rapor sıraya alındı",
+    "sendNowError": "Gönderim hatası",
+    "createSuccess": "Rapor oluşturuldu",
+    "updateSuccess": "Rapor güncellendi",
+    "deleteSuccess": "Rapor silindi",
+    "deleteError": "Silinemedi",
+    "saveError": "Kaydedilemedi",
+    "deleteTitle": "Raporu sil",
+    "deleteBody": "{name} kalıcı olarak silinecek. Geçmiş loglar saklanır.",
+    "previewTitle": "Günlük Özet Önizleme",
+    "previewSubtitle": "Bu dile göre dünün satışlarıyla render edilmiş hali.",
+    "logColTime": "Zaman",
+    "logColType": "Tip",
+    "logColRecipients": "Alıcı",
+    "logColTrigger": "Tetikleyen",
+    "logColStatus": "Durum",
+    "logColDuration": "Süre",
+    "logColError": "Hata",
+    "logEmpty": "Henüz gönderim yok."
+  }
+,
+  "alerts": {
+    "title": "Eşik Uyarıları",
+    "subtitle": "İş metrikleri belirli bir eşiği aştığında otomatik e-posta. Bekleme süresi (cooldown) aynı uyarının tekrar tekrar gelmesini engeller.",
+    "tabList": "Tanımlar",
+    "tabLogs": "Tetiklenme Geçmişi",
+    "addAlert": "Yeni Uyarı",
+    "editAlert": "Uyarıyı Düzenle",
+    "addSubtitle": "Yeni eşik tanımla",
+    "editSubtitle": "Mevcut tanımı güncelle",
+    "defaultName": "Satış Düşüş Uyarısı",
+    "emptyState": "Henüz uyarı tanımlı değil.",
+    "colName": "Ad",
+    "colType": "Tip",
+    "colThreshold": "Eşik",
+    "colRecipients": "Alıcılar",
+    "colCooldown": "Bekleme (dk)",
+    "colLocale": "Dil",
+    "colLastTriggered": "Son tetiklenme",
+    "colActive": "Aktif",
+    "colActions": "İşlemler",
+    "edit": "Düzenle",
+    "delete": "Sil",
+    "test": "Test et",
+    "cooldownHint": "Aynı uyarı bu süre içinde tekrar tetiklenmez.",
+    "typeSalesDrop": "Satış Düşüşü",
+    "typeStockout": "Stok Çıkışı",
+    "typeOnlineAckDelay": "Online Sipariş Onay Gecikmesi",
+    "typeRevenueTarget": "Günlük Hedef Tutturulmadı",
+    "typeRefundSpike": "İade Patlaması",
+    "typeFailedPayments": "Başarısız Ödeme",
+    "configPercent": "Son 7 günün ortalamasının yüzde kaçı altına düşerse tetiklensin (%).",
+    "configCount": "Bu sayıda veya daha fazla stoksuz ürün olduğunda.",
+    "configMinutes": "Online sipariş bu kadar dakikadan çoktur 'open' durumda kalırsa.",
+    "configAmountCents": "Saat 21:00 sonrası bugünkü ciro bu tutarın (cents) altındaysa.",
+    "configCountToday": "Bugün bu kadar veya daha fazla olduğunda.",
+    "testDispatched": "Uyarı değerlendirildi (cooldown atlandı)",
+    "testError": "Test hatası",
+    "createSuccess": "Uyarı oluşturuldu",
+    "updateSuccess": "Uyarı güncellendi",
+    "deleteSuccess": "Uyarı silindi",
+    "deleteError": "Silinemedi",
+    "saveError": "Kaydedilemedi",
+    "deleteTitle": "Uyarıyı sil",
+    "deleteBody": "{name} silinecek. Geçmiş loglar saklanır.",
+    "statusFired": "Tetiklendi",
+    "statusSendFailed": "Gönderim hatası",
+    "statusSuppressed": "Cooldown",
+    "logColTime": "Zaman",
+    "logColMessage": "Mesaj",
+    "logColValue": "Değer",
+    "logColRecipients": "Alıcı",
+    "logColStatus": "Durum",
+    "logEmpty": "Henüz tetiklenmedi."
   }
 ,
   "masterProducts": {
@@ -1047,5 +1255,58 @@
     "addonHqDesc": "Master menü cascade ile çok-restoranlı zincir.",
     "addonBrandingName": "Custom Branding",
     "addonBrandingDesc": "Kendi logo + renklerin fişlerde ve online sipariş üzerinde."
+  },
+  "admin": {
+    "tenants": {
+      "title": "Tenants — Süper Admin",
+      "subtitle": "Tüm restoranların admin hesaplarına geçici giriş yapabilirsiniz.",
+      "col": {
+        "tenant": "Restoran",
+        "owner": "Sahip / Admin",
+        "adminCount": "Admin Sayısı",
+        "lastActive": "Son Aktivite",
+        "action": "İşlem"
+      },
+      "login": "Giriş yap",
+      "loggingIn": "Yönlendiriliyor…",
+      "noOwner": "Admin yok",
+      "noOwnerError": "{tenant} restoranının admin kullanıcısı yok.",
+      "empty": "Henüz tenant yok.",
+      "footer": "Her giriş 15 dakika sonra otomatik sona erer ve audit log'a kaydedilir.",
+      "genericError": "Giriş yapılamadı. Tekrar deneyin."
+    }
+  },
+  "menuSource": {
+    "title": "Menü Yönetimi",
+    "subtitle": "Menü ve modifier verisinin sahibi kim? Düzenlemeler nereden yapılıyor?",
+    "savedToast": "Menü yönetim ayarları kaydedildi.",
+    "menuAuthority": {
+      "title": "Menü yetkisi",
+      "description": "Kategoriler ve ürünleri kim yönetiyor?",
+      "optionGastrohub": "Gastro Hub'da yönet",
+      "optionGastrohubHint": "Menü Reservation tarafında düzenlenir; POS sadece okur. (Default)",
+      "optionGastrocore": "POS'ta yönet",
+      "optionGastrocoreHint": "Menü burada düzenlenir; her değişiklik Gastro Hub'a otomatik gönderilir."
+    },
+    "modifierAuthority": {
+      "title": "Modifier yetkisi",
+      "description": "Ekstra grupları ve seçenekleri kim yönetiyor?",
+      "optionGastrohub": "Gastro Hub'da yönet",
+      "optionGastrohubHint": "Modifier grupları Reservation tarafında düzenlenir.",
+      "optionGastrocore": "POS'ta yönet",
+      "optionGastrocoreHint": "Modifier grupları burada düzenlenir; her değişiklik Gastro Hub'a gönderilir."
+    },
+    "hubMapping": {
+      "title": "Gastro Hub eşleştirmesi",
+      "description": "POS push'larının doğru restorana gitmesi için Reservation tarafındaki restaurant.id gerekli.",
+      "fieldLabel": "Gastro Hub restaurant ID",
+      "hint": "Reservation veritabanındaki cuid değeri. Gastro Hub admin'inden alın.",
+      "warningRequired": "POS'ta yönet seçildiğinde Gastro Hub restaurant ID zorunludur, aksi halde push'lar başarısız olur."
+    }
+  },
+  "impersonation": {
+    "activeAs": "<target>{targetEmail}</target> olarak görüntülüyorsunuz. Süper Admin: <super>{superAdminEmail}</super>.",
+    "exitButton": "Sonlandır",
+    "exiting": "Sonlandırılıyor…"
   }
 }

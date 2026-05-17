@@ -249,3 +249,113 @@ export async function fetchAggregateStats(session: SessionPayload): Promise<Aggr
     return null;
   }
 }
+
+// =============================================================================
+// Reporting automation (041)
+// =============================================================================
+
+export interface ScheduledReportRow {
+  id: string;
+  tenant_id: string;
+  name: string;
+  report_type: string;
+  schedule_cron: string;
+  recipients_emails: string[];
+  format: string;
+  filters: Record<string, unknown>;
+  locale: string;
+  is_active: boolean;
+  last_sent_at?: string | null;
+  last_status?: string | null;
+  next_run_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportLogRow {
+  id: string;
+  scheduled_report_id?: string | null;
+  report_type: string;
+  sent_at: string;
+  sent_to_emails: string[];
+  sent_recipients_count: number;
+  status: string;
+  error_message?: string | null;
+  duration_ms?: number;
+  trigger_source: string;
+}
+
+export interface ThresholdAlertRow {
+  id: string;
+  tenant_id: string;
+  name: string;
+  alert_type: string;
+  threshold: Record<string, unknown>;
+  recipients_emails: string[];
+  cooldown_minutes: number;
+  locale: string;
+  is_active: boolean;
+  last_triggered_at?: string | null;
+  last_value?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlertLogRow {
+  id: string;
+  alert_id?: string | null;
+  triggered_at: string;
+  value?: number | null;
+  message: string;
+  sent_to: string[];
+  status: string;
+  error_message?: string | null;
+}
+
+export async function fetchScheduledReports(session: SessionPayload): Promise<ScheduledReportRow[]> {
+  try {
+    const data = await apiGet<{ data: ScheduledReportRow[] }>("/reporting/scheduled", {
+      token: session.token,
+      tenantId: session.tenantId,
+    });
+    return Array.isArray(data?.data) ? data.data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchReportLogs(session: SessionPayload, limit = 50): Promise<ReportLogRow[]> {
+  try {
+    const data = await apiGet<{ data: ReportLogRow[] }>(`/reporting/logs?limit=${limit}`, {
+      token: session.token,
+      tenantId: session.tenantId,
+    });
+    return Array.isArray(data?.data) ? data.data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchThresholdAlerts(session: SessionPayload): Promise<ThresholdAlertRow[]> {
+  try {
+    const data = await apiGet<{ data: ThresholdAlertRow[] }>("/reporting/alerts", {
+      token: session.token,
+      tenantId: session.tenantId,
+    });
+    return Array.isArray(data?.data) ? data.data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchAlertLogs(session: SessionPayload, limit = 50): Promise<AlertLogRow[]> {
+  try {
+    const data = await apiGet<{ data: AlertLogRow[] }>(`/reporting/alerts/logs?limit=${limit}`, {
+      token: session.token,
+      tenantId: session.tenantId,
+    });
+    return Array.isArray(data?.data) ? data.data : [];
+  } catch {
+    return [];
+  }
+}

@@ -38,6 +38,15 @@ const (
 	ContextKeyOrganizationID contextKey = "organization_id"
 	// ContextKeyOrgRole is the context key for the HQ chain role (HQ_ADMIN, HQ_MANAGER, ...).
 	ContextKeyOrgRole contextKey = "org_role"
+	// ContextKeyIsSuperAdmin marks the caller as a platform super admin
+	// (migration 024 — F1 Wallee-style ghost login). String "true" / "" only.
+	ContextKeyIsSuperAdmin contextKey = "is_super_admin"
+	// ContextKeyImpersonatedBy is the super admin user id when this request
+	// is made through an impersonation token. Empty for normal auth.
+	ContextKeyImpersonatedBy contextKey = "impersonated_by"
+	// ContextKeyImpersonationSessionID ties the request back to its
+	// impersonation_sessions row.
+	ContextKeyImpersonationSessionID contextKey = "impersonation_session_id"
 )
 
 // Middleware is a function that wraps an http.Handler.
@@ -317,6 +326,20 @@ func AuthRequired(validateToken func(token string) (claims map[string]string, er
 					}
 				}
 			}
+			if v, ok := claims["is_super_admin"]; ok {
+				ctx = context.WithValue(ctx, ContextKeyIsSuperAdmin, v)
+				if v == "true" {
+					if tid := r.Header.Get("X-Tenant-ID"); tid != "" {
+						ctx = context.WithValue(ctx, ContextKeyTenantID, tid)
+					}
+				}
+			}
+			if v, ok := claims["impersonated_by"]; ok {
+				ctx = context.WithValue(ctx, ContextKeyImpersonatedBy, v)
+			}
+			if v, ok := claims["impersonation_session_id"]; ok {
+				ctx = context.WithValue(ctx, ContextKeyImpersonationSessionID, v)
+			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -405,6 +428,31 @@ func GetStoreID(ctx context.Context) string {
 // GetDeviceType extracts the device type from context.
 func GetDeviceType(ctx context.Context) string {
 	if v, ok := ctx.Value(ContextKeyDeviceType).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// IsSuperAdmin reports whether the JWT carried is_super_admin=true
+// (migration 024 — F1).
+func IsSuperAdmin(ctx context.Context) bool {
+	v, _ := ctx.Value(ContextKeyIsSuperAdmin).(string)
+	return v == "true"
+}
+
+// GetImpersonatedBy returns the super admin user id when this request is
+// being made through an impersonation token. Empty for normal auth.
+func GetImpersonatedBy(ctx context.Context) string {
+	if v, ok := ctx.Value(ContextKeyImpersonatedBy).(string); ok {
+		return v
+	}
+	return ""
+}
+
+// GetImpersonationSessionID returns the impersonation_sessions row id this
+// request is acting under, or "" when not impersonating.
+func GetImpersonationSessionID(ctx context.Context) string {
+	if v, ok := ctx.Value(ContextKeyImpersonationSessionID).(string); ok {
 		return v
 	}
 	return ""

@@ -14,12 +14,37 @@ export interface AdminUser {
   organization_id: string;
   email: string;
   name: string;
-  // DB role from admin_users.role ("admin" | "brand_manager" | "store_manager" | "viewer").
   role: string;
-  // Org-level role mapped server-side from `role`. Stamped into the JWT and
-  // returned by /auth/admin/login so the frontend can branch on HQ vs store.
   org_role?: UserRole | string;
   store_ids?: string[];
+  // F1 super admin (migration 024).
+  is_super_admin?: boolean;
+  impersonated_by_email?: string;
+  impersonated_by_id?: string;
+}
+
+export interface TenantInfo {
+  organization_id: string;
+  organization_name: string;
+  owner_email?: string;
+  owner_user_id?: string;
+  owner_name?: string;
+  admin_user_count: number;
+  last_active_at?: string | null;
+}
+
+export interface ImpersonateResponse {
+  success: boolean;
+  session_id: string;
+  token: string;
+  expires_at: string;
+  target_user: {
+    id: string;
+    email: string;
+    name: string;
+    organization_id: string;
+    role: string;
+  };
 }
 
 export type UserRole =

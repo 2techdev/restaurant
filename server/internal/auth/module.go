@@ -45,6 +45,9 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 
 	// Self-service profile + password change
 	m.registerMeRoutes(mux)
+
+	// Super admin impersonation — F1, Wallee-style ghost login (migration 024)
+	m.registerImpersonationRoutes(mux)
 }
 
 // ValidateToken exposes the JWT validation for use by middleware.
