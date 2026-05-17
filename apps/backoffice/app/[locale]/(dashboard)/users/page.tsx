@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { canManageHq } from "@/lib/roles";
 import { UsersClient } from "@/components/users/users-client";
-import { fetchAdminUsers } from "@/lib/server-data";
+import { fetchAdminUsers, fetchAppUsers } from "@/lib/server-data";
 
 export default async function UsersPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -14,7 +14,10 @@ export default async function UsersPage({ params }: { params: Promise<{ locale: 
   if (!canManageHq(orgRole)) redirect(`/${locale}/dashboard`);
 
   const t = await getTranslations({ locale, namespace: "users" });
-  const initial = await fetchAdminUsers(session);
+  const [admins, staff] = await Promise.all([
+    fetchAdminUsers(session),
+    fetchAppUsers(session),
+  ]);
   const isHqAdmin = orgRole === "HQ_ADMIN";
 
   return (
@@ -25,7 +28,12 @@ export default async function UsersPage({ params }: { params: Promise<{ locale: 
           <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
         </div>
       </div>
-      <UsersClient initial={initial} canWrite={isHqAdmin} currentUserId={session.user.id} />
+      <UsersClient
+        initialAdmins={admins}
+        initialStaff={staff}
+        canWrite={isHqAdmin}
+        currentUserId={session.user.id}
+      />
     </div>
   );
 }

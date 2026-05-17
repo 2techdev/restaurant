@@ -239,6 +239,32 @@ export async function fetchAdminUsers(session: SessionPayload): Promise<AdminUse
   }
 }
 
+// app_users (POS staff) — tenant-scoped via /api/v1/users.
+// Roles: manager, cashier, waiter, kitchen, kiosk (see server/internal/users).
+export interface AppUserRow {
+  id: string;
+  name: string;
+  email?: string | null;
+  role: string;
+  is_active: boolean;
+  store_id?: string | null;
+  last_login?: string | null;
+  last_login_at?: string | null;
+}
+
+export async function fetchAppUsers(session: SessionPayload): Promise<AppUserRow[]> {
+  try {
+    const data = await apiGet<AppUserRow[] | { data: AppUserRow[] }>("/users", {
+      token: session.token,
+      tenantId: session.tenantId,
+    });
+    if (Array.isArray(data)) return data;
+    return Array.isArray(data?.data) ? data.data : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchAggregateStats(session: SessionPayload): Promise<AggregateStats | null> {
   try {
     return await apiGet<AggregateStats>("/admin/dashboard", {
