@@ -254,6 +254,60 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     }
   }
 
+  /// Add an ad-hoc "open item" (no menu product) to the current ticket.
+  ///
+  /// Used for one-off charges like "Special order — CHF 42" where the
+  /// cashier just types a name + price. The synthetic productId is
+  /// prefixed with `OPEN-` so receipt/reporting paths can detect open
+  /// items if needed (most paths just treat them as normal lines).
+  ///
+  /// Tax group defaults to "standard" (8.1%) — Swiss caterers rarely
+  /// know the right group for an ad-hoc charge, and standard is the
+  /// safest legal default. Cashier can override per-item via existing
+  /// tax-edit affordances if needed.
+  Future<void> addOpenItem({
+    required String name,
+    required int priceCents,
+    String taxGroup = 'standard',
+    int? course,
+    String? gangId,
+    String? categoryGangId,
+  }) async {
+    if (state == null) return;
+    final resolvedGangId = gangId ?? categoryGangId;
+
+    final itemId = IdGenerator.generateId();
+    final taxAmount = _extractItemTax(
+      grossPrice: priceCents,
+      taxGroup: taxGroup,
+      orderType: state!.orderType,
+    );
+
+    final item = OrderItemEntity(
+      id: itemId,
+      tenantId: state!.tenantId,
+      ticketId: state!.id,
+      productId: 'OPEN-$itemId',
+      productName: name,
+      quantity: 1,
+      unitPrice: priceCents,
+      subtotal: priceCents,
+      taxAmount: taxAmount,
+      course: course ?? 1,
+      gangId: resolvedGangId,
+      isOpenPrice: true,
+      taxGroup: taxGroup,
+    );
+
+    state = state!.addItem(item);
+
+    if (state!.status != TicketStatus.draft) {
+      final repo = _ref.read(orderRepositoryProvider);
+      await repo.addItemToTicket(state!.id, item);
+      state = await repo.getTicketById(state!.id);
+    }
+  }
+
   /// Assign [seatNumber] to an existing order item (null clears it).
   ///
   /// Persists immediately so the split-bill screen can read a stable view

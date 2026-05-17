@@ -17,6 +17,7 @@ import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provide
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/open_item_dialog.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
@@ -86,8 +87,62 @@ class OrderPanel extends ConsumerWidget {
                       : _FlatItemList(ticket: ticket),
             ),
           ),
+          if (ticket != null) const _OpenItemRow(),
           _TotalsFooter(ticket: ticket),
         ],
+      ),
+    );
+  }
+}
+
+/// "Açık Tutar" call-to-action — adds an ad-hoc charge to the active
+/// ticket without going through the menu (catering, custom requests,
+/// anything not on the product grid).
+class _OpenItemRow extends StatelessWidget {
+  const _OpenItemRow();
+
+  String _label(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
+    switch (lang) {
+      case 'de':
+        return 'Offener Betrag';
+      case 'en':
+        return 'Open Item';
+      case 'fr':
+        return 'Montant libre';
+      case 'it':
+        return 'Importo libero';
+      default:
+        return 'Açık Tutar';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: GcColors.surfaceContainer,
+      child: InkWell(
+        onTap: () => showOpenItemDialog(context),
+        child: Padding(
+          padding: AppInsets.h16v12,
+          child: Row(
+            children: [
+              const Icon(
+                Icons.add_circle_outline_rounded,
+                color: GcColors.primary,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _label(context),
+                style: GcText.button.copyWith(
+                  fontSize: 13,
+                  color: GcColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
