@@ -112,7 +112,9 @@
     "settingsIntegrations": "Integrations",
     "settingsAudit": "Audit Log",
     "comingSoon": "Coming soon",
-    "comingSoonHint": "This feature is under development. Outside pilot scope."
+    "comingSoonHint": "This feature is under development. Outside pilot scope.",
+    "tenants": "Tenants",
+    "superAdmin": "Super Admin"
   },
   "dashboard": {
     "todayRevenue": "Today's Revenue",
@@ -170,7 +172,33 @@
     "isRequired": "Required",
     "lockedBadge": "HQ Locked",
     "localBadge": "Local",
-    "lockedTooltip": "This product is locked by Headquarters (HQ)"
+    "lockedTooltip": "This product is locked by Headquarters (HQ)",
+    "import": {
+      "headerButton": "Import from Gastro Hub",
+      "title": "Import menu from Gastro Hub",
+      "codePlaceholder": "XXX-XXX",
+      "steps": { "input": "Code", "preview": "Preview", "result": "Result" },
+      "step1": {
+        "heading": "Enter connection code",
+        "description": "If you previously set up your menu on gastro.2hub.ch, generate a connection code there and paste it here. Your existing menu will be copied to the POS system.",
+        "codeLabel": "Connection code",
+        "codeHint": "Format: XXX-XXX (e.g. M7K-9PQ). Codes are valid for 15 minutes.",
+        "previewButton": "Get preview"
+      },
+      "step2": { "heading": "Preview", "description": "Review what will be imported before continuing.", "applyButton": "Import" },
+      "step3": {
+        "heading": "Menu imported successfully",
+        "description": "Your menu was successfully copied from Gastro Hub.",
+        "categories": "Categories", "products": "Products", "modifiers": "Modifier groups",
+        "updated": "updated", "linkedAt": "Linked at", "syncEventId": "Sync event ID", "viewMenuButton": "View menu"
+      },
+      "preview": {
+        "categories": "Categories", "products": "Products", "modifiers": "Modifier groups",
+        "new": "new", "update": "update", "unchanged": "unchanged", "skip": "skipped", "error": "errors",
+        "warnings": "Warnings", "rowReport": "Detailed report ({count} rows)",
+        "recordCol": "Record", "statusCol": "Status", "moreRows": "more rows"
+      }
+    }
   },
   "orders": {
     "title": "Orders",
@@ -523,7 +551,29 @@
     "credentialTitle": "New password",
     "credentialSubtitle": "This password is shown only once. Share via a secure channel.",
     "credentialWarning": "After closing, the password cannot be retrieved. Have the user change it on first login.",
-    "copyAction": "Copy"
+    "copyAction": "Copy",
+    "tabAdmin": "Backoffice Users",
+    "tabStaff": "POS Staff",
+    "staffSubtitle": "Staff that sign in to the POS, waiter and kitchen apps. A PIN enables fast user-switching on a shared tablet.",
+    "addStaff": "New staff",
+    "editStaff": "Edit staff",
+    "addStaffSubtitle": "Create a new POS user",
+    "editStaffSubtitle": "Update staff details",
+    "staffSearchPlaceholder": "Search name or email…",
+    "staffEmptyState": "No staff yet",
+    "staffEmailPlaceholder": "Optional",
+    "resetPinAction": "Reset PIN",
+    "setNewPassword": "Set a new password",
+    "passwordLabel": "Password",
+    "pinLabel": "PIN (4-6 digits)",
+    "pinPlaceholder": "Optional — for fast switch on a tablet",
+    "pinPlaceholderEdit": "New PIN (to change)",
+    "pinHint": "The PIN enables fast user-switching on a shared tablet.",
+    "roleManager": "Manager",
+    "roleCashier": "Cashier",
+    "roleWaiter": "Waiter",
+    "roleKitchen": "Kitchen",
+    "roleKiosk": "Kiosk"
   }
 ,
   "masterProducts": {
@@ -687,5 +737,30 @@
     "addonHqDesc": "Multi-restaurant chain with master menu cascade.",
     "addonBrandingName": "Custom Branding",
     "addonBrandingDesc": "Your logo + colors on the receipts and online ordering."
+  },
+  "admin": {
+    "tenants": {
+      "title": "Manage Tenants",
+      "subtitle": "Temporarily log in as any tenant's admin to investigate and assist.",
+      "col": {
+        "tenant": "Restaurant",
+        "owner": "Owner / Admin",
+        "adminCount": "Admins",
+        "lastActive": "Last active",
+        "action": "Action"
+      },
+      "login": "Login as User",
+      "loggingIn": "Redirecting…",
+      "noOwner": "No admin",
+      "noOwnerError": "Tenant {tenant} has no admin user.",
+      "empty": "No tenants yet.",
+      "footer": "Each impersonation expires after 15 minutes and is recorded in the audit log.",
+      "genericError": "Could not log in. Please try again."
+    }
+  },
+  "impersonation": {
+    "activeAs": "You are logged in as <target>{targetEmail}</target> (Super Admin: <super>{superAdminEmail}</super>).",
+    "exitButton": "Exit",
+    "exiting": "Exiting…"
   }
 }

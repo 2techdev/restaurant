@@ -19,6 +19,7 @@ import {
   UserCog,
   Landmark,
   BarChart4,
+  ShieldCheck,
   ChevronRight,
   Plus,
   type LucideIcon,
@@ -49,6 +50,7 @@ const ICONS: Record<string, LucideIcon> = {
   UserCog,
   Landmark,
   BarChart4,
+  ShieldCheck,
 };
 
 // v2 storage schema: separate "manually overridden" set from the auto-open
@@ -90,12 +92,25 @@ function groupContainsActive(group: NavGroup, locale: string, pathname: string):
   return group.items.some((it) => isItemActive(pathOf(it.href(locale)), pathname));
 }
 
-export function Sidebar({ locale, role }: { locale: string; role: UserRole | string }) {
+export function Sidebar({
+  locale,
+  role,
+  isSuperAdmin = false,
+}: {
+  locale: string;
+  role: UserRole | string;
+  /** Renders nav entries with `superAdminOnly: true` (F1 — migration 024). */
+  isSuperAdmin?: boolean;
+}) {
   const t = useTranslations("nav");
   const pathname = usePathname();
   const isHq = canManageHq(role);
 
-  const visible = NAV_CONFIG.filter((e) => !e.hqOnly || isHq);
+  const visible = NAV_CONFIG.filter((e) => {
+    if (e.hqOnly && !isHq) return false;
+    if (e.kind === "leaf" && e.superAdminOnly && !isSuperAdmin) return false;
+    return true;
+  });
 
   const [state, setState] = React.useState<ExpansionState>(EMPTY_STATE);
   const [hydrated, setHydrated] = React.useState(false);

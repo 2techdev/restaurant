@@ -112,7 +112,9 @@
     "settingsIntegrations": "Integrations",
     "settingsAudit": "Journal d'audit",
     "comingSoon": "Bientot disponible",
-    "comingSoonHint": "Fonctionnalite en cours de developpement. Hors du perimetre pilote."
+    "comingSoonHint": "Fonctionnalite en cours de developpement. Hors du perimetre pilote.",
+    "tenants": "Tenants",
+    "superAdmin": "Super Admin"
   },
   "dashboard": {
     "todayRevenue": "Chiffre d'affaires aujourd'hui",
@@ -170,7 +172,33 @@
     "isRequired": "Obligatoire",
     "lockedBadge": "Verrouillé HQ",
     "localBadge": "Local",
-    "lockedTooltip": "Ce produit est verrouillé par le siège (HQ)"
+    "lockedTooltip": "Ce produit est verrouillé par le siège (HQ)",
+    "import": {
+      "headerButton": "Importer depuis Gastro Hub",
+      "title": "Importer le menu depuis Gastro Hub",
+      "codePlaceholder": "XXX-XXX",
+      "steps": { "input": "Code", "preview": "Aperçu", "result": "Résultat" },
+      "step1": {
+        "heading": "Saisir le code de liaison",
+        "description": "Si vous avez déjà configuré votre menu sur gastro.2hub.ch, générez un code de liaison et collez-le ici. Votre menu sera copié dans le système POS.",
+        "codeLabel": "Code de liaison",
+        "codeHint": "Format : XXX-XXX (ex. M7K-9PQ). Les codes sont valides 15 minutes.",
+        "previewButton": "Obtenir l'aperçu"
+      },
+      "step2": { "heading": "Aperçu", "description": "Vérifiez ce qui sera importé avant de continuer.", "applyButton": "Importer" },
+      "step3": {
+        "heading": "Menu importé avec succès",
+        "description": "Votre menu a été copié depuis Gastro Hub.",
+        "categories": "Catégories", "products": "Produits", "modifiers": "Groupes de modificateurs",
+        "updated": "mis à jour", "linkedAt": "Lié le", "syncEventId": "ID d'événement sync", "viewMenuButton": "Voir le menu"
+      },
+      "preview": {
+        "categories": "Catégories", "products": "Produits", "modifiers": "Groupes de modificateurs",
+        "new": "nouveau", "update": "mise à jour", "unchanged": "inchangé", "skip": "ignoré", "error": "erreurs",
+        "warnings": "Avertissements", "rowReport": "Rapport détaillé ({count} lignes)",
+        "recordCol": "Enregistrement", "statusCol": "Statut", "moreRows": "lignes supplémentaires"
+      }
+    }
   },
   "orders": {
     "title": "Commandes",
@@ -523,7 +551,29 @@
     "credentialTitle": "Nouveau mot de passe",
     "credentialSubtitle": "Ce mot de passe ne s'affiche qu'une fois. Transmettez-le via un canal securise.",
     "credentialWarning": "Une fois ferme, le mot de passe ne pourra plus etre affiche. A changer des la premiere connexion.",
-    "copyAction": "Copier"
+    "copyAction": "Copier",
+    "tabAdmin": "Comptes Backoffice",
+    "tabStaff": "Personnel POS",
+    "staffSubtitle": "Personnel qui se connecte aux applis POS, salle et cuisine. Un PIN permet de basculer rapidement entre utilisateurs sur une tablette partagée.",
+    "addStaff": "Nouveau personnel",
+    "editStaff": "Modifier le personnel",
+    "addStaffSubtitle": "Créer un nouvel utilisateur POS",
+    "editStaffSubtitle": "Mettre à jour les informations du personnel",
+    "staffSearchPlaceholder": "Rechercher nom ou e-mail…",
+    "staffEmptyState": "Aucun personnel pour l'instant",
+    "staffEmailPlaceholder": "Optionnel",
+    "resetPinAction": "Réinitialiser le PIN",
+    "setNewPassword": "Définir un nouveau mot de passe",
+    "passwordLabel": "Mot de passe",
+    "pinLabel": "PIN (4-6 chiffres)",
+    "pinPlaceholder": "Optionnel — pour basculer vite sur tablette",
+    "pinPlaceholderEdit": "Nouveau PIN (pour changer)",
+    "pinHint": "Le PIN permet de basculer rapidement entre utilisateurs sur une tablette partagée.",
+    "roleManager": "Manager",
+    "roleCashier": "Caissier",
+    "roleWaiter": "Serveur",
+    "roleKitchen": "Cuisine",
+    "roleKiosk": "Kiosque"
   }
 ,
   "masterProducts": {
@@ -687,5 +737,30 @@
     "addonHqDesc": "Multi-restaurant chain with master menu cascade.",
     "addonBrandingName": "Custom Branding",
     "addonBrandingDesc": "Your logo + colors on the receipts and online ordering."
+  },
+  "admin": {
+    "tenants": {
+      "title": "Gérer les Tenants",
+      "subtitle": "Connectez-vous temporairement à n'importe quel compte admin pour aider.",
+      "col": {
+        "tenant": "Restaurant",
+        "owner": "Propriétaire / Admin",
+        "adminCount": "Admins",
+        "lastActive": "Dernière activité",
+        "action": "Action"
+      },
+      "login": "Se connecter en tant qu'utilisateur",
+      "loggingIn": "Redirection…",
+      "noOwner": "Aucun admin",
+      "noOwnerError": "Le restaurant {tenant} n'a pas d'utilisateur admin.",
+      "empty": "Aucun tenant.",
+      "footer": "Chaque session expire après 15 minutes et est enregistrée dans le journal d'audit.",
+      "genericError": "Connexion impossible. Veuillez réessayer."
+    }
+  },
+  "impersonation": {
+    "activeAs": "Vous êtes connecté en tant que <target>{targetEmail}</target> (Super Admin : <super>{superAdminEmail}</super>).",
+    "exitButton": "Quitter",
+    "exiting": "Sortie…"
   }
 }

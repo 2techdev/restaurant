@@ -26,6 +26,16 @@ type Claims struct {
 	OrganizationID string `json:"organization_id,omitempty"`
 	OrgRole        string `json:"org_role,omitempty"` // HQ_ADMIN | HQ_MANAGER | RESTAURANT_MANAGER | RESTAURANT_STAFF | POS_OPERATOR
 
+	// Super admin / impersonation fields (migration 024 — F1).
+	// IsSuperAdmin is set on the *normal* admin JWT for users with the
+	// admin_users.is_super_admin flag. ImpersonatedBy + ImpersonationSessionID
+	// are set on the *short-lived* impersonation JWT (15 min). Their presence
+	// flags downstream audit trails that this token acts on behalf of a super
+	// admin, not the target user themselves.
+	IsSuperAdmin           bool   `json:"is_super_admin,omitempty"`
+	ImpersonatedBy         string `json:"impersonated_by,omitempty"`
+	ImpersonationSessionID string `json:"impersonation_session_id,omitempty"`
+
 	// Standard JWT fields
 	Subject   string `json:"sub,omitempty"`
 	IssuedAt  int64  `json:"iat,omitempty"`
@@ -50,11 +60,19 @@ func NewJWTService(secret string, expiry time.Duration) *JWTService {
 // jwtHeader is the static header for HS256 JWTs.
 var jwtHeader = base64URLEncode([]byte(`{"alg":"HS256","typ":"JWT"}`))
 
-// GenerateToken creates a signed JWT with the given claims.
+// GenerateToken creates a signed JWT with the given claims using the service's
+// default expiry.
 func (s *JWTService) GenerateToken(claims Claims) (string, error) {
+	return s.GenerateTokenWithExpiry(claims, s.expiry)
+}
+
+// GenerateTokenWithExpiry creates a signed JWT with a caller-specified expiry.
+// Used by short-lived impersonation tokens (15 min) without spinning up a
+// separate JWTService instance.
+func (s *JWTService) GenerateTokenWithExpiry(claims Claims, expiry time.Duration) (string, error) {
 	now := time.Now()
 	claims.IssuedAt = now.Unix()
-	claims.ExpiresAt = now.Add(s.expiry).Unix()
+	claims.ExpiresAt = now.Add(expiry).Unix()
 	claims.Issuer = "gastrocore"
 
 	if claims.UserID != "" {
@@ -137,6 +155,15 @@ func (s *JWTService) ValidateToken(token string) (map[string]string, error) {
 	}
 	if claims.OrgRole != "" {
 		result["org_role"] = claims.OrgRole
+	}
+	if claims.IsSuperAdmin {
+		result["is_super_admin"] = "true"
+	}
+	if claims.ImpersonatedBy != "" {
+		result["impersonated_by"] = claims.ImpersonatedBy
+	}
+	if claims.ImpersonationSessionID != "" {
+		result["impersonation_session_id"] = claims.ImpersonationSessionID
 	}
 
 	return result, nil
