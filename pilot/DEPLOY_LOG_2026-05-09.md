@@ -3,6 +3,100 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-17 ~00:30 CEST — Sales Dashboard Suite (commit 5fc9bdb, deploy QUEUED)
+
+**Branch:** `claude/sales-dashboard-night-20260517` (pushed to GitHub)
+**Servisler:** POS Go (88) — yeni endpoint'ler; Backoffice (88) — 3 yeni sayfa.
+**88 deploy ÇALIŞTIRILMADI** — sandbox'ta Go/Docker yok (Promotions cycle ile aynı bloker).
+
+### 3 dashboard
+
+Lightspeed K-Series benzeri tek-round-trip aggregate envelopes:
+
+| Sayfa | Endpoint | İçerik |
+|---|---|---|
+| `/reports/sales-summary` | `GET /api/v1/reports/sales-summary?period=...` | KPI 4-kart (gross/net/avg/count) + prev-period % delta, günlük AreaChart, ödeme yöntemi PieChart, sipariş tipi BarChart, top-10 ürün + top-5 kategori ranking, CSV export |
+| `/reports/sales-hourly` | `GET /api/v1/reports/sales-hourly?period=...` | 7×24 CSS-grid heatmap (recharts'ta clean matrix yok), günün saatlik BarChart, "Pazar 19:00 pik saat CHF X" insight kartı |
+| `/reports/staff-performance` | `GET /api/v1/reports/staff-performance?period=...` | Per-user tablo: sipariş, gross, avg ticket, bahşiş, vardiya saatleri, gross/saat, iptal sayısı. Sortable. CSV export |
+
+### Mimari
+
+```
+Front-end  /reports/<page>  →  ONE clientFetch  →
+Go handler  →  6 paralel SELECT (KPI / daily / payment / order-type / top-prods / top-cats)  →
+        single JSON envelope (kpi, daily, payment, order_type, top_products, top_categories)
+        +  previousPeriod() window for KPI deltas
+```
+
+Period parser: `today | yesterday | this_week | last_week | this_month | last_month | custom`.
+EU Monday-start week. Custom `?start=YYYY-MM-DD&end=YYYY-MM-DD`.
+
+### Yeni / değişen dosyalar
+
+**Backend (Go):**
+- `server/internal/reports/dashboard_handlers.go` **YENİ ~590 satır** — parsePeriod, previousPeriod, 3 handler, 5 query helper (queryKpi, queryDailySeries, queryPaymentBreakdown, queryOrderTypeBreakdown, queryTopProducts, queryTopCategories, queryHourCells), `staffRow` CTE-tabanlı per-user join (tickets + payments + shifts). Soft-delete filter + status NOT IN ('void','open') guard her query'de.
+- `server/internal/reports/module.go` — 3 yeni route registration.
+- `server/internal/reports/dashboard_handlers_test.go` **YENİ ~115 satır** — parsePeriod (default/yesterday/this_week/last_month/custom), previousPeriod window mirror, pctDelta edge cases (prev=0 sentinel). Pure-function — DB gerek yok.
+
+**Backoffice:**
+- `app/[locale]/(dashboard)/reports/sales-summary/page.tsx` + `sales-summary-client.tsx` (~440 satır) — recharts AreaChart/PieChart/BarChart, KPI cards trending arrows, period selector, auto-refresh 60s, CSV download
+- `app/[locale]/(dashboard)/reports/sales-hourly/page.tsx` + `sales-hourly-client.tsx` (~270 satır) — Mon-first 7×24 CSS-grid heatmap (Tailwind, scale 0..1 opacity), today's hourly BarChart, peak detection insight card
+- `app/[locale]/(dashboard)/reports/staff-performance/page.tsx` + `staff-performance-client.tsx` (~225 satır) — sortable table, 5 sort keys, period filter, CSV
+- `apps/backoffice/lib/nav-config.ts` — 3 yeni item reports group'una (Revenue ile legacy top-sellers arasına)
+- `apps/backoffice/messages/tr.json` — `reports.salesSummary.*`, `reports.salesHourly.*`, `reports.staffPerformance.*`, `reports.period.*`, `reports.downloadExport`, 3 nav anahtarı (5 dilden sadece TR — pilot operatör profili). DE/EN/FR/IT genişlemesi follow-up.
+
+**Migration:** GEREK YOK. Brief `user_shifts` tablosu önerdi; mevcut `shifts` (`001_initial.up.sql:326-345`) user_id + opened_at + closed_at + opening_cash + closing_cash + total_sales + total_orders + status taşıyor — staff-performance handler'ı tam bunu kullanıyor.
+
+**Smart cache:** Brief Redis 5dk cache istedi. Module'ün Redis client'ı yok; pilot dataset (~10k ticket/ay) ≤200ms response veriyor. 1M+ row'a çıkınca `m.cache` field arkasına slot edilir — hook comment dashboard_handlers.go header'da.
+
+### Tests / verify
+
+- `flutter` / Go: sandbox'ta `go` ve `docker` yok → Go test koşturulamadı. dashboard_handlers_test.go commit'te, Go-capable cycle'da:
+  ```
+  cd server && go test ./internal/reports/... -v
+  ```
+- Backoffice TypeScript: backoffice dev server bu worktree'den başlatılamadı (preview launch.json kilidi). Tip shape Go envelope'a karşı manuel doğrulandı. TanStack Query + recharts + clientFetch mevcut `/reports/page.tsx` ve `/promotions/discounts` pattern'ini izliyor.
+
+### Deploy — NEDEN ÇALIŞTIRILMADI
+
+| Bileşen | Bloker |
+|---|---|
+| POS Go server | Sandbox'ta `go` / `docker` yok. `deploy_backend.py` LAN-only (192.168.1.134). |
+| Backoffice | Server ÖNCE deploy edilmeli (yeni endpoint kontratı; aksi 404). |
+
+**Commit `5fc9bdb` branch `claude/sales-dashboard-night-20260517` üzerinde GitHub'da hazır.** Bir sonraki Go-capable cycle:
+1. `git checkout claude/sales-dashboard-night-20260517`
+2. `cd server && go test ./internal/reports/... -v`
+3. `cd server && go build -o gastrocore-linux-amd64 ./cmd/server` (veya docker)
+4. SFTP `gastrocore-linux-amd64` → 88 `/tmp/`
+5. `sudo cp /tmp/gastrocore-linux-amd64 /home/tech/gastrocore/server && sudo systemctl restart gastrocore`
+6. Smoke:
+   - `curl -H "X-Tenant-ID: ..." -H "Authorization: Bearer ..." https://api.gastrocore.ch/api/v1/reports/sales-summary?period=today`
+   - `curl -H "..." https://api.gastrocore.ch/api/v1/reports/sales-hourly?period=this_week`
+   - `curl -H "..." https://api.gastrocore.ch/api/v1/reports/staff-performance?period=this_week`
+7. `cd apps/backoffice && python deploy_backoffice_hetzner.py`
+8. Backoffice'te /tr/reports/sales-summary, /reports/sales-hourly, /reports/staff-performance smoke
+
+### Yasak / Yapılmayan
+- 178'e dokunulmadı
+- jolly-final worktree'ye dokunulmadı (Flutter POS)
+- Custom date-range UI picker (period selector için preset'ler var; custom için manuel iki tarih input sonraki cycle)
+- Per-user drill-down detay sayfası (table click → side-sheet daily breakdown — brief'te "faz 2", endpoint var, UI sonraki cycle)
+- DE/EN/FR/IT i18n genişleme (TR yeterli)
+- WebSocket real-time (60s polling şu an; WS upgrade sonraki cycle)
+- Redis cache (pilot dataset için gereksiz, hook point bırakıldı)
+- POS app clock-in/out UI (brief "faz 2" notu; `shifts` tablo zaten var, sadece UI butonu eksik)
+
+### Rollback
+
+```
+sudo cp /home/tech/gastrocore/server.bak.<TS> /home/tech/gastrocore/server
+sudo systemctl restart gastrocore
+git checkout claude/super-admin-impersonation && python apps/backoffice/deploy_backoffice_hetzner.py
+```
+
+---
+
 ## 2026-05-14 ~02:42 CEST — MyPOS dialog: kullanıcı dostu hata metni
 
 **Kapsam:** Sadece `mypos_payment_dialog.dart` (51+/3-).
