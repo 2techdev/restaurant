@@ -3,6 +3,76 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-18 ~14:48 CEST — HACCP düzeltme: 134'ten temizlik + 88'e gerçek prod deploy
+
+**Düzeltme:** Aşağıdaki HACCP entry'sinde backend hedef yanlış yazılmıştı (192.168.1.134 — test server). Kullanıcının prod POS Go server'ı **88.99.190.108** (gastro.2hub.ch / api.gastrocore.ch). 134 temizlendi, 88'e gerçek prod deploy yapıldı.
+
+### 134 cleanup (test server, kullanılmıyor)
+
+- `docker rm -f gastrocore-server` — yeni HACCP container'ı kaldırıldı.
+- `task_templates / task_instances / task_alerts / tasks_enabled / function / trigger` 134'ün DB'sinden DROP edildi.
+- `/home/tech/gastrocore/docker-compose.yml` JWT_SECRET 29-char eski değerine geri çekildi.
+- Sonuç: 134'te sadece eski `gastrocore-db` + `gastrocore-redis` çalışıyor (8 hafta öncesinden, ben dokunmadan önceki hâli).
+
+### 88 prod deploy (doğru hedef)
+
+**Mimari (88):** Native Go binary `/home/tech/gastrocore/server`, systemd `gastrocore.service`, port 8090. `gastro-postgres` Docker container (db=`gastro`, user=`gastro`). Backoffice native Next.js standalone, systemd `backoffice.service`, port 3001. Hetzner.
+
+1. **JWT_SECRET'a DOKUNMADIM.** `/home/tech/gastrocore/.env` mtime hâlâ 2026-05-09 00:57 — 9 gündür değiştirilmemiş. 86 char (validation 32+ ister, sorun yok). **Mevcut backoffice + POS oturumları intact, re-login GEREKMİYOR.**
+
+2. **Migration 039:** `gastro-postgres` container içine `docker cp` ile gönderildi, `psql -U gastro -d gastro -v ON_ERROR_STOP=1 -1 -f` ile uygulandı, `schema_migrations` tablosuna `INSERT 0 1` ile kaydedildi. Doğrulandı:
+   - 3 tablo (task_templates, task_instances, task_alerts) ✓
+   - `tenants.tasks_enabled` column ✓
+   - `seed_default_haccp_templates(uuid)` fonksiyonu + `trg_seed_haccp_on_tenant_insert` trigger ✓
+   - 4 mevcut tenant her biri 5 default şablon (toplam 20) seedlendi ✓
+
+3. **Binary build:** 88'in en son build source tree'si `/tmp/build-gastrocore-20260518-135853/server/` cikti — kopyalandı `/tmp/build-haccp-20260518/server/`, üzerine SFTP ile `internal/tasks/*.go` + `migrations/039_*.sql` eklendi. `cmd/server/main.go`'ya 3 cerrahi yama (import + module init + RegisterRoutes + StartCron). Build: `docker run --rm -v /tmp/build-haccp-20260518/server:/src -w /src golang:1.23-alpine sh -c "go build -ldflags='-s -w' -o /src/server-new ./cmd/server"`. Çıktı: 8847512 byte binary, **`internal/partner` dahil 88'in tüm mevcut modülleri korundu**, sadece `internal/tasks` eklendi.
+
+4. **Binary swap:** İlk denemede `cp` "Text file busy" verdi (executable kullanımda) — silent fail. Doğru sıra: `systemctl stop` → `cp` → `systemctl start`. Eski binary `server.bak.20260518-pre-haccp` (8749208 byte) olarak yedeklendi.
+
+5. **Smoke (88 üzerinden):**
+
+```
+JWT_SECRET length on 88: 86 chars (.env mtime 2026-05-09 → unchanged)
+
+GET  /health                             → 200 ok
+GET  /api/v1/tasks/templates             → 401 (auth gate)
+GET  /api/v1/tasks/today                 → 401
+GET  /api/v1/tasks/reports/summary       → 401
+GET  /api/v1/tasks/alerts                → 401
+POST /api/v1/tasks/cron/run              → 401
+GET  /nope-not-a-route-xxx               → 404 (sanity: 401 catch-all yok)
+
+Backoffice → 88 API proxy:
+GET http://127.0.0.1:3001/tr/operations/tasks       → 307 (login redirect, page mounted)
+GET http://127.0.0.1:3001/de/operations/tasks       → 307
+GET http://127.0.0.1:3001/api/proxy/api/v1/tasks/templates → 401 (proxy → 8090 → auth)
+
+Running binary in /proc/<pid>/exe strings → contains "internal/tasks" (3 hits).
+ps: tech 2438857 1 0 12:46 /home/tech/gastrocore/server (8847512 bytes, May 18 12:46).
+```
+
+### Rollback (88'de bir şey ters giderse)
+
+```bash
+ssh tech@88.99.190.108 'sudo systemctl stop gastrocore.service \
+  && cp /home/tech/gastrocore/server.bak.20260518-pre-haccp /home/tech/gastrocore/server \
+  && sudo systemctl start gastrocore.service'
+
+# Migration geri al (yeni veri kaybı kabul edilebilirse):
+ssh tech@88.99.190.108 'docker exec -i gastro-postgres psql -U gastro -d gastro -c "
+  DROP TRIGGER IF EXISTS trg_seed_haccp_on_tenant_insert ON tenants;
+  DROP FUNCTION IF EXISTS tg_seed_haccp_on_tenant_insert();
+  DROP FUNCTION IF EXISTS seed_default_haccp_templates(UUID);
+  ALTER TABLE tenants DROP COLUMN IF EXISTS tasks_enabled;
+  DROP TABLE IF EXISTS task_alerts, task_instances, task_templates CASCADE;
+  DELETE FROM schema_migrations WHERE version=''039_haccp_tasks'';"'
+```
+
+### Açık noktalar (önceki entry'de listelenenler aynen geçerli)
+
+POS Flutter entegrasyonu (faz 2), foto upload endpoint, tenant feature toggle UI — değişiklik yok.
+
 ## 2026-05-18 ~13:10 CEST — HACCP Digital Checklist Module (migration 039 + backoffice + cron) — deployed
 
 **Kapsam:** Backend Go server (192.168.1.134, port 8090) + Backoffice (88.99.190.108, systemd `backoffice.service`). POS Flutter app dokunulmadı — POS entegrasyonu faz 2 (ayrı session).
