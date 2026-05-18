@@ -14,7 +14,9 @@ import (
 
 	"github.com/gastrocore/server/internal/audit"
 	"github.com/gastrocore/server/internal/auth"
+	"github.com/gastrocore/server/internal/bexio"
 	"github.com/gastrocore/server/internal/crm"
+	"github.com/gastrocore/server/internal/customer_analytics"
 	"github.com/gastrocore/server/internal/dashboard"
 	"github.com/gastrocore/server/internal/devices"
 	"github.com/gastrocore/server/internal/docs"
@@ -24,11 +26,15 @@ import (
 	"github.com/gastrocore/server/internal/kds"
 	"github.com/gastrocore/server/internal/license"
 	"github.com/gastrocore/server/internal/licenses"
+	"github.com/gastrocore/server/internal/loyalty"
+	"github.com/gastrocore/server/internal/manager_mobile"
 	"github.com/gastrocore/server/internal/menu"
 	"github.com/gastrocore/server/internal/notifications"
 	"github.com/gastrocore/server/internal/online"
+	"github.com/gastrocore/server/internal/order_profiles"
 	"github.com/gastrocore/server/internal/orders"
 	"github.com/gastrocore/server/internal/org"
+	"github.com/gastrocore/server/internal/osd"
 	"github.com/gastrocore/server/internal/pos"
 	"github.com/gastrocore/server/internal/printers"
 	"github.com/gastrocore/server/internal/promotions"
@@ -38,10 +44,13 @@ import (
 	"github.com/gastrocore/server/internal/reservations"
 	"github.com/gastrocore/server/internal/shared/config"
 	"github.com/gastrocore/server/internal/shared/database"
+	"github.com/gastrocore/server/internal/shared/i18n"
+	"github.com/gastrocore/server/internal/shared/metrics"
 	"github.com/gastrocore/server/internal/shared/middleware"
 	"github.com/gastrocore/server/internal/stations"
 	"github.com/gastrocore/server/internal/stores"
 	"github.com/gastrocore/server/internal/suppliers"
+	"github.com/gastrocore/server/internal/tasks"
 	"github.com/gastrocore/server/internal/users"
 	gosync "github.com/gastrocore/server/internal/sync"
 	"github.com/gastrocore/server/internal/tables"
@@ -130,6 +139,15 @@ func main() {
 	// Swiss-compliant receipt templates (020)
 	receiptTemplatesModule := receipt_templates.NewModule(db)
 
+	// Night-sprint stub modules (parallel sessions wire model+logic later).
+	loyaltyModule := loyalty.NewModule(db)
+	orderProfilesModule := order_profiles.NewModule(db)
+	tasksModule := tasks.NewModule(db)
+	bexioModule := bexio.NewModule(db)
+	osdModule := osd.NewModule(db)
+	managerMobileModule := manager_mobile.NewModule(db)
+	customerAnalyticsModule := customer_analytics.NewModule(db)
+
 	// ---------------------------------------------------------------------------
 	// Build router
 	// ---------------------------------------------------------------------------
@@ -206,6 +224,19 @@ func main() {
 	// Receipt templates (020) — Swiss MWST-compliant printable layouts
 	receiptTemplatesModule.RegisterRoutes(mux)
 
+	// Night-sprint stubs (501 Not Implemented; replaced piecemeal).
+	loyaltyModule.RegisterRoutes(mux)
+	orderProfilesModule.RegisterRoutes(mux)
+	tasksModule.RegisterRoutes(mux)
+	bexioModule.RegisterRoutes(mux)
+	osdModule.RegisterRoutes(mux)
+	managerMobileModule.RegisterRoutes(mux)
+	customerAnalyticsModule.RegisterRoutes(mux)
+
+	// Prometheus exposition + DB pool sampling.
+	metrics.Register(mux, db)
+	middleware.SetRequestRecorder(metrics.RecordRequest)
+
 	// ---------------------------------------------------------------------------
 	// Middleware chain
 	// ---------------------------------------------------------------------------
@@ -241,11 +272,15 @@ func main() {
 	authGate := middleware.Middleware(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			path := r.URL.Path
-			if !strings.HasPrefix(path, "/api/v1/") ||
+			// JWT applies to /api/v1/* and /admin/* except the public carve-outs.
+			needsAuth := strings.HasPrefix(path, "/api/v1/") || strings.HasPrefix(path, "/admin/")
+			if !needsAuth ||
 				strings.HasPrefix(path, "/api/v1/online/") ||
 				strings.HasPrefix(path, "/api/v1/menu/version/") ||
 				strings.HasPrefix(path, "/api/v1/menu/snapshot/") ||
 				strings.HasPrefix(path, "/api/v1/receipt-templates/sync/") ||
+				strings.HasPrefix(path, "/api/v1/osd/") ||
+				path == "/admin/integrations/bexio/callback" ||
 				publicAPIPaths[path] {
 				next.ServeHTTP(w, r)
 				return
@@ -272,6 +307,8 @@ func main() {
 		securityHeadersMW,
 		corsMW,
 		middleware.MaxBodySize,
+		middleware.RequestTimeout(25*time.Second),
+		i18n.Middleware,
 		authEndpointLimiter,
 		rateLimiter,
 		authGate,
