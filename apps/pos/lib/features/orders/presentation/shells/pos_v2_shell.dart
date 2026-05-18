@@ -40,6 +40,7 @@ import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/theme/pos_v2_theme.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/combo_picker_dialog.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/favorites_bar.dart'
     show allActiveProductsProvider;
 import 'package:gastrocore_pos/features/orders/presentation/widgets/shell/order_panel.dart'
@@ -2815,6 +2816,10 @@ class _SchnellBar extends ConsumerWidget {
       ticket = ref.read(currentTicketProvider);
     }
     if (ticket == null) return;
+    if (product.isCombo) {
+      await showComboPickerDialog(context, comboProduct: product);
+      return;
+    }
     notifier.addItem(product, course: gang);
   }
 }
@@ -2958,6 +2963,10 @@ class _ItemsGrid extends ConsumerWidget {
       ticket = ref.read(currentTicketProvider);
     }
     if (ticket == null) return;
+    if (product.isCombo) {
+      await showComboPickerDialog(context, comboProduct: product);
+      return;
+    }
     notifier.addItem(product, course: gang);
   }
 }

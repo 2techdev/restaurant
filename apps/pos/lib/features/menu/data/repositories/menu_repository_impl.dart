@@ -10,6 +10,7 @@ import 'package:drift/drift.dart';
 import 'package:gastrocore_pos/core/database/app_database.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
+import 'package:gastrocore_pos/features/menu/domain/entities/combo_item_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/modifier_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_specification_entity.dart';
@@ -736,5 +737,34 @@ class MenuRepositoryImpl {
       isDefault: row.isDefault,
       displayOrder: row.displayOrder,
     );
+  }
+
+  // =========================================================================
+  // Combos — component lookup for set-menu pickers
+  // =========================================================================
+
+  /// Load every component row attached to [comboProductId] in
+  /// `display_order` order. Empty list when the product isn't a combo or
+  /// has no rows yet (e.g. seed forgot to add components).
+  Future<List<ComboItemEntity>> getComboItems(String comboProductId) async {
+    final query = _db.select(_db.comboItems)
+      ..where((c) => c.comboProductId.equals(comboProductId))
+      ..orderBy([
+        (c) => OrderingTerm(expression: c.displayOrder),
+      ]);
+    final rows = await query.get();
+    return rows
+        .map((r) => ComboItemEntity(
+              id: r.id,
+              tenantId: r.tenantId,
+              comboProductId: r.comboProductId,
+              itemProductId: r.itemProductId,
+              quantity: r.quantity,
+              groupName: r.groupName,
+              isRequired: r.isRequired,
+              canSubstitute: r.canSubstitute,
+              displayOrder: r.displayOrder,
+            ))
+        .toList();
   }
 }

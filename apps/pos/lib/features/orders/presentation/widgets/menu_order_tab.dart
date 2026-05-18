@@ -16,6 +16,7 @@ import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provide
 import 'package:gastrocore_pos/features/orders/domain/entities/order_item_entity.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
+import 'package:gastrocore_pos/features/orders/presentation/widgets/combo_picker_dialog.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/modifier_dialog.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/menu_settings_dialog.dart';
 import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
@@ -171,6 +172,13 @@ class _MenuOrderTabState extends ConsumerState<MenuOrderTab>
 
   Future<void> _onProductTapped(ProductEntity product) async {
     final categoryGangId = _categoryGangId(product.categoryId);
+
+    // Combo / set menu — open the component picker. The picker itself
+    // handles adding the parent + each chosen component to the ticket.
+    if (product.isCombo) {
+      await showComboPickerDialog(context, comboProduct: product);
+      return;
+    }
 
     if (product.modifierGroups.isNotEmpty) {
       final modifierGroups = ModifierGroupData.fromProductEntity(product);
