@@ -252,6 +252,20 @@ class OrderRepositoryImpl {
     );
   }
 
+  /// Attach or detach a loyalty customer from a persisted ticket.
+  ///
+  /// Pass `null` to unlink. Used by the topbar customer chip in the POS
+  /// shell so the link survives an app restart. Drafts don't call here —
+  /// they fold the customer id into the initial createTicket payload.
+  Future<void> setTicketCustomer(String id, String? customerId) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
+      TicketsCompanion(
+        customerId: Value(customerId),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   // =========================================================================
   // Order items
   // =========================================================================

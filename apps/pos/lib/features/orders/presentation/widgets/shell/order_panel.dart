@@ -19,6 +19,7 @@ import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dar
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/open_item_dialog.dart';
 import 'package:gastrocore_pos/features/settings/domain/entities/restaurant_settings.dart';
+import 'package:gastrocore_pos/features/settings/domain/service_charge.dart';
 import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 import 'package:gastrocore_pos/l10n/app_localizations.dart';
 
@@ -374,13 +375,13 @@ class _GangGroupedList extends ConsumerWidget {
     final states = ref
             .watch(orderGangStatesProvider(ticket.id))
             .valueOrNull ??
-        const [];
+        const <String, OrderGangStateEntity>{};
     final statusByCourse = <int, GangOrderStatus>{};
     if (templates.isNotEmpty && states.isNotEmpty) {
       final sortByTemplateId = <String, int>{
         for (final t in templates) t.id: t.sortOrder,
       };
-      for (final s in states) {
+      for (final s in states.values) {
         final course = sortByTemplateId[s.gangTemplateId];
         if (course != null) statusByCourse[course] = s.status;
       }
@@ -832,22 +833,40 @@ class _SeatPickerSheet extends StatelessWidget {
 // Totals footer — Balance Due in Work Sans Black
 // ---------------------------------------------------------------------------
 
-class _TotalsFooter extends StatelessWidget {
+class _TotalsFooter extends ConsumerWidget {
   const _TotalsFooter({required this.ticket});
   final TicketEntity? ticket;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final subtotal = ticket?.subtotal ?? 0;
-    final total = ticket?.total ?? 0;
-    final serviceFee = ticket?.serviceFeeAmount ?? 0;
     final tax = ticket?.taxAmount ?? 0;
 
-    // POS v2: show Netto / MWST (8.1% inkl.) / Zu bezahlen as an inline
-    // three-row block. The subtotal field already stores the gross (MWST
-    // included), so Netto = subtotal − tax. Keeping this math in the view
-    // avoids another domain field for pilot; a later sprint can compute it
-    // on the entity.
+    // POS v2: show Netto / Service / MWST / Zu bezahlen as an inline
+    // block. The subtotal field already stores the gross (MWST inkl).
+    // Service charge is derived live from RestaurantSettings here —
+    // ticket.serviceFeeAmount stays as the persisted value stamped at
+    // payment time so historical receipts don't drift.
+    final settings = ref.watch(restaurantSettingsProvider).valueOrNull;
+    final liveServiceFee = computeServiceFeeAmount(
+      subtotalCents: subtotal,
+      settings: settings,
+    );
+    // Prefer the persisted ticket value once it has been stamped (>0),
+    // otherwise show the live preview as the operator builds the cart.
+    final serviceFee = (ticket?.serviceFeeAmount ?? 0) > 0
+        ? ticket!.serviceFeeAmount
+        : liveServiceFee;
+
+    final ticketTotal = ticket?.total ?? 0;
+    // Live preview while building the cart: ticket.total doesn't include
+    // the unstamped service charge, so add it here so the cashier sees
+    // the real number the customer will pay.
+    final total = ticketTotal +
+        (ticket != null && ticket!.serviceFeeAmount == 0
+            ? liveServiceFee
+            : 0);
+
     final netto = subtotal - tax;
     return Container(
       color: GcColors.surfaceContainerHigh,
@@ -856,7 +875,13 @@ class _TotalsFooter extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _row('Netto', netto),
-          if (serviceFee > 0) _row('Service', serviceFee),
+          if (serviceFee > 0)
+            _row(
+              settings != null && settings.serviceChargePercent > 0
+                  ? 'Service ${_fmtPercent(settings.serviceChargePercent)}%'
+                  : 'Service',
+              serviceFee,
+            ),
           if (tax > 0) _row('MWST 8.1 % (inkl.)', tax, dim: true),
           const SizedBox(height: AppTokens.space8),
           Container(
@@ -882,6 +907,12 @@ class _TotalsFooter extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static String _fmtPercent(double pct) {
+    return pct.truncateToDouble() == pct
+        ? pct.toStringAsFixed(0)
+        : pct.toStringAsFixed(1);
   }
 
   Widget _row(String label, int cents, {bool dim = false}) {

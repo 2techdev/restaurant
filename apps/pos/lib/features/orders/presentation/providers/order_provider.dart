@@ -13,6 +13,9 @@ import 'package:gastrocore_pos/core/printing/models/print_models.dart';
 import 'package:gastrocore_pos/core/printing/providers/print_use_case_provider.dart';
 import 'package:gastrocore_pos/core/utils/id_generator.dart';
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
+import 'package:gastrocore_pos/features/gang/data/gang_repository.dart';
+import 'package:gastrocore_pos/features/gang/presentation/providers/gang_provider.dart';
+import 'package:gastrocore_pos/features/gang/domain/entities/gang_template_entity.dart';
 import 'package:gastrocore_pos/features/kitchen/domain/entities/kitchen_ticket_entity.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/providers/kitchen_provider.dart';
 import 'package:gastrocore_pos/features/orders/data/repositories/order_repository_impl.dart';
@@ -27,6 +30,8 @@ import 'package:gastrocore_pos/features/overrides/domain/entities/override_actio
 import 'package:gastrocore_pos/features/overrides/presentation/providers/override_provider.dart';
 import 'package:gastrocore_pos/features/pricing/application/happy_hour_evaluator.dart';
 import 'package:gastrocore_pos/features/pricing/providers/happy_hour_provider.dart';
+import 'package:gastrocore_pos/features/settings/domain/service_charge.dart';
+import 'package:gastrocore_pos/features/settings/presentation/providers/settings_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Swiss VAT configuration (effective 2024-01-01)
@@ -397,6 +402,20 @@ class CurrentTicketNotifier extends StateNotifier<TicketEntity?> {
     if (state == null) return null;
 
     final repo = _ref.read(orderRepositoryProvider);
+
+    // Stamp service charge from settings on first save so the receipt and
+    // payment screens read a stable value (settings can change mid-day
+    // but a ticket's service-fee snapshot must not drift).
+    if (state!.serviceFeeAmount == 0) {
+      final settings = _ref.read(restaurantSettingsProvider).valueOrNull;
+      final fee = computeServiceFeeAmount(
+        subtotalCents: state!.subtotal,
+        settings: settings,
+      );
+      if (fee > 0) {
+        state = state!.copyWith(serviceFeeAmount: fee);
+      }
+    }
 
     // If ticket is still a draft (never persisted), create it
     if (state!.status == TicketStatus.draft) {
