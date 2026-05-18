@@ -31,11 +31,15 @@ import {
   Plus,
   Send,
   Receipt,
+  User as UserIcon,
+  Pizza,
+  Folder,
   type LucideIcon,
 } from "lucide-react";
 import { useTenant } from "./tenant-context";
 import { canManageHq } from "@/lib/roles";
 import { NAV_CONFIG, type NavEntry } from "@/lib/nav-config";
+import { clientFetch } from "@/lib/api-client";
 
 const ICONS: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -59,10 +63,20 @@ interface PaletteContextValue {
 }
 const PaletteCtx = React.createContext<PaletteContextValue | null>(null);
 
+interface DynamicIndex {
+  products: Array<{ id: string; name: string }>;
+  categories: Array<{ id: string; name: string }>;
+  users: Array<{ id: string; name: string; email?: string }>;
+}
+
+const EMPTY_INDEX: DynamicIndex = { products: [], categories: [], users: [] };
+
 /**
  * Singleton command palette mounted once at the dashboard layout. Bound to
  * ⌘K / Ctrl+K globally; topbar search box opens the same dialog via
- * usePalette().
+ * usePalette(). Lazily fetches a per-tenant index (products / categories /
+ * team users) the first time the palette opens, then reuses it for the
+ * rest of the session — refreshed when the active tenant changes.
  */
 export function CommandPaletteProvider({
   locale,
@@ -71,12 +85,16 @@ export function CommandPaletteProvider({
   locale: string;
   children: React.ReactNode;
 }) {
-  const t = useTranslations("nav");
+  const tNav = useTranslations("nav");
+  const tCmd = useTranslations("cmdk");
   const router = useRouter();
   const tenant = useTenant();
   const isHq = canManageHq(tenant.user.role);
 
   const [open, setOpen] = React.useState(false);
+  const [index, setIndex] = React.useState<DynamicIndex>(EMPTY_INDEX);
+  const [indexLoaded, setIndexLoaded] = React.useState<string | null>(null);
+  const activeTenantId = tenant.activeTenantId;
 
   // Global keyboard shortcut: ⌘K (mac) / Ctrl+K (everyone else).
   React.useEffect(() => {
@@ -89,6 +107,38 @@ export function CommandPaletteProvider({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Lazy fetch the dynamic index when palette first opens (or active tenant
+  // changes). 401s collapse to empty so the static nav is still useful.
+  React.useEffect(() => {
+    if (!open) return;
+    if (indexLoaded === activeTenantId) return;
+    let alive = true;
+    (async () => {
+      const safe = async <T,>(p: Promise<T>): Promise<T | null> => {
+        try { return await p; } catch { return null; }
+      };
+      const [products, categories, users] = await Promise.all([
+        safe(clientFetch<{ products?: Array<{ id: string; name: string }> } | Array<{ id: string; name: string }>>({ path: "/menu/products" })),
+        safe(clientFetch<{ categories?: Array<{ id: string; name: string }> } | Array<{ id: string; name: string }>>({ path: "/menu/categories" })),
+        safe(clientFetch<Array<{ id: string; name: string; email?: string }>>({ path: "/users" })),
+      ]);
+      if (!alive) return;
+      const unwrap = <T,>(x: unknown, key: string): T[] => {
+        if (Array.isArray(x)) return x as T[];
+        const obj = x as Record<string, unknown> | null | undefined;
+        const arr = obj?.[key];
+        return Array.isArray(arr) ? (arr as T[]) : [];
+      };
+      setIndex({
+        products:   unwrap<{ id: string; name: string }>(products,   "products"),
+        categories: unwrap<{ id: string; name: string }>(categories, "categories"),
+        users:      unwrap<{ id: string; name: string; email?: string }>(users, "data"),
+      });
+      setIndexLoaded(activeTenantId);
+    })();
+    return () => { alive = false; };
+  }, [open, indexLoaded, activeTenantId]);
 
   const ctxValue = React.useMemo<PaletteContextValue>(
     () => ({ open: () => setOpen(true) }),
@@ -117,7 +167,7 @@ export function CommandPaletteProvider({
       if (entry.kind === "leaf") {
         items.push({
           key: entry.labelKey,
-          label: t(entry.labelKey),
+          label: tNav(entry.labelKey),
           href: entry.href(locale),
           icon: Icon,
         });
@@ -125,7 +175,7 @@ export function CommandPaletteProvider({
         for (const sub of entry.items) {
           items.push({
             key: `${entry.id}:${sub.labelKey}`,
-            label: `${t(entry.labelKey)} → ${t(sub.labelKey)}`,
+            label: `${tNav(entry.labelKey)} → ${tNav(sub.labelKey)}`,
             href: sub.href(locale),
             icon: Icon,
           });
@@ -133,38 +183,38 @@ export function CommandPaletteProvider({
       }
     }
     return items;
-  }, [t, locale, isHq]);
+  }, [tNav, locale, isHq]);
 
   return (
     <PaletteCtx.Provider value={ctxValue}>
       {children}
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Sayfa, eylem veya restoran ara…" />
+        <CommandInput placeholder={tCmd("placeholder")} />
         <CommandList>
-          <CommandEmpty>Sonuç bulunamadı</CommandEmpty>
+          <CommandEmpty>{tCmd("noResults")}</CommandEmpty>
 
-          <CommandGroup heading="Hızlı eylemler">
+          <CommandGroup heading={tCmd("groupQuickActions")}>
             <CommandItem onSelect={() => go(`/${locale}/orders/new`)}>
               <Plus />
-              <span>Yeni Sipariş</span>
+              <span>{tCmd("actionNewOrder")}</span>
               <CommandShortcut>N O</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => go(`/${locale}/menu/publish-history`)}
             >
               <Send />
-              <span>Menü Yayınla</span>
+              <span>{tCmd("actionPublishMenu")}</span>
               <CommandShortcut>P M</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => go(`/${locale}/reports/mwst`)}>
               <Receipt />
-              <span>Vergi Raporu Çıkar (MWST)</span>
+              <span>{tCmd("actionMwstReport")}</span>
             </CommandItem>
           </CommandGroup>
 
           <CommandSeparator />
 
-          <CommandGroup heading="Sayfalara git">
+          <CommandGroup heading={tCmd("groupPages")}>
             {navItems.map((it) => {
               const Icon = it.icon;
               return (
@@ -176,13 +226,71 @@ export function CommandPaletteProvider({
             })}
           </CommandGroup>
 
+          {index.products.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading={tCmd("groupProducts")}>
+                {index.products.slice(0, 50).map((p) => (
+                  <CommandItem
+                    key={`prod-${p.id}`}
+                    value={`product ${p.name}`}
+                    onSelect={() => go(`/${locale}/menu/products?focus=${p.id}`)}
+                  >
+                    <Pizza />
+                    <span>{p.name}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+
+          {index.categories.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading={tCmd("groupCategories")}>
+                {index.categories.slice(0, 30).map((c) => (
+                  <CommandItem
+                    key={`cat-${c.id}`}
+                    value={`category ${c.name}`}
+                    onSelect={() => go(`/${locale}/menu`)}
+                  >
+                    <Folder />
+                    <span>{c.name}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+
+          {index.users.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading={tCmd("groupUsers")}>
+                {index.users.slice(0, 30).map((u) => (
+                  <CommandItem
+                    key={`user-${u.id}`}
+                    value={`user ${u.name} ${u.email ?? ""}`}
+                    onSelect={() => go(`/${locale}/team`)}
+                  >
+                    <UserIcon />
+                    <span>{u.name}</span>
+                    {u.email ? (
+                      <span className="ml-auto text-xs text-muted-foreground">{u.email}</span>
+                    ) : null}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+
           {tenant.tenants.length > 0 && (
             <>
               <CommandSeparator />
-              <CommandGroup heading="Restoran değiştir">
+              <CommandGroup heading={tCmd("groupSwitchTenant")}>
                 {tenant.tenants.map((x) => (
                   <CommandItem
                     key={x.id}
+                    value={`tenant ${x.name}`}
                     onSelect={() => {
                       tenant.setActive(x.id);
                       setOpen(false);
