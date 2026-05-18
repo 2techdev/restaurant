@@ -309,3 +309,138 @@ WHERE NOT EXISTS (
     SELECT 1 FROM task_templates ex
     WHERE ex.tenant_id = t.id AND ex.name = seed.name AND ex.is_deleted = FALSE
 );
+
+-- 6. Auto-seed defaults on tenant creation.
+-- The bulk INSERT above only covers tenants that exist at migration
+-- time. The trigger below fires on tenant insert and writes the same
+-- five HACCP-standard templates for the new row. The defaults are
+-- embedded as VALUES inside the function body so cold-start installs
+-- (no tenants seeded yet) still work — i.e. a fresh DB after a new
+-- tenant onboarding ends up with the canonical catalogue.
+CREATE OR REPLACE FUNCTION seed_default_haccp_templates(p_tenant UUID)
+RETURNS void AS $$
+BEGIN
+  INSERT INTO task_templates
+      (id, tenant_id, name, name_jsonb, description, description_jsonb,
+       category, schedule_cron, items_jsonb, is_active)
+  SELECT
+      gen_random_uuid(),
+      p_tenant,
+      seed.name, seed.name_jsonb,
+      seed.description, seed.description_jsonb,
+      seed.category, seed.schedule_cron, seed.items_jsonb,
+      TRUE
+  FROM (VALUES
+      (
+        'Sabah Açılış',
+        '{"de":"Morgenöffnung","en":"Morning Opening","fr":"Ouverture du matin","it":"Apertura mattutina","tr":"Sabah Açılış"}'::jsonb,
+        'Lokal hijyen + ekipman kontrolü',
+        '{"de":"Hygiene + Geräte-Kontrolle","en":"Hygiene + equipment check","fr":"Hygiène + contrôle équipement","it":"Igiene + controllo attrezzature","tr":"Lokal hijyen + ekipman kontrolü"}'::jsonb,
+        'opening',
+        '0 6 * * *',
+        '[
+          {"id":"o1","type":"checkbox","required":true,
+            "label":{"de":"Hände gewaschen + Handschuhe getragen","en":"Hands washed + gloves on","fr":"Mains lavées + gants","it":"Mani lavate + guanti","tr":"Eller yıkandı + eldiven takıldı"}},
+          {"id":"o2","type":"temperature","required":true,
+            "label":{"de":"Kühlschrank Temperatur","en":"Fridge temperature","fr":"Température réfrigérateur","it":"Temperatura frigorifero","tr":"Buzdolabı sıcaklığı"},
+            "validation":{"min":2,"max":7,"unit":"C"}},
+          {"id":"o3","type":"checkbox","required":true,
+            "label":{"de":"Gerätekontrolle (Herd, Ofen, Grill)","en":"Equipment check (stove, oven, grill)","fr":"Contrôle équipement","it":"Controllo attrezzature","tr":"Ekipman kontrolü (ocak, fırın, ızgara)"}}
+        ]'::jsonb
+      ),
+      (
+        'Akşam Kapanış',
+        '{"de":"Abendschliessung","en":"Evening Closing","fr":"Fermeture du soir","it":"Chiusura serale","tr":"Akşam Kapanış"}'::jsonb,
+        'Temizlik + ısı + soğutma kapanış kontrolleri',
+        '{"de":"Reinigung + Temperatur + Kühlung","en":"Cleaning + temperature + refrigeration","fr":"Nettoyage + température + réfrigération","it":"Pulizia + temperatura + refrigerazione","tr":"Temizlik + ısı + soğutma"}'::jsonb,
+        'closing',
+        '0 23 * * *',
+        '[
+          {"id":"c1","type":"checkbox","required":true,
+            "label":{"de":"Arbeitsflächen gereinigt","en":"Surfaces cleaned","fr":"Surfaces nettoyées","it":"Superfici pulite","tr":"Tezgahlar temizlendi"}},
+          {"id":"c2","type":"temperature","required":true,
+            "label":{"de":"Tiefkühlfach Temperatur","en":"Freezer temperature","fr":"Température congélateur","it":"Temperatura congelatore","tr":"Deep freezer sıcaklığı"},
+            "validation":{"min":-25,"max":-18,"unit":"C"}},
+          {"id":"c3","type":"checkbox","required":true,
+            "label":{"de":"Müll entsorgt","en":"Waste removed","fr":"Déchets retirés","it":"Rifiuti smaltiti","tr":"Çöp atıldı"}},
+          {"id":"c4","type":"signature","required":true,
+            "label":{"de":"Unterschrift Schichtleiter","en":"Shift manager signature","fr":"Signature responsable","it":"Firma responsabile","tr":"Vardiya sorumlusu imzası"}}
+        ]'::jsonb
+      ),
+      (
+        'Sıcaklık Saati',
+        '{"de":"Stündliche Temperatur","en":"Hourly Temperature","fr":"Température horaire","it":"Temperatura oraria","tr":"Sıcaklık Saati"}'::jsonb,
+        'Her saat soğuk depo + deep freezer + soğuk vitrin',
+        '{"de":"Kühllager + Tiefkühl + Vitrine — stündlich","en":"Cold storage + freezer + display — hourly","fr":"Stockage froid + congélateur + vitrine","it":"Magazzino freddo + congelatore + vetrina","tr":"Soğuk depo + deep freezer + vitrin"}'::jsonb,
+        'temperature',
+        '0 6-23 * * *',
+        '[
+          {"id":"t1","type":"temperature","required":true,
+            "label":{"de":"Kühllager","en":"Cold storage","fr":"Stockage froid","it":"Magazzino freddo","tr":"Soğuk depo"},
+            "validation":{"min":2,"max":7,"unit":"C"}},
+          {"id":"t2","type":"temperature","required":true,
+            "label":{"de":"Tiefkühlfach","en":"Freezer","fr":"Congélateur","it":"Congelatore","tr":"Deep freezer"},
+            "validation":{"min":-25,"max":-18,"unit":"C"}},
+          {"id":"t3","type":"temperature","required":false,
+            "label":{"de":"Verkaufsvitrine","en":"Display fridge","fr":"Vitrine réfrigérée","it":"Vetrina refrigerata","tr":"Soğuk vitrin"},
+            "validation":{"min":4,"max":8,"unit":"C"}}
+        ]'::jsonb
+      ),
+      (
+        'Vardiya Sonu Mutfak',
+        '{"de":"Schichtende Küche","en":"Shift-end Kitchen","fr":"Fin de service cuisine","it":"Fine turno cucina","tr":"Vardiya Sonu Mutfak"}'::jsonb,
+        'Vardiya sonu mutfak temizlik kontrol listesi',
+        '{"de":"Reinigungs-Checkliste am Schichtende","en":"Shift-end cleaning checklist","fr":"Checklist nettoyage fin de service","it":"Checklist pulizie fine turno","tr":"Vardiya sonu temizlik checklist"}'::jsonb,
+        'cleaning',
+        '0 15,23 * * *',
+        '[
+          {"id":"s1","type":"checkbox","required":true,
+            "label":{"de":"Ofen gereinigt","en":"Oven cleaned","fr":"Four nettoyé","it":"Forno pulito","tr":"Fırın temizlendi"}},
+          {"id":"s2","type":"checkbox","required":true,
+            "label":{"de":"Friteuse Öl gefiltert","en":"Fryer oil filtered","fr":"Huile friteuse filtrée","it":"Olio friggitrice filtrato","tr":"Fritöz yağı süzüldü"}},
+          {"id":"s3","type":"checkbox","required":true,
+            "label":{"de":"Boden gewischt","en":"Floor mopped","fr":"Sol nettoyé","it":"Pavimento pulito","tr":"Zemin paspaslandı"}},
+          {"id":"s4","type":"photo","required":false,
+            "label":{"de":"Foto Endzustand","en":"Photo of final state","fr":"Photo état final","it":"Foto stato finale","tr":"Son durum fotoğrafı"}}
+        ]'::jsonb
+      ),
+      (
+        'Tedarik Kabul',
+        '{"de":"Wareneingang","en":"Goods Receiving","fr":"Réception marchandises","it":"Ricevimento merci","tr":"Tedarik Kabul"}'::jsonb,
+        'Gelen mal kontrolü (sıcaklık, lot, son kullanma)',
+        '{"de":"Kontrolle eingehender Ware (Temperatur, Lot, MHD)","en":"Inspect incoming goods (temperature, lot, expiry)","fr":"Contrôle marchandises entrantes","it":"Controllo merci in entrata","tr":"Gelen mal kontrolü (sıcaklık, lot, son kullanma)"}'::jsonb,
+        'delivery',
+        '0 0 31 2 *',
+        '[
+          {"id":"d1","type":"text","required":true,
+            "label":{"de":"Lieferant","en":"Supplier","fr":"Fournisseur","it":"Fornitore","tr":"Tedarikçi"}},
+          {"id":"d2","type":"temperature","required":true,
+            "label":{"de":"Wareneingangstemperatur","en":"Incoming temperature","fr":"Température à réception","it":"Temperatura ricezione","tr":"Kabul sıcaklığı"},
+            "validation":{"min":0,"max":7,"unit":"C"}},
+          {"id":"d3","type":"text","required":true,
+            "label":{"de":"Lot / MHD","en":"Lot / expiry","fr":"Lot / DLC","it":"Lotto / scadenza","tr":"Lot / son kullanma"}},
+          {"id":"d4","type":"photo","required":false,
+            "label":{"de":"Foto Lieferschein","en":"Photo of delivery note","fr":"Photo bon de livraison","it":"Foto bolla","tr":"İrsaliye fotoğrafı"}}
+        ]'::jsonb
+      )
+  ) AS seed(name, name_jsonb, description, description_jsonb, category, schedule_cron, items_jsonb)
+  WHERE NOT EXISTS (
+      SELECT 1 FROM task_templates ex
+      WHERE ex.tenant_id = p_tenant AND ex.name = seed.name AND ex.is_deleted = FALSE
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION tg_seed_haccp_on_tenant_insert()
+RETURNS trigger AS $$
+BEGIN
+  PERFORM seed_default_haccp_templates(NEW.id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_seed_haccp_on_tenant_insert ON tenants;
+CREATE TRIGGER trg_seed_haccp_on_tenant_insert
+    AFTER INSERT ON tenants
+    FOR EACH ROW
+    EXECUTE FUNCTION tg_seed_haccp_on_tenant_insert();

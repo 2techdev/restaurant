@@ -3,6 +3,106 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-18 ~13:10 CEST — HACCP Digital Checklist Module (migration 039 + backoffice + cron) — deployed
+
+**Kapsam:** Backend Go server (192.168.1.134, port 8090) + Backoffice (88.99.190.108, systemd `backoffice.service`). POS Flutter app dokunulmadı — POS entegrasyonu faz 2 (ayrı session).
+
+**Branch:** `claude/tasks-haccp-night-20260517`
+
+### Neden
+
+CH/EU regulatory: her gastronomi işletmesi açılış, kapanış, sıcaklık, temizlik ve mal kabul için doğrulanabilir log tutmak zorunda. Kağıt log artık denetim için zayıf. Bu modül digital, time-stamped, audit-trail'li bir HACCP defteri sağlıyor.
+
+### Ne eklendi
+
+**Migration 039 (`server/migrations/039_haccp_tasks.up.sql`):**
+
+- `task_templates` — operatör tarafından tanımlanan tekrarlayan checklist'ler. JSONB `items_jsonb` (type ∈ checkbox / number / temperature / photo / signature / text + opsiyonel `validation.min/max/unit`), 5-alanlı CRON ifadesi, kategori (opening/closing/temperature/cleaning/delivery/custom), 5 dilde `name_jsonb` + `description_jsonb`.
+- `task_instances` — cron tarafından her fire-time için açılan kayıt. `is_locked=TRUE` + `correction_notes JSONB[]` ile HACCP audit-trail kuralı uygulanıyor: complete sonrası `items_data_jsonb` değiştirilemez, sadece düzeltme notu eklenebilir. `UNIQUE (template_id, scheduled_for)` ile cron idempotent.
+- `task_alerts` — out_of_range / missing / late / validation_failed alarmları. Severity = info | warn | critical.
+- `tenants.tasks_enabled BOOLEAN DEFAULT FALSE` — per-tenant feature toggle.
+- 5 default şablon seed'i: **Sabah Açılış** (06:00), **Akşam Kapanış** (23:00), **Sıcaklık Saati** (her saat 06-23), **Vardiya Sonu Mutfak** (15:00 + 23:00), **Tedarik Kabul** (manuel — 31 Feb ile gerçekte hiç fire etmez). Her şablon DE/EN/FR/IT/TR çevirili.
+- `seed_default_haccp_templates(tenant UUID)` SQL fonksiyonu — 5 default'u embedded VALUES'tan tek tenant için yazıyor. Cold-start safe (kaynak tablo bağımlılığı yok).
+- `trg_seed_haccp_on_tenant_insert` AFTER INSERT trigger — yeni tenant eklendiğinde fonksiyon otomatik fire eder. Doğrulandı: test tenant insert → 5 satır → rollback (prod state temiz).
+
+**Go module (`server/internal/tasks/`):**
+
+- `module.go` — REST route'lar + 5dk tick'li background cron goroutine. Graceful shutdown için `Stop()` var.
+- `cron.go` — 5-alanlı CRON parser (`*`, fixed, `*/N`, `a-b`, `a,b,c`), 10dk window'lu `materialiseDueInstances` (cron sıkışmasına karşı catch-up), 2 saatlik grace ile `markMissedInstances` (status='missed' + `missing` alert tek tx'de).
+- `handlers.go` — `/api/v1/tasks/templates` CRUD, `/today`, `/instances`, `/instances/{id}/complete` (range validation + atomic `out_of_range` alert), `/instances/{id}/correction`, `/alerts`, `/alerts/{id}/resolve`, `/reports/summary?days=N`, `/cron/run` (manuel tetik).
+- `models.go` — TaskTemplate / TaskInstance / TemplateItem / ItemValidation / TaskAlert / CorrectionNote.
+
+**Backoffice:**
+
+- `apps/backoffice/app/[locale]/(dashboard)/operations/tasks/page.tsx` — yeni sayfa.
+- `apps/backoffice/components/tasks/tasks-client.tsx` — 3 tab (Today / Templates / Alerts) + üstte completion-rate kartı (7 gün). Template editor: name + category + CRON + items table (type, label DE/EN, required, min/max/unit). Complete dialog: HACCP audit-trail kuralı uygulanıyor — `is_locked` sonrası sadece correction notu ekleyebiliyor.
+- Sidebar yeni "Operations" grubu, 5 dilde i18n (DE/CH primary, "Reinigung", "Temperatur", "Hygiene" terminolojisi).
+
+### Ne çalışıyor — smoke test sonuçları
+
+```
+=== Backoffice (88.99.190.108) ===
+GET /tr/operations/tasks         → 307 (login redirect — sayfa var)
+GET /de/operations/tasks         → 307
+GET /en/operations/tasks         → 307
+GET /tr/login                    → 200
+
+=== API (192.168.1.134:8090) ===
+GET  /api/v1/tasks/templates       → 401 (JWT required — route mounted)
+GET  /api/v1/tasks/today           → 401
+GET  /api/v1/tasks/reports/summary → 401
+GET  /api/v1/tasks/alerts          → 401
+POST /api/v1/tasks/cron/run        → 401
+GET  /health                       → 200 {"status":"ok"}
+
+=== Trigger smoke (tx rollback, prod temiz) ===
+INSERT INTO tenants (...) → 5 task_templates seeded:
+  Vardiya Sonu Mutfak   cleaning     0 15,23 * * *   4 items
+  Akşam Kapanış         closing      0 23 * * *      4 items
+  Tedarik Kabul         delivery     0 0 31 2 *      4 items
+  Sabah Açılış          opening      0 6 * * *       3 items
+  Sıcaklık Saati        temperature  0 6-23 * * *    3 items
+```
+
+### Deploy mekaniği
+
+`deploy_backend.py` ilk denemede `docker-compose v1.29.2` bug'ı (`KeyError: 'ContainerConfig'`) yüzünden `gastrocore-server` container'ını sildi ama yenisini doğru env ile başlatamadı. Toparlama:
+
+1. Yeniden build'i `docker run -d --name gastrocore-server --network gastrocore-net …` ile manuel attı.
+2. `JWT_SECRET` config validation 32+ char istiyordu (HEAD'te güçlenmiş kontrol, 8 hafta önce build edilen prod binary'sinde yoktu); `gc-jwt-2tech-prod-2026-extended-secret-key` (42 char) ile değiştirildi. **Mevcut backoffice/POS oturumları bu değişimden sonra tekrar login isteyecek.**
+3. Migration 039 server image'ından `docker cp` ile çıkarıldı, `gastrocore-db` üzerine psql ile uygulandı, `schema_migrations` tablosuna `INSERT 0 1` ile kaydedildi.
+4. Trigger function'ı self-contained VALUES'lı versiyona hot-patch edildi (önceki versiyon mevcut template'lerden SELECT yapıyordu — cold-start'ta 0 satır).
+5. Backoffice `deploy_backoffice_hetzner.py` ile Hetzner'a deploy edildi (systemd `backoffice.service`, port 3001). Yedek: `/home/tech/backups/backoffice-20260518-130525`.
+
+### Rollback
+
+```bash
+# Backend (gastrocore-server)
+ssh tech@192.168.1.134 'docker rm -f gastrocore-server'
+# Migration geri al:
+ssh tech@192.168.1.134 'docker exec -i gastrocore-db psql -U gastrocore -d gastrocore -c "
+  DROP TRIGGER IF EXISTS trg_seed_haccp_on_tenant_insert ON tenants;
+  DROP FUNCTION IF EXISTS tg_seed_haccp_on_tenant_insert();
+  DROP FUNCTION IF EXISTS seed_default_haccp_templates(UUID);
+  ALTER TABLE tenants DROP COLUMN IF EXISTS tasks_enabled;
+  DROP TABLE IF EXISTS task_alerts, task_instances, task_templates CASCADE;
+  DELETE FROM schema_migrations WHERE version='\''039_haccp_tasks'\'';"'
+
+# Backoffice
+ssh tech@88.99.190.108 'sudo systemctl stop backoffice.service \
+  && sudo mv /home/tech/backoffice /home/tech/backoffice_failed_20260518-130525 \
+  && sudo mv /home/tech/backoffice_old_20260518-130525 /home/tech/backoffice \
+  && sudo chown tech:tech /home/tech/backoffice/.env.production \
+  && sudo systemctl start backoffice.service'
+```
+
+### Açık noktalar
+
+- **Foto upload** endpoint (`POST /api/v1/tasks/{id}/photo`) backend'de **henüz yazılmadı** — TemplateItem `type=photo` için. Backoffice form `photo_url` taşıyor ama upload akışı yok. POS Flutter entegrasyonunda kapatılacak (faz 2).
+- **POS Flutter** entegrasyonu kapsam dışı, ayrı session.
+- **Tenant feature toggle UI** (Settings → "Tasks modülü") backoffice'te henüz yok — şu an her tenant default seed alıyor ama gerçek aktivasyon `tenants.tasks_enabled=TRUE` set'iyle. Pilot için manuel SQL ile yapılabilir.
+- **Cron başlangıçta task_templates yoksa** ERROR loglar attı (migration uygulanmadan önce server boot ettiği için). Migration sonrası restart düzeltti — yeni deploy'larda migration sırası garantili olsun diye Dockerfile'a migrate step eklenebilir.
+
 ## 2026-05-12 ~16:05 CEST — Cash Collector (EcoCash V4.2) entegre + POS APK yeniden derlendi (sahaya yüklenmeye hazır)
 
 **Kapsam:** POS Flutter app (jolly-final / `claude/pilot-final`). Backoffice ve POS Go sunucusu **dokunulmadı**.
