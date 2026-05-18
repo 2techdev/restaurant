@@ -17,6 +17,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LocaleSwitcher } from "@/components/shell/locale-switcher";
 import { TenantSwitcher } from "@/components/shell/tenant-switcher";
 import { usePalette } from "@/components/shell/command-palette";
+import { SetupProgressPill } from "@/components/setup/setup-progress-pill";
 import type { AdminUser } from "@/lib/api-types";
 
 export function Topbar({ locale, user }: { locale: string; user: AdminUser }) {
@@ -39,6 +40,7 @@ export function Topbar({ locale, user }: { locale: string; user: AdminUser }) {
     <header className="flex h-14 items-center justify-between border-b border-border bg-card/30 backdrop-blur-sm px-4">
       <div className="flex items-center gap-3">
         <TenantSwitcher />
+        <SetupProgressPill locale={locale} />
       </div>
 
       {/* Center: Command palette trigger (display only — opens palette on click). */}
