@@ -30,4 +30,11 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/reports/hourly", m.handleHourlyReport)
 	mux.HandleFunc("GET /api/v1/reports/mwst", m.handleMWSTReport)
 	mux.HandleFunc("GET /api/v1/reports/export", m.handleExport)
+
+	// Sales Dashboard Suite (2026-05-17) — Lightspeed-style aggregated
+	// dashboard endpoints. Each returns a single envelope so the
+	// front-end can render a full page in one round-trip.
+	mux.HandleFunc("GET /api/v1/reports/sales-summary", m.HandleSalesSummary)
+	mux.HandleFunc("GET /api/v1/reports/sales-hourly", m.HandleSalesHourly)
+	mux.HandleFunc("GET /api/v1/reports/staff-performance", m.HandleStaffPerformance)
 }

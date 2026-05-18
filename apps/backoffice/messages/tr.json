@@ -79,6 +79,9 @@
     "reportsHourly": "Saatlik Dağılım",
     "reportsMwst": "MWST Raporu",
     "reportsExport": "Export (CSV)",
+    "reportsSalesSummary": "Satış Özeti",
+    "reportsSalesHourly": "Saatlik Satışlar",
+    "reportsStaffPerformance": "Personel Performansı",
     "customersList": "Müşteri Listesi",
     "customersLoyalty": "Sadakat",
     "customersFeedback": "Geri Bildirim",
@@ -452,6 +455,76 @@
   "reports": {
     "title": "Raporlar",
     "revenue": "Ciro",
+    "downloadExport": "CSV İndir",
+    "period": {
+      "today": "Bugün",
+      "yesterday": "Dün",
+      "thisWeek": "Bu hafta",
+      "lastWeek": "Geçen hafta",
+      "thisMonth": "Bu ay",
+      "lastMonth": "Geçen ay",
+      "custom": "Özel aralık"
+    },
+    "salesSummary": {
+      "title": "Satış Özeti",
+      "subtitle": "Seçili dönem için ciro, sipariş, ödeme yöntemleri ve en çok satanlar.",
+      "kpi": {
+        "gross": "Brüt ciro",
+        "net": "Net ciro",
+        "avgTicket": "Ort. fiş",
+        "orderCount": "Sipariş sayısı"
+      },
+      "dailyChart": "Günlük satış grafiği",
+      "paymentBreakdown": "Ödeme yöntemi dağılımı",
+      "orderTypeBreakdown": "Sipariş tipi dağılımı",
+      "topProducts": "En çok satan 10 ürün",
+      "topCategories": "En çok satan 5 kategori",
+      "orders": "sipariş"
+    },
+    "salesHourly": {
+      "title": "Saatlik Satışlar",
+      "subtitle": "7 gün × 24 saat ısı haritası ve günün saatlik dağılımı.",
+      "heatmap": "Hafta × saat ısı haritası",
+      "hourlyToday": "Günün saatlik dağılımı",
+      "period": {
+        "lastWeek": "Geçen hafta"
+      },
+      "insight": {
+        "peak": "Pik saat tespiti",
+        "peakLine": "{day} {hour} pik saat — {amount} ciro"
+      },
+      "day": {
+        "sun": "Pz",
+        "mon": "Pa",
+        "tue": "Sa",
+        "wed": "Ça",
+        "thu": "Pe",
+        "fri": "Cu",
+        "sat": "Ct"
+      }
+    },
+    "staffPerformance": {
+      "title": "Personel Performansı",
+      "subtitle": "Garson/personel başına ciro, sipariş, bahşiş ve vardiya süresi.",
+      "sort": {
+        "revenue": "Ciroya göre",
+        "orderCount": "Sipariş sayısına göre",
+        "avgTicket": "Ort. fişe göre",
+        "tip": "Bahşişe göre",
+        "shift": "Vardiya süresine göre"
+      },
+      "col": {
+        "name": "Ad",
+        "role": "Rol",
+        "orderCount": "Sipariş",
+        "gross": "Ciro",
+        "avgTicket": "Ort. fiş",
+        "tip": "Bahşiş",
+        "shiftHours": "Vardiya (sa)",
+        "grossPerHour": "Ciro/sa",
+        "voids": "İptal"
+      }
+    },
     "topSellers": "En çok satanlar",
     "topSellersSubtitle": "Dönem bazında en çok satılan ürünler",
     "salesTimeline": "Satış zaman çizelgesi",

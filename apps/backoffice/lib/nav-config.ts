@@ -119,6 +119,9 @@ export const NAV_CONFIG: NavEntry[] = [
     icon: "BarChart3",
     items: [
       { href: (l) => `/${l}/reports`, labelKey: "reportsRevenue" },
+      { href: (l) => `/${l}/reports/sales-summary`, labelKey: "reportsSalesSummary" },
+      { href: (l) => `/${l}/reports/sales-hourly`, labelKey: "reportsSalesHourly" },
+      { href: (l) => `/${l}/reports/staff-performance`, labelKey: "reportsStaffPerformance" },
       { href: (l) => `/${l}/reports/top-sellers`, labelKey: "reportsTopSellers" },
       { href: (l) => `/${l}/reports/hourly`, labelKey: "reportsHourly" },
       { href: (l) => `/${l}/reports/mwst`, labelKey: "reportsMwst" },
