@@ -252,6 +252,19 @@ class OrderRepositoryImpl {
     );
   }
 
+  /// Replace the free-form notes column on a persisted ticket.
+  ///
+  /// Used by the table-merge flow to stamp an audit note like "merged
+  /// from #0014" on the source ticket as it's voided. No-op for drafts.
+  Future<void> updateTicketNotes(String id, String? notes) async {
+    await (_db.update(_db.tickets)..where((t) => t.id.equals(id))).write(
+      TicketsCompanion(
+        notes: Value(notes),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   /// Attach or detach a loyalty customer from a persisted ticket.
   ///
   /// Pass `null` to unlink. Used by the topbar customer chip in the POS

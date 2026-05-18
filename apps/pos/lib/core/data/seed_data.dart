@@ -14,6 +14,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart' show Icons;
 
 import 'package:gastrocore_pos/core/database/app_database.dart';

@@ -4594,7 +4594,7 @@ class _ActionButtonEditorDialogState
               for (final g in gangs)
                 DropdownMenuItem<String>(
                   value: g.id,
-                  child: Text('${g.sortOrder}. ${g.name}'),
+                  child: Text('${g.sortOrder}. ${g.fallbackLabel}'),
                 ),
             ],
             onChanged: (v) => setState(() => _gangId = v),

@@ -116,6 +116,11 @@ class RestaurantSettings {
   /// time sized to [clampedMaxGangs].
   final List<String> gangLabels;
 
+  /// Whether the cashier is required to open a shift before taking orders.
+  /// When off (e.g. small bistros that don't track tills) the shift-open
+  /// screen is skipped and the POS lands straight on the order grid.
+  final bool shiftStartRequired;
+
   /// [maxGangs] forced into the valid [kMinGangs]..[kMaxGangs] range.
   int get clampedMaxGangs => _clampMaxGangs(maxGangs);
 

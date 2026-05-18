@@ -19,7 +19,7 @@ import 'package:gastrocore_pos/features/shifts/presentation/screens/z_report_scr
 import 'package:gastrocore_pos/features/home/presentation/screens/home_screen.dart';
 import 'package:gastrocore_pos/features/orders/presentation/shells/pos_shell_router.dart';
 import 'package:gastrocore_pos/features/kitchen/presentation/screens/kitchen_display_screen.dart';
-import 'package:gastrocore_pos/features/payments/presentation/screens/payment_screen.dart';
+import 'package:gastrocore_pos/features/orders/presentation/screens/payment_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/shift_close_screen.dart';
 import 'package:gastrocore_pos/features/shifts/presentation/screens/day_close_screen.dart';
 import 'package:gastrocore_pos/features/orders/presentation/screens/receipt_preview_screen.dart';
@@ -241,7 +241,7 @@ GoRouter createAppRouter({
           path: AppRoutes.payment,
           builder: (context, state) {
             final ticketId = state.pathParameters['ticketId'] ?? '';
-            return PaymentScreen(ticketId: ticketId);
+            return OrderPaymentScreen(ticketId: ticketId);
           },
         ),
         GoRoute(

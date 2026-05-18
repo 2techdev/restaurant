@@ -106,6 +106,8 @@ part 'app_database.g.dart';
     OrderGangStates,
     Stations,
     ServiceCalls,
+    ActionButtons,
+    ZReports,
   ],
   daos: [AuditLogDao, ComboDao, InventoryDao, ReceiptCounterDao, SyncEventDao],
 )
