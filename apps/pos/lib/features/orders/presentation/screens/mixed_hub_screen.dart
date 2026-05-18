@@ -22,6 +22,8 @@ import 'package:gastrocore_pos/core/theme/app_colors.dart';
 import 'package:gastrocore_pos/features/orders/domain/entities/ticket_entity.dart';
 import 'package:gastrocore_pos/features/orders/presentation/providers/order_provider.dart';
 import 'package:gastrocore_pos/features/orders/presentation/widgets/mode_switcher_pill.dart';
+import 'package:gastrocore_pos/features/online_orders/presentation/providers/online_order_provider.dart';
+import 'package:gastrocore_pos/features/online_orders/presentation/providers/online_orders_settings_provider.dart';
 import 'package:gastrocore_pos/features/tables/presentation/providers/table_provider.dart';
 
 class MixedHubScreen extends ConsumerWidget {
@@ -32,14 +34,25 @@ class MixedHubScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
       body: SafeArea(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: const [
-            SizedBox(width: 340, child: _LeftPanel()),
-            VerticalDivider(width: 1, color: AppColors.border),
-            Expanded(child: _RightPanel()),
-          ],
-        ),
+        // v2 (2026-05-17 UX overhaul): 3-column command center.
+        // LEFT (≈320) Active tickets list (was sol panel)
+        // MID  (Expanded) Floor preview grid (was right panel)
+        // RIGHT (≈300) Quick-sale CTA + online preview + KPI
+        child: LayoutBuilder(builder: (context, bc) {
+          final narrow = bc.maxWidth < 1180;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(width: 320, child: _LeftPanel()),
+              const VerticalDivider(width: 1, color: AppColors.border),
+              const Expanded(child: _RightPanel()),
+              if (!narrow) ...[
+                const VerticalDivider(width: 1, color: AppColors.border),
+                const SizedBox(width: 300, child: _SideRail()),
+              ],
+            ],
+          );
+        }),
       ),
     );
   }
@@ -84,8 +97,6 @@ class _LeftPanel extends ConsumerWidget {
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 18),
-          _QuickSaleCta(),
           const SizedBox(height: 18),
           const Text(
             'AKTİF BESTELLUNGEN',
@@ -293,6 +304,263 @@ class _TicketRow extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// v2 right column — quick-sale hero CTA + online preview + KPIs.
+/// Renders only when the layout has ≥1180dp width; narrower viewports
+/// fall back to the 2-col view (Left + Mid).
+class _SideRail extends ConsumerWidget {
+  const _SideRail();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = ref.watch(pendingOnlineOrdersProvider);
+    final onlineEnabled = ref.watch(onlineOrdersEnabledProvider);
+    final openTickets = ref.watch(openTicketsProvider).value ?? const [];
+    // Naive KPI — sum of today's open tickets, no date filtering yet.
+    // Faz D upgrade will add a closed-tickets-today provider.
+    final activeRevenue = openTickets.fold<int>(0, (s, t) => s + t.total);
+    return Container(
+      color: AppColors.surfaceContainerLow,
+      padding: const EdgeInsets.fromLTRB(18, 24, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'KOMUTLAR',
+            style: TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _QuickSaleCta(),
+          const SizedBox(height: 18),
+          if (onlineEnabled) ...[
+            _OnlinePreviewCard(pendingCount: pending.length),
+            const SizedBox(height: 14),
+          ],
+          const Text(
+            'GÜNCEL',
+            style: TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _KpiTile(
+                  label: 'Aktif',
+                  value: '${openTickets.length}',
+                  caption: 'sipariş',
+                  tint: const Color(0xFF1E40AF),
+                  tintBg: const Color(0xFFDBEAFE),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _KpiTile(
+                  label: 'Açık Tutar',
+                  value: 'CHF ${(activeRevenue / 100).toStringAsFixed(0)}',
+                  caption: 'şu an',
+                  tint: const Color(0xFF15803D),
+                  tintBg: const Color(0xFFDCFCE7),
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          const Text(
+            'v22 · mixed-hub',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 10,
+              color: AppColors.textDim,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OnlinePreviewCard extends StatelessWidget {
+  const _OnlinePreviewCard({required this.pendingCount});
+  final int pendingCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final empty = pendingCount == 0;
+    return Material(
+      color: empty ? AppColors.surface : const Color(0xFFFFEDD5),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: () => context.push(AppRoutes.onlineOrders),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: empty
+                  ? AppColors.border
+                  : const Color(0xFFEA580C).withValues(alpha: 0.5),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: empty
+                      ? AppColors.surfaceContainerHigh
+                      : const Color(0xFFEA580C),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.cloud_download_outlined,
+                  size: 18,
+                  color: empty ? AppColors.textDim : Colors.white,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Online Bestellungen',
+                      style: TextStyle(
+                        fontFamily: 'WorkSans',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: empty
+                            ? AppColors.textPrimary
+                            : const Color(0xFF7C2D12),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      empty
+                          ? 'Bekleyen yok'
+                          : '$pendingCount yeni sipariş bekliyor',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        color: empty
+                            ? AppColors.textDim
+                            : const Color(0xFFC2410C),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!empty)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEA580C),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$pendingCount',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.textDim,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KpiTile extends StatelessWidget {
+  const _KpiTile({
+    required this.label,
+    required this.value,
+    required this.caption,
+    required this.tint,
+    required this.tintBg,
+  });
+  final String label;
+  final String value;
+  final String caption;
+  final Color tint;
+  final Color tintBg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: tintBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: tint.withValues(alpha: 0.30)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontFamily: 'WorkSans',
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: tint,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: tint,
+              height: 1.0,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            caption,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.textDim,
+            ),
+          ),
+        ],
       ),
     );
   }
