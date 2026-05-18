@@ -36,6 +36,10 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/menu/products/{id}", m.handleUpdateProduct)
 	mux.HandleFunc("DELETE /api/v1/menu/products/{id}", m.handleDeleteProduct)
 
+	// Snooze ("86'd") — single + bulk PATCH (migration 035).
+	mux.HandleFunc("PATCH /api/v1/menu/products/{id}/snooze", m.handleSnoozeProduct)
+	mux.HandleFunc("POST /api/v1/menu/products/snooze/bulk", m.handleSnoozeBulk)
+
 	mux.HandleFunc("GET /api/v1/menu/modifiers", m.handleListModifiers)
 
 	// Cloud-master sync — version, snapshot, publish, api-key rotate.

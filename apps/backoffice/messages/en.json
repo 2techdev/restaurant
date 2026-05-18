@@ -117,7 +117,8 @@
     "comingSoonHint": "This feature is under development. Outside pilot scope.",
     "tenants": "Tenants",
     "superAdmin": "Super Admin",
-    "team": "Team"
+    "team": "Team",
+    "rmReasonCodes": "Reason Codes"
   },
   "dashboard": {
     "todayRevenue": "Today's Revenue",
@@ -180,7 +181,11 @@
       "headerButton": "Import from Gastro Hub",
       "title": "Import menu from Gastro Hub",
       "codePlaceholder": "XXX-XXX",
-      "steps": { "input": "Code", "preview": "Preview", "result": "Result" },
+      "steps": {
+        "input": "Code",
+        "preview": "Preview",
+        "result": "Result"
+      },
       "step1": {
         "heading": "Enter connection code",
         "description": "If you previously set up your menu on gastro.2hub.ch, generate a connection code there and paste it here. Your existing menu will be copied to the POS system.",
@@ -188,20 +193,49 @@
         "codeHint": "Format: XXX-XXX (e.g. M7K-9PQ). Codes are valid for 15 minutes.",
         "previewButton": "Get preview"
       },
-      "step2": { "heading": "Preview", "description": "Review what will be imported before continuing.", "applyButton": "Import" },
+      "step2": {
+        "heading": "Preview",
+        "description": "Review what will be imported before continuing.",
+        "applyButton": "Import"
+      },
       "step3": {
         "heading": "Menu imported successfully",
         "description": "Your menu was successfully copied from Gastro Hub.",
-        "categories": "Categories", "products": "Products", "modifiers": "Modifier groups",
-        "updated": "updated", "linkedAt": "Linked at", "syncEventId": "Sync event ID", "viewMenuButton": "View menu"
+        "categories": "Categories",
+        "products": "Products",
+        "modifiers": "Modifier groups",
+        "updated": "updated",
+        "linkedAt": "Linked at",
+        "syncEventId": "Sync event ID",
+        "viewMenuButton": "View menu"
       },
       "preview": {
-        "categories": "Categories", "products": "Products", "modifiers": "Modifier groups",
-        "new": "new", "update": "update", "unchanged": "unchanged", "skip": "skipped", "error": "errors",
-        "warnings": "Warnings", "rowReport": "Detailed report ({count} rows)",
-        "recordCol": "Record", "statusCol": "Status", "moreRows": "more rows"
+        "categories": "Categories",
+        "products": "Products",
+        "modifiers": "Modifier groups",
+        "new": "new",
+        "update": "update",
+        "unchanged": "unchanged",
+        "skip": "skipped",
+        "error": "errors",
+        "warnings": "Warnings",
+        "rowReport": "Detailed report ({count} rows)",
+        "recordCol": "Record",
+        "statusCol": "Status",
+        "moreRows": "more rows"
       }
-    }
+    },
+    "snoozeColumn": "Availability",
+    "statusAvailable": "Available",
+    "statusSnoozed": "Sold out",
+    "snoozedUntil": "Until:",
+    "snoozeBulk": "Status for {count} items",
+    "snoozeFor": "Duration",
+    "snooze1h": "Sold out 1 hour",
+    "snooze2h": "Sold out 2 hours",
+    "snoozeEod": "Sold out until end of day",
+    "snoozeManual": "Sold out until manual reset",
+    "snoozeClear": "Make available (all selected)"
   },
   "orders": {
     "title": "Orders",
@@ -609,8 +643,7 @@
     "credentialSubtitle": "This password is shown only once. Share via a secure channel.",
     "credentialWarning": "After closing, the password cannot be retrieved. Have the user change it on first login.",
     "copyAction": "Copy"
-  }
-,
+  },
   "masterProducts": {
     "title": "Master Menu — Products",
     "subtitle": "HQ master products that cascade to all member restaurants",
@@ -797,5 +830,71 @@
     "activeAs": "You are logged in as <target>{targetEmail}</target> (Super Admin: <super>{superAdminEmail}</super>).",
     "exitButton": "Exit",
     "exiting": "Exiting…"
+  },
+  "cmdk": {
+    "placeholder": "Search pages, products, users, categories…",
+    "noResults": "No results",
+    "groupQuickActions": "Quick actions",
+    "groupPages": "Go to page",
+    "groupProducts": "Products",
+    "groupCategories": "Categories",
+    "groupUsers": "Users",
+    "groupSwitchTenant": "Switch restaurant",
+    "actionNewOrder": "New Order",
+    "actionPublishMenu": "Publish Menu",
+    "actionMwstReport": "Export Tax Report (MWST)"
+  },
+  "setupProgress": {
+    "pill": "Setup {percent}%",
+    "title": "Setup Progress",
+    "subtitle": "{done}/{total} steps complete",
+    "complete": "Setup complete",
+    "dismiss": "Dismiss",
+    "optional": "optional",
+    "steps": {
+      "tenant_created": "Restaurant created",
+      "admin_user": "First admin account created",
+      "tenant_info": "Restaurant info filled in (address / phone)",
+      "opening_hours": "Opening hours configured",
+      "first_category": "First category added",
+      "first_product": "First product added",
+      "tax_profile": "Tax profile configured",
+      "receipt_template": "Receipt template selected",
+      "payment_method": "Payment method configured",
+      "pos_device": "POS device paired",
+      "first_staff": "First staff member added"
+    }
+  },
+  "reasonCodes": {
+    "title": "Reason Codes",
+    "subtitle": "Pickers shown in the POS when voiding an order or applying a manual discount.",
+    "tabVoid": "Void reasons",
+    "tabDiscount": "Discount reasons",
+    "addReason": "New reason",
+    "editReason": "Edit reason",
+    "formHint": "Code must be unique (e.g. WRONG_ORDER). Per-locale labels are optional.",
+    "labelsLabel": "Languages",
+    "labelPlaceholder": "{locale} label",
+    "colCode": "Code",
+    "colLabelTr": "TR label",
+    "colOrder": "Order",
+    "colApproval": "Approval?",
+    "colMaxPercent": "Max %",
+    "colStatus": "Status",
+    "colActions": "Actions",
+    "yesApproval": "Yes",
+    "noApproval": "No",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "requiresApprovalLabel": "Requires manager approval",
+    "maxPercentLabel": "Max discount percent (%)",
+    "maxPercentHint": "Maximum discount permitted with this reason. Blank = unlimited.",
+    "emptyState": "No reasons defined yet. Add a new one.",
+    "createSuccess": "Reason created",
+    "updateSuccess": "Reason updated",
+    "deleteSuccess": "Reason deleted",
+    "deleteError": "Delete failed",
+    "saveError": "Save failed",
+    "deleteConfirmBody": "Reason {code} will be deleted. Continue?"
   }
 }

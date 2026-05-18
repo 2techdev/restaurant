@@ -117,7 +117,8 @@
     "comingSoonHint": "Diese Funktion ist in Entwicklung — ausserhalb des Pilotumfangs.",
     "tenants": "Tenants",
     "superAdmin": "Super Admin",
-    "team": "Team"
+    "team": "Team",
+    "rmReasonCodes": "Begründungs-Codes"
   },
   "dashboard": {
     "todayRevenue": "Umsatz heute",
@@ -180,7 +181,11 @@
       "headerButton": "Aus Gastro Hub importieren",
       "title": "Menü aus Gastro Hub importieren",
       "codePlaceholder": "XXX-XXX",
-      "steps": { "input": "Code", "preview": "Vorschau", "result": "Ergebnis" },
+      "steps": {
+        "input": "Code",
+        "preview": "Vorschau",
+        "result": "Ergebnis"
+      },
       "step1": {
         "heading": "Verbindungscode eingeben",
         "description": "Wenn Sie Ihr Menü zuvor auf gastro.2hub.ch eingerichtet haben, erstellen Sie dort einen Verbindungscode und fügen Sie ihn hier ein. Ihr bestehendes Menü wird in das POS-System kopiert.",
@@ -188,20 +193,49 @@
         "codeHint": "Format: XXX-XXX (z. B. M7K-9PQ). Codes sind 15 Minuten gültig.",
         "previewButton": "Vorschau abrufen"
       },
-      "step2": { "heading": "Vorschau", "description": "Prüfen Sie, was importiert wird, bevor Sie fortfahren.", "applyButton": "Importieren" },
+      "step2": {
+        "heading": "Vorschau",
+        "description": "Prüfen Sie, was importiert wird, bevor Sie fortfahren.",
+        "applyButton": "Importieren"
+      },
       "step3": {
         "heading": "Menü erfolgreich importiert",
         "description": "Ihr Menü wurde aus Gastro Hub übernommen.",
-        "categories": "Kategorien", "products": "Produkte", "modifiers": "Modifier-Gruppen",
-        "updated": "aktualisiert", "linkedAt": "Verknüpft am", "syncEventId": "Sync-Event-ID", "viewMenuButton": "Menü anzeigen"
+        "categories": "Kategorien",
+        "products": "Produkte",
+        "modifiers": "Modifier-Gruppen",
+        "updated": "aktualisiert",
+        "linkedAt": "Verknüpft am",
+        "syncEventId": "Sync-Event-ID",
+        "viewMenuButton": "Menü anzeigen"
       },
       "preview": {
-        "categories": "Kategorien", "products": "Produkte", "modifiers": "Modifier-Gruppen",
-        "new": "neu", "update": "Aktualisierung", "unchanged": "unverändert", "skip": "übersprungen", "error": "Fehler",
-        "warnings": "Hinweise", "rowReport": "Detaillierter Bericht ({count} Zeilen)",
-        "recordCol": "Datensatz", "statusCol": "Status", "moreRows": "weitere Zeilen"
+        "categories": "Kategorien",
+        "products": "Produkte",
+        "modifiers": "Modifier-Gruppen",
+        "new": "neu",
+        "update": "Aktualisierung",
+        "unchanged": "unverändert",
+        "skip": "übersprungen",
+        "error": "Fehler",
+        "warnings": "Hinweise",
+        "rowReport": "Detaillierter Bericht ({count} Zeilen)",
+        "recordCol": "Datensatz",
+        "statusCol": "Status",
+        "moreRows": "weitere Zeilen"
       }
-    }
+    },
+    "snoozeColumn": "Verfügbarkeit",
+    "statusAvailable": "Verfügbar",
+    "statusSnoozed": "Ausverkauft",
+    "snoozedUntil": "Bis:",
+    "snoozeBulk": "Status für {count} Artikel",
+    "snoozeFor": "Dauer",
+    "snooze1h": "1 Stunde ausverkauft",
+    "snooze2h": "2 Stunden ausverkauft",
+    "snoozeEod": "Bis Tagesende ausverkauft",
+    "snoozeManual": "Bis manueller Rücknahme",
+    "snoozeClear": "Verfügbar machen (alle ausgewählten)"
   },
   "orders": {
     "title": "Bestellungen",
@@ -609,8 +643,7 @@
     "credentialSubtitle": "Dieses Passwort wird nur einmal angezeigt. Über sicheren Kanal übermitteln.",
     "credentialWarning": "Nach Schliessen kann das Passwort nicht mehr angezeigt werden. Beim ersten Login ändern lassen.",
     "copyAction": "Kopieren"
-  }
-,
+  },
   "masterProducts": {
     "title": "Stammmenü — Artikel",
     "subtitle": "HQ-Stammartikel die an alle Mitglied-Restaurants verteilt werden",
@@ -797,5 +830,71 @@
     "activeAs": "Sie sind als <target>{targetEmail}</target> angemeldet (Super-Admin: <super>{superAdminEmail}</super>).",
     "exitButton": "Beenden",
     "exiting": "Beende…"
+  },
+  "cmdk": {
+    "placeholder": "Seiten, Produkte, Benutzer, Kategorien suchen…",
+    "noResults": "Keine Ergebnisse",
+    "groupQuickActions": "Schnellaktionen",
+    "groupPages": "Seite öffnen",
+    "groupProducts": "Produkte",
+    "groupCategories": "Kategorien",
+    "groupUsers": "Benutzer",
+    "groupSwitchTenant": "Restaurant wechseln",
+    "actionNewOrder": "Neue Bestellung",
+    "actionPublishMenu": "Menü veröffentlichen",
+    "actionMwstReport": "Steuerbericht exportieren (MWST)"
+  },
+  "setupProgress": {
+    "pill": "Setup {percent}%",
+    "title": "Setup-Fortschritt",
+    "subtitle": "{done}/{total} Schritte erledigt",
+    "complete": "Setup abgeschlossen",
+    "dismiss": "Ausblenden",
+    "optional": "optional",
+    "steps": {
+      "tenant_created": "Restaurant erstellt",
+      "admin_user": "Erstes Admin-Konto erstellt",
+      "tenant_info": "Restaurant-Daten erfasst (Adresse / Telefon)",
+      "opening_hours": "Öffnungszeiten konfiguriert",
+      "first_category": "Erste Kategorie angelegt",
+      "first_product": "Erstes Produkt angelegt",
+      "tax_profile": "Steuerprofil konfiguriert",
+      "receipt_template": "Belegvorlage ausgewählt",
+      "payment_method": "Zahlungsmethode konfiguriert",
+      "pos_device": "POS-Gerät gekoppelt",
+      "first_staff": "Erstes Personal angelegt"
+    }
+  },
+  "reasonCodes": {
+    "title": "Begründungs-Codes",
+    "subtitle": "Auswahllisten, die im POS bei Stornierung oder manuellem Rabatt angezeigt werden.",
+    "tabVoid": "Stornogründe",
+    "tabDiscount": "Rabattgründe",
+    "addReason": "Neuer Grund",
+    "editReason": "Grund bearbeiten",
+    "formHint": "Code muss eindeutig sein (z. B. WRONG_ORDER). Labels pro Sprache sind optional.",
+    "labelsLabel": "Sprachen",
+    "labelPlaceholder": "{locale}-Label",
+    "colCode": "Code",
+    "colLabelTr": "TR-Label",
+    "colOrder": "Reihenfolge",
+    "colApproval": "Genehmigung?",
+    "colMaxPercent": "Max %",
+    "colStatus": "Status",
+    "colActions": "Aktionen",
+    "yesApproval": "Ja",
+    "noApproval": "Nein",
+    "statusActive": "Aktiv",
+    "statusInactive": "Inaktiv",
+    "requiresApprovalLabel": "Manager-Freigabe erforderlich",
+    "maxPercentLabel": "Max. Rabatt (%)",
+    "maxPercentHint": "Maximaler Rabatt mit diesem Grund. Leer = unbegrenzt.",
+    "emptyState": "Noch keine Gründe definiert. Neuen hinzufügen.",
+    "createSuccess": "Grund erstellt",
+    "updateSuccess": "Grund aktualisiert",
+    "deleteSuccess": "Grund gelöscht",
+    "deleteError": "Löschen fehlgeschlagen",
+    "saveError": "Speichern fehlgeschlagen",
+    "deleteConfirmBody": "Grund {code} wird gelöscht. Fortfahren?"
   }
 }

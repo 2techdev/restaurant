@@ -40,6 +40,8 @@ import (
 	"github.com/gastrocore/server/internal/shared/database"
 	"github.com/gastrocore/server/internal/shared/middleware"
 	"github.com/gastrocore/server/internal/partner"
+	"github.com/gastrocore/server/internal/reasons"
+	"github.com/gastrocore/server/internal/setup"
 	"github.com/gastrocore/server/internal/stations"
 	"github.com/gastrocore/server/internal/stores"
 	"github.com/gastrocore/server/internal/suppliers"
@@ -121,6 +123,8 @@ func main() {
 	printersModule := printers.NewModule(db)
 	orgModule := org.NewModule(db, syncModule.SyncHub())
 	partnerModule := partner.NewModule(db, cfg)
+	reasonsModule := reasons.NewModule(db, cfg)
+	setupModule := setup.NewModule(db)
 
 	// Coverage extension (016)
 	feedbackModule := feedback.NewModule(db)
@@ -198,6 +202,8 @@ func main() {
 	printersModule.RegisterRoutes(mux)
 	orgModule.RegisterRoutes(mux)
 	partnerModule.RegisterRoutes(mux)
+	reasonsModule.RegisterRoutes(mux)
+	setupModule.RegisterRoutes(mux)
 
 	// Coverage extension (016)
 	feedbackModule.RegisterRoutes(mux)
@@ -294,6 +300,12 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+
+	// Background reapers (migration 035): clear is_snoozed on rows whose
+	// snooze_until has passed. Stops with the server context.
+	reaperCtx, reaperCancel := context.WithCancel(context.Background())
+	defer reaperCancel()
+	menuModule.StartSnoozeReaper(reaperCtx)
 
 	// Graceful shutdown
 	go func() {

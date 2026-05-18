@@ -117,7 +117,8 @@
     "comingSoonHint": "Funzionalita in sviluppo. Fuori dal perimetro pilota.",
     "tenants": "Tenants",
     "superAdmin": "Super Admin",
-    "team": "Team"
+    "team": "Team",
+    "rmReasonCodes": "Codici motivo"
   },
   "dashboard": {
     "todayRevenue": "Fatturato oggi",
@@ -180,7 +181,11 @@
       "headerButton": "Importa da Gastro Hub",
       "title": "Importa menu da Gastro Hub",
       "codePlaceholder": "XXX-XXX",
-      "steps": { "input": "Codice", "preview": "Anteprima", "result": "Risultato" },
+      "steps": {
+        "input": "Codice",
+        "preview": "Anteprima",
+        "result": "Risultato"
+      },
       "step1": {
         "heading": "Inserisci il codice di collegamento",
         "description": "Se hai già configurato il tuo menu su gastro.2hub.ch, genera un codice di collegamento e incollalo qui. Il tuo menu sarà copiato nel sistema POS.",
@@ -188,20 +193,49 @@
         "codeHint": "Formato: XXX-XXX (es. M7K-9PQ). I codici sono validi 15 minuti.",
         "previewButton": "Ottieni anteprima"
       },
-      "step2": { "heading": "Anteprima", "description": "Verifica cosa verrà importato prima di continuare.", "applyButton": "Importa" },
+      "step2": {
+        "heading": "Anteprima",
+        "description": "Verifica cosa verrà importato prima di continuare.",
+        "applyButton": "Importa"
+      },
       "step3": {
         "heading": "Menu importato con successo",
         "description": "Il tuo menu è stato copiato da Gastro Hub.",
-        "categories": "Categorie", "products": "Prodotti", "modifiers": "Gruppi modificatori",
-        "updated": "aggiornati", "linkedAt": "Collegato il", "syncEventId": "ID evento sync", "viewMenuButton": "Visualizza menu"
+        "categories": "Categorie",
+        "products": "Prodotti",
+        "modifiers": "Gruppi modificatori",
+        "updated": "aggiornati",
+        "linkedAt": "Collegato il",
+        "syncEventId": "ID evento sync",
+        "viewMenuButton": "Visualizza menu"
       },
       "preview": {
-        "categories": "Categorie", "products": "Prodotti", "modifiers": "Gruppi modificatori",
-        "new": "nuovo", "update": "aggiornamento", "unchanged": "invariato", "skip": "ignorato", "error": "errori",
-        "warnings": "Avvisi", "rowReport": "Report dettagliato ({count} righe)",
-        "recordCol": "Record", "statusCol": "Stato", "moreRows": "righe in più"
+        "categories": "Categorie",
+        "products": "Prodotti",
+        "modifiers": "Gruppi modificatori",
+        "new": "nuovo",
+        "update": "aggiornamento",
+        "unchanged": "invariato",
+        "skip": "ignorato",
+        "error": "errori",
+        "warnings": "Avvisi",
+        "rowReport": "Report dettagliato ({count} righe)",
+        "recordCol": "Record",
+        "statusCol": "Stato",
+        "moreRows": "righe in più"
       }
-    }
+    },
+    "snoozeColumn": "Disponibilità",
+    "statusAvailable": "Disponibile",
+    "statusSnoozed": "Esaurito",
+    "snoozedUntil": "Fino a:",
+    "snoozeBulk": "Stato per {count} articoli",
+    "snoozeFor": "Durata",
+    "snooze1h": "Esaurito 1 ora",
+    "snooze2h": "Esaurito 2 ore",
+    "snoozeEod": "Esaurito fino a fine giornata",
+    "snoozeManual": "Esaurito fino a reset manuale",
+    "snoozeClear": "Rendi disponibile (tutti selezionati)"
   },
   "orders": {
     "title": "Ordini",
@@ -609,8 +643,7 @@
     "credentialSubtitle": "Questa password viene mostrata solo una volta. Trasmettere tramite canale sicuro.",
     "credentialWarning": "Dopo la chiusura non sara piu recuperabile. Far cambiare al primo accesso.",
     "copyAction": "Copia"
-  }
-,
+  },
   "masterProducts": {
     "title": "Master Menu — Products",
     "subtitle": "HQ master products that cascade to all member restaurants",
@@ -797,5 +830,71 @@
     "activeAs": "Sei connesso come <target>{targetEmail}</target> (Super Admin: <super>{superAdminEmail}</super>).",
     "exitButton": "Esci",
     "exiting": "Uscita…"
+  },
+  "cmdk": {
+    "placeholder": "Cerca pagine, prodotti, utenti, categorie…",
+    "noResults": "Nessun risultato",
+    "groupQuickActions": "Azioni rapide",
+    "groupPages": "Vai alla pagina",
+    "groupProducts": "Prodotti",
+    "groupCategories": "Categorie",
+    "groupUsers": "Utenti",
+    "groupSwitchTenant": "Cambia ristorante",
+    "actionNewOrder": "Nuovo ordine",
+    "actionPublishMenu": "Pubblica menu",
+    "actionMwstReport": "Esporta rapporto IVA (MWST)"
+  },
+  "setupProgress": {
+    "pill": "Setup {percent}%",
+    "title": "Avanzamento configurazione",
+    "subtitle": "{done}/{total} passi completati",
+    "complete": "Configurazione completa",
+    "dismiss": "Nascondi",
+    "optional": "facoltativo",
+    "steps": {
+      "tenant_created": "Ristorante creato",
+      "admin_user": "Primo account amministratore creato",
+      "tenant_info": "Dati del ristorante inseriti (indirizzo / telefono)",
+      "opening_hours": "Orari di apertura configurati",
+      "first_category": "Prima categoria aggiunta",
+      "first_product": "Primo prodotto aggiunto",
+      "tax_profile": "Profilo fiscale configurato",
+      "receipt_template": "Modello di ricevuta selezionato",
+      "payment_method": "Metodo di pagamento configurato",
+      "pos_device": "Dispositivo POS abbinato",
+      "first_staff": "Primo personale aggiunto"
+    }
+  },
+  "reasonCodes": {
+    "title": "Codici motivo",
+    "subtitle": "Selettori mostrati nel POS durante l'annullamento di un ordine o l'applicazione di uno sconto manuale.",
+    "tabVoid": "Motivi di annullamento",
+    "tabDiscount": "Motivi di sconto",
+    "addReason": "Nuovo motivo",
+    "editReason": "Modifica motivo",
+    "formHint": "Il codice deve essere unico (es. WRONG_ORDER). Etichette per lingua opzionali.",
+    "labelsLabel": "Lingue",
+    "labelPlaceholder": "Etichetta {locale}",
+    "colCode": "Codice",
+    "colLabelTr": "Etichetta TR",
+    "colOrder": "Ordine",
+    "colApproval": "Approvazione?",
+    "colMaxPercent": "Max %",
+    "colStatus": "Stato",
+    "colActions": "Azioni",
+    "yesApproval": "Sì",
+    "noApproval": "No",
+    "statusActive": "Attivo",
+    "statusInactive": "Inattivo",
+    "requiresApprovalLabel": "Richiede approvazione del manager",
+    "maxPercentLabel": "Sconto massimo (%)",
+    "maxPercentHint": "Sconto massimo consentito con questo motivo. Vuoto = illimitato.",
+    "emptyState": "Nessun motivo definito. Aggiungine uno.",
+    "createSuccess": "Motivo creato",
+    "updateSuccess": "Motivo aggiornato",
+    "deleteSuccess": "Motivo eliminato",
+    "deleteError": "Eliminazione non riuscita",
+    "saveError": "Salvataggio non riuscito",
+    "deleteConfirmBody": "Il motivo {code} verrà eliminato. Continuare?"
   }
 }

@@ -118,7 +118,8 @@
     "comingSoonHint": "Bu özellik geliştirilme aşamasında. Pilot kapsamı dışındadır.",
     "tenants": "Tenants",
     "superAdmin": "Süper Admin",
-    "team": "Ekip"
+    "team": "Ekip",
+    "rmReasonCodes": "Sebep Kodları"
   },
   "dashboard": {
     "todayRevenue": "Günlük ciro",
@@ -350,7 +351,18 @@
         "diff": "Değişiklik",
         "actions": "İşlem"
       }
-    }
+    },
+    "snoozeColumn": "Stok Durumu",
+    "statusAvailable": "Mevcut",
+    "statusSnoozed": "Tükendi",
+    "snoozedUntil": "Bitiş:",
+    "snoozeBulk": "{count} ürün için durum",
+    "snoozeFor": "Süre seç",
+    "snooze1h": "1 saat tükendi",
+    "snooze2h": "2 saat tükendi",
+    "snoozeEod": "Gün sonuna kadar tükendi",
+    "snoozeManual": "Manuel iptal edene kadar tükendi",
+    "snoozeClear": "Mevcut yap (tüm seçilenler)"
   },
   "orders": {
     "title": "Siparişler",
@@ -358,7 +370,13 @@
     "filterByStatus": "Duruma göre",
     "exportCsv": "CSV dışa aktar",
     "orderNumber": "Sipariş #{number}",
-    "status": "Durum",
+    "status": {
+      "paid": "Ödendi",
+      "open": "Açık",
+      "preparing": "Hazırlanıyor",
+      "closed": "Kapandı",
+      "cancelled": "İptal edildi"
+    },
     "total": "Toplam",
     "date": "Tarih",
     "customer": "Müşteri",
@@ -373,13 +391,6 @@
     "takeaway": "Paket",
     "delivery": "Teslimat",
     "detail": "Sipariş detayı",
-    "status": {
-      "paid": "Ödendi",
-      "open": "Açık",
-      "preparing": "Hazırlanıyor",
-      "closed": "Kapandı",
-      "cancelled": "İptal edildi"
-    },
     "history": {
       "title": "Sipariş Geçmişi",
       "subtitle": "Tüm geçmiş siparişleri filtrele, ara ve detaya in.",
@@ -976,8 +987,13 @@
         "discountValue": "Değer"
       },
       "day": {
-        "mon": "Pa", "tue": "Sa", "wed": "Ça", "thu": "Pe",
-        "fri": "Cu", "sat": "Ct", "sun": "Pz"
+        "mon": "Pa",
+        "tue": "Sa",
+        "wed": "Ça",
+        "thu": "Pe",
+        "fri": "Cu",
+        "sat": "Ct",
+        "sun": "Pz"
       },
       "type": {
         "PERCENT": "Yüzde",
@@ -1029,8 +1045,7 @@
         "footer": "Alt Yazı"
       }
     }
-  }
-,
+  },
   "masterProducts": {
     "title": "Master Menü — Ürünler",
     "subtitle": "Tüm üye restoranlara cascade olan HQ master ürünleri",
@@ -1245,5 +1260,71 @@
     "activeAs": "<target>{targetEmail}</target> olarak görüntülüyorsunuz. Süper Admin: <super>{superAdminEmail}</super>.",
     "exitButton": "Sonlandır",
     "exiting": "Sonlandırılıyor…"
+  },
+  "cmdk": {
+    "placeholder": "Sayfa, ürün, kullanıcı, kategori ara…",
+    "noResults": "Sonuç bulunamadı",
+    "groupQuickActions": "Hızlı eylemler",
+    "groupPages": "Sayfalara git",
+    "groupProducts": "Ürünler",
+    "groupCategories": "Kategoriler",
+    "groupUsers": "Kullanıcılar",
+    "groupSwitchTenant": "Restoran değiştir",
+    "actionNewOrder": "Yeni Sipariş",
+    "actionPublishMenu": "Menü Yayınla",
+    "actionMwstReport": "Vergi Raporu Çıkar (MWST)"
+  },
+  "setupProgress": {
+    "pill": "Kurulum %{percent}",
+    "title": "Kurulum İlerlemesi",
+    "subtitle": "{done}/{total} adım tamamlandı",
+    "complete": "Kurulum tamam",
+    "dismiss": "Gizle",
+    "optional": "opsiyonel",
+    "steps": {
+      "tenant_created": "Restoran oluşturuldu",
+      "admin_user": "İlk yönetici hesabı yaratıldı",
+      "tenant_info": "Restoran bilgileri eklendi (adres / telefon)",
+      "opening_hours": "Açılış saatleri ayarlandı",
+      "first_category": "İlk kategori eklendi",
+      "first_product": "İlk ürün eklendi",
+      "tax_profile": "Vergi profili ayarlandı",
+      "receipt_template": "Fiş şablonu seçildi",
+      "payment_method": "Ödeme yöntemi yapılandırıldı",
+      "pos_device": "POS cihazı bağlandı",
+      "first_staff": "İlk personel eklendi"
+    }
+  },
+  "reasonCodes": {
+    "title": "Sebep Kodları",
+    "subtitle": "POS'ta sipariş iptali (void) ve indirim uygulamasında sunulan sebep listeleri.",
+    "tabVoid": "İptal sebepleri",
+    "tabDiscount": "İndirim sebepleri",
+    "addReason": "Yeni sebep",
+    "editReason": "Sebebi düzenle",
+    "formHint": "Code benzersiz olmalı (örn. WRONG_ORDER). Her dilde label girilebilir.",
+    "labelsLabel": "Diller",
+    "labelPlaceholder": "{locale} etiket",
+    "colCode": "Kod",
+    "colLabelTr": "TR etiket",
+    "colOrder": "Sıra",
+    "colApproval": "Onay gerekli?",
+    "colMaxPercent": "Max %",
+    "colStatus": "Durum",
+    "colActions": "İşlemler",
+    "yesApproval": "Evet",
+    "noApproval": "Hayır",
+    "statusActive": "Aktif",
+    "statusInactive": "Pasif",
+    "requiresApprovalLabel": "Müdür onayı gerekli",
+    "maxPercentLabel": "Maksimum indirim oranı (%)",
+    "maxPercentHint": "Bu sebepte uygulanabilecek en yüksek indirim. Boş = sınırsız.",
+    "emptyState": "Henüz sebep tanımlı değil. Yeni sebep ekleyin.",
+    "createSuccess": "Sebep oluşturuldu",
+    "updateSuccess": "Sebep güncellendi",
+    "deleteSuccess": "Sebep silindi",
+    "deleteError": "Silinemedi",
+    "saveError": "Kaydedilemedi",
+    "deleteConfirmBody": "{code} kodlu sebep silinecek. Devam edilsin mi?"
   }
 }

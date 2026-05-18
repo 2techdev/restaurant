@@ -102,6 +102,10 @@ export interface MenuProduct {
   policy_lock?: "FLEXIBLE" | "PRICE_LOCKED" | "FULLY_LOCKED";
   /** Yerel ürün mü? (HQ master menünden gelmediyse) */
   is_local?: boolean;
+  /** "86'd" / sold-out flag — migration 035. */
+  is_snoozed?: boolean;
+  /** Optional auto-reset deadline. NULL = stays snoozed until manually toggled. */
+  snooze_until?: string | null;
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
