@@ -224,6 +224,17 @@ export const NAV_CONFIG: NavEntry[] = [
   },
   {
     kind: "group",
+    id: "operations",
+    labelKey: "operations",
+    icon: "ClipboardCheck",
+    items: [
+      { href: (l) => `/${l}/operations/tasks`, labelKey: "operationsTasks" },
+      { href: (l) => `/${l}/operations/tasks?tab=templates`, labelKey: "operationsTemplates" },
+      { href: (l) => `/${l}/operations/tasks?tab=alerts`, labelKey: "operationsAlerts" },
+    ],
+  },
+  {
+    kind: "group",
     id: "settings",
     labelKey: "settings",
     icon: "Settings",

@@ -42,6 +42,7 @@ import (
 	"github.com/gastrocore/server/internal/stations"
 	"github.com/gastrocore/server/internal/stores"
 	"github.com/gastrocore/server/internal/suppliers"
+	"github.com/gastrocore/server/internal/tasks"
 	"github.com/gastrocore/server/internal/users"
 	gosync "github.com/gastrocore/server/internal/sync"
 	"github.com/gastrocore/server/internal/tables"
@@ -130,6 +131,9 @@ func main() {
 	// Swiss-compliant receipt templates (020)
 	receiptTemplatesModule := receipt_templates.NewModule(db)
 
+	// HACCP digital checklist (039) — templates + scheduled instances + alerts
+	tasksModule := tasks.NewModule(db)
+
 	// ---------------------------------------------------------------------------
 	// Build router
 	// ---------------------------------------------------------------------------
@@ -205,6 +209,10 @@ func main() {
 
 	// Receipt templates (020) — Swiss MWST-compliant printable layouts
 	receiptTemplatesModule.RegisterRoutes(mux)
+
+	// HACCP digital checklist (039) — REST surface + background cron
+	tasksModule.RegisterRoutes(mux)
+	tasksModule.StartCron(context.Background())
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain
