@@ -41,6 +41,7 @@ import 'package:gastrocore_pos/features/reservations/presentation/screens/reserv
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_form_screen.dart';
 import 'package:gastrocore_pos/features/reservations/presentation/screens/reservation_list_screen.dart';
 import 'package:gastrocore_pos/features/tables/presentation/screens/floor_plan_screen.dart';
+import 'package:gastrocore_pos/features/cfd/presentation/screens/cfd_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_list_screen.dart';
 import 'package:gastrocore_pos/features/customers/presentation/screens/customer_detail_screen.dart';
 import 'package:gastrocore_pos/features/dashboard/presentation/screens/analytics_screen.dart';
@@ -80,6 +81,7 @@ abstract final class AppRoutes {
   static const String voidOrder = '/void/:ticketId';
   static const String qrBill = '/qr-bill';
   static const String zReport = '/z-report';
+  static const String cfd = '/cfd';
   static const String reservations = '/reservations';
   static const String reservationCalendar = '/reservations/calendar';
   static const String reservationNew = '/reservations/new';
@@ -253,6 +255,10 @@ GoRouter createAppRouter({
         GoRoute(
           path: AppRoutes.zReport,
           builder: (context, state) => const ZReportScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.cfd,
+          builder: (context, state) => const CfdScreen(),
         ),
         GoRoute(
           path: AppRoutes.receipt,
