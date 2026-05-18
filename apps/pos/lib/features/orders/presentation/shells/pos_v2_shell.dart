@@ -31,6 +31,8 @@ import 'package:gastrocore_pos/features/audit_log/presentation/providers/audit_l
 import 'package:gastrocore_pos/features/auth/presentation/providers/auth_provider.dart';
 import 'package:gastrocore_pos/features/customers/domain/entities/customer_entity.dart';
 import 'package:gastrocore_pos/features/customers/presentation/providers/customer_provider.dart';
+import 'package:gastrocore_pos/features/hardware/barcode/barcode_listener.dart';
+import 'package:gastrocore_pos/features/hardware/barcode/barcode_scanner.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/category_entity.dart';
 import 'package:gastrocore_pos/features/menu/domain/entities/product_entity.dart';
 import 'package:gastrocore_pos/features/menu/presentation/providers/menu_provider.dart';
@@ -79,7 +81,14 @@ class PosV2Shell extends ConsumerWidget {
     return ColoredBox(
       color: context.v2.bg,
       child: const SafeArea(
-        child: _V2Layout(),
+        // BarcodeScannerShell installs the keyboard listener that
+        // captures USB/BT scanner keystrokes; BarcodeScanListener
+        // bridges the published scan to the cart.
+        child: BarcodeScannerShell(
+          child: BarcodeScanListener(
+            child: _V2Layout(),
+          ),
+        ),
       ),
     );
   }
