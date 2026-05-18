@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+
+	"github.com/gastrocore/server/internal/shared/i18n"
 )
 
 // JSON writes a JSON response with the given status code and data.
@@ -65,4 +67,31 @@ func Created(w http.ResponseWriter, data any) {
 // NoContent writes a 204 No Content response.
 func NoContent(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// LocalizedError is the i18n-aware variant of Error. It looks up the
+// locale stashed in r.Context() (by the i18n middleware) and translates
+// the message via i18n.T(lang, code). The wire format matches Error:
+// {code, message}, where message is now the localized string.
+//
+// fallback is used when the code has no translation entry (so callers can
+// still emit a domain-specific message). Pass "" to fall back to the code
+// itself.
+func LocalizedError(w http.ResponseWriter, r *http.Request, status int, code, fallback string) {
+	lang := i18n.FromContext(r.Context())
+	msg := i18n.T(lang, code)
+	if msg == code && fallback != "" {
+		msg = fallback
+	}
+	JSON(w, status, apiError{Code: code, Message: msg})
+}
+
+// LocalizedErrorWithDetails is LocalizedError with a typed details payload.
+func LocalizedErrorWithDetails(w http.ResponseWriter, r *http.Request, status int, code, fallback string, details any) {
+	lang := i18n.FromContext(r.Context())
+	msg := i18n.T(lang, code)
+	if msg == code && fallback != "" {
+		msg = fallback
+	}
+	JSON(w, status, apiError{Code: code, Message: msg, Details: details})
 }
