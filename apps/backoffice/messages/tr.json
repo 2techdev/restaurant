@@ -70,6 +70,8 @@
     "menuCategories": "Kategoriler",
     "menuProducts": "Ürünler",
     "menuModifiers": "Modifier Grupları",
+    "menuLoyalty": "Sadakat Programı",
+    "menuGiftCards": "Hediye Kartları",
     "menuPublishHistory": "Yayın Geçmişi",
     "promotionsCampaigns": "Kampanyalar",
     "promotionsHappyHour": "Happy Hour",
@@ -680,6 +682,96 @@
     "smtpHost": "Host",
     "smtpUser": "Kullanıcı",
     "webhookUrl": "Webhook URL"
+  },
+  "loyaltyAdmin": {
+    "title": "Sadakat Programı",
+    "subtitle": "Tier'lar, kazanma/harcama oranları ve bonus kampanyaları",
+    "settings": {
+      "title": "Program Ayarları",
+      "subtitle": "Genel sadakat programı yapılandırması",
+      "enabled": "Aktif",
+      "earnRate": "Kazanma oranı (1 CHF = X puan)",
+      "earnRateHint": "1 CHF harcandığında kazanılan puan miktarı (varsayılan: 1.0)",
+      "redeemRate": "Harcama oranı (Y puan = 1 CHF)",
+      "redeemRateHint": "1 CHF değerinde indirim için gereken puan (varsayılan: 100)",
+      "expiryMonths": "Puan geçerlilik süresi (ay)",
+      "expiryHint": "Bu süreyi geçen puanlar otomatik geçersizleşir"
+    },
+    "tiers": {
+      "title": "Seviyeler",
+      "subtitle": "Tier aralıkları, çarpanlar ve avantajlar",
+      "add": "Yeni Seviye",
+      "edit": "Seviyeyi Düzenle",
+      "empty": "Henüz seviye tanımlı değil",
+      "formHint": "Bronz/Gümüş/Altın/Platin varsayılan olarak yüklenir — istediğin gibi düzenle",
+      "deleteConfirm": "Bu seviye silinsin mi?",
+      "col": {
+        "code": "Kod",
+        "name": "Ad",
+        "range": "Puan Aralığı",
+        "minPoints": "Min puan",
+        "maxPoints": "Maks puan (∞ için boş)",
+        "multiplier": "Çarpan",
+        "benefits": "Avantajlar",
+        "color": "Renk"
+      }
+    },
+    "campaigns": {
+      "title": "Bonus Kampanyalar",
+      "subtitle": "Belirli zaman aralıklarında ek puan çarpanı",
+      "empty": "Aktif kampanya yok",
+      "active": "Aktif",
+      "inactive": "Pasif",
+      "col": {
+        "name": "Ad",
+        "window": "Tarih aralığı",
+        "multiplier": "Çarpan",
+        "status": "Durum"
+      }
+    }
+  },
+  "giftCards": {
+    "title": "Hediye Kartları",
+    "subtitle": "Kart üret, bakiye sorgula, kısmi kullanıma izin ver",
+    "list": {
+      "title": "Tüm Kartlar",
+      "subtitle": "En son üretilen 500 kart"
+    },
+    "issueNew": "Yeni Kart",
+    "issueHint": "Müşteriye verilecek kart. Kod otomatik üretilir.",
+    "bulkIssue": "Toplu Üret",
+    "bulkHint": "Bir denominasyon için birden fazla kart üret (kampanya için)",
+    "bulkIssued": "Toplu üretildi",
+    "bulkIssuedDesc": "{count} kart başarıyla oluşturuldu",
+    "bulkNotesHint": "Kampanya adı, hediye sebebi vb.",
+    "issued": "Kart Üretildi",
+    "issue": "Üret",
+    "void": "İptal Et",
+    "voided": "Kart iptal edildi",
+    "voidConfirm": "Bu kart iptal edilsin mi? Geri alınamaz.",
+    "empty": "Hediye kartı yok",
+    "customAmount": "Özel CHF",
+    "issueToCustomer": "Müşteriye ata (opsiyonel)",
+    "customerIdHint": "Müşteri ID — boş bırakırsanız anonim olur",
+    "notesHint": "Doğum günü, müşteri sadakati vs.",
+    "quantity": "Adet",
+    "codeCopied": "Kod kopyalandı",
+    "copyCode": "Kodu kopyala",
+    "expiresOn": "Geçerlilik: {date}",
+    "filter": { "all": "Tümü" },
+    "status": {
+      "active": "Aktif",
+      "redeemed": "Tamamen kullanıldı",
+      "expired": "Süresi doldu",
+      "voided": "İptal edildi"
+    },
+    "col": {
+      "code": "Kod",
+      "denomination": "Yüklü tutar",
+      "balance": "Bakiye",
+      "status": "Durum",
+      "expires": "Geçerlilik"
+    }
   },
   "settings": {
     "title": "Ayarlar",

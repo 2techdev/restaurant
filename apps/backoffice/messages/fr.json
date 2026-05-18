@@ -70,6 +70,8 @@
     "menuCategories": "Categories",
     "menuProducts": "Produits",
     "menuModifiers": "Groupes de modifiers",
+    "menuLoyalty": "Programme de fidélité",
+    "menuGiftCards": "Cartes cadeaux",
     "menuPublishHistory": "Historique publications",
     "promotionsCampaigns": "Campagnes",
     "promotionsHappyHour": "Happy Hour",
@@ -453,6 +455,96 @@
     "smtpHost": "Host",
     "smtpUser": "User",
     "webhookUrl": "Webhook URL"
+  },
+  "loyaltyAdmin": {
+    "title": "Programme de fidélité",
+    "subtitle": "Niveaux, taux de gain/échange et campagnes bonus",
+    "settings": {
+      "title": "Paramètres du programme",
+      "subtitle": "Configuration globale du programme de fidélité",
+      "enabled": "Actif",
+      "earnRate": "Taux de gain (1 CHF = X points)",
+      "earnRateHint": "Points gagnés par CHF dépensé (défaut : 1.0)",
+      "redeemRate": "Taux d'échange (Y points = 1 CHF)",
+      "redeemRateHint": "Points nécessaires pour 1 CHF de crédit (défaut : 100)",
+      "expiryMonths": "Validité des points (mois)",
+      "expiryHint": "Les points expirent automatiquement après ce délai"
+    },
+    "tiers": {
+      "title": "Niveaux",
+      "subtitle": "Plages de points, multiplicateurs et avantages",
+      "add": "Nouveau niveau",
+      "edit": "Modifier le niveau",
+      "empty": "Aucun niveau défini",
+      "formHint": "Bronze/Argent/Or/Platine sont pré-initialisés — personnalisez librement",
+      "deleteConfirm": "Supprimer ce niveau ?",
+      "col": {
+        "code": "Code",
+        "name": "Nom",
+        "range": "Plage de points",
+        "minPoints": "Points min",
+        "maxPoints": "Points max (vide = ∞)",
+        "multiplier": "Multiplicateur",
+        "benefits": "Avantages",
+        "color": "Couleur"
+      }
+    },
+    "campaigns": {
+      "title": "Campagnes bonus",
+      "subtitle": "Fenêtres temporelles avec multiplicateur supplémentaire",
+      "empty": "Aucune campagne active",
+      "active": "Active",
+      "inactive": "Inactive",
+      "col": {
+        "name": "Nom",
+        "window": "Période",
+        "multiplier": "Multiplicateur",
+        "status": "Statut"
+      }
+    }
+  },
+  "giftCards": {
+    "title": "Cartes cadeaux",
+    "subtitle": "Émettez des cartes, vérifiez le solde, autorisez les échanges partiels",
+    "list": {
+      "title": "Toutes les cartes",
+      "subtitle": "Les 500 dernières cartes émises"
+    },
+    "issueNew": "Nouvelle carte",
+    "issueHint": "Émettez une carte pour un client. Le code est généré automatiquement.",
+    "bulkIssue": "Émission groupée",
+    "bulkHint": "Émettez plusieurs cartes de la même valeur (campagnes)",
+    "bulkIssued": "Émission groupée terminée",
+    "bulkIssuedDesc": "{count} cartes créées avec succès",
+    "bulkNotesHint": "Nom de la campagne, occasion, etc.",
+    "issued": "Carte émise",
+    "issue": "Émettre",
+    "void": "Annuler",
+    "voided": "Carte annulée",
+    "voidConfirm": "Annuler cette carte ? Action irréversible.",
+    "empty": "Aucune carte cadeau",
+    "customAmount": "Montant CHF personnalisé",
+    "issueToCustomer": "Attribuer au client (optionnel)",
+    "customerIdHint": "ID client — laissez vide pour anonyme",
+    "notesHint": "Anniversaire, fidélité, etc.",
+    "quantity": "Quantité",
+    "codeCopied": "Code copié",
+    "copyCode": "Copier le code",
+    "expiresOn": "Expire le : {date}",
+    "filter": { "all": "Toutes" },
+    "status": {
+      "active": "Active",
+      "redeemed": "Entièrement utilisée",
+      "expired": "Expirée",
+      "voided": "Annulée"
+    },
+    "col": {
+      "code": "Code",
+      "denomination": "Valeur",
+      "balance": "Solde",
+      "status": "Statut",
+      "expires": "Expire"
+    }
   },
   "settings": {
     "title": "Paramètres",

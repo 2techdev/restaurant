@@ -98,6 +98,8 @@ export const NAV_CONFIG: NavEntry[] = [
       { href: (l) => `/${l}/menu`, labelKey: "menuCategories", kbd: "G M" },
       { href: (l) => `/${l}/menu/products`, labelKey: "menuProducts" },
       { href: (l) => `/${l}/menu/modifiers`, labelKey: "menuModifiers" },
+      { href: (l) => `/${l}/menu/loyalty`, labelKey: "menuLoyalty" },
+      { href: (l) => `/${l}/menu/giftcards`, labelKey: "menuGiftCards" },
       { href: (l) => `/${l}/menu/publish-history`, labelKey: "menuPublishHistory" },
     ],
   },

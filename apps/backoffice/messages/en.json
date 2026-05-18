@@ -70,6 +70,8 @@
     "menuCategories": "Categories",
     "menuProducts": "Products",
     "menuModifiers": "Modifier Groups",
+    "menuLoyalty": "Loyalty Program",
+    "menuGiftCards": "Gift Cards",
     "menuPublishHistory": "Publish History",
     "promotionsCampaigns": "Campaigns",
     "promotionsHappyHour": "Happy Hour",
@@ -453,6 +455,96 @@
     "smtpHost": "Host",
     "smtpUser": "User",
     "webhookUrl": "Webhook URL"
+  },
+  "loyaltyAdmin": {
+    "title": "Loyalty Program",
+    "subtitle": "Tiers, earn/redeem rates and bonus campaigns",
+    "settings": {
+      "title": "Program Settings",
+      "subtitle": "Global loyalty program configuration",
+      "enabled": "Enabled",
+      "earnRate": "Earn rate (1 CHF = X points)",
+      "earnRateHint": "Points earned per CHF spent (default: 1.0)",
+      "redeemRate": "Redeem rate (Y points = 1 CHF)",
+      "redeemRateHint": "Points needed for CHF 1 of credit (default: 100)",
+      "expiryMonths": "Point expiry (months)",
+      "expiryHint": "Points expire automatically after this window"
+    },
+    "tiers": {
+      "title": "Tiers",
+      "subtitle": "Point ranges, multipliers and benefits",
+      "add": "New Tier",
+      "edit": "Edit Tier",
+      "empty": "No tiers defined yet",
+      "formHint": "Bronze/Silver/Gold/Platinum are seeded by default — customize freely",
+      "deleteConfirm": "Delete this tier?",
+      "col": {
+        "code": "Code",
+        "name": "Name",
+        "range": "Point Range",
+        "minPoints": "Min points",
+        "maxPoints": "Max points (blank = ∞)",
+        "multiplier": "Multiplier",
+        "benefits": "Benefits",
+        "color": "Color"
+      }
+    },
+    "campaigns": {
+      "title": "Bonus Campaigns",
+      "subtitle": "Time windows with extra point multipliers",
+      "empty": "No active campaigns",
+      "active": "Active",
+      "inactive": "Inactive",
+      "col": {
+        "name": "Name",
+        "window": "Date range",
+        "multiplier": "Multiplier",
+        "status": "Status"
+      }
+    }
+  },
+  "giftCards": {
+    "title": "Gift Cards",
+    "subtitle": "Issue cards, check balance, allow partial redemption",
+    "list": {
+      "title": "All Cards",
+      "subtitle": "Last 500 issued cards"
+    },
+    "issueNew": "New Card",
+    "issueHint": "Issue a card to a customer. Code is auto-generated.",
+    "bulkIssue": "Bulk Issue",
+    "bulkHint": "Issue multiple cards of the same denomination (campaigns)",
+    "bulkIssued": "Bulk issued",
+    "bulkIssuedDesc": "{count} cards created successfully",
+    "bulkNotesHint": "Campaign name, occasion, etc.",
+    "issued": "Card Issued",
+    "issue": "Issue",
+    "void": "Void",
+    "voided": "Card voided",
+    "voidConfirm": "Void this card? Cannot be undone.",
+    "empty": "No gift cards yet",
+    "customAmount": "Custom CHF",
+    "issueToCustomer": "Issue to customer (optional)",
+    "customerIdHint": "Customer ID — leave blank for anonymous",
+    "notesHint": "Birthday, retention reward, etc.",
+    "quantity": "Quantity",
+    "codeCopied": "Code copied",
+    "copyCode": "Copy code",
+    "expiresOn": "Expires on: {date}",
+    "filter": { "all": "All" },
+    "status": {
+      "active": "Active",
+      "redeemed": "Fully redeemed",
+      "expired": "Expired",
+      "voided": "Voided"
+    },
+    "col": {
+      "code": "Code",
+      "denomination": "Face value",
+      "balance": "Balance",
+      "status": "Status",
+      "expires": "Expires"
+    }
   },
   "settings": {
     "title": "Settings",

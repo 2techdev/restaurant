@@ -70,6 +70,8 @@
     "menuCategories": "Kategorien",
     "menuProducts": "Produkte",
     "menuModifiers": "Modifier-Gruppen",
+    "menuLoyalty": "Treueprogramm",
+    "menuGiftCards": "Geschenkkarten",
     "menuPublishHistory": "Veröffentlichungen",
     "promotionsCampaigns": "Kampagnen",
     "promotionsHappyHour": "Happy Hour",
@@ -453,6 +455,96 @@
     "smtpHost": "Host",
     "smtpUser": "Benutzer",
     "webhookUrl": "Webhook-URL"
+  },
+  "loyaltyAdmin": {
+    "title": "Treueprogramm",
+    "subtitle": "Stufen, Verdienst-/Einlöseraten und Bonus-Kampagnen",
+    "settings": {
+      "title": "Programm-Einstellungen",
+      "subtitle": "Globale Treueprogramm-Konfiguration",
+      "enabled": "Aktiv",
+      "earnRate": "Verdienstrate (1 CHF = X Punkte)",
+      "earnRateHint": "Punkte, die der Kunde pro ausgegebenem CHF erhält (Standard: 1.0)",
+      "redeemRate": "Einlöserate (Y Punkte = 1 CHF)",
+      "redeemRateHint": "Punkte für 1 CHF Rabatt (Standard: 100)",
+      "expiryMonths": "Punkte-Gültigkeit (Monate)",
+      "expiryHint": "Punkte verfallen automatisch nach dieser Frist"
+    },
+    "tiers": {
+      "title": "Stufen",
+      "subtitle": "Punkteschwellen, Multiplikatoren und Vorteile",
+      "add": "Neue Stufe",
+      "edit": "Stufe bearbeiten",
+      "empty": "Noch keine Stufen definiert",
+      "formHint": "Bronze/Silber/Gold/Platin sind vorinitialisiert — anpassen nach Bedarf",
+      "deleteConfirm": "Stufe wirklich löschen?",
+      "col": {
+        "code": "Code",
+        "name": "Bezeichnung",
+        "range": "Punkte-Bereich",
+        "minPoints": "Min. Punkte",
+        "maxPoints": "Max. Punkte (leer = ∞)",
+        "multiplier": "Multiplikator",
+        "benefits": "Vorteile",
+        "color": "Farbe"
+      }
+    },
+    "campaigns": {
+      "title": "Bonus-Kampagnen",
+      "subtitle": "Zeitfenster mit zusätzlichem Punkte-Multiplikator",
+      "empty": "Keine aktiven Kampagnen",
+      "active": "Aktiv",
+      "inactive": "Inaktiv",
+      "col": {
+        "name": "Bezeichnung",
+        "window": "Zeitraum",
+        "multiplier": "Multiplikator",
+        "status": "Status"
+      }
+    }
+  },
+  "giftCards": {
+    "title": "Geschenkkarten",
+    "subtitle": "Karten ausgeben, Guthaben prüfen, Teilbeträge einlösen",
+    "list": {
+      "title": "Alle Karten",
+      "subtitle": "Die letzten 500 ausgegebenen Karten"
+    },
+    "issueNew": "Neue Karte",
+    "issueHint": "Karte für Kunden ausstellen. Code wird automatisch generiert.",
+    "bulkIssue": "Massen-Ausgabe",
+    "bulkHint": "Mehrere Karten gleicher Denomination ausstellen (für Aktionen)",
+    "bulkIssued": "Massen-Ausgabe abgeschlossen",
+    "bulkIssuedDesc": "{count} Karten erfolgreich erstellt",
+    "bulkNotesHint": "Kampagnenname, Anlass usw.",
+    "issued": "Karte erstellt",
+    "issue": "Ausgeben",
+    "void": "Stornieren",
+    "voided": "Karte storniert",
+    "voidConfirm": "Karte wirklich stornieren? Kann nicht rückgängig gemacht werden.",
+    "empty": "Keine Geschenkkarten vorhanden",
+    "customAmount": "Eigener CHF-Betrag",
+    "issueToCustomer": "An Kunden ausgeben (optional)",
+    "customerIdHint": "Kunden-ID — leer lassen für anonyme Karte",
+    "notesHint": "Geburtstag, Stammkunden-Geschenk usw.",
+    "quantity": "Anzahl",
+    "codeCopied": "Code kopiert",
+    "copyCode": "Code kopieren",
+    "expiresOn": "Gültig bis: {date}",
+    "filter": { "all": "Alle" },
+    "status": {
+      "active": "Aktiv",
+      "redeemed": "Vollständig eingelöst",
+      "expired": "Abgelaufen",
+      "voided": "Storniert"
+    },
+    "col": {
+      "code": "Code",
+      "denomination": "Nennwert",
+      "balance": "Guthaben",
+      "status": "Status",
+      "expires": "Gültig bis"
+    }
   },
   "settings": {
     "title": "Einstellungen",

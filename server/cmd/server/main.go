@@ -27,6 +27,7 @@ import (
 	"github.com/gastrocore/server/internal/menu"
 	"github.com/gastrocore/server/internal/notifications"
 	"github.com/gastrocore/server/internal/online"
+	"github.com/gastrocore/server/internal/loyalty"
 	"github.com/gastrocore/server/internal/orders"
 	"github.com/gastrocore/server/internal/org"
 	"github.com/gastrocore/server/internal/pos"
@@ -124,6 +125,7 @@ func main() {
 	feedbackModule := feedback.NewModule(db)
 	suppliersModule := suppliers.NewModule(db)
 	promotionsModule := promotions.NewModule(db)
+	loyaltyModule := loyalty.NewModule(db)
 	auditModule := audit.NewModule(db)
 	notificationsModule := notifications.NewModule(db)
 
@@ -200,6 +202,8 @@ func main() {
 	feedbackModule.RegisterRoutes(mux)
 	suppliersModule.RegisterRoutes(mux)
 	promotionsModule.RegisterRoutes(mux)
+	loyaltyModule.RegisterRoutes(mux)
+	loyaltyModule.RegisterGiftCardRoutes(mux)
 	auditModule.RegisterRoutes(mux)
 	notificationsModule.RegisterRoutes(mux)
 
