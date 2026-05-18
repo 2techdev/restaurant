@@ -3,6 +3,182 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-18 ~13:10 CEST — Loyalty 2.0 (per-tenant tier'lar) + Gift Card 2.0 — LIVE on 88
+
+**Servisler:** POS Go (88, `gastrocore.service`) + Backoffice (88, `backoffice.service`) — POS Flutter, Reservation (178) **dokunulmadı**. jolly-final lineage'ine değil değiştirilen tek satır yok.
+
+### Migration 036_loyalty_giftcards (uygulandı)
+
+5 yeni tablo + mevcut `customers` extension. Idempotent (her ALTER `IF NOT EXISTS`, her INSERT `ON CONFLICT DO NOTHING`).
+
+```
+loyalty_tiers              — per-tenant tier (code/name/min-max/multiplier/benefits)
+loyalty_bonus_campaigns    — multiplier window (örn. "%2x weekend")
+loyalty_program_settings   — toggle + earn/redeem rate + expiry
+gift_cards                 — code/denomination/balance, status enum, 5-yr expiry
+gift_card_transactions     — ledger (issue/redeem/refund/void/expire)
+customers (+3 col)         — total_earned, current_tier, tier_upgrade_at
+loyalty_transactions       — type CHECK genişletildi ('expire' eklendi)
+```
+
+**Seed:** Her mevcut tenant için 4 tier (Bronze/Silber/Gold/Platin) — Swiss-DE primary, 5 dil çevirileri JSONB içinde. Multipliers: 1.00 / 1.25 / 1.50 / 2.00. Benefits örnek: Silber %5 indirim, Gold +ücretsiz tatlı, Platin +VIP rezervasyon. **2 tenant × 4 tier = 8 satır seed edildi** (verify-tables çıktısı log altında).
+
+`loyalty_program_settings.is_enabled` default **false** — operator backoffice'ten açana kadar earn/redeem 403 döner.
+
+### Backend (Go) — yeni `internal/loyalty` paketi
+
+Modül `Module` (db handle + tenant resolver paylaşıyor). 15 yeni endpoint:
+
+```
+# Tier yönetimi
+GET    /api/v1/loyalty/tiers
+POST   /api/v1/loyalty/tiers
+PUT    /api/v1/loyalty/tiers/{id}
+DELETE /api/v1/loyalty/tiers/{id}
+
+# Program ayarları
+GET    /api/v1/loyalty/settings        — auto-create row on first read
+PUT    /api/v1/loyalty/settings        — partial update (COALESCE)
+
+# Customer hesap görünümü
+GET    /api/v1/loyalty/account/{customer_id}
+       — points + total_earned + current_tier + next_tier + points_to_next preview
+
+# Earn / Redeem (POS contract)
+POST   /api/v1/loyalty/earn
+       Body: {customer_id, amount_cents, order_id?, points? override}
+       Behavior: tier-aware multiplier × active bonus campaign multiplier,
+       SELECT FOR UPDATE on customer row, recompute tier from total_earned,
+       insert loyalty_transactions row + update customer atomically.
+       Returns: {points_earned, points_balance, tier_before, tier_after,
+                 tier_upgraded, multiplier_used, bonus_campaign_id?}
+POST   /api/v1/loyalty/redeem
+       Body: {customer_id, points, order_id?}
+       Behavior: 'INSUFFICIENT_POINTS' if balance < points, otherwise
+       atomic deduct. Returns chf_value_redeemed for receipt printing.
+
+# Bonus kampanyalar
+GET/POST/PUT/DELETE /api/v1/loyalty/bonus-campaigns[/{id}]
+
+# Gift cards
+GET    /api/v1/giftcards               ?status=active|redeemed|expired|voided
+POST   /api/v1/giftcards               — single issue, auto code GC-XXXX-XXXX
+POST   /api/v1/giftcards/bulk          — 1..500 cards, same denomination
+GET    /api/v1/giftcards/{code}        — full record; ?balance compact view (POS)
+POST   /api/v1/giftcards/{code}/redeem — partial allowed, expires check,
+                                          status → 'redeemed' when balance hits 0
+POST   /api/v1/giftcards/{code}/refund — credit back (cancelled order),
+                                          capped at denomination, status → 'active'
+PATCH  /api/v1/giftcards/{code}/void   — operator-only, balance → 0
+```
+
+**Yetki:** Write endpoints `OWNER / MANAGER / HQ_ADMIN / HQ_MANAGER` rollerine kısıtlı (`canManageLoyalty` / `canManageGiftCards`). Read endpoints tüm authed çağrılara açık.
+
+**Code generator** (gift card): 8-char base-31 alfabe (0/O/1/I/L hariç — operatör manuel girince hatalı okuma minimuma iniyor). Format `GC-XXXX-XXXX`. Collision retry 8x.
+
+### Backoffice (Next.js)
+
+Sidebar Menü grubuna 2 yeni sub-item:
+- `Sadakat Programı` (`/menu/loyalty`)
+- `Hediye Kartları` (`/menu/giftcards`)
+
+**`/menu/loyalty`** — tek sayfa, 3 kart:
+1. Program ayarları (enable toggle + earn rate + redeem rate + expiry months)
+2. Tier tablosu (color-picker, multiplier, min/max, benefits badge — Bronze/Silver/Gold/Platinum)
+3. Bonus campaigns tablosu (read-only listing — CRUD endpointleri var, UI Phase 2)
+
+**`/menu/giftcards`** — tek sayfa:
+- Status filter dropdown (Tümü / Aktif / Kullanılmış / Süresi dolmuş / İptal)
+- Tek kart üret modali (CHF 25 / 50 / 100 / 200 quick-pick + özel tutar)
+- Toplu üret modali (1–500 kart, aynı denomination)
+- Kart listesi: code (tıkla → kopyala), denomination, balance, status, expires
+- Void action (active kartlar için, confirm dialog)
+- "Just issued" dialog — kod büyük mono, copy-to-clipboard butonu
+
+### i18n (5 dil)
+
+Yeni top-level namespace'ler: `loyaltyAdmin` ve `giftCards`. DE primary (Swiss market). Sidebar etiketleri (`menuLoyalty`, `menuGiftCards`) 5 dilde:
+
+- DE: "Treueprogramm", "Geschenkkarten"
+- TR: "Sadakat Programı", "Hediye Kartları"
+- EN: "Loyalty Program", "Gift Cards"
+- FR: "Programme de fidélité", "Cartes cadeaux"
+- IT: "Programma fedeltà", "Carte regalo"
+
+Tier isimleri zaten migration seed'inde JSONB olarak yatıyor — POS UI'da `name_translations[locale]` üzerinden çekilir.
+
+5 dil JSON `python -m json.tool` validation: **5/5 OK**.
+
+### Smoke (88, 2026-05-18)
+
+```
+# Route registration (expect 401, not 404 — auth middleware in front)
+GET    /api/v1/loyalty/tiers           → 401 ✓
+GET    /api/v1/loyalty/settings        → 401 ✓
+GET    /api/v1/loyalty/account/dummy   → 401 ✓
+POST   /api/v1/loyalty/earn            → 401 ✓
+POST   /api/v1/loyalty/redeem          → 401 ✓
+GET    /api/v1/giftcards               → 401 ✓
+POST   /api/v1/giftcards               → 401 ✓
+GET    /api/v1/giftcards/DUMMY-CODE    → 401 ✓
+
+# DB-level gift card flow
+INSERT GC-SMK1-T2164 (CHF 50, balance 5000c)  → ok
+UPDATE balance -= 3000c                       → balance 2000c
+SELECT → 2000|active                          → partial redeem doğrulandı
+
+# Tiers per tenant
+e909d142-… → 4 tiers (Bronze/Silber/Gold/Platin) ✓
+0b289fc4-… → 4 tiers ✓
+
+# Public HTTPS
+https://backoffice.gastrocore.ch/tr/menu/loyalty   → 307 (redirect to login) ✓
+https://backoffice.gastrocore.ch/tr/menu/giftcards → 307 ✓
+https://backoffice.gastrocore.ch/tr/login          → 200 ✓
+```
+
+### Deploy timestamps (88, 2026-05-18)
+
+- DB migration → 13:01 CEST (`schema_migrations` row eklendi)
+- Go server build + swap → 13:01 CEST (golang:1.23-alpine cross-compile, 8.4 MB binary)
+- `gastrocore.service` restart → 13:01 CEST, `active (running)`, health 200
+- Backoffice build (`gallant-davinci-258bef` worktree) → 13:08 CEST
+- Backoffice deploy → 13:09 CEST, `backoffice.service` `active (running)`
+
+### Out of scope (POS Flutter — sonraki cycle)
+
+POS-side wiring **bu cycle'da yapılmadı** (user kapsam dışı bıraktı):
+- Cart'a "Puan Kullan" butonu — `/api/v1/loyalty/redeem` endpoint'ini çağıracak
+- Customer assign edildiğinde order completion'da `/loyalty/earn` çağrısı —
+  `orders` tablosunda `customer_id` kolonu yok, ayrı migration + handler değişikliği gerek
+- Gift card scan/manuel kod giriş ekranı + `/giftcards/{code}/redeem` çağrısı
+- Receipt'te kazanılan puan + tier upgrade gösterimi
+- Backoffice'te customer detail page'inde points balance widget — Phase 2
+
+Bu işler `claude/pos-flutter-loyalty-wire-<date>` adında ayrı bir worktree'de yapılacak. jolly-final lineage'ine merge sonrası APK rebuild gerekecek (mevcut `pilot/app-pos-release.apk` etkilenmez — Cash Collector V4.2 cycle'ından kalan binary kalıyor).
+
+### Rollback komutları
+
+```bash
+# Go server
+ssh tech@88.99.190.108 'sudo systemctl stop gastrocore.service && \
+  cp /home/tech/gastrocore/server.bak.20260518-130145 /home/tech/gastrocore/server && \
+  sudo systemctl start gastrocore.service'
+
+# Backoffice
+ssh tech@88.99.190.108 'sudo systemctl stop backoffice.service && \
+  sudo mv /home/tech/backoffice /home/tech/backoffice_failed_20260518-130930 && \
+  sudo mv /home/tech/backoffice_old_20260518-130930 /home/tech/backoffice && \
+  sudo chown tech:tech /home/tech/backoffice/.env.production && \
+  sudo systemctl start backoffice.service'
+
+# Migration (down) — yalnız son ihtimal (tier'lar ve gift card kayıtları kaybolur)
+psql "$DATABASE_URL" -f server/migrations/036_loyalty_giftcards.down.sql
+psql "$DATABASE_URL" -c "DELETE FROM schema_migrations WHERE version='036_loyalty_giftcards'"
+```
+
+✅ Reservation (178) **dokunulmadı** · ✅ POS Flutter / jolly-final **dokunulmadı** · ✅ Cash Collector V4.2 binary intact · ✅ AskUserQuestion kullanılmadı · ✅ Sibling agent'larla (Tenant switcher / Order profiles) endpoint çakışması yok (yeni paket `internal/loyalty` ayrı dosyalar; `customers` table'a yalnız 3 yeni kolon eklendi, mevcut select'ler kırılmadı)
+
 ## 2026-05-12 ~16:30 CEST — Menü / Master Menü / Raporlar: çift navigation (sidebar + üst sekme) tekleştirildi — LIVE on 88
 
 **Servisler:** Backoffice (88, `backoffice.service`) — POS Go, Reservation **dokunulmadı**.

@@ -474,7 +474,7 @@ function LastIssuedDialog({
           <p className="text-sm text-muted-foreground">
             CHF {(card.denomination_cents / 100).toFixed(2)}
             {" · "}
-            {t("expiresOn", { date: new Date(card.expires_at).toLocaleDateString() })}
+            {t("expires")}: {new Date(card.expires_at).toLocaleDateString()}
           </p>
         </div>
         <DialogFooter>
