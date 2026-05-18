@@ -178,6 +178,7 @@ export const NAV_CONFIG: NavEntry[] = [
       { href: (l) => `/${l}/restaurant-management/tax-profiles`, labelKey: "rmTaxProfiles" },
       { href: (l) => `/${l}/restaurant-management/receipt-templates`, labelKey: "rmReceiptTemplates" },
       { href: (l) => `/${l}/restaurant-management/payment-methods`, labelKey: "rmPaymentMethods" },
+      { href: (l) => `/${l}/restaurant-management/reason-codes`, labelKey: "rmReasonCodes" },
     ],
   },
   // ─────── HEADQUARTERS section ───────

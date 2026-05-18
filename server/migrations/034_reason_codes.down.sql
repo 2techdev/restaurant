@@ -1,0 +1,4 @@
+BEGIN;
+DROP TABLE IF EXISTS discount_reasons CASCADE;
+DROP TABLE IF EXISTS void_reasons     CASCADE;
+COMMIT;
