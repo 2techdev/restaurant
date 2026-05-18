@@ -46,7 +46,6 @@ one-by-one without touching routing.
 - **Loyalty** (`server/internal/loyalty/`): `/api/v1/loyalty/accounts/{customer_id}` (get/history/earn/redeem/adjust) + `/api/v1/loyalty/tiers` + admin tier + rules CRUD.
 - **Order Profiles** (`server/internal/order_profiles/`): `/api/v1/order-profiles` CRUD + `/apply`.
 - **Tasks / HACCP** (`server/internal/tasks/`): staff `/api/v1/tasks` list/complete/skip + admin `/admin/tasks/templates` CRUD + `/admin/tasks/haccp/report`.
-- **Bexio** (`server/internal/bexio/`): admin OAuth connect/disconnect, manual sync, history, mappings + **public** `/admin/integrations/bexio/callback` OAuth landing.
 - **OSD** (`server/internal/osd/`): public `/api/v1/osd/{slug}/{active-tickets,now-serving,realtime}`.
 - **Manager mobile** (`server/internal/manager_mobile/`): `/api/v1/manager/{dashboard,notifications,notifications/{id}/ack,alerts,realtime}` (manager role+).
 - **Customer analytics** (`server/internal/customer_analytics/`): `/admin/segments` + `/admin/campaigns` CRUD + run + members + send + results.
@@ -55,7 +54,6 @@ one-by-one without touching routing.
 
 ```
 A  pilot/PERF_AUDIT_2026-05-17.md                             (this report)
-A  server/internal/bexio/module.go
 A  server/internal/customer_analytics/module.go
 A  server/internal/loyalty/module.go
 A  server/internal/manager_mobile/module.go
@@ -70,6 +68,10 @@ M  server/cmd/server/main.go        (imports, module init, route registration, a
 M  server/internal/shared/middleware/middleware.go   (RequestRecorder hook in Logger + RequestTimeout)
 M  server/internal/shared/response/response.go       (LocalizedError + LocalizedErrorWithDetails)
 ```
+
+> Note: an earlier draft included a `server/internal/bexio/` stub for
+> third-party accounting OAuth. Removed at user request — the business
+> uses its own accounting workflow, no external integration needed.
 
 ## What was NOT done
 

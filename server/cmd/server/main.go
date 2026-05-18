@@ -14,7 +14,6 @@ import (
 
 	"github.com/gastrocore/server/internal/audit"
 	"github.com/gastrocore/server/internal/auth"
-	"github.com/gastrocore/server/internal/bexio"
 	"github.com/gastrocore/server/internal/crm"
 	"github.com/gastrocore/server/internal/customer_analytics"
 	"github.com/gastrocore/server/internal/dashboard"
@@ -143,7 +142,6 @@ func main() {
 	loyaltyModule := loyalty.NewModule(db)
 	orderProfilesModule := order_profiles.NewModule(db)
 	tasksModule := tasks.NewModule(db)
-	bexioModule := bexio.NewModule(db)
 	osdModule := osd.NewModule(db)
 	managerMobileModule := manager_mobile.NewModule(db)
 	customerAnalyticsModule := customer_analytics.NewModule(db)
@@ -228,7 +226,6 @@ func main() {
 	loyaltyModule.RegisterRoutes(mux)
 	orderProfilesModule.RegisterRoutes(mux)
 	tasksModule.RegisterRoutes(mux)
-	bexioModule.RegisterRoutes(mux)
 	osdModule.RegisterRoutes(mux)
 	managerMobileModule.RegisterRoutes(mux)
 	customerAnalyticsModule.RegisterRoutes(mux)
@@ -280,7 +277,6 @@ func main() {
 				strings.HasPrefix(path, "/api/v1/menu/snapshot/") ||
 				strings.HasPrefix(path, "/api/v1/receipt-templates/sync/") ||
 				strings.HasPrefix(path, "/api/v1/osd/") ||
-				path == "/admin/integrations/bexio/callback" ||
 				publicAPIPaths[path] {
 				next.ServeHTTP(w, r)
 				return
