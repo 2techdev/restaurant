@@ -114,7 +114,10 @@
     "comingSoon": "Prossimamente",
     "comingSoonHint": "Funzionalita in sviluppo. Fuori dal perimetro pilota.",
     "tenants": "Tenants",
-    "superAdmin": "Super Admin"
+    "superAdmin": "Super Admin",
+    "marketing": "Marketing",
+    "marketingSegments": "Segmenti",
+    "marketingCampaigns": "Campagne"
   },
   "dashboard": {
     "todayRevenue": "Fatturato oggi",
@@ -177,7 +180,11 @@
       "headerButton": "Importa da Gastro Hub",
       "title": "Importa menu da Gastro Hub",
       "codePlaceholder": "XXX-XXX",
-      "steps": { "input": "Codice", "preview": "Anteprima", "result": "Risultato" },
+      "steps": {
+        "input": "Codice",
+        "preview": "Anteprima",
+        "result": "Risultato"
+      },
       "step1": {
         "heading": "Inserisci il codice di collegamento",
         "description": "Se hai già configurato il tuo menu su gastro.2hub.ch, genera un codice di collegamento e incollalo qui. Il tuo menu sarà copiato nel sistema POS.",
@@ -185,18 +192,36 @@
         "codeHint": "Formato: XXX-XXX (es. M7K-9PQ). I codici sono validi 15 minuti.",
         "previewButton": "Ottieni anteprima"
       },
-      "step2": { "heading": "Anteprima", "description": "Verifica cosa verrà importato prima di continuare.", "applyButton": "Importa" },
+      "step2": {
+        "heading": "Anteprima",
+        "description": "Verifica cosa verrà importato prima di continuare.",
+        "applyButton": "Importa"
+      },
       "step3": {
         "heading": "Menu importato con successo",
         "description": "Il tuo menu è stato copiato da Gastro Hub.",
-        "categories": "Categorie", "products": "Prodotti", "modifiers": "Gruppi modificatori",
-        "updated": "aggiornati", "linkedAt": "Collegato il", "syncEventId": "ID evento sync", "viewMenuButton": "Visualizza menu"
+        "categories": "Categorie",
+        "products": "Prodotti",
+        "modifiers": "Gruppi modificatori",
+        "updated": "aggiornati",
+        "linkedAt": "Collegato il",
+        "syncEventId": "ID evento sync",
+        "viewMenuButton": "Visualizza menu"
       },
       "preview": {
-        "categories": "Categorie", "products": "Prodotti", "modifiers": "Gruppi modificatori",
-        "new": "nuovo", "update": "aggiornamento", "unchanged": "invariato", "skip": "ignorato", "error": "errori",
-        "warnings": "Avvisi", "rowReport": "Report dettagliato ({count} righe)",
-        "recordCol": "Record", "statusCol": "Stato", "moreRows": "righe in più"
+        "categories": "Categorie",
+        "products": "Prodotti",
+        "modifiers": "Gruppi modificatori",
+        "new": "nuovo",
+        "update": "aggiornamento",
+        "unchanged": "invariato",
+        "skip": "ignorato",
+        "error": "errori",
+        "warnings": "Avvisi",
+        "rowReport": "Report dettagliato ({count} righe)",
+        "recordCol": "Record",
+        "statusCol": "Stato",
+        "moreRows": "righe in più"
       }
     }
   },
@@ -289,7 +314,24 @@
     "colVisits": "Visits",
     "colLastVisit": "Last visit",
     "notes": "Notes",
-    "confirmDelete": "Delete customer {name}?"
+    "confirmDelete": "Delete customer {name}?",
+    "colContact": "Contatto",
+    "colTags": "Tag",
+    "colAvgTicket": "Scontrino medio",
+    "refreshAggregates": "Aggiorna analisi",
+    "refreshAggregatesHint": "Ricalcola visite, scontrino medio, prodotto preferito e ora preferita dai ticket.",
+    "aggregatesRefreshed": "Analisi aggiornata",
+    "aggregatesRefreshedDesc": "{n} clienti aggiornati · {ms} ms",
+    "birthday": "Compleanno",
+    "anniversary": "Anniversario",
+    "tags": "Tag",
+    "tagsHint": "Separati da virgola. Es.: VIP, abituale, allergico.",
+    "dietary": "Tag dieta",
+    "allergens": "Allergeni",
+    "lifetimeSpent": "Spesa totale",
+    "avgTicket": "Scontrino medio",
+    "totalVisits": "Visite totali",
+    "firstVisit": "Prima visita"
   },
   "loyalty": {
     "title": "Loyalty Program",
@@ -552,8 +594,7 @@
     "credentialSubtitle": "Questa password viene mostrata solo una volta. Trasmettere tramite canale sicuro.",
     "credentialWarning": "Dopo la chiusura non sara piu recuperabile. Far cambiare al primo accesso.",
     "copyAction": "Copia"
-  }
-,
+  },
   "masterProducts": {
     "title": "Master Menu — Products",
     "subtitle": "HQ master products that cascade to all member restaurants",
@@ -740,5 +781,62 @@
     "activeAs": "Sei connesso come <target>{targetEmail}</target> (Super Admin: <super>{superAdminEmail}</super>).",
     "exitButton": "Esci",
     "exiting": "Uscita…"
+  },
+  "marketing": {
+    "segments": {
+      "title": "Segmenti clienti",
+      "subtitle": "Filtri salvati per le campagne di marketing",
+      "new": "Nuovo segmento",
+      "edit": "Modifica segmento",
+      "empty": "Nessun segmento. Scegli un modello o creane uno.",
+      "name": "Nome",
+      "description": "Descrizione",
+      "combinator": "Combinatore",
+      "filters": "Filtri",
+      "addFilter": "Aggiungi filtro",
+      "filterType": "Tipo di filtro",
+      "days": "Giorni",
+      "value": "Valore",
+      "tag": "Tag",
+      "hours": "Ore (es. 11,12,13)",
+      "noFiltersHint": "Senza filtri, tutti i clienti rientrano.",
+      "matchedCount": "Clienti corrispondenti",
+      "presets": "Modelli",
+      "allCustomers": "Tutti i clienti",
+      "confirmDelete": "Eliminare il segmento {name}?",
+      "formHint": "Definisci i clienti del segmento. Il conteggio si aggiorna in tempo reale.",
+      "noParam": "Nessun parametro."
+    },
+    "campaigns": {
+      "title": "Campagne di marketing",
+      "subtitle": "Invia campagne email, SMS e push ai segmenti",
+      "new": "Nuova campagna",
+      "edit": "Modifica campagna",
+      "empty": "Nessuna campagna.",
+      "name": "Nome",
+      "channel": "Canale",
+      "segment": "Segmento",
+      "subject": "Oggetto",
+      "body": "Testo",
+      "templates": "Modelli",
+      "allCustomers": "Tutti i clienti",
+      "formHint": "Scegli un segmento e compila oggetto + testo.",
+      "send": "Invia",
+      "stats": "Statistiche",
+      "confirmSend": "Inviare la campagna {name}?",
+      "confirmDelete": "Eliminare la campagna {name}?",
+      "sentToast": "Campagna inviata",
+      "sentDesc": "{sent} di {total} inviati · {failed} falliti",
+      "sentN": "{n} inviati",
+      "openedN": "{n} aperti",
+      "noSegment": "Tutti i clienti",
+      "statsTitle": "Statistiche · {name}",
+      "recipients": "Destinatari",
+      "sent": "Inviati",
+      "opened": "Aperti",
+      "clicked": "Cliccati",
+      "converted": "Convertiti"
+    },
+    "loading": "Caricamento…"
   }
 }

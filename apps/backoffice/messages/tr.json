@@ -115,7 +115,10 @@
     "comingSoon": "Yakında",
     "comingSoonHint": "Bu özellik geliştirilme aşamasında. Pilot kapsamı dışındadır.",
     "tenants": "Tenants",
-    "superAdmin": "Süper Admin"
+    "superAdmin": "Süper Admin",
+    "marketing": "Pazarlama",
+    "marketingSegments": "Segmentler",
+    "marketingCampaigns": "Kampanyalar"
   },
   "dashboard": {
     "todayRevenue": "Günlük ciro",
@@ -355,7 +358,13 @@
     "filterByStatus": "Duruma göre",
     "exportCsv": "CSV dışa aktar",
     "orderNumber": "Sipariş #{number}",
-    "status": "Durum",
+    "status": {
+      "paid": "Ödendi",
+      "open": "Açık",
+      "preparing": "Hazırlanıyor",
+      "closed": "Kapandı",
+      "cancelled": "İptal edildi"
+    },
     "total": "Toplam",
     "date": "Tarih",
     "customer": "Müşteri",
@@ -370,13 +379,6 @@
     "takeaway": "Paket",
     "delivery": "Teslimat",
     "detail": "Sipariş detayı",
-    "status": {
-      "paid": "Ödendi",
-      "open": "Açık",
-      "preparing": "Hazırlanıyor",
-      "closed": "Kapandı",
-      "cancelled": "İptal edildi"
-    },
     "history": {
       "title": "Sipariş Geçmişi",
       "subtitle": "Tüm geçmiş siparişleri filtrele, ara ve detaya in.",
@@ -516,7 +518,24 @@
     "colVisits": "Ziyaret",
     "colLastVisit": "Son ziyaret",
     "notes": "Notlar",
-    "confirmDelete": "{name} müşterisini silmek istediğinizden emin misiniz?"
+    "confirmDelete": "{name} müşterisini silmek istediğinizden emin misiniz?",
+    "colContact": "İletişim",
+    "colTags": "Etiketler",
+    "colAvgTicket": "Ort. fiş",
+    "refreshAggregates": "Analizi yenile",
+    "refreshAggregatesHint": "Ziyaret, ortalama fiş, favori ürün, tercih saati biletlerden yeniden hesaplanır.",
+    "aggregatesRefreshed": "Analiz güncellendi",
+    "aggregatesRefreshedDesc": "{n} müşteri güncellendi · {ms} ms",
+    "birthday": "Doğum günü",
+    "anniversary": "Yıldönümü",
+    "tags": "Etiketler",
+    "tagsHint": "Virgülle ayır. örn: VIP, sürekli müşteri, alerji.",
+    "dietary": "Diyet etiketleri",
+    "allergens": "Alerjenler",
+    "lifetimeSpent": "Toplam harcama",
+    "avgTicket": "Ort. fiş",
+    "totalVisits": "Toplam ziyaret",
+    "firstVisit": "İlk ziyaret"
   },
   "loyalty": {
     "title": "Sadakat Programı",
@@ -919,8 +938,13 @@
         "discountValue": "Değer"
       },
       "day": {
-        "mon": "Pa", "tue": "Sa", "wed": "Ça", "thu": "Pe",
-        "fri": "Cu", "sat": "Ct", "sun": "Pz"
+        "mon": "Pa",
+        "tue": "Sa",
+        "wed": "Ça",
+        "thu": "Pe",
+        "fri": "Cu",
+        "sat": "Ct",
+        "sun": "Pz"
       },
       "type": {
         "PERCENT": "Yüzde",
@@ -972,8 +996,7 @@
         "footer": "Alt Yazı"
       }
     }
-  }
-,
+  },
   "masterProducts": {
     "title": "Master Menü — Ürünler",
     "subtitle": "Tüm üye restoranlara cascade olan HQ master ürünleri",
@@ -1188,5 +1211,62 @@
     "activeAs": "<target>{targetEmail}</target> olarak görüntülüyorsunuz. Süper Admin: <super>{superAdminEmail}</super>.",
     "exitButton": "Sonlandır",
     "exiting": "Sonlandırılıyor…"
+  },
+  "marketing": {
+    "segments": {
+      "title": "Müşteri segmentleri",
+      "subtitle": "Pazarlama kampanyaları için kayıtlı filtreler",
+      "new": "Yeni segment",
+      "edit": "Segmenti düzenle",
+      "empty": "Henüz segment yok. Yukarıdan hazır şablon seç veya yeni oluştur.",
+      "name": "Ad",
+      "description": "Açıklama",
+      "combinator": "Birleştirici",
+      "filters": "Filtreler",
+      "addFilter": "Filtre ekle",
+      "filterType": "Filtre türü",
+      "days": "Gün",
+      "value": "Değer",
+      "tag": "Etiket",
+      "hours": "Saatler (örn 11,12,13)",
+      "noFiltersHint": "Filtresiz: tüm müşteriler.",
+      "matchedCount": "Eşleşen müşteri",
+      "presets": "Şablonlar",
+      "allCustomers": "Tüm müşteriler",
+      "confirmDelete": "{name} segmenti silinsin mi?",
+      "formHint": "Hangi müşterilerin bu segmente düştüğünü tanımla. Sayım aşağıda canlı güncellenir.",
+      "noParam": "Parametre gerekmez."
+    },
+    "campaigns": {
+      "title": "Pazarlama kampanyaları",
+      "subtitle": "Segmentlere e-posta, SMS ve push kampanyaları gönderin",
+      "new": "Yeni kampanya",
+      "edit": "Kampanyayı düzenle",
+      "empty": "Henüz kampanya yok.",
+      "name": "Ad",
+      "channel": "Kanal",
+      "segment": "Segment",
+      "subject": "Konu",
+      "body": "Metin",
+      "templates": "Şablonlar",
+      "allCustomers": "Tüm müşteriler",
+      "formHint": "Segment seç, konu ve metin doldur. Gönderim her alıcıyı kaydeder.",
+      "send": "Gönder",
+      "stats": "İstatistik",
+      "confirmSend": "{name} kampanyası şimdi gönderilsin mi?",
+      "confirmDelete": "{name} kampanyası silinsin mi?",
+      "sentToast": "Kampanya gönderildi",
+      "sentDesc": "{total} hedefin {sent} tanesi gönderildi · {failed} başarısız",
+      "sentN": "{n} gönderildi",
+      "openedN": "{n} açıldı",
+      "noSegment": "Tüm müşteriler",
+      "statsTitle": "İstatistik · {name}",
+      "recipients": "Alıcılar",
+      "sent": "Gönderildi",
+      "opened": "Açıldı",
+      "clicked": "Tıklandı",
+      "converted": "Dönüşüm"
+    },
+    "loading": "Yükleniyor…"
   }
 }

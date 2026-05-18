@@ -45,6 +45,7 @@ func NewModule(db *sql.DB, hub SyncNotifier) *Module {
 
 // RegisterRoutes mounts all CRM routes on the given mux.
 func (m *Module) RegisterRoutes(mux *http.ServeMux) {
+	// Customers — base CRUD + loyalty (legacy /crm/ prefix kept for POS clients).
 	mux.HandleFunc("GET /api/v1/crm/customers", m.handleListCustomers)
 	mux.HandleFunc("POST /api/v1/crm/customers", m.handleCreateCustomer)
 	mux.HandleFunc("GET /api/v1/crm/customers/{id}", m.handleGetCustomer)
@@ -64,6 +65,31 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/customers/{id}/loyalty/add", m.handleAddLoyalty)
 	mux.HandleFunc("GET /api/v1/customers/{id}/loyalty", m.handleListLoyalty)
 	mux.HandleFunc("GET /api/v1/customers/{id}/orders", m.handleCustomerOrders)
+
+	// Customer extended profile + analytics refresh (migration 038).
+	mux.HandleFunc("GET /api/v1/crm/customers/{id}/profile-extended", m.handleExtendedProfile)
+	mux.HandleFunc("GET /api/v1/customers/{id}/profile-extended", m.handleExtendedProfile)
+	mux.HandleFunc("POST /api/v1/crm/aggregates/refresh", m.handleRefreshAggregates)
+
+	// Segments (migration 038).
+	mux.HandleFunc("GET /api/v1/crm/segments", m.handleListSegments)
+	mux.HandleFunc("POST /api/v1/crm/segments", m.handleCreateSegment)
+	mux.HandleFunc("POST /api/v1/crm/segments/preview", m.handleSegmentPreview)
+	mux.HandleFunc("GET /api/v1/crm/segments/{id}", m.handleGetSegment)
+	mux.HandleFunc("PUT /api/v1/crm/segments/{id}", m.handleUpdateSegment)
+	mux.HandleFunc("DELETE /api/v1/crm/segments/{id}", m.handleDeleteSegment)
+	mux.HandleFunc("GET /api/v1/crm/segments/{id}/members", m.handleSegmentMembers)
+
+	// Marketing campaigns (migration 038). Distinct from public.campaigns
+	// (promotional discount schedule) — these are email/sms/push blasts.
+	mux.HandleFunc("GET /api/v1/crm/campaigns", m.handleListCampaigns)
+	mux.HandleFunc("POST /api/v1/crm/campaigns", m.handleCreateCampaign)
+	mux.HandleFunc("GET /api/v1/crm/campaigns/{id}", m.handleGetCampaign)
+	mux.HandleFunc("PUT /api/v1/crm/campaigns/{id}", m.handleUpdateCampaign)
+	mux.HandleFunc("DELETE /api/v1/crm/campaigns/{id}", m.handleDeleteCampaign)
+	mux.HandleFunc("POST /api/v1/crm/campaigns/{id}/send", m.handleSendCampaign)
+	mux.HandleFunc("GET /api/v1/crm/campaigns/{id}/stats", m.handleCampaignStats)
+	mux.HandleFunc("GET /api/v1/crm/campaigns/{id}/recipients", m.handleCampaignRecipients)
 }
 
 // publishSyncEvent writes a sync event to the sync_events table and notifies

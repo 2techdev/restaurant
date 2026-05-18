@@ -138,6 +138,16 @@ export const NAV_CONFIG: NavEntry[] = [
   },
   {
     kind: "group",
+    id: "marketing",
+    labelKey: "marketing",
+    icon: "Megaphone",
+    items: [
+      { href: (l) => `/${l}/marketing/segments`, labelKey: "marketingSegments" },
+      { href: (l) => `/${l}/marketing/campaigns`, labelKey: "marketingCampaigns" },
+    ],
+  },
+  {
+    kind: "group",
     id: "inventory",
     labelKey: "inventory",
     icon: "Package",

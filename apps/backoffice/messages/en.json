@@ -114,7 +114,10 @@
     "comingSoon": "Coming soon",
     "comingSoonHint": "This feature is under development. Outside pilot scope.",
     "tenants": "Tenants",
-    "superAdmin": "Super Admin"
+    "superAdmin": "Super Admin",
+    "marketing": "Marketing",
+    "marketingSegments": "Segments",
+    "marketingCampaigns": "Campaigns"
   },
   "dashboard": {
     "todayRevenue": "Today's Revenue",
@@ -177,7 +180,11 @@
       "headerButton": "Import from Gastro Hub",
       "title": "Import menu from Gastro Hub",
       "codePlaceholder": "XXX-XXX",
-      "steps": { "input": "Code", "preview": "Preview", "result": "Result" },
+      "steps": {
+        "input": "Code",
+        "preview": "Preview",
+        "result": "Result"
+      },
       "step1": {
         "heading": "Enter connection code",
         "description": "If you previously set up your menu on gastro.2hub.ch, generate a connection code there and paste it here. Your existing menu will be copied to the POS system.",
@@ -185,18 +192,36 @@
         "codeHint": "Format: XXX-XXX (e.g. M7K-9PQ). Codes are valid for 15 minutes.",
         "previewButton": "Get preview"
       },
-      "step2": { "heading": "Preview", "description": "Review what will be imported before continuing.", "applyButton": "Import" },
+      "step2": {
+        "heading": "Preview",
+        "description": "Review what will be imported before continuing.",
+        "applyButton": "Import"
+      },
       "step3": {
         "heading": "Menu imported successfully",
         "description": "Your menu was successfully copied from Gastro Hub.",
-        "categories": "Categories", "products": "Products", "modifiers": "Modifier groups",
-        "updated": "updated", "linkedAt": "Linked at", "syncEventId": "Sync event ID", "viewMenuButton": "View menu"
+        "categories": "Categories",
+        "products": "Products",
+        "modifiers": "Modifier groups",
+        "updated": "updated",
+        "linkedAt": "Linked at",
+        "syncEventId": "Sync event ID",
+        "viewMenuButton": "View menu"
       },
       "preview": {
-        "categories": "Categories", "products": "Products", "modifiers": "Modifier groups",
-        "new": "new", "update": "update", "unchanged": "unchanged", "skip": "skipped", "error": "errors",
-        "warnings": "Warnings", "rowReport": "Detailed report ({count} rows)",
-        "recordCol": "Record", "statusCol": "Status", "moreRows": "more rows"
+        "categories": "Categories",
+        "products": "Products",
+        "modifiers": "Modifier groups",
+        "new": "new",
+        "update": "update",
+        "unchanged": "unchanged",
+        "skip": "skipped",
+        "error": "errors",
+        "warnings": "Warnings",
+        "rowReport": "Detailed report ({count} rows)",
+        "recordCol": "Record",
+        "statusCol": "Status",
+        "moreRows": "more rows"
       }
     }
   },
@@ -289,7 +314,24 @@
     "colVisits": "Visits",
     "colLastVisit": "Last visit",
     "notes": "Notes",
-    "confirmDelete": "Delete customer {name}?"
+    "confirmDelete": "Delete customer {name}?",
+    "colContact": "Contact",
+    "colTags": "Tags",
+    "colAvgTicket": "Avg ticket",
+    "refreshAggregates": "Refresh analytics",
+    "refreshAggregatesHint": "Recomputes visits, avg ticket, favorite product, preferred hour from tickets.",
+    "aggregatesRefreshed": "Analytics refreshed",
+    "aggregatesRefreshedDesc": "{n} customers updated · {ms} ms",
+    "birthday": "Birthday",
+    "anniversary": "Anniversary",
+    "tags": "Tags",
+    "tagsHint": "Comma-separated. e.g. VIP, regular, allergy-aware.",
+    "dietary": "Dietary tags",
+    "allergens": "Allergens",
+    "lifetimeSpent": "Lifetime spend",
+    "avgTicket": "Avg ticket",
+    "totalVisits": "Total visits",
+    "firstVisit": "First visit"
   },
   "loyalty": {
     "title": "Loyalty Program",
@@ -552,8 +594,7 @@
     "credentialSubtitle": "This password is shown only once. Share via a secure channel.",
     "credentialWarning": "After closing, the password cannot be retrieved. Have the user change it on first login.",
     "copyAction": "Copy"
-  }
-,
+  },
   "masterProducts": {
     "title": "Master Menu — Products",
     "subtitle": "HQ master products that cascade to all member restaurants",
@@ -740,5 +781,62 @@
     "activeAs": "You are logged in as <target>{targetEmail}</target> (Super Admin: <super>{superAdminEmail}</super>).",
     "exitButton": "Exit",
     "exiting": "Exiting…"
+  },
+  "marketing": {
+    "segments": {
+      "title": "Customer segments",
+      "subtitle": "Saved filters for marketing campaigns and targeting",
+      "new": "New segment",
+      "edit": "Edit segment",
+      "empty": "No segments yet. Pick a preset above or create a new one.",
+      "name": "Name",
+      "description": "Description",
+      "combinator": "Combinator",
+      "filters": "Filters",
+      "addFilter": "Add filter",
+      "filterType": "Filter type",
+      "days": "Days",
+      "value": "Value",
+      "tag": "Tag",
+      "hours": "Hours (e.g. 11,12,13)",
+      "noFiltersHint": "With no filters, this segment matches every customer.",
+      "matchedCount": "Matched customers",
+      "presets": "Presets",
+      "allCustomers": "All customers",
+      "confirmDelete": "Delete segment {name}?",
+      "formHint": "Define which customers fall into this segment. The match count below updates live.",
+      "noParam": "No parameter required."
+    },
+    "campaigns": {
+      "title": "Marketing campaigns",
+      "subtitle": "Send email, SMS, and push campaigns to segments",
+      "new": "New campaign",
+      "edit": "Edit campaign",
+      "empty": "No campaigns yet. Click New campaign to start.",
+      "name": "Name",
+      "channel": "Channel",
+      "segment": "Segment",
+      "subject": "Subject",
+      "body": "Body",
+      "templates": "Templates",
+      "allCustomers": "All customers",
+      "formHint": "Pick a segment and fill subject + body. Sending records each recipient.",
+      "send": "Send",
+      "stats": "Stats",
+      "confirmSend": "Send campaign {name} now?",
+      "confirmDelete": "Delete campaign {name}?",
+      "sentToast": "Campaign sent",
+      "sentDesc": "{sent} of {total} sent · {failed} failed",
+      "sentN": "{n} sent",
+      "openedN": "{n} opened",
+      "noSegment": "All customers",
+      "statsTitle": "Stats · {name}",
+      "recipients": "Recipients",
+      "sent": "Sent",
+      "opened": "Opened",
+      "clicked": "Clicked",
+      "converted": "Converted"
+    },
+    "loading": "Loading…"
   }
 }

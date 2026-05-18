@@ -20,6 +20,7 @@ import {
   Landmark,
   BarChart4,
   ShieldCheck,
+  Megaphone,
   ChevronRight,
   Plus,
   type LucideIcon,
@@ -51,6 +52,7 @@ const ICONS: Record<string, LucideIcon> = {
   Landmark,
   BarChart4,
   ShieldCheck,
+  Megaphone,
 };
 
 // v2 storage schema: separate "manually overridden" set from the auto-open
