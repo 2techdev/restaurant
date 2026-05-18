@@ -3,6 +3,61 @@
 > Pilot launch öncesi günlük deploy kayıtları. Her deploy sonrası bu dosyaya
 > üste prepend ekle. Deploy başarısızsa rollback komutu + zaman damgası yaz.
 
+## 2026-05-17 ~22:30 CEST — Customer-Facing Display (CFD) backend canlı (178) + spec doc
+
+**Servis:** Reservation Next.js (`gastro.2hub.ch`, systemd `reservation`, port 3001 — 178). POS-side Flutter wiring **ertelendi** (jolly-final lineage + APK rebuild; spec doc'ta tam Dart taslak).
+
+### Mimari
+POS app her cart değişikliğinde Reservation'a `POST /api/cfd/state/{deviceId}` bearer auth ile push eder; Reservation Redis pub/sub ile SSE üzerinden CFD tablette anlık render. Pair flow PIN one-shot (POS PIN üretir, müşteri tabletinden girilir, token bind olur). 5 dil (TR/DE/EN/FR/IT), payment phase state-machine, mevcut Redis altyapısı reuse.
+
+### Yeni dosyalar (Reservation 178)
+- `src/lib/cfd-state.ts` — Redis state shapes + helpers (PIN/token TTL, channel adlandırma, `EMPTY_CART_STATE`)
+- `src/app/api/cfd/pair/[deviceId]/route.ts` — POST PIN+token mint (POS init)
+- `src/app/api/cfd/claim/[deviceId]/route.ts` — POST PIN tüket → token (CFD bind)
+- `src/app/api/cfd/state/[deviceId]/route.ts` — GET snapshot + POST push (bearer)
+- `src/app/api/cfd/stream/[deviceId]/route.ts` — GET SSE (Redis subscribe + 25s heartbeat + exponential reconnect-friendly)
+- `src/app/(public)/[slug]/cfd/page.tsx` + `cfd-display-client.tsx` — fullscreen display (50/50 brand+cart layout, payment overlay, dark)
+- `src/app/(public)/[slug]/cfd/pair/page.tsx` + `pair-client.tsx` — PIN entry (kiosk-friendly, 6-digit tel input)
+- `src/app/dashboard/cfd-tester/page.tsx` — admin demo (PIN üret + canlı cart push + phase selector + log)
+- `src/app/(public)/[slug]/osd/osd-client.tsx` — **stub** (paralel agent yarım bırakmıştı, build'i kırıyordu; minimal i18n placeholder ile unblock)
+
+### Deploy + smoke (canlı, 22:30 UTC)
+- `npm run build` clean (Prisma generate sonra), `deploy_hetzner_safe.py` standart akış
+- CSS regression guard: **5/5 pass** (HTML no-store, CSS 200, palazzo+badi-bistro custom domain 200)
+- PM2 reload OK (PID 735908, restart count 33, 228 MB)
+- `/api/health` 200, `/` 307 (login redirect)
+
+**Public CFD smoke:**
+| Test | Sonuç |
+|---|---|
+| `GET /demo-restaurant/cfd/pair?device=cfd-demo-01&lang=tr` | **200** ✓ |
+| `POST /api/cfd/pair/cfd-demo-01` | **200** + `{pin:"344823", token:"cfd_80ca…", expiresInSec:300}` ✓ |
+| `POST /api/cfd/claim/cfd-demo-01` (wrong PIN "000000") | **401 INVALID_PIN_OR_EXPIRED** ✓ |
+| `GET /api/cfd/stream/cfd-demo-01` (no token) | **401** ✓ |
+
+### Demo path (POS app olmadan)
+1. `https://gastro.2hub.ch/dashboard/cfd-tester` (admin login)
+2. "PIN üret" → ekrana 6 hane düşer
+3. CFD tablette `https://gastro.2hub.ch/demo-restaurant/cfd/pair?device=cfd-demo-01&lang=tr` aç, PIN gir
+4. Tester'da cart düzenle + phase selector "awaiting_card" / "success" → Push → CFD anında geçer
+5. Display fullscreen tablet için optimize (kiosk mode), exponential reconnect on SSE drop
+
+### Bilinçli erteleme
+- **POS Flutter `CfdClient`** + Settings UI + cart provider listener + APK rebuild — jolly-final lineage, ayrı sprint. Tam Dart taslak `pilot/CFD_INTEGRATION_SPEC.md §6`'da.
+- **QR pair flow** — pair URL'i QR olarak göster, CFD tablette `?device&pin` query ile auto-claim
+- **Promo banner backoffice editor** — `banner.text` push'unu backoffice'ten yönet
+- **Logo/theme auto-prefill** — Restaurant tablosundan `logoUrl + primaryColor` çek, initial state'e ekle (şu an POS push body'sinden alıyor)
+
+### Branch + commit
+- Branch: `claude/cfd-night-20260517` (Restaurant repo)
+- Commit: `30fe4c5` `docs(cfd): integration spec for POS app + tester URL`
+- Push: `origin/claude/cfd-night-20260517` (PR URL: github.com/2techdev/restaurant/pull/new/claude/cfd-night-20260517)
+- Reservation tarafı git-tracked değil — kod canlı 178'de, lokal `E:/Project/reservation/` working tree
+
+### Rollback
+Reservation revert: deploy_hetzner_safe.py `_old` snapshot rotation otomatik (CFD page'leri kaldırma → 404 döner, mevcut akışlar etkilenmez — `/cfd` route'u opt-in)
+
+
 ## 2026-05-17 ~00:30 CEST — Sales Dashboard Suite (commit 5fc9bdb, deploy QUEUED)
 
 **Branch:** `claude/sales-dashboard-night-20260517` (pushed to GitHub)
