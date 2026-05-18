@@ -98,7 +98,22 @@ func (sw *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return nil, nil, fmt.Errorf("underlying ResponseWriter does not implement http.Hijacker")
 }
 
-// Logger logs each request with method, path, status, and duration.
+// RequestRecorder is a callback invoked at the end of every request so a
+// metrics package can register a counter/histogram observation without
+// causing a middleware → metrics → middleware import cycle.
+type RequestRecorder func(method string, status int, duration time.Duration)
+
+// requestRecorder holds the optional observer; nil = no metrics.
+var requestRecorder RequestRecorder
+
+// SetRequestRecorder installs the per-request observer. Call once at
+// startup before traffic begins.
+func SetRequestRecorder(rec RequestRecorder) {
+	requestRecorder = rec
+}
+
+// Logger logs each request with method, path, status, and duration, and
+// fans out to the installed RequestRecorder when present.
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -106,13 +121,17 @@ func Logger(next http.Handler) http.Handler {
 
 		next.ServeHTTP(sw, r)
 
+		dur := time.Since(start)
 		slog.Info("http request",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", sw.status,
-			"duration_ms", time.Since(start).Milliseconds(),
+			"duration_ms", dur.Milliseconds(),
 			"request_id", r.Context().Value(ContextKeyRequestID),
 		)
+		if requestRecorder != nil {
+			requestRecorder(r.Method, sw.status, dur)
+		}
 	})
 }
 
@@ -243,6 +262,41 @@ func SecurityHeaders(production bool) Middleware {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// RequestTimeout caps the request context to the given duration unless the
+// path matches a WebSocket / streaming route. The cap is below the HTTP
+// server's WriteTimeout so handlers see context.Done before the connection
+// is forcibly closed and can return a 504 rather than a generic 500.
+//
+// WebSocket upgrade paths must not be capped — they run for the lifetime
+// of the connection. Excluded paths: /api/v1/*/ws, /api/v1/sync/ws,
+// /api/v1/kds/ws, /api/v1/pos/ws, /api/v1/online/ws, /api/v1/manager/realtime.
+func RequestTimeout(d time.Duration) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if isStreamingPath(r.URL.Path) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), d)
+			defer cancel()
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func isStreamingPath(p string) bool {
+	if strings.HasSuffix(p, "/ws") {
+		return true
+	}
+	switch {
+	case strings.Contains(p, "/realtime"),
+		strings.Contains(p, "/stream"),
+		strings.HasPrefix(p, "/api/v1/osd/") && strings.HasSuffix(p, "/realtime"):
+		return true
+	}
+	return false
 }
 
 // maxBodyBytes is the default request-body size limit (10 MiB) applied by
