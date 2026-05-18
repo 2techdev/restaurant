@@ -70,6 +70,7 @@
     "menuCategories": "Categories",
     "menuProducts": "Products",
     "menuModifiers": "Modifier Groups",
+    "menuOrderProfiles": "Order Profiles",
     "menuPublishHistory": "Publish History",
     "promotionsCampaigns": "Campaigns",
     "promotionsHappyHour": "Happy Hour",
@@ -170,7 +171,87 @@
     "isRequired": "Required",
     "lockedBadge": "HQ Locked",
     "localBadge": "Local",
-    "lockedTooltip": "This product is locked by Headquarters (HQ)"
+    "lockedTooltip": "This product is locked by Headquarters (HQ)",
+    "orderProfilesPage": {
+      "title": "Order Profiles",
+      "subtitle": "Time-based presets for pricing, service charge, and print routing.",
+      "activeNowHeader": "Active now",
+      "singleActive": "One profile active",
+      "multipleActive": "{n} profiles active — highest priority wins",
+      "noneActive": "No profile active — no default profile defined.",
+      "newProfile": "New profile",
+      "editProfile": "Edit profile",
+      "editHint": "Schedule + pricing rules + service charge + print routing.",
+      "testModeHeader": "Test mode",
+      "testModeHint": "Pick a date + time → server reports which profile would win at that instant.",
+      "testTimeLabel": "Test time",
+      "testWinner": "Winner",
+      "testNoWinner": "No active profile at that time",
+      "listHeader": "{count, plural, =0 {No profiles} =1 {1 profile} other {# profiles}}",
+      "loading": "Loading profiles…",
+      "emptyState": "No profiles yet — start with 'New profile'.",
+      "defaultBadge": "Default",
+      "activeNowBadge": "Active now",
+      "savedToast": "Profile saved.",
+      "saveError": "Save failed",
+      "deletedToast": "Profile deleted.",
+      "deleteError": "Delete failed",
+      "deleteConfirmTitle": "Delete profile?",
+      "deleteConfirmBody": "Profile {name} will be permanently deleted. The default profile cannot be deleted.",
+      "col": {
+        "name": "Profile",
+        "schedule": "Schedule",
+        "rules": "Rules",
+        "priority": "Priority",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "field": {
+        "code": "Code (URL-safe)",
+        "codeHint": "Stable identifier — clients match against this.",
+        "name": "Name",
+        "otherLanguages": "Other languages (TR / DE / FR / IT)",
+        "description": "Description",
+        "priority": "Priority",
+        "priorityHint": "Highest number wins. Default: 10.",
+        "isActive": "Active",
+        "isDefault": "Default profile (fallback when no schedule matches)"
+      },
+      "weekday": {
+        "mon": "Mon", "tue": "Tue", "wed": "Wed", "thu": "Thu", "fri": "Fri", "sat": "Sat", "sun": "Sun"
+      },
+      "schedule": {
+        "title": "Schedule",
+        "hint": "Which weekdays + times this profile is active. End-before-start = slot crosses midnight (e.g. 22:00-02:00).",
+        "addSlot": "Add slot",
+        "startsAt": "Start",
+        "endsAt": "End",
+        "emptyWarning": "Schedule is empty — profile will never become active.",
+        "defaultNotice": "For the default profile the schedule is ignored; it runs as the fallback when no other slot matches."
+      },
+      "pricing": {
+        "title": "Pricing rules",
+        "hint": "Per category or product: override price (CHF) or percent discount.",
+        "empty": "No rules.",
+        "addRule": "Add rule",
+        "targetCategory": "Category",
+        "targetProduct": "Product",
+        "valuePercent": "Discount %",
+        "valueFixed": "Fixed CHF",
+        "col": { "target": "Target", "value": "Value" }
+      },
+      "serviceCharge": {
+        "title": "Service charge",
+        "toggleHint": "Auto-added to the cart while this profile is active.",
+        "labelPlaceholder": "Label (e.g. Late Night surcharge)"
+      },
+      "print": {
+        "title": "Print routing",
+        "kitchen": "Kitchen printer",
+        "bar": "Bar printer",
+        "copies": "Customer copies"
+      }
+    }
   },
   "orders": {
     "title": "Orders",

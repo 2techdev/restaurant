@@ -70,6 +70,7 @@
     "menuCategories": "Kategoriler",
     "menuProducts": "Ürünler",
     "menuModifiers": "Modifier Grupları",
+    "menuOrderProfiles": "Sipariş Profilleri",
     "menuPublishHistory": "Yayın Geçmişi",
     "promotionsCampaigns": "Kampanyalar",
     "promotionsHappyHour": "Happy Hour",
@@ -261,6 +262,86 @@
         "publishedBy": "Yayınlayan",
         "diff": "Değişiklik",
         "actions": "İşlem"
+      }
+    },
+    "orderProfilesPage": {
+      "title": "Sipariş Profilleri",
+      "subtitle": "Zaman bazlı fiyatlandırma, servis bedeli ve baskı kuralları için ön ayarlar.",
+      "activeNowHeader": "Şu an aktif",
+      "singleActive": "Tek profil aktif",
+      "multipleActive": "{n} profil aktif — en yüksek öncelik kazandı",
+      "noneActive": "Hiçbir profil aktif değil — varsayılan profil yok.",
+      "newProfile": "Yeni profil",
+      "editProfile": "Profili düzenle",
+      "editHint": "Schedule + fiyat kuralları + servis bedeli + baskı yönlendirme.",
+      "testModeHeader": "Test modu",
+      "testModeHint": "Bir tarih + saat seç → o anda hangi profil kazanırdı, sunucu hesaplar.",
+      "testTimeLabel": "Test zamanı",
+      "testWinner": "Kazanan",
+      "testNoWinner": "Bu zamanda aktif profil yok",
+      "listHeader": "{count, plural, =0 {Profil yok} =1 {1 profil} other {# profil}}",
+      "loading": "Profiller yükleniyor…",
+      "emptyState": "Henüz profil yok — 'Yeni profil' ile başla.",
+      "defaultBadge": "Varsayılan",
+      "activeNowBadge": "Şu an aktif",
+      "savedToast": "Profil kaydedildi.",
+      "saveError": "Kaydedilemedi",
+      "deletedToast": "Profil silindi.",
+      "deleteError": "Silinemedi",
+      "deleteConfirmTitle": "Profili sil?",
+      "deleteConfirmBody": "{name} profili kalıcı olarak silinecek. Varsayılan profil silinemez.",
+      "col": {
+        "name": "Profil",
+        "schedule": "Schedule",
+        "rules": "Kural",
+        "priority": "Öncelik",
+        "status": "Durum",
+        "actions": "İşlem"
+      },
+      "field": {
+        "code": "Kod (URL-safe)",
+        "codeHint": "Sabit kalır — istemciler bu koda göre eşler.",
+        "name": "Ad",
+        "otherLanguages": "Diğer diller (TR / EN / FR / IT)",
+        "description": "Açıklama",
+        "priority": "Öncelik",
+        "priorityHint": "Yüksek olan kazanır. Varsayılan: 10.",
+        "isActive": "Aktif",
+        "isDefault": "Varsayılan profil (schedule eşleşmediğinde geçerli)"
+      },
+      "weekday": {
+        "mon": "Pzt", "tue": "Sal", "wed": "Çar", "thu": "Per", "fri": "Cum", "sat": "Cmt", "sun": "Paz"
+      },
+      "schedule": {
+        "title": "Schedule",
+        "hint": "Hangi günlerde + saatlerde aktif. Slot bitişi başlangıçtan küçükse gece yarısını aşıyordur (örn. 22:00-02:00).",
+        "addSlot": "Slot ekle",
+        "startsAt": "Başlangıç",
+        "endsAt": "Bitiş",
+        "emptyWarning": "Schedule boş — profil hiçbir zaman aktif olmayacak.",
+        "defaultNotice": "Varsayılan profil için schedule göz ardı edilir; herhangi bir slot eşleşmediğinde fallback olarak çalışır."
+      },
+      "pricing": {
+        "title": "Fiyat kuralları",
+        "hint": "Kategori veya ürün başına override fiyat (CHF) ya da % indirim.",
+        "empty": "Kural yok.",
+        "addRule": "Kural ekle",
+        "targetCategory": "Kategori",
+        "targetProduct": "Ürün",
+        "valuePercent": "% indirim",
+        "valueFixed": "Sabit CHF",
+        "col": { "target": "Hedef", "value": "Değer" }
+      },
+      "serviceCharge": {
+        "title": "Servis bedeli",
+        "toggleHint": "Profil aktifken sepete otomatik eklenir.",
+        "labelPlaceholder": "Etiket (örn. Late Night Zuschlag)"
+      },
+      "print": {
+        "title": "Baskı yönlendirme",
+        "kitchen": "Mutfak yazıcısı",
+        "bar": "Bar yazıcısı",
+        "copies": "Müşteri kopya sayısı"
       }
     }
   },

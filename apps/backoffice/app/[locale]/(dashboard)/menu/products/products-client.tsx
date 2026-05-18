@@ -632,7 +632,7 @@ function ProductSheet({
                 </div>
               ))}
               <p className="text-[11px] text-muted-foreground">
-                Boş bırakılan diller POS'ta ana dile geri düşer.
+                Boş bırakılan diller POS&apos;ta ana dile geri düşer.
               </p>
             </div>
           </details>

@@ -70,6 +70,7 @@
     "menuCategories": "Categories",
     "menuProducts": "Produits",
     "menuModifiers": "Groupes de modifiers",
+    "menuOrderProfiles": "Profils de commande",
     "menuPublishHistory": "Historique publications",
     "promotionsCampaigns": "Campagnes",
     "promotionsHappyHour": "Happy Hour",
@@ -170,7 +171,87 @@
     "isRequired": "Obligatoire",
     "lockedBadge": "Verrouillé HQ",
     "localBadge": "Local",
-    "lockedTooltip": "Ce produit est verrouillé par le siège (HQ)"
+    "lockedTooltip": "Ce produit est verrouillé par le siège (HQ)",
+    "orderProfilesPage": {
+      "title": "Profils de commande",
+      "subtitle": "Préréglages horaires pour la tarification, les suppléments et le routage d'impression.",
+      "activeNowHeader": "Actif maintenant",
+      "singleActive": "Un profil actif",
+      "multipleActive": "{n} profils actifs — la priorité la plus haute l'emporte",
+      "noneActive": "Aucun profil actif — pas de profil par défaut défini.",
+      "newProfile": "Nouveau profil",
+      "editProfile": "Modifier le profil",
+      "editHint": "Horaire + règles de prix + supplément de service + routage d'impression.",
+      "testModeHeader": "Mode test",
+      "testModeHint": "Choisis une date + heure → le serveur indique quel profil gagnerait à cet instant.",
+      "testTimeLabel": "Heure de test",
+      "testWinner": "Gagnant",
+      "testNoWinner": "Aucun profil actif à cette heure",
+      "listHeader": "{count, plural, =0 {Aucun profil} =1 {1 profil} other {# profils}}",
+      "loading": "Chargement des profils…",
+      "emptyState": "Aucun profil pour l'instant — commence avec « Nouveau profil ».",
+      "defaultBadge": "Par défaut",
+      "activeNowBadge": "Actif maintenant",
+      "savedToast": "Profil enregistré.",
+      "saveError": "Échec d'enregistrement",
+      "deletedToast": "Profil supprimé.",
+      "deleteError": "Échec de suppression",
+      "deleteConfirmTitle": "Supprimer le profil ?",
+      "deleteConfirmBody": "Le profil {name} sera supprimé définitivement. Le profil par défaut ne peut pas être supprimé.",
+      "col": {
+        "name": "Profil",
+        "schedule": "Horaire",
+        "rules": "Règles",
+        "priority": "Priorité",
+        "status": "Statut",
+        "actions": "Action"
+      },
+      "field": {
+        "code": "Code (URL-safe)",
+        "codeHint": "Identifiant stable — les clients correspondent via ce code.",
+        "name": "Nom",
+        "otherLanguages": "Autres langues (TR / DE / EN / IT)",
+        "description": "Description",
+        "priority": "Priorité",
+        "priorityHint": "Le plus haut nombre gagne. Par défaut : 10.",
+        "isActive": "Actif",
+        "isDefault": "Profil par défaut (fallback si aucun horaire ne correspond)"
+      },
+      "weekday": {
+        "mon": "Lun", "tue": "Mar", "wed": "Mer", "thu": "Jeu", "fri": "Ven", "sat": "Sam", "sun": "Dim"
+      },
+      "schedule": {
+        "title": "Horaire",
+        "hint": "Quels jours + heures ce profil est actif. Fin avant début = créneau franchissant minuit (ex. 22:00-02:00).",
+        "addSlot": "Ajouter un créneau",
+        "startsAt": "Début",
+        "endsAt": "Fin",
+        "emptyWarning": "Horaire vide — le profil ne sera jamais actif.",
+        "defaultNotice": "Pour le profil par défaut, l'horaire est ignoré ; il sert de fallback quand aucun autre créneau ne correspond."
+      },
+      "pricing": {
+        "title": "Règles de prix",
+        "hint": "Par catégorie ou produit : prix fixe (CHF) ou remise en %.",
+        "empty": "Aucune règle.",
+        "addRule": "Ajouter une règle",
+        "targetCategory": "Catégorie",
+        "targetProduct": "Produit",
+        "valuePercent": "Remise %",
+        "valueFixed": "Prix fixe CHF",
+        "col": { "target": "Cible", "value": "Valeur" }
+      },
+      "serviceCharge": {
+        "title": "Supplément de service",
+        "toggleHint": "Ajouté automatiquement au panier tant que ce profil est actif.",
+        "labelPlaceholder": "Libellé (p. ex. Late Night Zuschlag)"
+      },
+      "print": {
+        "title": "Routage d'impression",
+        "kitchen": "Imprimante cuisine",
+        "bar": "Imprimante bar",
+        "copies": "Copies client"
+      }
+    }
   },
   "orders": {
     "title": "Commandes",

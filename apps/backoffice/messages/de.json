@@ -70,6 +70,7 @@
     "menuCategories": "Kategorien",
     "menuProducts": "Produkte",
     "menuModifiers": "Modifier-Gruppen",
+    "menuOrderProfiles": "Bestellprofile",
     "menuPublishHistory": "Veröffentlichungen",
     "promotionsCampaigns": "Kampagnen",
     "promotionsHappyHour": "Happy Hour",
@@ -170,7 +171,87 @@
     "isRequired": "Pflicht",
     "lockedBadge": "HQ Gesperrt",
     "localBadge": "Lokal",
-    "lockedTooltip": "Dieses Produkt wurde von der Zentrale (HQ) gesperrt"
+    "lockedTooltip": "Dieses Produkt wurde von der Zentrale (HQ) gesperrt",
+    "orderProfilesPage": {
+      "title": "Bestellprofile",
+      "subtitle": "Voreinstellungen für zeitbasierte Preise, Servicezuschläge und Druck-Routing.",
+      "activeNowHeader": "Aktuell aktiv",
+      "singleActive": "Ein Profil ist aktiv",
+      "multipleActive": "{n} Profile aktiv — höchste Priorität gewinnt",
+      "noneActive": "Kein Profil aktiv — kein Standardprofil definiert.",
+      "newProfile": "Neues Profil",
+      "editProfile": "Profil bearbeiten",
+      "editHint": "Zeitplan + Preisregeln + Servicezuschlag + Druck-Routing.",
+      "testModeHeader": "Testmodus",
+      "testModeHint": "Wähle Datum + Uhrzeit → der Server berechnet, welches Profil zu diesem Zeitpunkt gewinnt.",
+      "testTimeLabel": "Testzeit",
+      "testWinner": "Gewinner",
+      "testNoWinner": "Zu diesem Zeitpunkt ist kein Profil aktiv",
+      "listHeader": "{count, plural, =0 {Keine Profile} =1 {1 Profil} other {# Profile}}",
+      "loading": "Profile werden geladen…",
+      "emptyState": "Noch keine Profile — leg mit 'Neues Profil' los.",
+      "defaultBadge": "Standard",
+      "activeNowBadge": "Aktuell aktiv",
+      "savedToast": "Profil gespeichert.",
+      "saveError": "Speichern fehlgeschlagen",
+      "deletedToast": "Profil gelöscht.",
+      "deleteError": "Löschen fehlgeschlagen",
+      "deleteConfirmTitle": "Profil löschen?",
+      "deleteConfirmBody": "Profil {name} wird endgültig gelöscht. Standardprofile können nicht gelöscht werden.",
+      "col": {
+        "name": "Profil",
+        "schedule": "Zeitplan",
+        "rules": "Regeln",
+        "priority": "Priorität",
+        "status": "Status",
+        "actions": "Aktion"
+      },
+      "field": {
+        "code": "Code (URL-sicher)",
+        "codeHint": "Bleibt unverändert — Clients ordnen anhand dieses Codes zu.",
+        "name": "Name",
+        "otherLanguages": "Weitere Sprachen (TR / EN / FR / IT)",
+        "description": "Beschreibung",
+        "priority": "Priorität",
+        "priorityHint": "Höchste Zahl gewinnt. Standard: 10.",
+        "isActive": "Aktiv",
+        "isDefault": "Standardprofil (Fallback, wenn kein Zeitplan greift)"
+      },
+      "weekday": {
+        "mon": "Mo", "tue": "Di", "wed": "Mi", "thu": "Do", "fri": "Fr", "sat": "Sa", "sun": "So"
+      },
+      "schedule": {
+        "title": "Zeitplan",
+        "hint": "An welchen Tagen + Uhrzeiten aktiv. Ende vor Start = Slot überschreitet Mitternacht (z. B. 22:00-02:00).",
+        "addSlot": "Slot hinzufügen",
+        "startsAt": "Start",
+        "endsAt": "Ende",
+        "emptyWarning": "Zeitplan leer — Profil wird nie aktiv sein.",
+        "defaultNotice": "Beim Standardprofil wird der Zeitplan ignoriert; es greift als Fallback, wenn kein anderer Slot passt."
+      },
+      "pricing": {
+        "title": "Preisregeln",
+        "hint": "Pro Kategorie oder Produkt: Festpreis (CHF) oder Rabatt in %.",
+        "empty": "Keine Regeln.",
+        "addRule": "Regel hinzufügen",
+        "targetCategory": "Kategorie",
+        "targetProduct": "Produkt",
+        "valuePercent": "Rabatt %",
+        "valueFixed": "Festpreis CHF",
+        "col": { "target": "Ziel", "value": "Wert" }
+      },
+      "serviceCharge": {
+        "title": "Servicezuschlag",
+        "toggleHint": "Wird automatisch zum Warenkorb hinzugefügt, solange dieses Profil aktiv ist.",
+        "labelPlaceholder": "Bezeichnung (z. B. Late Night Zuschlag)"
+      },
+      "print": {
+        "title": "Druck-Routing",
+        "kitchen": "Küchen-Drucker",
+        "bar": "Bar-Drucker",
+        "copies": "Kundenkopien"
+      }
+    }
   },
   "orders": {
     "title": "Bestellungen",

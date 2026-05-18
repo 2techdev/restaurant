@@ -70,6 +70,7 @@
     "menuCategories": "Categorie",
     "menuProducts": "Prodotti",
     "menuModifiers": "Gruppi modifier",
+    "menuOrderProfiles": "Profili ordine",
     "menuPublishHistory": "Cronologia pubblicazioni",
     "promotionsCampaigns": "Campagne",
     "promotionsHappyHour": "Happy Hour",
@@ -170,7 +171,87 @@
     "isRequired": "Obbligatorio",
     "lockedBadge": "Bloccato HQ",
     "localBadge": "Locale",
-    "lockedTooltip": "Questo prodotto è bloccato dalla sede centrale (HQ)"
+    "lockedTooltip": "Questo prodotto è bloccato dalla sede centrale (HQ)",
+    "orderProfilesPage": {
+      "title": "Profili ordine",
+      "subtitle": "Preset basati sull'orario per prezzi, supplementi e instradamento stampa.",
+      "activeNowHeader": "Attivo ora",
+      "singleActive": "Un profilo attivo",
+      "multipleActive": "{n} profili attivi — vince la priorità più alta",
+      "noneActive": "Nessun profilo attivo — non è stato definito un profilo predefinito.",
+      "newProfile": "Nuovo profilo",
+      "editProfile": "Modifica profilo",
+      "editHint": "Orario + regole prezzo + supplemento di servizio + instradamento stampa.",
+      "testModeHeader": "Modalità test",
+      "testModeHint": "Scegli data + ora → il server indica quale profilo vincerebbe in quel momento.",
+      "testTimeLabel": "Ora di test",
+      "testWinner": "Vincitore",
+      "testNoWinner": "Nessun profilo attivo in quel momento",
+      "listHeader": "{count, plural, =0 {Nessun profilo} =1 {1 profilo} other {# profili}}",
+      "loading": "Caricamento profili…",
+      "emptyState": "Ancora nessun profilo — inizia con 'Nuovo profilo'.",
+      "defaultBadge": "Predefinito",
+      "activeNowBadge": "Attivo ora",
+      "savedToast": "Profilo salvato.",
+      "saveError": "Salvataggio non riuscito",
+      "deletedToast": "Profilo eliminato.",
+      "deleteError": "Eliminazione non riuscita",
+      "deleteConfirmTitle": "Eliminare il profilo?",
+      "deleteConfirmBody": "Il profilo {name} sarà eliminato definitivamente. Il profilo predefinito non può essere eliminato.",
+      "col": {
+        "name": "Profilo",
+        "schedule": "Orario",
+        "rules": "Regole",
+        "priority": "Priorità",
+        "status": "Stato",
+        "actions": "Azioni"
+      },
+      "field": {
+        "code": "Codice (URL-safe)",
+        "codeHint": "Identificatore stabile — i client abbinano in base a questo.",
+        "name": "Nome",
+        "otherLanguages": "Altre lingue (TR / DE / EN / FR)",
+        "description": "Descrizione",
+        "priority": "Priorità",
+        "priorityHint": "Vince il numero più alto. Predefinito: 10.",
+        "isActive": "Attivo",
+        "isDefault": "Profilo predefinito (fallback se nessun orario corrisponde)"
+      },
+      "weekday": {
+        "mon": "Lun", "tue": "Mar", "wed": "Mer", "thu": "Gio", "fri": "Ven", "sat": "Sab", "sun": "Dom"
+      },
+      "schedule": {
+        "title": "Orario",
+        "hint": "Quali giorni + orari il profilo è attivo. Fine prima dell'inizio = slot oltrepassa la mezzanotte (es. 22:00-02:00).",
+        "addSlot": "Aggiungi slot",
+        "startsAt": "Inizio",
+        "endsAt": "Fine",
+        "emptyWarning": "Orario vuoto — il profilo non sarà mai attivo.",
+        "defaultNotice": "Per il profilo predefinito l'orario è ignorato; funge da fallback quando nessun altro slot corrisponde."
+      },
+      "pricing": {
+        "title": "Regole prezzo",
+        "hint": "Per categoria o prodotto: prezzo fisso (CHF) o sconto in %.",
+        "empty": "Nessuna regola.",
+        "addRule": "Aggiungi regola",
+        "targetCategory": "Categoria",
+        "targetProduct": "Prodotto",
+        "valuePercent": "Sconto %",
+        "valueFixed": "Prezzo fisso CHF",
+        "col": { "target": "Obiettivo", "value": "Valore" }
+      },
+      "serviceCharge": {
+        "title": "Supplemento di servizio",
+        "toggleHint": "Aggiunto automaticamente al carrello finché questo profilo è attivo.",
+        "labelPlaceholder": "Etichetta (es. Late Night Zuschlag)"
+      },
+      "print": {
+        "title": "Instradamento stampa",
+        "kitchen": "Stampante cucina",
+        "bar": "Stampante bar",
+        "copies": "Copie cliente"
+      }
+    }
   },
   "orders": {
     "title": "Ordini",

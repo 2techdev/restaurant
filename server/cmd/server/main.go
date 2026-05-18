@@ -27,6 +27,7 @@ import (
 	"github.com/gastrocore/server/internal/menu"
 	"github.com/gastrocore/server/internal/notifications"
 	"github.com/gastrocore/server/internal/online"
+	"github.com/gastrocore/server/internal/orderprofiles"
 	"github.com/gastrocore/server/internal/orders"
 	"github.com/gastrocore/server/internal/org"
 	"github.com/gastrocore/server/internal/pos"
@@ -130,6 +131,9 @@ func main() {
 	// Swiss-compliant receipt templates (020)
 	receiptTemplatesModule := receipt_templates.NewModule(db)
 
+	// Order Profiles (037) — time-based pricing presets + WS fanout.
+	orderProfilesModule := orderprofiles.NewModule(db, syncModule.SyncHub())
+
 	// ---------------------------------------------------------------------------
 	// Build router
 	// ---------------------------------------------------------------------------
@@ -205,6 +209,14 @@ func main() {
 
 	// Receipt templates (020) — Swiss MWST-compliant printable layouts
 	receiptTemplatesModule.RegisterRoutes(mux)
+
+	// Order Profiles (037) — must register routes AND start the periodic
+	// recompute loop (60s tick).  The loop broadcasts profile_changed WS
+	// events when the winning profile for a tenant flips.
+	orderProfilesModule.RegisterRoutes(mux)
+	profilesCtx, profilesCancel := context.WithCancel(context.Background())
+	defer profilesCancel()
+	orderProfilesModule.Start(profilesCtx)
 
 	// ---------------------------------------------------------------------------
 	// Middleware chain
